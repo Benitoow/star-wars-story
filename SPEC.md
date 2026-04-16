@@ -164,11 +164,11 @@ Each chapter follows a thematic structure:
 ### 5.1 UI Languages (8)
 Interface elements in: French (FR), English (EN), Spanish (ES), German (DE), Italian (IT), Portuguese (PT), Japanese (JA), Chinese (ZH)
 
-### 5.2 Instant Language Switching
-- Language selector in header, always accessible
-- No page reload required
-- All UI text updates instantly via `t()` translation function
-- User preference saved to localStorage
+### 5.2 Story Language
+- Story narration language automatically matches the UI language
+- No separate language selection for narration
+- Language selector in story header for changing UI language
+- Changing UI language also changes story language
 
 ### 5.3 Translation Scope
 UI Elements translated:
@@ -179,7 +179,7 @@ UI Elements translated:
 - Placeholder text
 - Tooltips and hints
 
-NOT translated (always in selected narration language):
+NOT translated (story always in UI language):
 - Story narrative content
 - Chapter titles
 - Choice text
@@ -289,11 +289,12 @@ const state = {
 
 ## 9. New UI Components
 
-### 9.1 Language Switcher
+### 9.1 Language Switcher (in story header)
 - Compact dropdown in story header
 - Shows current language code (FR, EN, etc.)
 - Hover shows full language name
-- Checkmark on current selection
+- Changes both UI and story language
+- Always accessible during story
 
 ### 9.2 Role Detail Panel
 - Expands on role hover/click
@@ -333,7 +334,7 @@ const state = {
 ### Multilingual
 - [ ] UI switches instantly between 8 languages without page reload
 - [ ] All UI text properly translated in all 8 languages
-- [ ] Story content remains in selected narration language
+- [ ] Story language automatically matches UI language
 
 ### Collaborative
 - [ ] Users can edit any narrative passage after AI presents it

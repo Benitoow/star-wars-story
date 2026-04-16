@@ -342,7 +342,6 @@ function renderImgModels(providerId) {
 
 /* ─── SETUP SCREENS ─────────────────────────── */
 function renderSetupScreens() {
-  renderChoiceGrid('language-grid', LANGUAGES, 'language');
   renderChoiceGrid('era-grid',     ERAS,     'era');
   renderChoiceGrid('faction-grid', FACTIONS, 'faction');
   renderChoiceGrid('role-grid',    ROLES,    'role');
@@ -360,7 +359,7 @@ function renderChoiceGrid(containerId, items, key) {
     if (item.id && key === 'faction') card.dataset.faction = item.id;
     card.style.setProperty('color', item.color || 'var(--gold)');
 
-    // Special rendering for roles - show faction badge and attributes preview
+    // Special rendering for roles - show faction badge
     if (key === 'role' && item.attributes) {
       card.innerHTML = `
         <div class="role-card-header">
@@ -371,11 +370,6 @@ function renderChoiceGrid(containerId, items, key) {
         </div>
         <span class="choice-name">${item.name}</span>
         <span class="choice-sub">${item.sub || ''}</span>
-        <div class="role-attr-preview">
-          <div class="attr-bar" title="${t('combat')}: ${item.attributes.combat}">
-            <div class="attr-fill" style="width:${item.attributes.combat}%; background:#FF6B35"></div>
-          </div>
-        </div>
       `;
     } else {
       card.innerHTML = `
@@ -465,8 +459,8 @@ function closeRoleDetail() {
 }
 
 function checkSetupComplete() {
-  const { language, era, faction, role, premise } = state.setup;
-  document.getElementById('btn-start-story').disabled = !(language && era && faction && role && premise);
+  const { era, faction, role, premise } = state.setup;
+  document.getElementById('btn-start-story').disabled = !(era && faction && role && premise);
 }
 
 /* ─── MODEL SELECTION ───────────────────────── */
@@ -533,6 +527,8 @@ function filterModels(query) {
 
 /* ─── STORY ─────────────────────────────────── */
 async function startStory() {
+  // Use UI language as story language
+  state.setup.language = state.uiLang;
   state.messages = [{ role: 'system', content: buildSystemPrompt(state.setup.language) }];
   state.turn = 0;
   state.userEdits = [];
@@ -811,9 +807,8 @@ function closeStoryMenu() {
 }
 
 function openStoryMenu() {
-  const { language, era, faction, role, premise } = state.setup;
+  const { era, faction, role, premise } = state.setup;
   const info = [
-    `${t('narrationLang', state.uiLang)}: ${LANGUAGES.find(l=>l.id===language)?.name || language || '—'}`,
     `${t('era', state.uiLang)}: ${ERAS.find(e=>e.id===era)?.name || era || '—'}`,
     `${t('faction', state.uiLang)}: ${FACTIONS.find(f=>f.id===faction)?.name || faction || '—'}`,
     `${t('role', state.uiLang)}: ${ROLES.find(r=>r.id===role)?.name || role || '—'}`,

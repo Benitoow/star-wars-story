@@ -124,14 +124,13 @@ function buildStartMessage(setup) {
   const roleContext = buildRoleContext(setup.role);
 
   return `Commence une histoire interactive Star Wars avec ces paramètres:
-- Langue de narration: ${language.promptName}
 - Ère: ${era}
 - Faction: ${faction}
 - Rôle: ${role}
 - Prémisse: ${premise} — ${premSub}
 ${roleContext}
 
-Génère le prologue de l'histoire dans cette langue. Plante le décor, introduis le personnage et crée une situation initiale captivante qui aboutit à un premier choix crucial.
+Génère le prologue de l'histoire en ${language.promptName}. Plante le décor, introduis le personnage et crée une situation initiale captivante qui aboutit à un premier choix crucial.
 Le personnage doit REFLETER ses attributs (particulièrement ${getRoleConfig(setup.role)?.attributes?.force > 50 ? 'sa connexion à la Force' : 'ses compétences'}) dans ses actions et réactionsinitiales.`;
 }
 
@@ -143,11 +142,10 @@ function buildContinueMessage(choiceText, turnNumber, languageId, setup, userEdi
 
   return `Tour ${turnNumber} — Le joueur choisit: "${choiceText}"
 
-Langue de narration: ${language.promptName}
 ${roleContext}
 ${userEditsContext}
 
-Continue l'histoire dans cette langue en tenant compte de ce choix. Les conséquences doivent être visibles et significatives. Maintiens la tension dramatique et propose de nouveaux choix.
+Continue l'histoire en ${language.promptName} en tenant compte de ce choix. Les conséquences doivent être visibles et significatives. Maintiens la tension dramatique et propose de nouveaux choix.
 Si le joueur a précédemment modifié des passages ("Votre version"), INTÈGRE CES ÉLÉMENTS naturellement dans la continuation du récit.`;
 }
 
