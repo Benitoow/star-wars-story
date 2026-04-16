@@ -269,10 +269,9 @@
     display: flex;
     align-items: center;
     gap: var(--space-md);
-  }
     flex-wrap: wrap;
     justify-content: flex-end;
-
+  }
 
   .language-switcher {
     display: inline-flex;
