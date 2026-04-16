@@ -132,8 +132,8 @@ function resolveBuildContinueMessage(choiceText, turnNumber, languageId, setup, 
   return `Tour ${turnNumber} — Le joueur choisit: "${choiceText}"\n\nContinue l'histoire en ${language.promptName} en tenant compte de ce choix. Les conséquences doivent être visibles et significatives.`;
 }
 
-function resolveParseStoryResponse(raw, turnNumber) {
-  if (typeof window.parseStoryResponse === 'function') return window.parseStoryResponse(raw, turnNumber);
+function resolveParseStoryResponse(raw, turnNumber, languageId) {
+  if (typeof window.parseStoryResponse === 'function') return window.parseStoryResponse(raw, turnNumber, languageId);
 
   let cleaned = String(raw || '').replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
   const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
@@ -833,7 +833,7 @@ async function generateNextTurn(userMessage) {
     }
 
     state.messages.push({ role: 'assistant', content: rawText });
-    const story = resolveParseStoryResponse(rawText, state.turn);
+    const story = resolveParseStoryResponse(rawText, state.turn, state.setup.language);
     state.currentChapter = story;
     if (state.currentStoryId) {
       upsertSavedStory({

@@ -5,9 +5,10 @@
 
 const SYSTEM_PROMPT = `Tu es un maître narrateur de l'univers Star Wars, expert en lore canonique et Legends. Tu crées des histoires immersives, cinématographiques et émotionnellement riches.
 
-RÈGLES STRICTES:
-1. Réponds UNIQUEMENT avec un objet JSON valide, sans markdown ni texte autour.
-2. Le JSON doit avoir exactement cette structure:
+RÈGLES STRICTES (NON-NÉGOCIABLES):
+0. N'invente AUCUN champ supplémentaire. N'utilise PAS "story_metadata", "prologue", "player_character", "environment_details", "choices_consequences", ni aucun wrapper. La racine du JSON DOIT contenir DIRECTEMENT les champs ci-dessous.
+1. Réponds UNIQUEMENT avec un objet JSON valide, sans markdown ni texte autour. Ne répète JAMAIS le JSON deux fois.
+2. Le JSON doit avoir exactement cette structure (tous les champs obligatoires, rien de plus):
 {
   "chapter_title": "Titre court et évocateur du chapitre (max 40 chars)",
   "chapter_number": 1,
@@ -149,24 +150,142 @@ Continue l'histoire en ${language.promptName} en tenant compte de ce choix. Les 
 Si le joueur a précédemment modifié des passages ("Votre version"), INTÈGRE CES ÉLÉMENTS naturellement dans la continuation du récit.`;
 }
 
+/* ─── Extract the largest well-formed JSON object from a raw string ─── */
+function extractBestJson(raw) {
+  const text = String(raw || '');
+  const candidates = [];
+  const stack = [];
+  let start = -1;
+  let inStr = false;
+  let esc = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inStr) {
+      if (esc) { esc = false; continue; }
+      if (c === '\\') { esc = true; continue; }
+      if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') { inStr = true; continue; }
+    if (c === '{') {
+      if (stack.length === 0) start = i;
+      stack.push('{');
+    } else if (c === '}') {
+      stack.pop();
+      if (stack.length === 0 && start !== -1) {
+        candidates.push(text.slice(start, i + 1));
+        start = -1;
+      }
+    }
+  }
+  // Prefer the longest valid JSON (most complete candidate)
+  candidates.sort((a, b) => b.length - a.length);
+  for (const c of candidates) {
+    try { return { text: c, parsed: JSON.parse(c) }; } catch {}
+  }
+  return null;
+}
+
+/* ─── Try to coerce an arbitrary shape into the expected schema ─── */
+function coerceStorySchema(parsed, languageId = DEFAULT_LANGUAGE_ID) {
+  if (!parsed || typeof parsed !== 'object') return null;
+  // Already valid
+  if (parsed.narrative && Array.isArray(parsed.choices)) return parsed;
+
+  // Models often nest under "prologue", "scene", "chapter", etc.
+  const prologue = parsed.prologue || parsed.scene || parsed.chapter || parsed.story || {};
+
+  // Find narrative text
+  let narrativeText = '';
+  const narrCandidate =
+    prologue.narrative_text || prologue.narrative || prologue.text ||
+    parsed.narrative_text || parsed.text || '';
+  if (typeof narrCandidate === 'string') narrativeText = narrCandidate;
+  else if (narrCandidate && typeof narrCandidate === 'object') {
+    narrativeText = narrCandidate[languageId] || narrCandidate.fr || narrCandidate.en || Object.values(narrCandidate)[0] || '';
+  }
+
+  // Find choices — could be array, object keyed by numbers, or nested
+  let choicesRaw =
+    prologue.choices || parsed.choices ||
+    prologue.choices_consequences || parsed.choices_consequences || [];
+  if (choicesRaw && typeof choicesRaw === 'object' && !Array.isArray(choicesRaw)) {
+    choicesRaw = Object.values(choicesRaw);
+  }
+  const choices = (Array.isArray(choicesRaw) ? choicesRaw : [])
+    .map(c => {
+      if (typeof c === 'string') return { text: c };
+      if (!c || typeof c !== 'object') return null;
+      const text = c.text || c.description || c.label || c.name || c.action || '';
+      return text ? {
+        text: String(text).slice(0, 220),
+        attribute: c.attribute || c.skill || 'survival',
+        difficulty: Number(c.difficulty) || 2,
+        faction_impact: c.faction_impact || {}
+      } : null;
+    })
+    .filter(Boolean)
+    .slice(0, 4);
+
+  // If still no choices, try to extract numbered options from narrative text
+  if (!choices.length && narrativeText) {
+    const numbered = [...narrativeText.matchAll(/^\s*(?:\*\*)?\s*(\d+)[\.\)]\s*(?:\*\*)?\s*([^\n]{5,200})/gm)];
+    numbered.slice(0, 4).forEach(m => {
+      choices.push({
+        text: m[2].replace(/\*+/g, '').trim(),
+        attribute: 'survival', difficulty: 2, faction_impact: {}
+      });
+    });
+  }
+
+  if (!narrativeText && !choices.length) return null;
+
+  return {
+    chapter_title: parsed.chapter_title || prologue.scene_title || parsed.title || parsed.story_metadata?.title || 'Prologue',
+    chapter_number: parsed.chapter_number || 1,
+    section_type: parsed.section_type || 'action',
+    narrative: {
+      context: '',
+      action: narrativeText,
+      dialogue: '',
+      reflection: '',
+      atmosphere: parsed.atmosphere || prologue.atmosphere || 'tense'
+    },
+    choices,
+    scene_description: parsed.scene_description || prologue.scene_description || 'Epic Star Wars cinematic scene with dramatic lighting',
+    user_edits_applied: null
+  };
+}
+
 /* ─── Parse LLM response with enhanced structure ─── */
-function parseStoryResponse(raw, turnNumber = 1) {
+function parseStoryResponse(raw, turnNumber = 1, languageId = DEFAULT_LANGUAGE_ID) {
   // Remove potential markdown code blocks
-  let cleaned = raw
+  let cleaned = String(raw || '')
     .replace(/^```json\s*/i, '')
     .replace(/^```\s*/i, '')
     .replace(/```\s*$/i, '')
     .trim();
 
-  // Extract JSON object if surrounded by text
-  const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-  if (jsonMatch) cleaned = jsonMatch[0];
+  // Extract the largest well-formed JSON (handles duplicated / truncated outputs)
+  const best = extractBestJson(cleaned);
+  if (best) cleaned = best.text;
 
   try {
-    const parsed = JSON.parse(cleaned);
+    const parsed = best?.parsed || JSON.parse(cleaned);
+
+    // Try to coerce non-standard shapes (e.g. story_metadata/prologue wrappers)
+    const coerced = coerceStorySchema(parsed, languageId);
+    if (coerced && coerced.narrative && Array.isArray(coerced.choices) && coerced.choices.length) {
+      Object.assign(parsed, {
+        narrative: coerced.narrative,
+        choices: coerced.choices,
+        chapter_title: parsed.chapter_title || coerced.chapter_title,
+        scene_description: parsed.scene_description || coerced.scene_description
+      });
+    }
 
     // Validate required fields
-    if (!parsed.narrative || !Array.isArray(parsed.choices)) {
+    if (!parsed.narrative || !Array.isArray(parsed.choices) || !parsed.choices.length) {
       throw new Error('Champs manquants');
     }
 
@@ -212,17 +331,30 @@ function parseStoryResponse(raw, turnNumber = 1) {
       user_edits_applied: parsed.user_edits_applied || null
     };
   } catch (e) {
-    // Fallback: return raw text with generic choices
-    console.warn('JSON parse failed, using fallback:', e.message);
+    // Fallback: try once more to coerce any JSON we found, else show a helpful message
+    console.warn('JSON parse failed, using fallback:', e.message, { rawPreview: String(raw || '').slice(0, 400) });
     const safeTurnNumber = Number.isFinite(turnNumber) ? turnNumber : 1;
 
+    // Last-resort coercion on the best JSON we could extract
+    const best = extractBestJson(raw);
+    if (best?.parsed) {
+      const coerced = coerceStorySchema(best.parsed, languageId);
+      if (coerced && coerced.choices.length) return coerced;
+    }
+
+    // Strip any JSON-looking garbage so the user sees readable text, not a dump
+    const readable = String(raw || '')
+      .replace(/```[a-z]*\s*/gi, '')
+      .replace(/^\s*\{[\s\S]*\}\s*$/m, '')
+      .trim() || 'Le modèle a renvoyé une réponse invalide. Essaie un autre modèle (ex: gpt-4o-mini, claude-3.5-sonnet) ou relance.';
+
     return {
-      chapter_title: 'L\'aventure continue',
+      chapter_title: 'Réponse non structurée',
       chapter_number: safeTurnNumber,
       section_type: 'action',
       narrative: {
-        context: cleaned.substring(0, 300),
-        action: cleaned,
+        context: '',
+        action: readable.slice(0, 2000),
         dialogue: '',
         reflection: '',
         atmosphere: 'tense'
@@ -324,3 +456,4 @@ Réponds avec:
   "integrated_text": "Le texte modifié ou adapté",
   "note": "Brief note on integration"
 }`;
+}

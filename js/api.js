@@ -50,7 +50,10 @@ async function callLLM(messages, { providerId, model, apiKey, onStream }) {
     messages,
     max_tokens: 2048,
     stream: useStream,
-    temperature: 0.85
+    temperature: 0.85,
+    // Force JSON output — honored by OpenAI, OpenRouter (when the upstream supports it),
+    // Groq, Together, DeepSeek, etc. Providers that don't recognize it simply ignore it.
+    response_format: { type: 'json_object' }
   };
   const res = await fetch(`${provider.baseUrl}/chat/completions`, {
     method: 'POST', headers,
@@ -215,7 +218,7 @@ async function tryImageProvider(providerId, prompt, apiKey, imgModel = null) {
 
   const timeout = 30000; // 30 second timeout
 
-  // OpenRouter image
+  // OpenRouter image — uses /chat/completions with modalities:["image","text"]
   if (providerId === 'openrouter_img') {
     const model = imgModel || prov.models[0]?.id;
     const controller = new AbortController();
@@ -230,14 +233,30 @@ async function tryImageProvider(providerId, prompt, apiKey, imgModel = null) {
           'X-Title': 'Star Wars Interactive Story',
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ model, prompt, n: 1 }),
+        body: JSON.stringify({
+          model,
+          modalities: ['image', 'text'],
+          messages: [{ role: 'user', content: prompt }]
+        }),
         signal: controller.signal
       });
       clearTimeout(timeoutId);
-      if (!res.ok) throw new Error(`OpenRouter Image HTTP ${res.status}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error?.message || `OpenRouter Image HTTP ${res.status}`);
+      }
       const data = await res.json();
-      return data.data?.[0]?.url || (data.data?.[0]?.b64_json
-        ? `data:image/png;base64,${data.data[0].b64_json}` : null);
+      const msg = data.choices?.[0]?.message || {};
+      // Images are returned under message.images (array of { type, image_url: { url } })
+      const imgEntry = Array.isArray(msg.images) ? msg.images[0] : null;
+      const url = imgEntry?.image_url?.url || imgEntry?.url || null;
+      if (url) return url;
+      // Fallback: some models embed the image as base64 inside content
+      if (typeof msg.content === 'string') {
+        const m = msg.content.match(/data:image\/[a-z]+;base64,[A-Za-z0-9+/=]+/);
+        if (m) return m[0];
+      }
+      return null;
     } catch (e) {
       clearTimeout(timeoutId);
       throw e;

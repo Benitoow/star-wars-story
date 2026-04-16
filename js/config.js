@@ -493,7 +493,7 @@ const IMAGE_PROVIDERS = {
     name: 'OpenRouter',
     desc: 'Nano Banana · GPT Image · FLUX.2',
     free: false,
-    endpoint: 'https://openrouter.ai/api/v1/images/generations',
+    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
     models: [
       { id: 'google/gemini-2.5-flash-image',                name: 'Nano Banana',             desc: 'Rapide et natif image',     tags: ['speed', 'quality'] },
       { id: 'openai/gpt-5-image-mini',                      name: 'GPT-5 Image Mini',        desc: 'Rapide et économique',      tags: ['speed'] },
