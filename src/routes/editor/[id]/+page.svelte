@@ -6,6 +6,7 @@
   import { showToast } from '$lib/stores/ui';
   import Header from '$lib/components/Header.svelte';
   import Sidebar from '$lib/components/Sidebar.svelte';
+  import SvgIcon from '$lib/components/SvgIcon.svelte';
 
   let loading = true;
   let saving = false;
@@ -13,46 +14,46 @@
   let storyId: string | null = null;
 
   const ERAS = [
-    { id: 'old_republic', name: 'Ancienne République', years: '25 000 - 1000 AVBY' },
-    { id: 'clone_wars', name: 'Guerres des Clones', years: '22 - 19 AVBY' },
-    { id: 'imperial', name: 'Ère Impériale', years: '19 - 4 AVBY' },
-    { id: 'new_republic', name: 'Nouvelle République', years: '4 - 28 APBY' },
-    { id: 'first_order', name: 'Premier Ordre', years: '28 - 35 APBY' }
+    { id: 'old_republic', name: 'Ancienne République', years: '25 000 - 1000 AVBY', icon: 'AncientRepublic.svg' },
+    { id: 'clone_wars', name: 'Guerres des Clones', years: '22 - 19 AVBY', icon: 'jedi-order-svgrepo-com.svg' },
+    { id: 'imperial', name: 'Ère Impériale', years: '19 - 4 AVBY', icon: 'Emblem_of_the_First_Galactic_Empire.svg' },
+    { id: 'new_republic', name: 'Nouvelle République', years: '4 - 28 APBY', icon: 'NR_Seal.svg' },
+    { id: 'first_order', name: 'Premier Ordre', years: '28 - 35 APBY', icon: 'Emblem_of_the_First_Order.svg' }
   ];
 
   const FACTIONS = [
-    { id: 'jedi', name: 'Ordre Jedi', color: '#4ec9b0' },
-    { id: 'sith', name: 'Ordre Sith', color: '#e51414' },
-    { id: 'empire', name: 'Empire Galactique', color: '#c41e3a' },
-    { id: 'rebels', name: 'Alliance Rebelle', color: '#f39c12' },
-    { id: 'republic', name: 'République Galactique', color: '#3498db' },
-    { id: 'mandalore', name: 'Mandalorians', color: '#9b59b6' },
-    { id: 'first_order', name: 'Premier Ordre', color: '#1a1a2e' },
-    { id: 'hutt', name: 'Cartel Hutt', color: '#27ae60' },
-    { id: 'neutral', name: 'Indépendant', color: '#95a5a6' }
+    { id: 'jedi', name: 'Ordre Jedi', color: '#4ec9b0', icon: 'jedi-order-svgrepo-com.svg' },
+    { id: 'sith', name: 'Ordre Sith', color: '#e51414', icon: 'starwars-sith-svgrepo-com.svg' },
+    { id: 'empire', name: 'Empire Galactique', color: '#c41e3a', icon: 'Emblem_of_the_First_Galactic_Empire.svg' },
+    { id: 'rebels', name: 'Alliance Rebelle', color: '#f39c12', icon: 'millennium-falcon-svgrepo-com.svg' },
+    { id: 'republic', name: 'République Galactique', color: '#3498db', icon: 'brand-galactic-republic-svgrepo-com.svg' },
+    { id: 'mandalore', name: 'Mandalorians', color: '#9b59b6', icon: 'mandalorian-svgrepo-com.svg' },
+    { id: 'first_order', name: 'Premier Ordre', color: '#1a1a2e', icon: 'Emblem_of_the_First_Order.svg' },
+    { id: 'hutt', name: 'Cartel Hutt', color: '#27ae60', icon: 'Desilijic_clan_vector.svg' },
+    { id: 'neutral', name: 'Indépendant', color: '#95a5a6', icon: 'alone-characterized-embodied-svgrepo-com.svg' }
   ];
 
   const ROLES = [
-    { id: 'jedi_knight', name: 'Chevalier Jedi', faction: 'jedi', icon: '🟢' },
-    { id: 'jedi_master', name: 'Maître Jedi', faction: 'jedi', icon: '🟢' },
-    { id: 'padawan', name: 'Padawan', faction: 'jedi', icon: '🟢' },
-    { id: 'sith_lord', name: 'Seigneur Sith', faction: 'sith', icon: '🔴' },
-    { id: 'sith_apprentice', name: 'Apprenti Sith', faction: 'sith', icon: '🔴' },
-    { id: 'imperial_officer', name: 'Officier Impérial', faction: 'empire', icon: '⚫' },
-    { id: 'stormtrooper', name: 'Stormtrooper', faction: 'empire', icon: '⚫' },
-    { id: 'rebel_pilot', name: 'Pilote Rebelle', faction: 'rebels', icon: '🟡' },
-    { id: 'rebel_leader', name: 'Leader Rebelle', faction: 'rebels', icon: '🟡' },
-    { id: 'senator', name: 'Sénateur', faction: 'republic', icon: '🔵' },
-    { id: 'clone_trooper', name: 'Clone Trooper', faction: 'republic', icon: '🔵' },
-    { id: 'mandalorian_warrior', name: 'Guerrier Mandalorien', faction: 'mandalore', icon: '🟣' },
-    { id: 'bounty_hunter', name: 'Chasseur de Primes', faction: 'neutral', icon: '⚪' },
-    { id: 'smuggler', name: 'Contrebandier', faction: 'neutral', icon: '⚪' },
-    { id: 'scavenger', name: 'Éclaireur', faction: 'neutral', icon: '⚪' },
-    { id: 'force_sensitive', name: 'Sensible à la Force', faction: 'neutral', icon: '⚪' },
-    { id: 'first_order_trooper', name: 'Soldat du Premier Ordre', faction: 'first_order', icon: '⚫' },
-    { id: 'resistance_member', name: 'Membre de la Résistance', faction: 'rebels', icon: '🟡' },
-    { id: 'hutt_enforcer', name: 'Main du Hutt', faction: 'hutt', icon: '🟢' },
-    { id: 'jedi_exile', name: ' Jedi Banni', faction: 'neutral', icon: '⚪' }
+    { id: 'jedi_knight', name: 'Chevalier Jedi', faction: 'jedi', icon: 'luke-skywalker-lightsaber-svgrepo-com.svg' },
+    { id: 'jedi_master', name: 'Maître Jedi', faction: 'jedi', icon: 'jedi-order-svgrepo-com.svg' },
+    { id: 'padawan', name: 'Padawan', faction: 'jedi', icon: 'lightsaber-svgrepo-com.svg' },
+    { id: 'sith_lord', name: 'Seigneur Sith', faction: 'sith', icon: 'SithEmblem-Traced-TORkit.svg' },
+    { id: 'sith_apprentice', name: 'Apprenti Sith', faction: 'sith', icon: 'starwars-sith-svgrepo-com.svg' },
+    { id: 'imperial_officer', name: 'Officier Impérial', faction: 'empire', icon: 'Emblem_of_the_First_Galactic_Empire.svg' },
+    { id: 'stormtrooper', name: 'Stormtrooper', faction: 'empire', icon: 'noun-storm-trooper-49992.svg' },
+    { id: 'rebel_pilot', name: 'Pilote Rebelle', faction: 'rebels', icon: 'millennium-falcon-svgrepo-com.svg' },
+    { id: 'rebel_leader', name: 'Leader Rebelle', faction: 'rebels', icon: 'brand-galactic-republic-svgrepo-com.svg' },
+    { id: 'senator', name: 'Sénateur', faction: 'republic', icon: 'brand-galactic-republic-svgrepo-com.svg' },
+    { id: 'clone_trooper', name: 'Clone Trooper', faction: 'republic', icon: 'noun-storm-trooper-49992.svg' },
+    { id: 'mandalorian_warrior', name: 'Guerrier Mandalorien', faction: 'mandalore', icon: 'mandalorian-svgrepo-com.svg' },
+    { id: 'bounty_hunter', name: 'Chasseur de Primes', faction: 'neutral', icon: 'scifi-starwars-boba-fett-svgrepo-com.svg' },
+    { id: 'smuggler', name: 'Contrebandier', faction: 'neutral', icon: 'millennium-falcon-svgrepo-com.svg' },
+    { id: 'scavenger', name: 'Éclaireur', faction: 'neutral', icon: 'alone-characterized-embodied-svgrepo-com.svg' },
+    { id: 'force_sensitive', name: 'Sensible à la Force', faction: 'neutral', icon: 'luke-skywalker-lightsaber-svgrepo-com.svg' },
+    { id: 'first_order_trooper', name: 'Soldat du Premier Ordre', faction: 'first_order', icon: 'Emblem_of_the_First_Order.svg' },
+    { id: 'resistance_member', name: 'Membre de la Résistance', faction: 'rebels', icon: 'millennium-falcon-svgrepo-com.svg' },
+    { id: 'hutt_enforcer', name: 'Main du Hutt', faction: 'hutt', icon: 'Desilijic_clan_vector.svg' },
+    { id: 'jedi_exile', name: ' Jedi Banni', faction: 'neutral', icon: 'alone-characterized-embodied-svgrepo-com.svg' }
   ];
 
   onMount(async () => {
@@ -204,6 +205,9 @@
                   class:selected={currentSetup.era === era.id}
                   on:click={() => selectEra(era.id)}
                 >
+                  <span class="era-icon">
+                    <SvgIcon filename={era.icon} size={40} color="currentColor" alt={era.name} />
+                  </span>
                   <span class="era-name">{era.name}</span>
                   <span class="era-years">{era.years}</span>
                 </button>
@@ -225,6 +229,9 @@
                   style="--faction-color: {faction.color}"
                   on:click={() => selectFaction(faction.id)}
                 >
+                  <span class="faction-icon">
+                    <SvgIcon filename={faction.icon} size={36} color="currentColor" alt={faction.name} />
+                  </span>
                   <span class="faction-name">{faction.name}</span>
                 </button>
               {/each}
@@ -247,7 +254,9 @@
                     class:selected={currentSetup.role === role.id}
                     on:click={() => selectRole(role.id)}
                   >
-                    <span class="role-icon">{role.icon}</span>
+                    <span class="role-icon">
+                      <SvgIcon filename={role.icon} size={28} color="currentColor" alt={role.name} />
+                    </span>
                     <span class="role-name">{role.name}</span>
                   </button>
                 {/each}
@@ -482,6 +491,8 @@ Utilisez les boutons ci-dessus pour ajouter des sections:
   .era-card {
     display: flex;
     flex-direction: column;
+    align-items: center;
+    gap: var(--space-sm);
     padding: var(--space-lg);
     background: var(--color-bg-secondary);
     border: 2px solid var(--color-border);
@@ -489,6 +500,32 @@ Utilisez les boutons ci-dessus pour ajouter des sections:
     cursor: pointer;
     transition: all var(--transition-fast);
     text-align: left;
+  }
+
+  .era-icon,
+  .faction-icon,
+  .role-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-gold);
+    flex-shrink: 0;
+  }
+
+  .era-icon {
+    width: 48px;
+    height: 48px;
+  }
+
+  .faction-icon {
+    width: 40px;
+    height: 40px;
+    margin-bottom: var(--space-xs);
+  }
+
+  .role-icon {
+    width: 30px;
+    height: 30px;
   }
 
   .era-card:hover {
@@ -521,6 +558,9 @@ Utilisez les boutons ci-dessus pour ajouter des sections:
   }
 
   .faction-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     padding: var(--space-md) var(--space-lg);
     background: var(--color-bg-secondary);
     border: 2px solid var(--color-border);
@@ -576,7 +616,7 @@ Utilisez les boutons ci-dessus pour ajouter des sections:
   }
 
   .role-icon {
-    font-size: 1.25rem;
+    line-height: 0;
   }
 
   .role-name {

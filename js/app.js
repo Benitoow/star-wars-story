@@ -40,11 +40,93 @@ function renderChoiceIcon(svgRef, className = 'choice-mask') {
   if (!svgRef) return '';
   const trimmed = String(svgRef).trim();
   if (trimmed.startsWith('<svg')) return trimmed;
+  const normalized = /^([a-z]+:|\/|data:)/i.test(trimmed)
+    ? trimmed
+    : trimmed.startsWith('svg/')
+      ? `/${trimmed}`
+      : `/svg/${trimmed.replace(/^\/+/, '')}`;
   const classes = ['choice-mask'];
   if (className && className !== 'choice-mask') {
     classes.push(className);
   }
-  return `<span class="${classes.join(' ')}" style="--choice-mask: url('${trimmed}')"></span>`;
+  return `<span class="${classes.join(' ')}" style="--choice-mask: url('${normalized}')"></span>`;
+}
+
+function resolveRoleConfig(roleId) {
+  if (typeof window.getRoleConfig === 'function') return window.getRoleConfig(roleId);
+  return ROLES.find(role => role.id === roleId) || null;
+}
+
+function resolveFactionConfig(factionId) {
+  if (typeof window.getFactionConfig === 'function') return window.getFactionConfig(factionId);
+  return FACTIONS.find(faction => faction.id === factionId) || null;
+}
+
+function resolveBuildSystemPrompt(languageId) {
+  if (typeof window.buildSystemPrompt === 'function') return window.buildSystemPrompt(languageId);
+  const language = LANGUAGES.find(l => l.id === languageId) || LANGUAGES[0] || { promptName: 'French' };
+  return `LANGUE DE SORTIE:\n- Rédige tout le contenu textuel du JSON en ${language.promptName}.\n- Garde "scene_description" en anglais pour la génération d'image.\n\nTu es un maître narrateur de l'univers Star Wars. Réponds uniquement avec un objet JSON valide conforme à la structure attendue.`;
+}
+
+function resolveBuildStartMessage(setup) {
+  if (typeof window.buildStartMessage === 'function') return window.buildStartMessage(setup);
+  const era = ERAS.find(e => e.id === setup.era)?.name || setup.era || 'Histoire Star Wars';
+  const faction = FACTIONS.find(f => f.id === setup.faction)?.name || setup.faction || '';
+  const role = ROLES.find(r => r.id === setup.role)?.name || setup.role || '';
+  const premise = PREMISES.find(p => p.id === setup.premise)?.name || setup.premise || '';
+  return `Commence une histoire interactive Star Wars avec ces paramètres:\n- Ère: ${era}\n- Faction: ${faction}\n- Rôle: ${role}\n- Prémisse: ${premise}\n\nGénère le prologue de l'histoire en ${LANGUAGES.find(l => l.id === setup.language)?.promptName || 'French'}. Réponds avec le JSON attendu.`;
+}
+
+function resolveBuildContinueMessage(choiceText, turnNumber, languageId, setup, userEdits = []) {
+  if (typeof window.buildContinueMessage === 'function') return window.buildContinueMessage(choiceText, turnNumber, languageId, setup, userEdits);
+  const language = LANGUAGES.find(l => l.id === languageId) || LANGUAGES[0] || { promptName: 'French' };
+  return `Tour ${turnNumber} — Le joueur choisit: "${choiceText}"\n\nContinue l'histoire en ${language.promptName} en tenant compte de ce choix. Les conséquences doivent être visibles et significatives.`;
+}
+
+function resolveParseStoryResponse(raw, turnNumber) {
+  if (typeof window.parseStoryResponse === 'function') return window.parseStoryResponse(raw, turnNumber);
+
+  let cleaned = String(raw || '').replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+  const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+  if (jsonMatch) cleaned = jsonMatch[0];
+
+  try {
+    const parsed = JSON.parse(cleaned);
+    return {
+      chapter_title: parsed.chapter_title || 'L\'aventure continue',
+      chapter_number: parsed.chapter_number || turnNumber || 1,
+      section_type: parsed.section_type || 'action',
+      narrative: typeof parsed.narrative === 'string'
+        ? { context: parsed.narrative.substring(0, 300), action: parsed.narrative, dialogue: '', reflection: '', atmosphere: 'tense' }
+        : {
+            context: parsed.narrative?.context || '',
+            action: parsed.narrative?.action || '',
+            dialogue: parsed.narrative?.dialogue || '',
+            reflection: parsed.narrative?.reflection || '',
+            atmosphere: parsed.narrative?.atmosphere || 'tense'
+          },
+      choices: Array.isArray(parsed.choices) ? parsed.choices.slice(0, 4) : [],
+      scene_description: parsed.scene_description || 'Epic Star Wars cinematic scene with dramatic lighting',
+      user_edits_applied: parsed.user_edits_applied || null
+    };
+  } catch {
+    return {
+      chapter_title: 'L\'aventure continue',
+      chapter_number: turnNumber || 1,
+      section_type: 'action',
+      narrative: { context: cleaned.substring(0, 300), action: cleaned, dialogue: '', reflection: '', atmosphere: 'tense' },
+      choices: [],
+      scene_description: 'Epic Star Wars cinematic scene with dramatic lighting',
+      user_edits_applied: null
+    };
+  }
+}
+
+function resolveFormatNarrative(story) {
+  if (typeof window.formatNarrative === 'function') return window.formatNarrative(story);
+  const narrative = story?.narrative || {};
+  const parts = [narrative.context, narrative.action, narrative.dialogue, narrative.reflection].filter(Boolean);
+  return `<div class="narrative-container"><div class="narrative-section"><p>${parts.join('</p><p>')}</p></div></div>`;
 }
 
 function getSavedStories() {
@@ -574,7 +656,7 @@ function renderChoiceGrid(containerId, items, key) {
 }
 
 function showRoleDetail(roleId) {
-  const role = getRoleConfig(roleId);
+  const role = resolveRoleConfig(roleId);
   if (!role) return;
 
   // Create or update role detail panel
@@ -586,7 +668,7 @@ function showRoleDetail(roleId) {
     document.querySelector('#screen-setup .screen-inner').appendChild(panel);
   }
 
-  const faction = getFactionConfig(role.faction);
+  const faction = resolveFactionConfig(role.faction);
 
   panel.innerHTML = `
     <div class="role-detail-header">
@@ -719,17 +801,17 @@ async function startStory() {
     status: 'active',
     chapterTitle: 'Prologue'
   });
-  state.messages = [{ role: 'system', content: buildSystemPrompt(state.setup.language) }];
+  state.messages = [{ role: 'system', content: resolveBuildSystemPrompt(state.setup.language) }];
   state.turn = 0;
   state.userEdits = [];
   state.currentChapter = null;
   goTo('screen-story');
-  await generateNextTurn(buildStartMessage(state.setup));
+  await generateNextTurn(resolveBuildStartMessage(state.setup));
 }
 
 async function makeChoice(choiceText) {
   if (state.isGenerating) return;
-  await generateNextTurn(buildContinueMessage(choiceText, state.turn, state.setup.language, state.setup, state.userEdits));
+  await generateNextTurn(resolveBuildContinueMessage(choiceText, state.turn, state.setup.language, state.setup, state.userEdits));
 }
 
 async function generateNextTurn(userMessage) {
@@ -758,7 +840,7 @@ async function generateNextTurn(userMessage) {
     }
 
     state.messages.push({ role: 'assistant', content: rawText });
-    const story = parseStoryResponse(rawText, state.turn);
+    const story = resolveParseStoryResponse(rawText, state.turn);
     state.currentChapter = story;
     if (state.currentStoryId) {
       upsertSavedStory({
@@ -781,7 +863,7 @@ async function generateNextTurn(userMessage) {
 
     // Type narrative
     showLoading(false);
-    await typeNarrative(formatNarrative(story));
+    await typeNarrative(resolveFormatNarrative(story));
 
     // Render choices with attribute info
     renderChoicesWithAttributes(story.choices);
@@ -831,12 +913,12 @@ async function generateStoryImageWithFallback(prompt) {
       document.getElementById('image-status')?.classList.add('hidden');
     } else {
       // Use placeholder
-      const faction = getFactionConfig(state.setup.faction);
+      const faction = resolveFactionConfig(state.setup.faction);
       img.src = generatePlaceholderSVG(t('imageFailed', state.uiLang), faction?.color);
     }
   } catch (e) {
     container.classList.remove('loading');
-    const faction = getFactionConfig(state.setup.faction);
+    const faction = resolveFactionConfig(state.setup.faction);
     img.src = generatePlaceholderSVG(t('imageFailed', state.uiLang), faction?.color);
     console.warn('Image generation failed:', e.message);
   }
