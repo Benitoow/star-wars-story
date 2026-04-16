@@ -1,0 +1,37 @@
+{
+  "name": "Star Wars Story Manager",
+  "short_name": "SW Stories",
+  "description": "Créez et gérez vos propres histoires interactives Star Wars",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#07070f",
+  "theme_color": "#FFE81F",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["games", "entertainment", "productivity"],
+  "lang": "fr",
+  "dir": "ltr",
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Nouvelle Histoire",
+      "short_name": "Nouveau",
+      "url": "/editor/new",
+      "description": "Créer une nouvelle histoire"
+    },
+    {
+      "name": "Corbeille",
+      "short_name": "Corbeille",
+      "url": "/trash",
+      "description": "Voir les histoires supprimées"
+    }
+  ]
+}

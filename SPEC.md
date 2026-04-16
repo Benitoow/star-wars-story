@@ -1,347 +1,415 @@
-# Star Wars Interactive Story — Enhanced System Specification
+# Star Wars Story Manager — Interactive Dashboard
 
 ## 1. Project Overview
 
-**Project Name:** Star Wars — Histoire Interactive IA  
-**Type:** Single-page interactive narrative web application  
-**Core Functionality:** AI-powered choose-your-own-adventure Star Wars stories with immersive visuals, role-based gameplay, multilingual support, and collaborative storytelling.  
-**Target Users:** Star Wars fans who want personalized, AI-generated interactive stories in the Star Wars universe.
+**Project Name:** Star Wars Story Manager  
+**Type:** Progressive Web App (PWA) with offline support  
+**Core Functionality:** A sophisticated dashboard for creating, managing, and sharing interactive Star Wars stories with AI-powered generation, local-first storage, and collaborative features.  
+**Target Users:** Star Wars fans and creative writers who want to create personalized interactive stories.
 
----
+## 2. Architecture
 
-## 2. Visual System & SVG Organization
+### 2.1 Tech Stack
+- **Framework:** SvelteKit (lightweight, fast, excellent DX)
+- **Language:** TypeScript
+- **Storage:** Dexie.js (IndexedDB wrapper)
+- **Build:** Vite
+- **Styling:** Custom CSS with CSS variables
+- **PWA:** Vite PWA plugin
 
-### 2.1 SVG Asset Architecture
-
-#### Faction SVGs (9 total)
-Each faction has a dedicated SVG icon that clearly represents its identity:
-
-| Faction ID | Name | SVG Icon | Color | File Reference |
-|------------|------|----------|-------|----------------|
-| `jedi` | Ordre Jedi | Jedi crest (rays) | #4FC3F7 | config.js: SVG.jedi |
-| `sith` | Ordre Sith | T-cross symbol | #FF1744 | config.js: SVG.sith |
-| `empire` | Empire Galactique | 12-petal imperial crest | #e0e0e0 | config.js: SVG.empire |
-| `rebels` | Alliance Rebelle | Phoenix crest | #FF6B35 | config.js: SVG.rebel |
-| `republic` | République Galactique | Circular sigil | #81D4FA | config.js: SVG.republic |
-| `mandalore` | Mandalorians | Mythosaur skull | #A5D6A7 | config.js: SVG.mando |
-| `first_order` | Premier Ordre | Hexagonal crest | #B71C1C | config.js: SVG.firstOrder |
-| `hutt` | Cartel Hutt | H with halo | #FFE082 | config.js: SVG.hutt |
-| `neutral` | Indépendant | Hooded silhouette | #bdbdbd | config.js: SVG.wanderer |
-
-#### Role SVGs (20 roles with distinct icons)
-Each role has a unique SVG icon representing their class/archetype:
-
-| Role ID | Name | SVG Icon | Faction Association |
-|---------|------|----------|---------------------|
-| `jedi_knight` | Chevalier Jedi | Blue lightsaber | jedi |
-| `jedi_master` | Maître Jedi | Jedi crest | jedi |
-| `padawan` | Padawan | Jedi with braid | jedi |
-| `sith_apprentice` | Apprenti Sith | Red lightsaber | sith |
-| `sith_lord` | Seigneur Sith | Sith crest | sith |
-| `inquisitor` | Inquisiteur | Ring lightsaber | empire |
-| `nightsister` | Sœur de la Nuit | Dathomir witch | neutral |
-| `mandalorian` | Mandalorien | Mythosaur helmet | mandalore |
-| `bounty_hunter` | Chasseur de primes | Boba Fett helmet | neutral |
-| `smuggler` | Contrebandier | Millennium Falcon silhouette | neutral |
-| `mercenary` | Mercenaire | Dual blasters | neutral |
-| `pilot` | As de l'Espace | X-Wing fighter | rebels |
-| `clone_trooper` | Soldat Clone | Clone helmet | republic |
-| `stormtrooper` | Stormtrooper | Imperial stormtrooper | empire |
-| `imperial_officer` | Officier Impérial | Imperial officer cap | empire |
-| `senator` | Sénateur | Senatorial robes | republic |
-| `spy` | Agent Secret | Spy/undercover | neutral |
-| `engineer` | Ingénieur | Gear/cog symbol | neutral |
-| `medic` | Médecin de Terrain | Medical symbol | neutral |
-| `droid` | Droïde Avancé | Astromech droid | neutral |
-
-### 2.2 SVG Display System
-- Role selection cards show: SVG icon, role name, faction badge, subtitle
-- Faction selection cards show: SVG icon, faction name, description, member count indicator
-- Selected states clearly highlight with faction color glow
-- SVG icons rendered inline using currentColor for theming adaptability
-
----
-
-## 3. Expanded Role System
-
-### 3.1 Role Attributes
-Each role has 6 core attributes (0-100 scale):
-
-| Attribute | Description |
-|-----------|-------------|
-| `combat` | Combat prowess, lightsaber/blaster skills |
-| `diplomacy` | Persuasion, negotiation, political acumen |
-| `stealth` | Sneaking, espionage, infiltration |
-| `tech` | Mechanical, hacking, droid interaction |
-| `force` | Force sensitivity level (0 if non-Force users) |
-| `survival` | Endurance, resourcefulness, adaptability |
-
-### 3.2 Role Skills
-Each role has 4 unique skills that define their capabilities:
-
+### 2.2 Project Structure
 ```
-jedi_knight:
-  - lightsaber_combat: "Maîtrise du sabre laser à double lame"
-  - force_push: "Manipulation de la Force pour repousser les obstacles"
-  - force_sense: "Perception des intentions et émotions"
-  - parry: "Déviation des tirs d'énergie"
-
-sith_lord:
-  - force_lightning: "Éclair de Force dévastateur"
-  - force_choke: "Strangulation à distance"
-  - mind_trick: "Manipulation mentale advanced"
-  - force_drain: "Absorption de la vie"
-
-mandalorian:
-  - jetpack: "机动跃迁"
-  - beskar_armor: "装甲防护"
-  - hunter_instincts: "猎人本能"
-  - weapons_expert: "武器专家"
+star-wars-story/
+├── src/
+│   ├── lib/
+│   │   ├── components/     # Reusable UI components
+│   │   ├── stores/         # Svelte stores for state
+│   │   ├── db/              # Dexie.js database schema
+│   │   ├── utils/           # Utility functions
+│   │   └── i18n/           # Internationalization
+│   ├── routes/
+│   │   ├── +page.svelte    # Dashboard (main)
+│   │   ├── story/[id]/     # Story editor/viewer
+│   │   ├── settings/        # User preferences
+│   │   └── onboarding/      # First-time user tour
+│   └── app.html
+├── static/
+│   ├── icons/              # PWA icons
+│   └── sw.js              # Service worker
+├── SPEC.md
+├── package.json
+└── svelte.config.js
 ```
 
-### 3.3 Role-Faction Interactions
-- **Jedi roles** get bonuses when aligned with `republic` or `neutral`
-- **Sith roles** get bonuses when aligned with `empire` or `first_order`
-- **Mandalorian** can join any faction but retains `mandalore` heritage bonuses
-- **Bounty Hunter/Smuggler** get unique dialogue options with `hutt` faction
-- **Clone/Stormtrooper** roles have forced faction alignment (cannot choose `neutral`)
+## 3. Data Model
 
-### 3.4 Cross-Role Dynamics
-- Jedi + Sith encounters: Force confrontation scenarios
-- Mandalorian + Bounty Hunter: Shared `mandalore` culture dialogue
-- Pilot + Spy: Space station infiltration missions
-- Engineer + Droid: Technical puzzle solutions
-- Medic + any: Healing/support dialogue trees
+### 3.1 Database Schema (IndexedDB via Dexie.js)
 
----
+```typescript
+interface Story {
+  id: string;              // UUID
+  title: string;
+  content: string;         // Rich text JSON or Markdown
+  setup: {
+    era: string;
+    faction: string;
+    role: string;
+    premise: string;
+  };
+  metadata: {
+    createdAt: Date;
+    updatedAt: Date;
+    lastPlayedAt?: Date;
+    playCount: number;
+    wordCount: number;
+  };
+  tags: string[];
+  folderId?: string;
+  theme?: StoryTheme;
+  version: number;
+  isArchived: boolean;
+  isDeleted: boolean;
+  deletedAt?: Date;
+}
 
-## 4. Narrative System
+interface Folder {
+  id: string;
+  name: string;
+  parentId?: string;
+  color: string;
+  createdAt: Date;
+}
 
-### 4.1 Story Structure
-Each chapter follows a thematic structure:
+interface UserPreferences {
+  id: 'preferences';       // Singleton
+  uiLanguage: string;
+  theme: 'light' | 'dark' | 'auto';
+  defaultImageProvider?: string;
+  defaultImgModel?: string;
+  autoSave: boolean;
+  autoSaveInterval: number; // ms
+  showOnboarding: boolean;
+  shortcuts: ShortcutMap;
+  profiles: CreativeProfile[];
+  activeProfileId?: string;
+}
 
-```json
-{
-  "chapter_title": "Titre du chapitre",
-  "chapter_number": 1,
-  "section_type": "confrontation|exploration|dialogue|reflection|action",
-  "narrative": {
-    "context": "Contexte historique ou situation actuelle",
-    "action": "Événements en cours avec descriptions sensorielles",
-    "dialogue": "Échanges verbaux avec styles vocaux distinctifs",
-    "reflection": "Monologue intérieur ou Gedanken"
-  },
-  "choices": [
-    {
-      "text": "Texte du choix",
-      "required_attribute": "combat|diplomacy|stealth|tech|force|survival",
-      "difficulty": 1-5,
-      "faction_impact": {"empire": -10, "rebels": +10}
-    }
-  ],
-  "scene_description": "English description for image generation",
-  "atmosphere": "lumineux|sombre|tense|mystique|apocalyptique"
+interface CreativeProfile {
+  id: string;
+  name: string;
+  icon: string;
+  config: {
+    defaultEra?: string;
+    defaultFaction?: string;
+    defaultRole?: string;
+    defaultPremise?: string;
+    preferredImageProvider?: string;
+    preferredImgModel?: string;
+    customPromptPrefix?: string;
+  };
+}
+
+interface AppState {
+  id: 'appState';          // Singleton
+  currentStoryId?: string;
+  recentStories: string[];   // Story IDs
+  trashCleanUpDate?: Date;
+  firstVisitDate: Date;
+  analytics: AnalyticsData;
+}
+
+interface StoryVersion {
+  id: string;
+  storyId: string;
+  content: string;
+  setup: Story['setup'];
+  savedAt: Date;
+  version: number;
+}
+
+interface AnalyticsData {
+  storiesCreated: number;
+  totalPlayTime: number;    // minutes
+  choicesMade: number;
+  imagesGenerated: number;
+  weeklyStats: WeeklyStat[];
+}
+
+interface WeeklyStat {
+  weekStart: Date;
+  storiesCreated: number;
+  timeSpent: number;
+  favoriteFaction?: string;
+  favoriteRole?: string;
 }
 ```
 
-### 4.2 Narrative Sections
-- **Contexte Historique:** Backstory elements, galaxy state, faction politics
-- **Événements Marquants:** Key plot points with cinematic descriptions
-- **Enjeux Actuels:** Current stakes and consequences of actions
-- **Dialogues/Monologues:** Character voice with distinct personality
-- **Descriptions Atmosphériques:** Environmental sensory details
-
-### 4.3 Language-Varied Writing
-- Rotate sentence structures (short/medium/long)
-- Alternate between action, description, dialogue
-- Use Star Wars-specific vocabulary and terminology
-- Avoid repetition of phrases across chapters
-
----
-
-## 5. Multilingual Support
-
-### 5.1 UI Languages (8)
-Interface elements in: French (FR), English (EN), Spanish (ES), German (DE), Italian (IT), Portuguese (PT), Japanese (JA), Chinese (ZH)
-
-### 5.2 Story Language
-- Story narration language automatically matches the UI language
-- No separate language selection for narration
-- Language selector in story header for changing UI language
-- Changing UI language also changes story language
-
-### 5.3 Translation Scope
-UI Elements translated:
-- Menu labels and buttons
-- Setup section headers
-- Role/faction descriptions
-- Error messages
-- Placeholder text
-- Tooltips and hints
-
-NOT translated (story always in UI language):
-- Story narrative content
-- Chapter titles
-- Choice text
-- Scene descriptions
-
----
-
-## 6. Collaborative Mode
-
-### 6.1 User Interpretation Space
-After each chapter's AI narrative, users can:
-- **Rewrite passages:** Edit any paragraph of the AI's narrative
-- **Add details:** Insert additional descriptions, memories, or backstory
-- **Alternative interpretation:** Provide alternate version of events
-- **Character thoughts:** Add inner monologue for their character
-
-### 6.2 Collaboration UI
-- "Votre version" expandable panel below AI narrative
-- Rich text editing with formatting options
-- Character count indicator
-- "Incorporer à l'histoire" button to save edits
-
-### 6.3 Integration Flow
-1. AI presents chapter narrative
-2. User reads, then expands "Votre version" panel
-3. User writes/edits their interpretation
-4. User clicks "Agir" to continue, their version is appended to context
-5. Next chapter considers user's additions in context
-
----
-
-## 7. Image Generation System
-
-### 7.1 Provider Network
-Primary providers with automatic fallback:
-1. OpenRouter (gemini-2.5-flash-image, gpt-5-image)
-2. fal.ai (FLUX Schnell, Recraft V3, Ideogram V2)
-3. Together AI (FLUX.1 Schnell Free, FLUX.1 Dev)
-4. DALL-E 3 (fallback)
-5. Stability AI (SD Ultra)
-
-### 7.2 Robustness Mechanisms
-- **Automatic retry:** 3 attempts with exponential backoff
-- **Fallback chain:** Try next provider if primary fails
-- **Placeholder:** Elegant Star Wars-themed placeholder on total failure
-- **Timeout:** 30-second timeout per attempt
-- **User notification:** Subtle indicator if image generation fails
-
-### 7.3 Image Display
-- Aspect ratio: 16:7 cinematic
-- Border glow matching faction color
-- Loading shimmer animation
-- Click to enlarge modal view
-
----
-
-## 8. Technical Architecture
-
-### 8.1 File Structure
-```
-star-wars-story/
-├── index.html           # Main HTML with new UI elements
-├── favicon.svg          # Rebel Alliance phoenix
-├── css/
-│   └── style.css        # Extended with new styles
-├── js/
-│   ├── app.js           # Main logic, UI language switching, collaboration
-│   ├── config.js        # Expanded roles, attributes, skills, I18N
-│   ├── api.js           # Image generation with fallback
-│   └── story.js         # Enhanced narrative structure
-└── svg/                 # External SVG assets (used in config.js as inline)
-```
-
-### 8.2 State Management
+### 3.2 Storage Configuration
 ```javascript
-const state = {
-  provider: null,
-  apiKey: '',
-  model: null,
-  imgProvider: 'none',
-  imgModel: null,
-  imgApiKey: '',
-  uiLang: 'fr',           // NEW: UI language preference
-  setup: {
-    language: null,        // Narration language
-    era: null,
-    faction: null,
-    role: null,
-    premise: null
-  },
-  userEdits: [],          // NEW: Collaborative mode edits
-  messages: [],
-  turn: 0,
-  isGenerating: false,
-  currentChapter: null    // NEW: For collaborative mode
-};
+const db = new Dexie('StarWarsStoryDB');
+db.version(1).stores({
+  stories: 'id, title, folderId, *tags, createdAt, updatedAt, isArchived, isDeleted',
+  folders: 'id, parentId, name',
+  storyVersions: 'id, storyId, savedAt, version',
+  preferences: 'id',
+  appState: 'id'
+});
 ```
 
-### 8.3 Key Functions
-- `switchUILanguage(langId)` - Instant UI language change
-- `saveUserEdit(chapterNum, editedText)` - Store collaborative edits
-- `applyUserEditsToContext()` - Include edits in next prompt
-- `generateImageWithFallback(prompt)` - Robust image generation
-- `renderNarrativeSection(narrativeObj)` - Structured narrative display
+## 4. Core Features
+
+### 4.1 Dashboard
+- **Story Grid/List View:** Toggle between grid and list display
+- **Quick Stats:** Stories created, time played, favorites
+- **Search Bar:** Full-text search across titles, content, tags
+- **Filter Bar:** By era, faction, role, tags, date, status
+- **Sort Options:** Date created, last modified, last played, alphabetical, popularity
+- **Bulk Actions:** Select multiple, archive, delete, move to folder
+- **Empty State:** Guided creation with templates
+
+### 4.2 Story Creation Flow
+1. **Quick Create:** One-click start with random setup
+2. **Guided Create:** Step-by-step era/faction/role/premise selection
+3. **Template Create:** Start from predefined templates
+4. **Import Create:** Import from Markdown/JSON/ZIP
+
+### 4.3 Story Editor
+- **Split View:** Narrative editor + live preview
+- **Rich Text Editor:** Bold, italic, headers, quotes, lists
+- **AI Integration Panel:** Generation controls, parameter tuning
+- **Version History:** Visual timeline with restore options
+- **Auto-save:** Configurable interval with visual indicator
+- **Metadata Editor:** Tags, folder, theme customization
+
+### 4.4 Story Player/Viewer
+- **Immersive Mode:** Full-screen, minimal UI
+- **Chapter Navigation:** Visual chapter list
+- **Progress Indicator:** Turn counter, chapter progress
+- **Save/Load:** Multiple save slots per story
+- **Image Gallery:** Generated images in story
+
+### 4.5 Folder System
+- **Nested Folders:** Drag-drop hierarchy
+- **Folder Colors:** Custom color coding
+- **Smart Folders:** Auto-populated by filters (Recently Played, Favorites, etc.)
+- **Folder Statistics:** Story count, total word count
+
+### 4.6 Search & Discovery
+- **Full-Text Search:** Title, content, tags
+- **Filter Combinations:** Era + Faction + Role + Tags
+- **Recent Searches:** History with quick access
+- **Suggestions:** Based on current selection
+
+### 4.7 Trash & Recovery
+- **Soft Delete:** Moved to trash, not permanent
+- **30-Day Retention:** Auto-permanent delete after 30 days
+- **Restore Options:** Single or bulk restore
+- **Empty Trash:** Secure permanent deletion with confirmation
+
+### 4.8 Export/Import
+- **Export Formats:** Markdown, JSON, PDF (future), HTML
+- **Project Export:** ZIP with images and metadata
+- **Import Formats:** Markdown, JSON, ZIP
+- **Backup/Restore:** Full app state backup
+
+### 4.9 Settings & Preferences
+- **Appearance:** Theme (light/dark/auto), font size, spacing
+- **AI Providers:** API key management, model selection
+- **Image Generation:** Provider, model, quality settings
+- **Creative Profiles:** Predefined configurations
+- **Shortcuts:** Customizable keyboard shortcuts
+- **Data Management:** Export backup, import, clear data
+- **Accessibility:** High contrast, reduced motion, screen reader
+
+### 4.10 Onboarding
+- **Welcome Tour:** 4-step guided introduction
+- **Feature Highlights:** Contextual tooltips
+- **Sample Story:** Pre-loaded demo story
+- **Achievement Badges:** First story, first export, etc.
+
+## 5. UI/UX Design
+
+### 5.1 Layout System
+- **Mobile (< 640px):** Single column, bottom nav
+- **Tablet (640-1024px):** Sidebar collapsible
+- **Desktop (> 1024px):** Full sidebar, multi-panel
+
+### 5.2 Navigation
+- **Main Navigation:** Sidebar (desktop) / Bottom tabs (mobile)
+  - Dashboard (home)
+  - All Stories
+  - Folders
+  - Trash
+  - Settings
+- **Contextual Nav:** Breadcrumbs, back buttons
+- **Quick Actions:** Floating action button for new story
+
+### 5.3 Theming
+- **Light Theme:** Clean white backgrounds, subtle shadows
+- **Dark Theme:** Deep navy/black, muted accents
+- **Dynamic Theme:** Based on time of day
+- **Custom Accent Colors:** User-selectable primary color
+
+### 5.4 Animations & Transitions
+- **Page Transitions:** Slide/fade between routes
+- **Micro-interactions:** Button hover, card press, save indicator
+- **Loading States:** Skeleton screens, progress bars
+- **Success Feedback:** Toast notifications, glow effects
+
+### 5.5 Components
+- **Button:** Primary, secondary, ghost, danger variants
+- **Card:** Story preview card with hover actions
+- **Modal:** Centered overlay with backdrop blur
+- **Toast:** Bottom-right notifications
+- **Dropdown:** Context menus, select menus
+- **Tooltip:** Hover information bubbles
+- **Badge:** Tags, counts, status indicators
+- **Progress:** Linear and circular variants
+- **Skeleton:** Loading placeholders
+
+## 6. PWA Features
+
+### 6.1 Service Worker
+- **Caching:** App shell, static assets, fonts
+- **Offline Support:** Full functionality without network
+- **Background Sync:** Queue actions for when online
+- **Update Notification:** New version available prompt
+
+### 6.2 Manifest
+- **Install Prompt:** Custom install banner
+- **Icons:** 192x192, 512x512, maskable
+- **Theme Color:** Dynamic based on theme
+- **Display Mode:** Standalone, minimal-ui
+
+### 6.3 Push Notifications (Future)
+- **Save Reminders:** Periodic auto-save prompts
+- **Version Alerts:** New app version available
+- **Custom Alerts:** User-defined reminders
+
+## 7. Performance
+
+### 7.1 Targets
+- **First Contentful Paint:** < 1.5s
+- **Time to Interactive:** < 3s
+- **Bundle Size:** < 500KB gzipped
+- **PWA Install Size:** < 10MB
+
+### 7.2 Optimization
+- **Code Splitting:** Route-based lazy loading
+- **Image Optimization:** WebP, lazy loading
+- **Virtual Scrolling:** For long lists (100+ items)
+- **Debouncing:** Search input, auto-save
+- **Memoization:** Expensive computations
+
+## 8. Accessibility
+
+### 8.1 WCAG 2.1 AA Compliance
+- **Color Contrast:** Minimum 4.5:1 ratio
+- **Keyboard Navigation:** Full functionality without mouse
+- **Focus Indicators:** Visible focus rings
+- **Screen Readers:** ARIA labels, semantic HTML
+- **Reduced Motion:** Respect prefers-reduced-motion
+- **Text Scaling:** Support up to 200% zoom
+
+### 8.2 Keyboard Shortcuts
+- `Ctrl/Cmd + N`: New story
+- `Ctrl/Cmd + S`: Save story
+- `Ctrl/Cmd + F`: Search
+- `Ctrl/Cmd + B`: Toggle sidebar
+- `Escape`: Close modal/deselect
+- `?`: Show shortcuts help
+
+## 9. Security
+
+### 9.1 Client-Side Encryption (Optional)
+- **Key Generation:** Web Crypto API
+- **Encryption:** AES-GCM for sensitive content
+- **Key Storage:** IndexedDB (user must remember passphrase)
+
+### 9.2 Privacy
+- **No External Tracking:** Zero analytics by default
+- **Local Processing:** All generation done locally or via user-provided API keys
+- **Data Isolation:** Each story's data kept separate
+- **Secure Delete:** Overwrite on permanent delete
+
+## 10. Data Flow
+
+### 10.1 Story Creation
+1. User clicks "New Story"
+2. Setup modal opens with era/faction/role/premise
+3. User confirms → Story created in DB
+4. Redirect to story editor
+5. AI generates initial content
+6. Auto-save kicks in
+
+### 10.2 Story Playback
+1. User selects story from dashboard
+2. Story state loaded from DB
+3. Player view rendered
+4. User makes choices
+5. AI generates continuation
+6. Story updated in DB
+7. Version snapshot created (every 5 turns)
+
+### 10.3 Auto-save Cycle
+1. Timer starts on first edit
+2. Debounced save on change (500ms)
+3. Visual indicator shows "Saving..."
+4. On success: "Saved" with timestamp
+5. Version created at milestones
+
+## 11. Error Handling
+
+### 11.1 API Errors
+- **Connection Failed:** Retry with exponential backoff
+- **Auth Error:** Prompt for new API key
+- **Rate Limited:** Queue requests, notify user
+- **Generation Failed:** Fallback message, retry option
+
+### 11.2 Storage Errors
+- **Quota Exceeded:** Prompt to delete old content
+- **Corruption Detected:** Attempt recovery, restore from version
+- **Migration Failed:** Rollback, notify user
+
+### 11.3 UI Error States
+- **Empty Search:** Friendly message with suggestions
+- **Load Failed:** Retry button, error details
+- **Offline:** Indication banner, cached content available
+
+## 12. Future Roadmap
+
+### 12.1 Phase 2 Features
+- Real-time collaboration via WebRTC or WebSockets
+- Cloud sync (optional, encrypted)
+- Plugin system for extensions
+- Text-to-speech narration
+- Video export from story
+
+### 12.2 Phase 3 Features
+- Community features (share, like, remix)
+- Marketplace for story templates
+- Mobile companion app
+- Advanced analytics dashboard
 
 ---
 
-## 9. New UI Components
+## Implementation Notes
 
-### 9.1 Language Switcher (in story header)
-- Compact dropdown in story header
-- Shows current language code (FR, EN, etc.)
-- Hover shows full language name
-- Changes both UI and story language
-- Always accessible during story
+### Critical Paths
+1. Dashboard with story CRUD
+2. Story editor with auto-save
+3. IndexedDB integration
+4. PWA manifest and service worker
+5. Settings persistence
 
-### 9.2 Role Detail Panel
-- Expands on role hover/click
-- Shows: Name, faction, 6 attributes with bars, 4 skills with descriptions
-- Color-coded by faction
+### MVP Scope
+- Single user, single device
+- No real-time collaboration
+- No cloud sync
+- Basic export (Markdown, JSON)
 
-### 9.3 Collaborative Panel
-- Collapsed by default: "Votre version des événements"
-- Expands to show textarea with Star Wars-themed styling
-- "Incorporer" button to save
-- Shows history of user's edits
-
-### 9.4 Image Generation Status
-- Loading: Animated lightsaber blade extending
-- Success: Image with faction-colored border
-- Failed: Star Wars-themed placeholder with retry option
-
----
-
-## 10. Acceptance Criteria
-
-### SVG Organization
-- [ ] Each faction has exactly one clear, recognizable SVG icon
-- [ ] Each role has a unique SVG that cannot be confused with another role
-- [ ] No missing SVG assignments - all 9 factions and 20 roles have icons
-
-### Role System
-- [ ] All 20 roles have 6 attributes and 4 skills defined
-- [ ] Role selection shows attributes/skills in detail panel
-- [ ] Cross-role interactions affect narrative options
-
-### Narrative
-- [ ] Chapters include context, action, dialogue, and atmospheric sections
-- [ ] Writing style varies to maintain engagement
-- [ ] Each choice shows potential attribute checks and faction impacts
-
-### Multilingual
-- [ ] UI switches instantly between 8 languages without page reload
-- [ ] All UI text properly translated in all 8 languages
-- [ ] Story language automatically matches UI language
-
-### Collaborative
-- [ ] Users can edit any narrative passage after AI presents it
-- [ ] User edits are included in subsequent story generation
-- [ ] Edit history is preserved and viewable
-
-### Image Generation
-- [ ] Images generate successfully for >95% of attempts
-- [ ] Fallback providers activate on primary failure
-- [ ] User sees clear feedback on generation status
+### Testing Strategy
+- Unit tests for stores and utilities
+- Component tests for UI interactions
+- E2E tests for critical flows
+- Manual testing on multiple devices
