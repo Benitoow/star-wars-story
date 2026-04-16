@@ -579,6 +579,7 @@ html, body {
   grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
   gap: 10px;
 }
+.choice-grid.languages { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
 .choice-grid.factions { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
 .choice-grid.premises { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
 

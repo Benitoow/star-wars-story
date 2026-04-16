@@ -67,6 +67,14 @@ const ICONS = {
 
 const _assetChoiceSvg = (path) => `<span class="choice-svg choice-mask" aria-hidden="true" style="--choice-mask: url('${path}')"></span>`;
 
+const _languageSvg = `<svg viewBox="0 0 44 44" class="choice-svg" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="22" cy="22" r="16"/>
+  <path d="M6 22h32"/>
+  <path d="M22 6c4.8 4.2 7.4 9.8 7.4 16s-2.6 11.8-7.4 16c-4.8-4.2-7.4-9.8-7.4-16S17.2 10.2 22 6z"/>
+  <path d="M11 13c3.4 1.9 7.2 2.9 11 2.9s7.6-1 11-2.9"/>
+  <path d="M11 31c3.4-1.9 7.2-2.9 11-2.9s7.6 1 11 2.9"/>
+</svg>`;
+
 // Galactic Empire — crest impérial 12 pétales
 function _genEmpireSvg() {
   const petals = Array.from({length: 12}, (_, i) => {
@@ -232,7 +240,7 @@ const IMAGE_PROVIDERS = {
   openrouter_img: {
     id: 'openrouter_img',
     name: 'OpenRouter',
-    desc: 'Nano Banana · GPT Image · previews',
+    desc: 'Nano Banana · GPT Image · FLUX.2',
     free: false,
     endpoint: 'https://openrouter.ai/api/v1/images/generations',
     models: [
@@ -241,6 +249,10 @@ const IMAGE_PROVIDERS = {
       { id: 'openai/gpt-5-image',                           name: 'GPT-5 Image',             desc: 'OpenAI, rendu premium',     tags: ['quality'] },
       { id: 'google/gemini-3.1-flash-image-preview',       name: 'Nano Banana 2',           desc: 'Édition image avancée',     tags: ['quality'] },
       { id: 'google/gemini-3-pro-image-preview',           name: 'Nano Banana Pro',         desc: 'Qualité maximale',          tags: ['quality'] },
+      { id: 'black-forest-labs/flux.2-max',                name: 'FLUX.2 Max',              desc: 'Qualité image maximale',    tags: ['quality'] },
+      { id: 'black-forest-labs/flux.2-pro',                name: 'FLUX.2 Pro',              desc: 'Production haut de gamme',  tags: ['quality'] },
+      { id: 'black-forest-labs/flux.2-flex',               name: 'FLUX.2 Flex',             desc: 'Détails et typographie',    tags: ['quality'] },
+      { id: 'black-forest-labs/flux.2-klein-4b',           name: 'FLUX.2 Klein',            desc: 'Rapide et économique',      tags: ['speed'] },
     ],
     icon: ICONS.openrouter
   },
@@ -310,6 +322,19 @@ const IMAGE_PROVIDERS = {
 };
 
 /* ─── STORY DATA ─────────────────────────────── */
+const LANGUAGES = [
+  { id: 'en', name: 'Anglais',      native: 'English',            promptName: 'English',                sub: 'Le web global',              color: '#4FC3F7', svg: _languageSvg },
+  { id: 'zh', name: 'Chinois',      native: '中文',                promptName: 'Chinese (Simplified)',   sub: 'Le plus grand bassin',       color: '#FFB74D', svg: _languageSvg },
+  { id: 'es', name: 'Espagnol',     native: 'Español',            promptName: 'Spanish',                sub: 'Europe & Amériques',         color: '#FF7043', svg: _languageSvg },
+  { id: 'ar', name: 'Arabe',        native: 'العربية',            promptName: 'Arabic',                 sub: 'RTL • MENA',                 color: '#26A69A', svg: _languageSvg },
+  { id: 'pt', name: 'Portugais',    native: 'Português',          promptName: 'Portuguese',             sub: 'Brésil & Portugal',          color: '#66BB6A', svg: _languageSvg },
+  { id: 'id', name: 'Indonésien',   native: 'Bahasa Indonesia',   promptName: 'Indonesian',             sub: 'Asie du Sud-Est',            color: '#AB47BC', svg: _languageSvg },
+  { id: 'fr', name: 'Français',     native: 'Français',           promptName: 'French',                 sub: 'Idéal pour le lore',         color: '#42A5F5', svg: _languageSvg },
+  { id: 'ja', name: 'Japonais',     native: '日本語',              promptName: 'Japanese',               sub: 'Gaming • manga • web',       color: '#EC407A', svg: _languageSvg },
+  { id: 'ru', name: 'Russe',        native: 'Русский',            promptName: 'Russian',                sub: 'Cyrillique • forums',        color: '#8D6E63', svg: _languageSvg },
+  { id: 'de', name: 'Allemand',     native: 'Deutsch',            promptName: 'German',                 sub: 'Technique • communauté',     color: '#FFA726', svg: _languageSvg },
+];
+
 const ERAS = [
   { id: 'old_republic',  name: 'Ancienne République', years: '25 000 – 1 000 av. BY',
     svg: _republicSvg.replace('choice-svg', 'choice-svg') },

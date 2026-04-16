@@ -10,7 +10,7 @@ const state = {
   imgProvider: 'none',
   imgModel: null,
   imgApiKey: '',
-  setup: { era: null, faction: null, role: null, premise: null },
+  setup: { language: null, era: null, faction: null, role: null, premise: null },
   messages: [],
   turn: 0,
   isGenerating: false
@@ -188,6 +188,7 @@ function renderImgModels(providerId) {
 
 /* ─── SETUP SCREENS ─────────────────────────── */
 function renderSetupScreens() {
+  renderChoiceGrid('language-grid', LANGUAGES, 'language');
   renderChoiceGrid('era-grid',     ERAS,     'era');
   renderChoiceGrid('faction-grid', FACTIONS, 'faction');
   renderChoiceGrid('role-grid',    ROLES,    'role');
@@ -219,8 +220,8 @@ function renderChoiceGrid(containerId, items, key) {
 }
 
 function checkSetupComplete() {
-  const { era, faction, role, premise } = state.setup;
-  document.getElementById('btn-start-story').disabled = !(era && faction && role && premise);
+  const { language, era, faction, role, premise } = state.setup;
+  document.getElementById('btn-start-story').disabled = !(language && era && faction && role && premise);
 }
 
 /* ─── MODEL SELECTION ───────────────────────── */
@@ -288,7 +289,7 @@ function filterModels(query) {
 
 /* ─── STORY ─────────────────────────────────── */
 async function startStory() {
-  state.messages = [{ role: 'system', content: SYSTEM_PROMPT }];
+  state.messages = [{ role: 'system', content: buildSystemPrompt(state.setup.language) }];
   state.turn = 0;
   goTo('screen-story');
   await generateNextTurn(buildStartMessage(state.setup));
@@ -296,7 +297,7 @@ async function startStory() {
 
 async function makeChoice(choiceText) {
   if (state.isGenerating) return;
-  await generateNextTurn(buildContinueMessage(choiceText, state.turn));
+  await generateNextTurn(buildContinueMessage(choiceText, state.turn, state.setup.language));
 }
 
 async function generateNextTurn(userMessage) {
@@ -429,11 +430,13 @@ function closeStoryMenu() {
 }
 
 function openStoryMenu() {
-  const { era, faction, role, premise } = state.setup;
+  const { language, era, faction, role, premise } = state.setup;
   const info = [
-    `Ère: ${ERAS.find(e=>e.id===era)?.name||era}`,
-    `Faction: ${FACTIONS.find(f=>f.id===faction)?.name||faction}`,
-    `Rôle: ${ROLES.find(r=>r.id===role)?.name||role}`,
+    `Langue: ${LANGUAGES.find(l=>l.id===language)?.name || language || '—'}`,
+    `Ère: ${ERAS.find(e=>e.id===era)?.name || era || '—'}`,
+    `Faction: ${FACTIONS.find(f=>f.id===faction)?.name || faction || '—'}`,
+    `Rôle: ${ROLES.find(r=>r.id===role)?.name || role || '—'}`,
+    `Prémisse: ${PREMISES.find(p=>p.id===premise)?.name || premise || '—'}`,
     `Tour: ${state.turn}`
   ].join('<br>');
   document.getElementById('overlay-story-info').innerHTML = info;

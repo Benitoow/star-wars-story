@@ -18,10 +18,33 @@ RÈGLES STRICTES:
 5. Utilise le lore Star Wars authentique: noms de planètes, technologie, factions.
 6. La narration est à la 2ème personne du singulier ("vous découvrez", "vous ressentez").`;
 
+const DEFAULT_LANGUAGE_ID = 'fr';
+
+function getLanguageConfig(languageId) {
+  return (
+    LANGUAGES.find(l => l.id === languageId) ||
+    LANGUAGES.find(l => l.id === DEFAULT_LANGUAGE_ID) ||
+    LANGUAGES[0] ||
+    { name: 'Français', native: 'Français', promptName: 'French' }
+  );
+}
+
+function buildSystemPrompt(languageId = DEFAULT_LANGUAGE_ID) {
+  const language = getLanguageConfig(languageId);
+
+  return `LANGUE DE SORTIE:
+- Rédige tout le contenu textuel du JSON en ${language.promptName}.
+- Garde "scene_description" en anglais pour la génération d'image.
+- N'utilise jamais un mélange de langues dans le même champ.
+
+${SYSTEM_PROMPT}`;
+}
+
 /**
  * Build the initial message for story start
  */
 function buildStartMessage(setup) {
+  const language = getLanguageConfig(setup.language);
   const era     = ERAS.find(e => e.id === setup.era)?.name     || setup.era;
   const faction = FACTIONS.find(f => f.id === setup.faction)?.name || setup.faction;
   const role    = ROLES.find(r => r.id === setup.role)?.name   || setup.role;
@@ -29,21 +52,26 @@ function buildStartMessage(setup) {
   const premSub = PREMISES.find(p => p.id === setup.premise)?.sub  || '';
 
   return `Commence une histoire interactive Star Wars avec ces paramètres:
+- Langue de narration: ${language.promptName}
 - Ère: ${era}
 - Faction: ${faction}
 - Rôle: ${role}
 - Prémisse: ${premise} — ${premSub}
 
-Génère le prologue de l'histoire. Plante le décor, introduis le personnage et crée une situation initiale captivante qui aboutit à un premier choix crucial.`;
+Génère le prologue de l'histoire dans cette langue. Plante le décor, introduis le personnage et crée une situation initiale captivante qui aboutit à un premier choix crucial.`;
 }
 
 /**
  * Build a continuation message after a player choice
  */
-function buildContinueMessage(choiceText, turnNumber) {
+function buildContinueMessage(choiceText, turnNumber, languageId) {
+  const language = getLanguageConfig(languageId);
+
   return `Tour ${turnNumber} — Le joueur choisit: "${choiceText}"
 
-Continue l'histoire en tenant compte de ce choix. Les conséquences doivent être visibles et significatives. Maintiens la tension dramatique et propose de nouveaux choix.`;
+Langue de narration: ${language.promptName}
+
+Continue l'histoire dans cette langue en tenant compte de ce choix. Les conséquences doivent être visibles et significatives. Maintiens la tension dramatique et propose de nouveaux choix.`;
 }
 
 /**
