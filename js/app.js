@@ -521,6 +521,7 @@ function selectProvider(id) {
 
   const saved = localStorage.getItem(`sw_key_${id}`);
   if (saved) {
+    state.apiKey = saved;
     document.getElementById('api-key-input').value = saved;
     document.getElementById('save-key-checkbox').checked = true;
     document.getElementById('btn-test-api').disabled = false;
@@ -786,6 +787,16 @@ function filterModels(query) {
 
 /* ─── STORY ─────────────────────────────────── */
 async function startStory() {
+  const keyFromInput = document.getElementById('api-key-input')?.value.trim() || '';
+  const resolvedApiKey = state.apiKey || keyFromInput || localStorage.getItem(`sw_key_${state.provider}`) || '';
+  if (!resolvedApiKey.trim()) {
+    alert('Clé API manquante. Sélectionne un fournisseur et renseigne ta clé avant de lancer l’histoire.');
+    goTo('screen-api');
+    return;
+  }
+
+  state.apiKey = resolvedApiKey.trim();
+
   // Use UI language as story language
   state.setup.language = state.uiLang;
   state.currentStoryId = state.currentStoryId || crypto.randomUUID();
@@ -1295,6 +1306,7 @@ function loadSavedSettings() {
 
   if (lastProvider && LLM_PROVIDERS[lastProvider]) {
     state.provider = lastProvider;
+    state.apiKey = localStorage.getItem(`sw_key_${lastProvider}`) || state.apiKey;
   }
   if (lastModel) {
     state.model = lastModel;

@@ -58,47 +58,6 @@
 </svelte:head>
 
 <div class="dashboard">
-  <!-- Stats Overview -->
-  <section class="stats-section">
-    <div class="stat-card">
-      <div class="stat-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/>
-          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
-        </svg>
-      </div>
-      <div class="stat-content">
-        <span class="stat-value">{$stories.length}</span>
-        <span class="stat-label">Histoires</span>
-      </div>
-    </div>
-
-    <div class="stat-card">
-      <div class="stat-icon gold">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/>
-        </svg>
-      </div>
-      <div class="stat-content">
-        <span class="stat-value">{$recentStories.length}</span>
-        <span class="stat-label">Récents</span>
-      </div>
-    </div>
-
-    <div class="stat-card">
-      <div class="stat-icon purple">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"/>
-          <polyline points="12,6 12,12 16,14"/>
-        </svg>
-      </div>
-      <div class="stat-content">
-        <span class="stat-value">0</span>
-        <span class="stat-label">Heures jouées</span>
-      </div>
-    </div>
-  </section>
-
   <!-- Filters -->
   <section class="filters-section">
     <div class="filter-group">
@@ -188,67 +147,6 @@
   .dashboard {
     max-width: 1200px;
     margin: 0 auto;
-  }
-
-  /* Stats Section */
-  .stats-section {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: var(--space-md);
-    margin-bottom: var(--space-xl);
-  }
-
-  .stat-card {
-    display: flex;
-    align-items: center;
-    gap: var(--space-md);
-    padding: var(--space-lg);
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-  }
-
-  .stat-icon {
-    width: 48px;
-    height: 48px;
-    padding: var(--space-sm);
-    background: rgba(79, 195, 247, 0.1);
-    border-radius: var(--radius-md);
-    color: var(--color-blue);
-  }
-
-  .stat-icon.gold {
-    background: rgba(255, 232, 31, 0.1);
-    color: var(--color-gold);
-  }
-
-  .stat-icon.purple {
-    background: rgba(206, 147, 216, 0.1);
-    color: var(--color-purple);
-  }
-
-  .stat-icon svg {
-    width: 100%;
-    height: 100%;
-  }
-
-  .stat-content {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .stat-value {
-    font-family: var(--font-display);
-    font-size: 1.75rem;
-    font-weight: 700;
-    color: var(--color-text-primary);
-    line-height: 1;
-  }
-
-  .stat-label {
-    font-size: 0.875rem;
-    color: var(--color-text-muted);
-    margin-top: var(--space-xs);
   }
 
   /* Filters Section */
@@ -424,10 +322,6 @@
   }
 
   @media (max-width: 768px) {
-    .stats-section {
-      grid-template-columns: 1fr;
-    }
-
     .filters-section {
       flex-direction: column;
     }

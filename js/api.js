@@ -11,10 +11,20 @@ const IMAGE_FALLBACK_ORDER = [
   'stability'
 ];
 
+function ensureApiKey(providerId, apiKey, resource = 'IA') {
+  if (providerId === 'none') return;
+
+  const trimmedKey = String(apiKey || '').trim();
+  if (!trimmedKey) {
+    throw new Error(`Clé API manquante pour ${resource}. Renseignez votre clé avant de lancer l'histoire.`);
+  }
+}
+
 /* ─── Call the LLM API ────────────────────────── */
 async function callLLM(messages, { providerId, model, apiKey, onStream }) {
   const provider = LLM_PROVIDERS[providerId];
   if (!provider) throw new Error('Provider inconnu: ' + providerId);
+  ensureApiKey(providerId, apiKey, 'le modèle texte');
 
   const headers = provider.getHeaders(apiKey);
   const useStream = typeof onStream === 'function';
@@ -116,6 +126,8 @@ async function testApiConnection(providerId, apiKey) {
     ? null
     : provider.models[0]?.id;
 
+  ensureApiKey(providerId, apiKey, 'la connexion API');
+
   if (provider.dynamicModels) {
     const res = await fetch(provider.modelsUrl, {
       headers: provider.getHeaders(apiKey)
@@ -159,6 +171,8 @@ async function generateImage(prompt, { imgProviderId, imgModel, imgApiKey, llmAp
   const prov = IMAGE_PROVIDERS[imgProviderId];
   if (!prov || imgProviderId === 'none') return null;
   const key = imgApiKey || llmApiKey;
+
+  ensureApiKey(imgProviderId, key, "la génération d'image");
 
   const swPrompt = `Epic Star Wars scene, cinematic lighting, highly detailed: ${prompt}`;
 
