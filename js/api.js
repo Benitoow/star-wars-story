@@ -158,6 +158,24 @@ async function generateImage(prompt, { imgProviderId, imgModel, imgApiKey, llmAp
 
   const swPrompt = `Epic Star Wars scene, cinematic lighting, highly detailed: ${prompt}`;
 
+  // ── OpenRouter image (OpenAI-compatible) ─────
+  if (imgProviderId === 'openrouter_img') {
+    const res = await fetch(prov.endpoint, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${key}`,
+        'HTTP-Referer': window.location.href,
+        'X-Title': 'Star Wars Interactive Story',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ model: imgModel, prompt: swPrompt, n: 1 })
+    });
+    if (!res.ok) throw new Error(`OpenRouter Image HTTP ${res.status}`);
+    const data = await res.json();
+    return data.data?.[0]?.url || (data.data?.[0]?.b64_json
+      ? `data:image/png;base64,${data.data[0].b64_json}` : null);
+  }
+
   if (imgProviderId === 'together_img') {
     const res = await fetch(prov.endpoint, {
       method: 'POST',

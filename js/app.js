@@ -213,41 +213,66 @@ function checkSetupComplete() {
 }
 
 /* ─── MODEL SELECTION ───────────────────────── */
+let _allModels = []; // keep full list for search filtering
+
 async function populateModels() {
-  const list = document.getElementById('model-list');
+  const list   = document.getElementById('model-list');
+  const search = document.getElementById('model-search');
   list.innerHTML = `<div class="model-loading">Chargement des modèles…</div>`;
+  search.value = '';
 
   try {
-    let models = [];
     const prov = LLM_PROVIDERS[state.provider];
-
     if (prov.dynamicModels) {
-      models = await fetchOpenRouterModels(state.apiKey);
+      _allModels = await fetchOpenRouterModels(state.apiKey);
     } else {
-      models = prov.models;
+      _allModels = prov.models;
     }
-
-    LLM_PROVIDERS[state.provider].models = models;
-    list.innerHTML = '';
-
-    for (const m of models) {
-      const item = document.createElement('div');
-      item.className = 'model-item';
-      item.dataset.id = m.id;
-      item.innerHTML = `<span class="model-id">${m.name || m.id}</span><span class="model-desc">${m.desc || ''}</span>`;
-      item.addEventListener('click', () => {
-        document.querySelectorAll('.model-item').forEach(i =>
-          i.classList.toggle('selected', i.dataset.id === m.id));
-        state.model = m.id;
-        document.getElementById('btn-confirm-model').disabled = false;
-      });
-      list.appendChild(item);
-    }
-    // Auto-select first
-    list.firstChild?.click();
+    LLM_PROVIDERS[state.provider].models = _allModels;
+    renderModelList(_allModels);
   } catch (e) {
     list.innerHTML = `<div class="model-loading" style="color:var(--red)">Erreur: ${e.message}</div>`;
   }
+}
+
+function renderModelList(models) {
+  const list = document.getElementById('model-list');
+  list.innerHTML = '';
+
+  if (!models.length) {
+    list.innerHTML = `<div class="search-no-result">Aucun modèle trouvé</div>`;
+    return;
+  }
+
+  for (const m of models) {
+    const item = document.createElement('div');
+    item.className = 'model-item';
+    item.dataset.id = m.id;
+    item.innerHTML = `<span class="model-id">${m.name || m.id}</span><span class="model-desc">${m.desc || m.id}</span>`;
+    item.addEventListener('click', () => {
+      document.querySelectorAll('#model-list .model-item').forEach(i =>
+        i.classList.toggle('selected', i.dataset.id === m.id));
+      state.model = m.id;
+      document.getElementById('btn-confirm-model').disabled = false;
+    });
+    list.appendChild(item);
+  }
+  // Auto-select first
+  list.firstChild?.click();
+}
+
+function filterModels(query) {
+  const q = query.toLowerCase().trim();
+  if (!q) {
+    renderModelList(_allModels);
+    return;
+  }
+  const filtered = _allModels.filter(m =>
+    (m.name || m.id).toLowerCase().includes(q) ||
+    (m.id || '').toLowerCase().includes(q) ||
+    (m.desc || '').toLowerCase().includes(q)
+  );
+  renderModelList(filtered);
 }
 
 /* ─── STORY ─────────────────────────────────── */
@@ -406,6 +431,11 @@ function openStoryMenu() {
 
 /* ─── EVENT LISTENERS ───────────────────────── */
 function setupEventListeners() {
+  // Model search
+  document.getElementById('model-search').addEventListener('input', (e) => {
+    filterModels(e.target.value);
+  });
+
   // API Key input
   const keyInput = document.getElementById('api-key-input');
   keyInput.addEventListener('input', () => {

@@ -16,11 +16,7 @@
   <div id="screen-api" class="screen active">
     <div class="screen-inner">
       <div class="logo-title">
-        <svg class="sw-logo" viewBox="0 0 200 60" xmlns="http://www.w3.org/2000/svg">
-          <text x="50%" y="42" dominant-baseline="middle" text-anchor="middle"
-                font-family="Orbitron,sans-serif" font-size="36" font-weight="900"
-                fill="#FFE81F" letter-spacing="8">STAR WARS</text>
-        </svg>
+        <h1 class="sw-logo-text">STAR WARS</h1>
         <p class="subtitle">Histoire Interactive IA</p>
       </div>
 
@@ -63,6 +59,10 @@
     <div class="screen-inner">
       <h2 class="screen-title">Choisissez votre modèle</h2>
       <p class="screen-subtitle">Le modèle qui donnera vie à votre histoire</p>
+      <div class="search-wrap">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="text" id="model-search" class="sw-input search-input" placeholder="Rechercher un modèle…" autocomplete="off" />
+      </div>
       <div id="model-list" class="model-list"></div>
       <div class="nav-buttons">
         <button class="sw-btn secondary" onclick="goTo('screen-api')">← Retour</button>
