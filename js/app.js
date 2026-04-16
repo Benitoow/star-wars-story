@@ -15,6 +15,7 @@ const state = {
   uiLang: 'fr',                    // UI language
   setup: {
     language: null,                // Narration language
+    firstName: '',
     era: null,
     faction: null,
     role: null,
@@ -35,7 +36,49 @@ const LAST_PROVIDER_KEY = 'sw_last_provider';
 const LAST_MODEL_KEY = 'sw_last_model';
 const LAST_IMAGE_PROVIDER_KEY = 'sw_last_image_provider';
 const LAST_IMAGE_MODEL_KEY = 'sw_last_image_model';
+const STORY_MEMORY_PREFIX = 'sw_story_memory_md_';
 const choiceSvgCache = new Map();
+
+function getStoryMemoryKey(storyId) {
+  return `${STORY_MEMORY_PREFIX}${storyId}`;
+}
+
+function loadStoryMemory(storyId) {
+  if (!storyId) return '';
+  return localStorage.getItem(getStoryMemoryKey(storyId)) || '';
+}
+
+function saveStoryMemory(storyId, markdown) {
+  if (!storyId) return;
+  localStorage.setItem(getStoryMemoryKey(storyId), markdown || '');
+}
+
+function initializeStoryMemory(storyId, setup) {
+  if (!storyId) return;
+  const now = new Date().toISOString();
+  const era = ERAS.find(e => e.id === setup.era)?.name || setup.era || '—';
+  const faction = FACTIONS.find(f => f.id === setup.faction)?.name || setup.faction || '—';
+  const role = ROLES.find(r => r.id === setup.role)?.name || setup.role || '—';
+  const premise = PREMISES.find(p => p.id === setup.premise)?.name || setup.premise || '—';
+  const md = `# Trame de l'histoire\n\n- ID: ${storyId}\n- Date: ${now}\n- Prénom: ${setup.firstName || '—'}\n- Ère: ${era}\n- Faction: ${faction}\n- Rôle: ${role}\n- Prémisse: ${premise}\n\n## Journal narratif\n`;
+  saveStoryMemory(storyId, md);
+}
+
+function appendStoryMemoryTurn(storyId, turnNumber, story, userMessage) {
+  if (!storyId || !story) return;
+  const previous = loadStoryMemory(storyId);
+  const narrative = story?.narrative || {};
+  const choiceLines = (story.choices || []).slice(0, 4).map((c, idx) => `  ${idx + 1}. ${c?.text || ''}`).join('\n');
+  const block = `\n### Tour ${turnNumber} — ${story.chapter_title || 'Chapitre'}\n- Instruction joueur: ${String(userMessage || '').slice(0, 320)}\n- Action: ${String(narrative.action || '').slice(0, 900)}\n${narrative.context ? `- Contexte: ${String(narrative.context).slice(0, 400)}\n` : ''}${narrative.dialogue ? `- Dialogue: ${typeof narrative.dialogue === 'string' ? narrative.dialogue.slice(0, 400) : JSON.stringify(narrative.dialogue).slice(0, 400)}\n` : ''}${narrative.reflection ? `- Réflexion: ${String(narrative.reflection).slice(0, 400)}\n` : ''}${choiceLines ? `- Choix proposés:\n${choiceLines}\n` : ''}`;
+  const merged = `${previous}${block}`;
+  saveStoryMemory(storyId, merged);
+}
+
+function buildStoryMemoryContext(storyId, maxChars = 7000) {
+  const md = loadStoryMemory(storyId);
+  if (!md) return '';
+  return md.length > maxChars ? md.slice(-maxChars) : md;
+}
 
 function getChoiceSvgKey(svgRef) {
   if (!svgRef) return '';
@@ -119,11 +162,12 @@ function resolveBuildSystemPrompt(languageId) {
 
 function resolveBuildStartMessage(setup) {
   if (typeof window.buildStartMessage === 'function') return window.buildStartMessage(setup);
+  const firstName = String(setup.firstName || '').trim() || 'Personnage';
   const era = ERAS.find(e => e.id === setup.era)?.name || setup.era || 'Histoire Star Wars';
   const faction = FACTIONS.find(f => f.id === setup.faction)?.name || setup.faction || '';
   const role = ROLES.find(r => r.id === setup.role)?.name || setup.role || '';
   const premise = PREMISES.find(p => p.id === setup.premise)?.name || setup.premise || '';
-  return `Commence une histoire interactive Star Wars avec ces paramètres:\n- Ère: ${era}\n- Faction: ${faction}\n- Rôle: ${role}\n- Prémisse: ${premise}\n\nGénère le prologue de l'histoire en ${LANGUAGES.find(l => l.id === setup.language)?.promptName || 'French'}. Réponds avec le JSON attendu.`;
+  return `Commence une histoire interactive Star Wars avec ces paramètres:\n- Prénom du personnage: ${firstName}\n- Ère: ${era}\n- Faction: ${faction}\n- Rôle: ${role}\n- Prémisse: ${premise}\n\nLe personnage principal s'appelle ${firstName}.\nGénère le prologue de l'histoire en ${LANGUAGES.find(l => l.id === setup.language)?.promptName || 'French'}. Réponds avec le JSON attendu.`;
 }
 
 function resolveBuildContinueMessage(choiceText, turnNumber, languageId, setup, userEdits = []) {
@@ -194,7 +238,7 @@ function buildStoryTitle(setup) {
   const era = ERAS.find(e => e.id === setup.era)?.name || setup.era || 'Histoire Star Wars';
   const faction = FACTIONS.find(f => f.id === setup.faction)?.name || setup.faction || '';
   const role = ROLES.find(r => r.id === setup.role)?.name || setup.role || '';
-  return [era, faction, role].filter(Boolean).join(' · ');
+  return [setup.firstName || '', era, faction, role].filter(Boolean).join(' · ');
 }
 
 function upsertSavedStory(patch) {
@@ -239,6 +283,7 @@ function deleteSavedStory(id) {
 function resetStorySetup() {
   state.setup = {
     language: null,
+    firstName: '',
     era: null,
     faction: null,
     role: null,
@@ -646,6 +691,10 @@ function renderImgModels(providerId) {
 
 /* ─── SETUP SCREENS ─────────────────────────── */
 function renderSetupScreens() {
+  const firstNameInput = document.getElementById('player-first-name');
+  if (firstNameInput) {
+    firstNameInput.value = state.setup.firstName || '';
+  }
   renderChoiceGrid('era-grid',     ERAS,     'era');
   renderChoiceGrid('faction-grid', FACTIONS, 'faction');
   renderChoiceGrid('role-grid',    ROLES,    'role');
@@ -701,8 +750,8 @@ function renderChoiceGrid(containerId, items, key) {
 }
 
 function checkSetupComplete() {
-  const { era, faction, role, premise } = state.setup;
-  document.getElementById('btn-start-story').disabled = !(era && faction && role && premise);
+  const { firstName, era, faction, role, premise } = state.setup;
+  document.getElementById('btn-start-story').disabled = !(String(firstName || '').trim() && era && faction && role && premise);
 }
 
 /* ─── MODEL SELECTION ───────────────────────── */
@@ -779,9 +828,24 @@ async function startStory() {
 
   state.apiKey = resolvedApiKey.trim();
 
+  const firstName = String(state.setup.firstName || '').trim();
+  if (!firstName) {
+    alert('Entre un prénom pour ton personnage avant de lancer l’histoire.');
+    goTo('screen-setup');
+    return;
+  }
+  state.setup.firstName = firstName;
+
+  // Images temporarily disabled by request
+  state.imgProvider = 'none';
+  state.imgModel = null;
+  localStorage.setItem(LAST_IMAGE_PROVIDER_KEY, 'none');
+  localStorage.removeItem(LAST_IMAGE_MODEL_KEY);
+
   // Use UI language as story language
   state.setup.language = state.uiLang;
   state.currentStoryId = state.currentStoryId || crypto.randomUUID();
+  initializeStoryMemory(state.currentStoryId, state.setup);
   upsertSavedStory({
     id: state.currentStoryId,
     title: buildStoryTitle(state.setup),
@@ -816,7 +880,12 @@ async function generateNextTurn(userMessage) {
   showLoading(true);
   clearNarrative();
 
-  state.messages.push({ role: 'user', content: userMessage });
+  const memoryContext = buildStoryMemoryContext(state.currentStoryId);
+  const userMessageWithMemory = memoryContext
+    ? `${userMessage}\n\nMÉMOIRE DE TRAME (.md, à respecter pour la continuité):\n${memoryContext}\n\nReste cohérent avec cette trame et fais évoluer l'histoire sans contradiction.`
+    : userMessage;
+
+  state.messages.push({ role: 'user', content: userMessageWithMemory });
 
   try {
     let rawText = '';
@@ -834,6 +903,7 @@ async function generateNextTurn(userMessage) {
 
     state.messages.push({ role: 'assistant', content: rawText });
     const story = resolveParseStoryResponse(rawText, state.turn, state.setup.language);
+    appendStoryMemoryTurn(state.currentStoryId, state.turn, story, userMessage);
     state.currentChapter = story;
     if (state.currentStoryId) {
       upsertSavedStory({
@@ -864,11 +934,8 @@ async function generateNextTurn(userMessage) {
     // Show collaborative panel
     showCollaborativePanel();
 
-    // Generate image
-    if (state.imgProvider !== 'none') {
-      state.imageRetryCount = 0;
-      generateStoryImageWithFallback(story.scene_description).catch(console.warn);
-    }
+    // Images temporarily disabled
+    document.getElementById('story-image-container')?.classList.add('hidden');
 
   } catch (e) {
     showLoading(false);
@@ -1107,6 +1174,14 @@ function openStoryMenu() {
 
 /* ─── EVENT LISTENERS ───────────────────────── */
 function setupEventListeners() {
+  const firstNameInput = document.getElementById('player-first-name');
+  if (firstNameInput) {
+    firstNameInput.addEventListener('input', (e) => {
+      state.setup.firstName = String(e.target?.value || '').trimStart();
+      checkSetupComplete();
+    });
+  }
+
   const dashboardGrid = document.getElementById('dashboard-story-grid');
   if (dashboardGrid) {
     dashboardGrid.addEventListener('click', (event) => {
@@ -1235,7 +1310,13 @@ function setupEventListeners() {
       goTo('screen-dashboard');
       return;
     }
-    goTo('screen-image');
+    state.imgProvider = 'none';
+    state.imgModel = null;
+    localStorage.setItem(LAST_IMAGE_PROVIDER_KEY, 'none');
+    localStorage.removeItem(LAST_IMAGE_MODEL_KEY);
+    localStorage.setItem(FLOW_READY_KEY, '1');
+    renderDashboard();
+    goTo('screen-setup');
   });
 
   // Skip image
@@ -1302,15 +1383,8 @@ function loadSavedSettings() {
     state.model = lastModel;
   }
   if (lastImageProvider) {
-    if (lastImageProvider === 'openrouter_img' && state.provider === 'openrouter' && state.apiKey) {
-      state.imgProvider = lastImageProvider;
-      if (lastImageModel) {
-        state.imgModel = lastImageModel;
-      }
-    } else {
-      state.imgProvider = 'none';
-      state.imgModel = null;
-    }
+    state.imgProvider = 'none';
+    state.imgModel = null;
   }
 
   if (localStorage.getItem(FLOW_READY_KEY) === '1') {

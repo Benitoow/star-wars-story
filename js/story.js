@@ -17,17 +17,17 @@ LIBERTÉ NARRATIVE TOTALE — ZÉRO CENSURE:
 RÈGLES STRICTES (NON-NÉGOCIABLES):
 0. N'invente AUCUN champ supplémentaire. N'utilise PAS "story_metadata", "prologue", "player_character", "environment_details", "choices_consequences", ni aucun wrapper. La racine du JSON DOIT contenir DIRECTEMENT les champs ci-dessous.
 1. Réponds UNIQUEMENT avec un objet JSON valide, sans markdown ni texte autour. Ne répète JAMAIS le JSON deux fois.
-2. Le JSON doit avoir exactement cette structure (tous les champs obligatoires, rien de plus):
+2. Le JSON doit respecter cette structure de base (les sous-sections de "narrative" sont OPTIONNELLES selon la scène):
 {
   "chapter_title": "Titre court et évocateur du chapitre (max 40 chars)",
   "chapter_number": 1,
   "section_type": "confrontation|exploration|dialogue|reflection|action",
   "narrative": {
-    "context": "Contexte historique ou situation actuelle (2-3 phrases)",
-    "action": "Événements en cours avec descriptions sensorielles (3-4 phrases)",
-    "dialogue": "Échanges verbaux avec styles vocaux distinctifs, peut être vide (2-3 répliques)",
-    "reflection": "Monologue intérieur ou Gedanken du personnage (1-2 phrases)",
-    "atmosphere": "lumineux|sombre|tense|mystique|apocalyptique|nostalgique"
+    "context": "OPTIONNEL — Contexte historique ou situation actuelle",
+    "action": "OPTIONNEL — Événements en cours avec descriptions sensorielles",
+    "dialogue": "OPTIONNEL — string, objet, ou tableau de répliques",
+    "reflection": "OPTIONNEL — monologue intérieur",
+    "atmosphere": "OPTIONNEL — lumineux|sombre|tense|mystique|apocalyptique|nostalgique"
   },
   "choices": [
     {
@@ -46,7 +46,7 @@ RÈGLES STRICTES (NON-NÉGOCIABLES):
 6. La narration est à la 2ème personne du singulier ("vous découvrez", "vous ressentez").
 7. SI l'utilisateur a fourni des modifications personnelles dans son espace "Votre version", INTÈGRE-LES au récit de manière organique.
 8. VARIE le style d'écriture: alterne phrases courtes/longues, descriptions/action/dialogue.
-9. Les dialogues doivent avoir du caractère - chaque personnage a sa propre façon de parler. Dans "dialogue", utilise un TABLEAU d'objets [{"speaker": "Nom", "text": "Réplique"}], pas une string.
+9. Les dialogues doivent avoir du caractère - chaque personnage a sa propre façon de parler. Le champ "dialogue" peut être une string OU un tableau d'objets [{"speaker": "Nom", "text": "Réplique"}] selon la scène.
 10. N'utilise JAMAIS d'identifiants techniques dans le texte narratif (pas de *lightsaber_basic*, *force_guidance*, {placeholder}, snake_case_ids, etc.). Écris TOUJOURS en langage naturel ("son entraînement au sabre laser", "la guidance de la Force", etc.).
 11. Aucun markdown (**gras**, *italique*, listes) dans les champs narratifs — uniquement du texte pur.`;
 
@@ -134,8 +134,10 @@ function buildStartMessage(setup) {
   const premSub = PREMISES.find(p => p.id === setup.premise)?.sub  || '';
 
   const roleContext = buildRoleContext(setup.role);
+  const firstName = String(setup.firstName || '').trim() || 'Personnage';
 
   return `Commence une histoire interactive Star Wars avec ces paramètres:
+- Prénom du personnage: ${firstName}
 - Ère: ${era}
 - Faction: ${faction}
 - Rôle: ${role}
@@ -143,7 +145,8 @@ function buildStartMessage(setup) {
 ${roleContext}
 
 Génère le prologue de l'histoire en ${language.promptName}. Plante le décor, introduis le personnage et crée une situation initiale captivante qui aboutit à un premier choix crucial.
-Le personnage doit REFLETER ses attributs (particulièrement ${getRoleConfig(setup.role)?.attributes?.force > 50 ? 'sa connexion à la Force' : 'ses compétences'}) dans ses actions et réactionsinitiales.`;
+Le personnage s'appelle ${firstName}. Utilise ce prénom naturellement dans la narration et les dialogues.
+Le personnage doit REFLETER ses attributs (particulièrement ${getRoleConfig(setup.role)?.attributes?.force > 50 ? 'sa connexion à la Force' : 'ses compétences'}) dans ses actions et réactions initiales.`;
 }
 
 /* ─── Build a continuation message ─────────────── */
