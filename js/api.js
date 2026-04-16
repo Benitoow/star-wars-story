@@ -58,11 +58,42 @@ async function callLLM(messages, { providerId, model, apiKey, onStream }) {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error?.message || `HTTP ${res.status}`);
+    console.error('[LLM error]', providerId, model, err);
+    throw new Error(formatProviderError(err, res.status));
   }
   if (useStream) return streamOpenAIResponse(res, onStream);
   const data = await res.json();
+  if (data?.error) {
+    console.error('[LLM error 200]', providerId, model, data);
+    throw new Error(formatProviderError(data, 200));
+  }
   return data.choices?.[0]?.message?.content || '';
+}
+
+/* ─── Extract a useful error message from provider payloads ─── */
+function formatProviderError(payload, status) {
+  const err = payload?.error || payload || {};
+  const base = err.message || payload?.message || `HTTP ${status}`;
+
+  // OpenRouter puts upstream details in metadata
+  const meta = err.metadata || payload?.metadata;
+  if (meta) {
+    const parts = [];
+    if (meta.provider_name) parts.push(meta.provider_name);
+    if (meta.raw) {
+      try {
+        const raw = typeof meta.raw === 'string' ? JSON.parse(meta.raw) : meta.raw;
+        const detail = raw?.error?.message || raw?.message || (typeof meta.raw === 'string' ? meta.raw : '');
+        if (detail) parts.push(String(detail).slice(0, 220));
+      } catch {
+        if (typeof meta.raw === 'string') parts.push(meta.raw.slice(0, 220));
+      }
+    }
+    if (Array.isArray(meta.reasons) && meta.reasons.length) parts.push(meta.reasons.join(', '));
+    if (parts.length) return `${base} — ${parts.join(' · ')}`;
+  }
+
+  return base;
 }
 
 /* ─── Streaming helpers ─────────────────────── */
