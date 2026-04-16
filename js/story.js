@@ -442,41 +442,49 @@ function formatDialogue(dialogue) {
 
 /* ─── Format narrative for display ───────────── */
 function formatNarrative(story) {
-  const { context, action, dialogue, reflection, atmosphere } = story.narrative;
+  const narrative = story?.narrative || {};
+  const { atmosphere } = narrative;
   const atmosphereClass = `atmosphere-${atmosphere}`;
 
-  const cContext    = cleanNarrativeText(context);
-  const cAction     = cleanNarrativeText(action);
-  const cReflection = cleanNarrativeText(reflection);
-  const dialogueHtml = formatDialogue(dialogue);
+  const sectionKey = String(story?.section_type || '').toLowerCase();
+  const availableKeys = Object.keys(narrative).filter(k => k !== 'atmosphere');
+  const orderedKeys = [
+    ...(availableKeys.includes(sectionKey) ? [sectionKey] : []),
+    ...availableKeys
+  ].filter((key, idx, arr) => arr.indexOf(key) === idx);
+
+  const labelFor = (key) => {
+    if (['context', 'action', 'dialogue', 'reflection'].includes(key)) return t(key);
+    return key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ');
+  };
 
   let html = `<div class="narrative-container ${atmosphereClass}">`;
 
-  if (cContext) {
-    html += `<div class="narrative-section context">
-      <span class="section-label">${t('context')}</span>
-      <p>${escapeHtml(cContext)}</p>
-    </div>`;
-  }
+  for (const key of orderedKeys) {
+    const value = narrative[key];
+    if (value === null || value === undefined || value === '') continue;
 
-  if (cAction) {
-    html += `<div class="narrative-section action">
-      <span class="section-label">${t('action')}</span>
-      <p>${escapeHtml(cAction)}</p>
-    </div>`;
-  }
+    const sectionClass = ['context', 'action', 'dialogue', 'reflection'].includes(key)
+      ? key
+      : 'action';
 
-  if (dialogueHtml) {
-    html += `<div class="narrative-section dialogue">
-      <span class="section-label">${t('dialogue')}</span>
-      <div class="dialogue-content">${dialogueHtml}</div>
-    </div>`;
-  }
+    if (key === 'dialogue') {
+      const dialogueHtml = formatDialogue(value);
+      if (!dialogueHtml) continue;
+      html += `<div class="narrative-section ${sectionClass}">
+        <span class="section-label">${labelFor(key)}</span>
+        <div class="dialogue-content">${dialogueHtml}</div>
+      </div>`;
+      continue;
+    }
 
-  if (cReflection) {
-    html += `<div class="narrative-section reflection">
-      <span class="section-label">${t('reflection')}</span>
-      <p><em>${escapeHtml(cReflection)}</em></p>
+    const cleaned = cleanNarrativeText(typeof value === 'string' ? value : JSON.stringify(value));
+    if (!cleaned) continue;
+    const content = key === 'reflection' ? `<p><em>${escapeHtml(cleaned)}</em></p>` : `<p>${escapeHtml(cleaned)}</p>`;
+
+    html += `<div class="narrative-section ${sectionClass}">
+      <span class="section-label">${labelFor(key)}</span>
+      ${content}
     </div>`;
   }
 
