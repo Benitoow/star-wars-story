@@ -27,7 +27,8 @@ const state = {
   dashboardModelEdit: false,
   isGenerating: false,
   currentChapter: null,
-  imageRetryCount: 0
+  imageRetryCount: 0,
+  hiddenSkillProgress: null
 };
 
 const STORY_STORAGE_KEY = 'sw_saved_stories';
@@ -37,7 +38,142 @@ const LAST_MODEL_KEY = 'sw_last_model';
 const LAST_IMAGE_PROVIDER_KEY = 'sw_last_image_provider';
 const LAST_IMAGE_MODEL_KEY = 'sw_last_image_model';
 const STORY_MEMORY_PREFIX = 'sw_story_memory_md_';
+const STORY_SKILL_PROGRESS_PREFIX = 'sw_story_skill_progress_';
+const HIDDEN_SKILL_KEYS = ['combat', 'diplomacy', 'stealth', 'tech', 'force', 'survival'];
 const choiceSvgCache = new Map();
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function normalizeSkillKey(rawKey) {
+  const key = String(rawKey || '').trim().toLowerCase();
+  return HIDDEN_SKILL_KEYS.includes(key) ? key : 'survival';
+}
+
+function getSkillProgressKey(storyId) {
+  return `${STORY_SKILL_PROGRESS_PREFIX}${storyId}`;
+}
+
+function xpNeededForNextLevel(level) {
+  const safeLevel = Math.max(1, Number(level) || 1);
+  return 120 + (safeLevel - 1) * 65;
+}
+
+function buildDefaultSkillProgress(roleId) {
+  const role = resolveRoleConfig(roleId);
+  const levels = {};
+  const xp = {};
+  const multipliers = {};
+
+  for (const key of HIDDEN_SKILL_KEYS) {
+    const baseAttr = clamp(Number(role?.attributes?.[key] ?? 45), 0, 100);
+    levels[key] = 1;
+    xp[key] = 0;
+    multipliers[key] = 0.72 + (baseAttr / 100) * 0.68; // intentionally slow growth
+  }
+
+  return {
+    levels,
+    xp,
+    multipliers,
+    roleId: roleId || null,
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function loadSkillProgress(storyId, roleId) {
+  if (!storyId) return buildDefaultSkillProgress(roleId);
+  const key = getSkillProgressKey(storyId);
+  const raw = localStorage.getItem(key);
+
+  if (!raw) {
+    const created = buildDefaultSkillProgress(roleId);
+    localStorage.setItem(key, JSON.stringify(created));
+    return created;
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    const fallback = buildDefaultSkillProgress(roleId);
+    return {
+      ...fallback,
+      ...parsed,
+      levels: { ...fallback.levels, ...(parsed.levels || {}) },
+      xp: { ...fallback.xp, ...(parsed.xp || {}) },
+      multipliers: { ...fallback.multipliers, ...(parsed.multipliers || {}) },
+      roleId: parsed.roleId || roleId || null,
+      updatedAt: parsed.updatedAt || fallback.updatedAt
+    };
+  } catch {
+    const repaired = buildDefaultSkillProgress(roleId);
+    localStorage.setItem(key, JSON.stringify(repaired));
+    return repaired;
+  }
+}
+
+function saveSkillProgress(storyId, progress) {
+  if (!storyId || !progress) return;
+  localStorage.setItem(getSkillProgressKey(storyId), JSON.stringify({
+    ...progress,
+    updatedAt: new Date().toISOString()
+  }));
+}
+
+function summarizeSkillLevels(progress) {
+  if (!progress) return '';
+  return HIDDEN_SKILL_KEYS
+    .map(key => {
+      const lvl = Number(progress.levels?.[key] || 1);
+      const xp = Number(progress.xp?.[key] || 0);
+      const need = xpNeededForNextLevel(lvl);
+      return `- ${key}: lvl ${lvl} (${xp}/${need})`;
+    })
+    .join('\n');
+}
+
+function applyHiddenSkillProgress(storyId, roleId, choiceMeta) {
+  if (!storyId || !choiceMeta) return null;
+
+  const progress = loadSkillProgress(storyId, roleId);
+  const attrKey = normalizeSkillKey(choiceMeta.attribute);
+  const diff = clamp(Number(choiceMeta.difficulty || 2), 1, 5);
+  const mult = Number(progress.multipliers?.[attrKey] || 1);
+  const gain = Math.max(1, Math.round((4 + diff * 2) * mult));
+
+  progress.xp[attrKey] = Number(progress.xp[attrKey] || 0) + gain;
+
+  let levelUps = 0;
+  while (progress.xp[attrKey] >= xpNeededForNextLevel(progress.levels[attrKey])) {
+    progress.xp[attrKey] -= xpNeededForNextLevel(progress.levels[attrKey]);
+    progress.levels[attrKey] += 1;
+    levelUps += 1;
+  }
+
+  saveSkillProgress(storyId, progress);
+  state.hiddenSkillProgress = progress;
+
+  const currentLevel = Number(progress.levels[attrKey] || 1);
+  const currentXp = Number(progress.xp[attrKey] || 0);
+  const nextXp = xpNeededForNextLevel(currentLevel);
+
+  return { attrKey, gain, levelUps, currentLevel, currentXp, nextXp };
+}
+
+function appendSkillProgressMemory(storyId, turnNumber, event, progress) {
+  if (!storyId || !event || !progress) return;
+  const previous = loadStoryMemory(storyId);
+  const summary = summarizeSkillLevels(progress);
+  const block = `\n#### Progression cachée — Tour ${turnNumber}\n- Attribut entraîné: ${event.attrKey}\n- XP gagnée: +${event.gain}\n- Niveau actuel: ${event.currentLevel}\n- Progression: ${event.currentXp}/${event.nextXp}${event.levelUps ? `\n- Level up: +${event.levelUps}` : ''}\n\n${summary}\n`;
+  saveStoryMemory(storyId, `${previous}${block}`);
+}
+
+function buildSkillProgressContext(storyId, roleId) {
+  const progress = loadSkillProgress(storyId, roleId);
+  state.hiddenSkillProgress = progress;
+  const lines = summarizeSkillLevels(progress);
+  return `NIVEAUX CACHÉS (invisibles pour le joueur, à utiliser pour la cohérence):\n${lines}\nPlus un niveau est élevé, plus le personnage est performant dans cet attribut.`;
+}
 
 function getStoryMemoryKey(storyId) {
   return `${STORY_MEMORY_PREFIX}${storyId}`;
@@ -55,12 +191,13 @@ function saveStoryMemory(storyId, markdown) {
 
 function initializeStoryMemory(storyId, setup) {
   if (!storyId) return;
+  if (loadStoryMemory(storyId)) return;
   const now = new Date().toISOString();
   const era = ERAS.find(e => e.id === setup.era)?.name || setup.era || '—';
   const faction = FACTIONS.find(f => f.id === setup.faction)?.name || setup.faction || '—';
   const role = ROLES.find(r => r.id === setup.role)?.name || setup.role || '—';
   const premise = PREMISES.find(p => p.id === setup.premise)?.name || setup.premise || '—';
-  const md = `# Trame de l'histoire\n\n- ID: ${storyId}\n- Date: ${now}\n- Prénom: ${setup.firstName || '—'}\n- Ère: ${era}\n- Faction: ${faction}\n- Rôle: ${role}\n- Prémisse: ${premise}\n\n## Journal narratif\n`;
+  const md = `# Trame de l'histoire\n\n- ID: ${storyId}\n- Date: ${now}\n- Prénom: ${setup.firstName || '—'}\n- Ère: ${era}\n- Faction: ${faction}\n- Rôle: ${role}\n- Prémisse: ${premise}\n\n## Journal narratif\n\n## Progression cachée\n`;
   saveStoryMemory(storyId, md);
 }
 
@@ -846,6 +983,7 @@ async function startStory() {
   state.setup.language = state.uiLang;
   state.currentStoryId = state.currentStoryId || crypto.randomUUID();
   initializeStoryMemory(state.currentStoryId, state.setup);
+  state.hiddenSkillProgress = loadSkillProgress(state.currentStoryId, state.setup.role);
   upsertSavedStory({
     id: state.currentStoryId,
     title: buildStoryTitle(state.setup),
@@ -866,12 +1004,26 @@ async function startStory() {
   await generateNextTurn(resolveBuildStartMessage(state.setup));
 }
 
-async function makeChoice(choiceText) {
+async function makeChoice(choiceInput) {
   if (state.isGenerating) return;
-  await generateNextTurn(resolveBuildContinueMessage(choiceText, state.turn, state.setup.language, state.setup, state.userEdits));
+
+  const choiceObj = (choiceInput && typeof choiceInput === 'object') ? choiceInput : null;
+  const choiceText = choiceObj?.text || String(choiceInput || '');
+  const progressionEvent = choiceObj
+    ? applyHiddenSkillProgress(state.currentStoryId, state.setup.role, choiceObj)
+    : null;
+
+  if (progressionEvent && state.hiddenSkillProgress) {
+    appendSkillProgressMemory(state.currentStoryId, state.turn + 1, progressionEvent, state.hiddenSkillProgress);
+  }
+
+  await generateNextTurn(
+    resolveBuildContinueMessage(choiceText, state.turn, state.setup.language, state.setup, state.userEdits),
+    progressionEvent
+  );
 }
 
-async function generateNextTurn(userMessage) {
+async function generateNextTurn(userMessage, progressionEvent = null) {
   state.isGenerating = true;
   state.turn++;
 
@@ -881,9 +1033,10 @@ async function generateNextTurn(userMessage) {
   clearNarrative();
 
   const memoryContext = buildStoryMemoryContext(state.currentStoryId);
+  const skillContext = buildSkillProgressContext(state.currentStoryId, state.setup.role);
   const userMessageWithMemory = memoryContext
-    ? `${userMessage}\n\nMÉMOIRE DE TRAME (.md, à respecter pour la continuité):\n${memoryContext}\n\nReste cohérent avec cette trame et fais évoluer l'histoire sans contradiction.`
-    : userMessage;
+    ? `${userMessage}\n\nMÉMOIRE DE TRAME (.md, à respecter pour la continuité):\n${memoryContext}\n\n${skillContext}\n${progressionEvent ? `\nDernière progression cachée: ${progressionEvent.attrKey} +${progressionEvent.gain} XP.` : ''}\n\nReste cohérent avec cette trame et fais évoluer l'histoire sans contradiction.`
+    : `${userMessage}\n\n${skillContext}`;
 
   state.messages.push({ role: 'user', content: userMessageWithMemory });
 
@@ -1037,7 +1190,7 @@ function renderChoicesWithAttributes(choices) {
         <span class="choice-diff">${difficultyStars}</span>
       </span>
     `;
-    btn.addEventListener('click', () => makeChoice(choice.text));
+    btn.addEventListener('click', () => makeChoice(choice));
     container.appendChild(btn);
   });
 }
