@@ -47,11 +47,19 @@ function getChoiceSvgKey(svgRef) {
 function stylizeChoiceSvg(markup) {
   return markup
     .replace(/<svg\b([^>]*)>/i, (match, attrs) => {
-      const withViewBox = /viewBox=/i.test(attrs) ? attrs : `${attrs} viewBox="0 0 24 24"`;
-      const withPreserve = /preserveAspectRatio=/i.test(withViewBox)
-        ? withViewBox
-        : `${withViewBox} preserveAspectRatio="xMidYMid meet"`;
-      return `<svg${withPreserve}>`;
+      let next = attrs;
+      if (!/viewBox=/i.test(next)) next = `${next} viewBox="0 0 24 24"`;
+      if (!/preserveAspectRatio=/i.test(next)) next = `${next} preserveAspectRatio="xMidYMid meet"`;
+      if (/\sclass="[^"]*"/i.test(next)) {
+        next = next.replace(/\sclass="([^"]*)"/i, (m, cls) => {
+          const classes = cls.split(/\s+/).filter(Boolean);
+          if (!classes.includes('choice-svg')) classes.push('choice-svg');
+          return ` class="${classes.join(' ')}"`;
+        });
+      } else {
+        next = `${next} class="choice-svg"`;
+      }
+      return `<svg${next}>`;
     })
     .replace(/\sfill="(?!none)[^"]*"/gi, ' fill="currentColor"')
     .replace(/\sstroke="(?!none)[^"]*"/gi, ' stroke="currentColor"')
