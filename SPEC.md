@@ -413,3 +413,71 @@ db.version(1).stores({
 - Component tests for UI interactions
 - E2E tests for critical flows
 - Manual testing on multiple devices
+
+---
+
+## 13. SVG Assets Organization
+
+### 13.1 Asset Location
+All SVG assets are located in `/svg/` directory at project root.
+
+### 13.2 Asset Categories
+
+#### Faction Emblems (9 total)
+| Filename | Faction | Color |
+|----------|---------|-------|
+| `jedi-order-svgrepo-com.svg` | Jedi Order | #4ec9b0 |
+| `starwars-sith-svgrepo-com.svg` | Sith Order | #e51414 |
+| `Emblem_of_the_First_Galactic_Empire.svg` | Galactic Empire | #c41e3a |
+| `Emblem_of_the_First_Order.svg` | First Order | #1a1a2e |
+| `brand-galactic-republic-svgrepo-com.svg` | Galactic Republic | #3498db |
+| `AncientRepublic.svg` | Old Republic | #820 |
+| `Desilijic_clan_vector.svg` | Hutt Cartel | #BC2729 |
+
+#### Character Icons (4 total)
+| Filename | Character Type | Use Case |
+|----------|---------------|----------|
+| `noun-storm-trooper-49992.svg` | Stormtrooper | Imperial roles |
+| `scifi-starwars-boba-fett-svgrepo-com.svg` | Boba Fett | Bounty hunter |
+| `mandalorian-svgrepo-com.svg` | Mandalorian | Mandalorian roles |
+| `alone-characterized-embodied-svgrepo-com.svg` | Scout/Survivor | Neutral roles |
+
+#### Ships (1+)
+| Filename | Ship | Use Case |
+|----------|------|----------|
+| `millennium-falcon-svgrepo-com.svg` | Millennium Falcon | Smuggler, travel choices |
+| (TODO: add X-wing, TIE fighter, etc.) | | |
+
+#### Lightsabers (2)
+| Filename | Type | Use Case |
+|----------|------|----------|
+| `lightsaber-svgrepo-com.svg` | Generic Lightsaber | Sith, generic Force |
+| `luke-skywalker-lightsaber-svgrepo-com.svg` | Luke's Green Saber | Jedi roles |
+
+### 13.3 Configuration File
+All assets are organized in `/src/lib/config/assets.ts`:
+- `FACTIONS[]` - Faction definitions with SVG paths
+- `ROLES[]` - Character roles with attributes and skills
+- `SHIPS[]` - Vehicle definitions
+- `CHOICE_TYPES` - Story choice categories
+- `ERAS[]` - Historical periods
+- `getSvgPath(filename)` - Helper to resolve SVG paths
+
+### 13.4 SVG Icon Component
+Use `<SvgIcon>` component to display icons:
+```svelte
+<script>
+  import SvgIcon from '$lib/components/SvgIcon.svelte';
+</script>
+
+<SvgIcon filename="jedi-order-svgrepo-com.svg" size={32} color="#4ec9b0" />
+```
+
+### 13.5 Missing Icons (TODO)
+The following icons need to be created or sourced:
+- [ ] Rebel Alliance emblem (currently uses Republic icon)
+- [ ] X-Wing fighter
+- [ ] TIE Fighter
+- [ ] Star Destroyer
+- [ ] T-16 skyhopper
+- [ ] Slave I (Boba Fett's ship)
