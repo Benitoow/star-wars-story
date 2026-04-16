@@ -2,24 +2,14 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { getPreferences, savePreferences, type UserPreferences } from '$lib/db';
-  import { showToast, theme } from '$lib/stores/ui';
+  import { showToast, theme, uiLanguage } from '$lib/stores/ui';
+  import { UI_LANGUAGE_OPTIONS, type UiLanguageCode } from '$lib/config/languages';
   import Header from '$lib/components/Header.svelte';
   import Sidebar from '$lib/components/Sidebar.svelte';
 
   let preferences: UserPreferences | null = null;
   let loading = true;
   let saving = false;
-
-  const LANGUAGES = [
-    { code: 'fr', name: 'Français' },
-    { code: 'en', name: 'English' },
-    { code: 'es', name: 'Español' },
-    { code: 'de', name: 'Deutsch' },
-    { code: 'it', name: 'Italiano' },
-    { code: 'pt', name: 'Português' },
-    { code: 'ja', name: '日本語' },
-    { code: 'zh', name: '中文' }
-  ];
 
   const IMAGE_PROVIDERS = [
     { id: 'openai', name: 'DALL-E (OpenAI)' },
@@ -38,6 +28,7 @@
     saving = true;
     try {
       await savePreferences(preferences);
+      uiLanguage.set(preferences.uiLanguage);
       theme.set(preferences.theme);
       showToast('Paramètres sauvegardés', 'success');
     } catch (e) {
@@ -55,7 +46,8 @@
   function handleLanguageChange(e: Event) {
     const target = e.target as HTMLSelectElement;
     if (preferences) {
-      preferences.uiLanguage = target.value;
+      preferences.uiLanguage = target.value as UiLanguageCode;
+      uiLanguage.set(preferences.uiLanguage);
     }
   }
 
@@ -223,7 +215,7 @@
                 value={preferences.uiLanguage}
                 on:change={handleLanguageChange}
               >
-                {#each LANGUAGES as lang}
+                {#each UI_LANGUAGE_OPTIONS as lang}
                   <option value={lang.code}>{lang.name}</option>
                 {/each}
               </select>

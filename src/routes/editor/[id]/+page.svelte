@@ -17,8 +17,7 @@
     { id: 'clone_wars', name: 'Guerres des Clones', years: '22 - 19 AVBY' },
     { id: 'imperial', name: 'Ère Impériale', years: '19 - 4 AVBY' },
     { id: 'new_republic', name: 'Nouvelle République', years: '4 - 28 APBY' },
-    { id: 'first_order', name: 'Premier Ordre', years: '28 - 35 APBY' },
-    { id: 'high_republic', name: 'Haute République', years: '200 - 100 AVBY' }
+    { id: 'first_order', name: 'Premier Ordre', years: '28 - 35 APBY' }
   ];
 
   const FACTIONS = [

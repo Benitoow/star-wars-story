@@ -11,8 +11,7 @@
     { id: 'clone_wars', name: 'Guerres des Clones' },
     { id: 'imperial', name: 'Ère Impériale' },
     { id: 'new_republic', name: 'Nouvelle République' },
-    { id: 'first_order', name: 'Premier Ordre' },
-    { id: 'high_republic', name: 'Haute République' }
+    { id: 'first_order', name: 'Premier Ordre' }
   ];
 
   const FACTIONS = [

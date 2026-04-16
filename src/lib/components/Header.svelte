@@ -1,7 +1,8 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { toggleSidebar, searchOpen, searchQuery, viewMode, toasts } from '$lib/stores/ui';
+  import { toggleSidebar, searchOpen, searchQuery, uiLanguage, viewMode, toasts } from '$lib/stores/ui';
   import { stories } from '$lib/stores/stories';
+  import { UI_LANGUAGE_OPTIONS, getLanguageLabel, type UiLanguageCode } from '$lib/config/languages';
 
   let showNewStoryModal = false;
   let newStoryTitle = '';
@@ -27,6 +28,11 @@
     } catch (e) {
       toasts.add({ type: 'error', message: 'Erreur lors de la création' });
     }
+  }
+
+  function handleLanguageChange(event: Event) {
+    const target = event.target as HTMLSelectElement;
+    uiLanguage.set(target.value as UiLanguageCode);
   }
 </script>
 
@@ -66,6 +72,15 @@
   </div>
 
   <div class="header-right">
+    <label class="language-switcher" title="Langue de l'interface">
+      <span class="language-switcher-label">{getLanguageLabel($uiLanguage)}</span>
+      <select class="language-select" value={$uiLanguage} on:change={handleLanguageChange}>
+        {#each UI_LANGUAGE_OPTIONS as language}
+          <option value={language.code}>{language.name}</option>
+        {/each}
+      </select>
+    </label>
+
     <div class="view-toggle hide-mobile">
       <button
         class="view-btn"
@@ -255,7 +270,41 @@
     align-items: center;
     gap: var(--space-md);
   }
+    flex-wrap: wrap;
+    justify-content: flex-end;
 
+
+  .language-switcher {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: 0 var(--space-sm);
+    height: 40px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg-tertiary);
+    color: var(--color-text-secondary);
+  }
+
+  .language-switcher-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .language-select {
+    background: transparent;
+    border: none;
+    color: var(--color-text-primary);
+    font: inherit;
+    outline: none;
+    cursor: pointer;
+    max-width: 110px;
+  }
+
+  .language-select option {
+    color: var(--color-text-primary);
+  }
   .view-toggle {
     display: flex;
     background: var(--color-bg-tertiary);
@@ -399,6 +448,18 @@
   @media (max-width: 768px) {
     .header {
       padding: var(--space-sm) var(--space-md);
+    }
+
+    .language-switcher {
+      height: 36px;
+    }
+
+    .language-switcher-label {
+      display: none;
+    }
+
+    .language-select {
+      max-width: 92px;
     }
 
     .search-bar {

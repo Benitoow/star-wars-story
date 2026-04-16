@@ -455,12 +455,6 @@ export const CHOICE_TYPES = {
    Historical periods of the Star Wars galaxy */
 export const ERAS = [
   {
-    id: 'high_republic',
-    name: 'Haute République',
-    years: '200 - 100 AVBY',
-    description: 'L âge d or de la République, avant les Guerres Clones'
-  },
-  {
     id: 'old_republic',
     name: 'Ancienne République',
     years: '25 000 - 1000 AVBY',
@@ -482,7 +476,8 @@ export const ERAS = [
     id: 'new_republic',
     name: 'Nouvelle République',
     years: '4 - 28 APBY',
-    description: 'La reconstruction et les menaces restantes de l Empire'
+    description: 'La reconstruction et les menaces restantes de l Empire',
+    icon: 'NR_Seal.svg'
   },
   {
     id: 'first_order',
@@ -526,6 +521,7 @@ export const SVG_PATHS: Record<string, string> = {
   'Emblem_of_the_First_Galactic_Empire.svg': '/svg/Emblem_of_the_First_Galactic_Empire.svg',
   'Emblem_of_the_First_Order.svg': '/svg/Emblem_of_the_First_Order.svg',
   'brand-galactic-republic-svgrepo-com.svg': '/svg/brand-galactic-republic-svgrepo-com.svg',
+  'NR_Seal.svg': '/svg/NR_Seal.svg',
   'AncientRepublic.svg': '/svg/AncientRepublic.svg',
   'Desilijic_clan_vector.svg': '/svg/Desilijic_clan_vector.svg',
   

@@ -2,6 +2,7 @@
    Database Schema — Dexie.js (IndexedDB)
 ══════════════════════════════════════════════ */
 import Dexie, { type Table } from 'dexie';
+import type { UiLanguageCode } from '$lib/config/languages';
 
 export interface Story {
   id: string;
@@ -55,7 +56,7 @@ export interface StoryVersion {
 
 export interface UserPreferences {
   id: 'preferences';
-  uiLanguage: string;
+  uiLanguage: UiLanguageCode;
   theme: 'light' | 'dark' | 'auto';
   defaultImageProvider?: string;
   defaultImgModel?: string;
@@ -141,7 +142,7 @@ export const db = new StarWarsDB();
 // ─── Default Data ──────────────────────────────
 export const DEFAULT_PREFERENCES: UserPreferences = {
   id: 'preferences',
-  uiLanguage: 'fr',
+  uiLanguage: 'auto',
   theme: 'dark',
   autoSave: true,
   autoSaveInterval: 30000,

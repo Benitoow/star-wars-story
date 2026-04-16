@@ -4,6 +4,7 @@
 import { writable, derived } from 'svelte/store';
 import { browser } from '$app/environment';
 import { getPreferences } from '$db';
+import { resolveUiLanguage, type UiLanguageCode } from '$lib/config/languages';
 
 // ─── Theme ───────────────────────────────────
 function createThemeStore() {
@@ -45,6 +46,38 @@ async function savePreference(key: string, value: any) {
 }
 
 export const theme = createThemeStore();
+
+// ─── UI Language ───────────────────────────
+function createUiLanguageStore() {
+  const { subscribe, set } = writable<UiLanguageCode>('auto');
+
+  function applyLanguage(code: UiLanguageCode) {
+    if (!browser) return;
+    document.documentElement.lang = resolveUiLanguage(code);
+  }
+
+  return {
+    subscribe,
+    set: (value: UiLanguageCode) => {
+      set(value);
+      applyLanguage(value);
+      if (browser) {
+        savePreference('uiLanguage', value);
+      }
+    },
+    init: async () => {
+      if (!browser) return;
+
+      const prefs = await getPreferences();
+      const saved = prefs.uiLanguage || 'auto';
+
+      set(saved);
+      applyLanguage(saved);
+    }
+  };
+}
+
+export const uiLanguage = createUiLanguageStore();
 
 // ─── Sidebar ────────────────────────────────
 export const sidebarOpen = writable(true);

@@ -14,8 +14,7 @@
     clone_wars: 'Guerres des Clones',
     imperial: 'Ère Impériale',
     new_republic: 'Nouvelle République',
-    first_order: 'Premier Ordre',
-    high_republic: 'Haute République'
+    first_order: 'Premier Ordre'
   };
 
   const FACTION_NAMES: Record<string, string> = {

@@ -1366,7 +1366,12 @@ html, body {
 
 /* ─── UI LANGUAGE SELECTOR ─────────────────── */
 .ui-lang-selector {
-  position: relative;
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 220;
+  display: flex;
+  align-items: center;
 }
 .current-lang {
   background: rgba(255,255,255,0.06);
@@ -1673,6 +1678,20 @@ html, body {
   }
   .dashboard-hero-actions .sw-btn {
     width: 100%;
+  }
+
+  .ui-lang-selector {
+    top: 12px;
+    right: 12px;
+  }
+
+  .current-lang {
+    padding: 6px 8px;
+    font-size: 9px;
+  }
+
+  .lang-dropdown {
+    min-width: 104px;
   }
 
   .dashboard-summary-grid {

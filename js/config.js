@@ -588,9 +588,8 @@ const ERAS = [
   { id: 'old_republic',  name: 'Ancienne République', years: '25 000 – 1 000 av. BY', color: '#81D4FA', svg: 'svg/AncientRepublic.svg' },
   { id: 'clone_wars',    name: 'Guerres des Clones',  years: '22 – 19 av. BY',        color: '#4FC3F7', svg: 'svg/jedi-order-svgrepo-com.svg' },
   { id: 'imperial',      name: 'Ère Impériale',       years: '19 av. – 5 apr. BY',    color: '#e0e0e0', svg: 'svg/Emblem_of_the_First_Galactic_Empire.svg' },
-  { id: 'new_republic',  name: 'Nouvelle République', years: '5 – 34 apr. BY',        color: '#FF6B35', svg: 'svg/brand-galactic-republic-svgrepo-com.svg' },
+  { id: 'new_republic',  name: 'Nouvelle République', years: '5 – 34 apr. BY',        color: '#FF6B35', svg: 'svg/NR_Seal.svg' },
   { id: 'first_order',   name: 'Premier Ordre',       years: '34 apr. BY+',           color: '#FF1744', svg: 'svg/Emblem_of_the_First_Order.svg' },
-  { id: 'high_republic', name: 'Haute République',    years: '500 – 100 av. BY',      color: '#FFE082', svg: 'svg/together-ai-icon.svg' },
 ];
 
 const FACTIONS = [
@@ -714,7 +713,7 @@ const ROLES = [
     name: 'Sœur de la Nuit',
     sub: 'Magie de Dathomir',
     color: '#8E24AA',
-    svg: 'svg/grok-ai-icon.svg',
+    svg: '',
     faction: 'neutral',
     description: 'Sorcières de Dathomir, mystérieuses et redoutées.',
     attributes: { combat: 55, diplomacy: 40, stealth: 75, tech: 30, force: 60, survival: 70 },
@@ -884,7 +883,7 @@ const ROLES = [
     name: 'Agent Secret',
     sub: 'Ombres & secrets',
     color: '#7E57C2',
-    svg: 'svg/grok-ai-icon.svg',
+    svg: '',
     faction: 'neutral',
     description: 'Espions et infiltrateurs, operant dans l\'ombre.',
     attributes: { combat: 35, diplomacy: 60, stealth: 90, tech: 50, force: 0, survival: 55 },
@@ -901,7 +900,7 @@ const ROLES = [
     name: 'Ingénieur',
     sub: 'Bâtisseur de l\'impossible',
     color: '#4DB6AC',
-    svg: 'svg/together-ai-icon.svg',
+    svg: '',
     faction: 'neutral',
     description: 'Experts techniques, capables de réparer ou construire tout.',
     attributes: { combat: 25, diplomacy: 45, stealth: 35, tech: 95, force: 0, survival: 55 },
@@ -950,11 +949,11 @@ const ROLES = [
 ];
 
 const PREMISES = [
-  { id: 'chosen',     name: 'L\'Élu',          sub: 'Une prophétie ancienne vous désigne', color: '#FFE81F', svg: 'svg/together-ai-icon.svg' },
+  { id: 'chosen',     name: 'L\'Élu',          sub: 'Une prophétie ancienne vous désigne', color: '#FFE81F', svg: '' },
   { id: 'outcast',    name: 'Le Banni',        sub: 'Trahi, seul, et déterminé',           color: '#CE93D8', svg: 'svg/alone-characterized-embodied-svgrepo-com.svg' },
   { id: 'heist',      name: 'Le Braquage',     sub: 'Un artefact que tous convoitent',     color: '#FFB74D', svg: 'svg/millennium-falcon-svgrepo-com.svg' },
   { id: 'war',        name: 'La Guerre',       sub: 'Au cœur d\'une bataille décisive',    color: '#EF5350', svg: 'svg/Emblem_of_the_First_Galactic_Empire.svg' },
-  { id: 'mystery',    name: 'Le Mystère',      sub: 'Un secret qui change tout',           color: '#80CBC4', svg: 'svg/grok-ai-icon.svg' },
+  { id: 'mystery',    name: 'Le Mystère',      sub: 'Un secret qui change tout',           color: '#80CBC4', svg: '' },
   { id: 'redemption', name: 'La Rédemption',   sub: 'Racheter un passé sombre',            color: '#AED581', svg: 'svg/SithEmblem-Traced-TORkit.svg' },
   { id: 'survival',   name: 'La Survie',       sub: 'Échouer, c\'est mourir',              color: '#FF8A65', svg: 'svg/scifi-starwars-boba-fett-svgrepo-com.svg' },
   { id: 'legacy',     name: 'L\'Héritage',     sub: 'Un nom, un fardeau, un destin',       color: '#BA68C8', svg: 'svg/AncientRepublic.svg' },
@@ -974,6 +973,27 @@ const UI_LANGUAGES = [
   { id: 'ja', label: '日本語',    native: 'JA' },
   { id: 'zh', label: '中文',      native: 'ZH' },
 ];
+
+function detectBrowserLanguage() {
+  const candidates = [
+    ...(navigator.languages || []),
+    navigator.language,
+    document.documentElement.lang
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    const normalized = String(candidate).toLowerCase();
+    const directMatch = UI_LANGUAGES.find(lang => lang.id === normalized);
+    if (directMatch) return directMatch.id;
+
+    const base = normalized.split('-')[0];
+    if (UI_LANGUAGES.find(lang => lang.id === base)) {
+      return base;
+    }
+  }
+
+  return 'fr';
+}
 
 const I18N = {
   fr: {

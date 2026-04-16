@@ -36,15 +36,15 @@ const LAST_MODEL_KEY = 'sw_last_model';
 const LAST_IMAGE_PROVIDER_KEY = 'sw_last_image_provider';
 const LAST_IMAGE_MODEL_KEY = 'sw_last_image_model';
 
-function renderChoiceIcon(svgRef, className = '') {
+function renderChoiceIcon(svgRef, className = 'choice-mask') {
   if (!svgRef) return '';
   const trimmed = String(svgRef).trim();
   if (trimmed.startsWith('<svg')) return trimmed;
-  const classes = ['choice-svg'];
-  if (className) {
+  const classes = ['choice-mask'];
+  if (className && className !== 'choice-mask') {
     classes.push(className);
   }
-  return `<img src="${trimmed}" alt="" class="${classes.join(' ')}" loading="lazy" decoding="async"/>`;
+  return `<span class="${classes.join(' ')}" style="--choice-mask: url('${trimmed}')"></span>`;
 }
 
 function getSavedStories() {
@@ -140,7 +140,6 @@ function renderDashboard() {
   if (!stories.length) {
     grid.innerHTML = `
       <div class="dashboard-empty">
-        <div class="dashboard-empty-icon">${renderChoiceIcon('svg/grok-ai-icon.svg', 'dashboard-empty-mask')}</div>
         <h3>Aucune histoire pour l’instant</h3>
         <p>Créez votre première histoire et elle apparaîtra ici.</p>
       </div>
@@ -153,7 +152,6 @@ function renderDashboard() {
     card.className = 'dashboard-story-card';
     card.dataset.id = story.id;
     card.innerHTML = `
-      <div class="dashboard-story-icon">${renderChoiceIcon('svg/together-ai-icon.svg', 'dashboard-story-mask')}</div>
       <div class="dashboard-story-body">
         <div class="dashboard-story-topline">
           <h3>${story.title}</h3>
@@ -282,9 +280,6 @@ function updateLanguageSelector() {
 }
 
 function renderLanguageSelector() {
-  const header = document.querySelector('.story-header');
-  if (!header) return;
-
   // Create language selector if not exists
   let selector = document.getElementById('ui-lang-selector');
   if (!selector) {
@@ -303,7 +298,7 @@ function renderLanguageSelector() {
         `).join('')}
       </div>
     `;
-    header.appendChild(selector);
+    document.body.appendChild(selector);
 
     // Add event listeners
     const currentBtn = selector.querySelector('.current-lang');
@@ -335,6 +330,10 @@ document.addEventListener('DOMContentLoaded', () => {
   if (savedUILang && UI_LANGUAGES.find(l => l.id === savedUILang)) {
     state.uiLang = savedUILang;
     window.__UI_LANG__ = savedUILang;
+  } else {
+    state.uiLang = detectBrowserLanguage();
+    window.__UI_LANG__ = state.uiLang;
+    localStorage.setItem('sw_ui_lang', state.uiLang);
   }
 
   initStarfield();
@@ -344,6 +343,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadSavedSettings();
   setupEventListeners();
   updateAllUIText();
+  renderLanguageSelector();
   renderDashboard();
 });
 

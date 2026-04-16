@@ -1,7 +1,7 @@
 <script lang="ts">
   import '../app.css';
   import { onMount } from 'svelte';
-  import { theme, sidebarOpen, toasts } from '$lib/stores/ui';
+  import { theme, uiLanguage, sidebarOpen, toasts } from '$lib/stores/ui';
   import { initializeDB } from '$lib/db';
   import Toast from '$lib/components/Toast.svelte';
   import Sidebar from '$lib/components/Sidebar.svelte';
@@ -12,6 +12,7 @@
   onMount(async () => {
     await initializeDB();
     await theme.init();
+    await uiLanguage.init();
     initialized = true;
   });
 </script>
