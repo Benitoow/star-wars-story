@@ -23,6 +23,7 @@ const state = {
   userEdits: [],                    // Collaborative mode edits
   messages: [],
   turn: 0,
+  dashboardModelEdit: false,
   isGenerating: false,
   currentChapter: null,
   imageRetryCount: 0
@@ -171,6 +172,39 @@ function renderDashboard() {
     `;
     grid.appendChild(card);
   });
+}
+
+async function openTextModelSelectorFromDashboard() {
+  state.dashboardModelEdit = false;
+  const rememberedProvider = state.provider || localStorage.getItem(LAST_PROVIDER_KEY);
+  if (!rememberedProvider || !LLM_PROVIDERS[rememberedProvider]) {
+    alert('Choisis d’abord un fournisseur IA.');
+    goTo('screen-api');
+    return;
+  }
+
+  state.provider = rememberedProvider;
+  const rememberedKey = localStorage.getItem(`sw_key_${state.provider}`);
+  if (!rememberedKey) {
+    alert('Aucune clé API mémorisée pour ce fournisseur.');
+    goTo('screen-api');
+    return;
+  }
+
+  state.apiKey = rememberedKey;
+  state.dashboardModelEdit = true;
+
+  selectProvider(state.provider);
+  await populateModels();
+
+  const rememberedModel = state.model || localStorage.getItem(LAST_MODEL_KEY);
+  if (rememberedModel) {
+    const existingModel = Array.from(document.querySelectorAll('#model-list .model-item'))
+      .find(item => item.dataset.id === rememberedModel);
+    existingModel?.click();
+  }
+
+  goTo('screen-model');
 }
 
 /* ─── UI LANGUAGE SYSTEM ─────────────────────── */
@@ -1052,6 +1086,16 @@ function setupEventListeners() {
     editImageModelBtn.addEventListener('click', () => goTo('screen-image'));
   }
 
+  const editTextModelBtn = document.getElementById('btn-edit-text-model');
+  if (editTextModelBtn) {
+    editTextModelBtn.addEventListener('click', () => {
+      openTextModelSelectorFromDashboard().catch((error) => {
+        console.error(error);
+        alert('Impossible de charger les modèles pour le moment.');
+      });
+    });
+  }
+
   // Model search
   const modelSearch = document.getElementById('model-search');
   if (modelSearch) {
@@ -1090,6 +1134,7 @@ function setupEventListeners() {
     err.classList.add('hidden');
 
     try {
+      state.dashboardModelEdit = false;
       await testApiConnection(state.provider, state.apiKey);
 
       if (document.getElementById('save-key-checkbox').checked) {
@@ -1114,11 +1159,19 @@ function setupEventListeners() {
   // Confirm model
   document.getElementById('btn-confirm-model')?.addEventListener('click', () => {
     localStorage.setItem(LAST_MODEL_KEY, state.model || '');
+    if (state.dashboardModelEdit) {
+      state.dashboardModelEdit = false;
+      localStorage.setItem(FLOW_READY_KEY, '1');
+      renderDashboard();
+      goTo('screen-dashboard');
+      return;
+    }
     goTo('screen-image');
   });
 
   // Skip image
   document.getElementById('btn-skip-image')?.addEventListener('click', () => {
+    state.dashboardModelEdit = false;
     state.imgProvider = 'none';
     state.imgModel = null;
     localStorage.setItem(LAST_IMAGE_PROVIDER_KEY, state.imgProvider);
@@ -1130,6 +1183,7 @@ function setupEventListeners() {
 
   // Confirm image provider
   document.getElementById('btn-confirm-image')?.addEventListener('click', () => {
+    state.dashboardModelEdit = false;
     const imgKey = document.getElementById('img-api-key').value.trim();
     if (imgKey) state.imgApiKey = imgKey;
     localStorage.setItem(LAST_IMAGE_PROVIDER_KEY, state.imgProvider);
