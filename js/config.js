@@ -24,29 +24,16 @@ const ICONS = {
     <path d="M16.778 1.844v1.919q-.569-.026-1.138-.032-.708-.008-1.415.037c-1.93.126-4.023.728-6.149 2.237-2.911 2.066-2.731 1.95-4.14 2.75-.396.223-1.342.574-2.185.798-.841.225-1.753.333-1.751.333v4.229s.768.108 1.61.333c.842.224 1.789.575 2.185.799 1.41.798 1.228.683 4.14 2.75 2.126 1.509 4.22 2.11 6.148 2.236.88.058 1.716.041 2.555.005v1.918l7.222-4.168-7.222-4.17v2.176c-.86.038-1.611.065-2.278.021-1.364-.09-2.417-.357-3.979-1.465-2.244-1.593-2.866-2.027-3.68-2.508.889-.518 1.449-.906 3.822-2.59 1.56-1.109 2.614-1.377 3.978-1.466.667-.044 1.418-.017 2.278.02v2.176L24 6.014Z"/>
   </svg>`,
 
-  // Groq — chip processeur avec éclair (inférence ultra-rapide sur silicium dédié)
-  groq: `<svg viewBox="0 0 24 24" class="provider-icon" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="6" y="6" width="12" height="12" rx="2"/>
-    <line x1="9"  y1="6"  x2="9"  y2="3" /><line x1="12" y1="6"  x2="12" y2="3" /><line x1="15" y1="6"  x2="15" y2="3" />
-    <line x1="9"  y1="18" x2="9"  y2="21"/><line x1="12" y1="18" x2="12" y2="21"/><line x1="15" y1="18" x2="15" y2="21"/>
-    <line x1="6"  y1="9"  x2="3"  y2="9" /><line x1="6"  y1="12" x2="3"  y2="12"/><line x1="6"  y1="15" x2="3"  y2="15"/>
-    <line x1="18" y1="9"  x2="21" y2="9" /><line x1="18" y1="12" x2="21" y2="12"/><line x1="18" y1="15" x2="21" y2="15"/>
-    <path d="M13.2 8.5L10.5 13H13L11 15.5" stroke-width="1.6"/>
+  // Groq — logo officiel Grok AI (xAI)
+  groq: `<svg viewBox="0 0 512 492" class="provider-icon" fill="currentColor">
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M197.76 315.52l170.197-125.803c8.342-6.186 20.267-3.776 24.256 5.803 20.907 50.539 11.563 111.253-30.08 152.939-41.621 41.685-99.562 50.816-152.512 29.994l-57.834 26.816c82.965 56.768 183.701 42.731 246.656-20.33 49.941-50.006 65.408-118.166 50.944-179.627l.128.149c-20.971-90.282 5.162-126.378 58.666-200.17 1.28-1.75 2.56-3.499 3.819-5.291l-70.421 70.507v-.214L197.76 315.52m-35.072 30.528c-59.563-56.96-49.28-145.088 1.515-195.926 37.568-37.61 99.136-52.97 152.874-30.4l57.707-26.666a166.554 166.554 0 00-39.019-21.334 191.467 191.467 0 00-208.042 41.942c-54.038 54.101-71.04 137.301-41.856 208.298 21.802 53.056-13.931 90.582-49.92 128.47C23.104 463.915 10.304 477.333 0 491.541l162.56-145.386"/>
   </svg>`,
 
-  // Together AI — réseau hexagonal de nœuds interconnectés (collaboration distribuée)
-  together: `<svg viewBox="0 0 24 24" class="provider-icon" fill="currentColor">
-    <circle cx="12" cy="12" r="2.2"/>
-    <circle cx="12" cy="3.5" r="1.6"/><circle cx="19.9" cy="8"   r="1.6"/><circle cx="19.9" cy="16" r="1.6"/>
-    <circle cx="12" cy="20.5" r="1.6"/><circle cx="4.1"  cy="16" r="1.6"/><circle cx="4.1"  cy="8"  r="1.6"/>
-    <g stroke="currentColor" stroke-width="1" fill="none" opacity="0.7">
-      <line x1="12" y1="10.1" x2="12"  y2="5.1" />
-      <line x1="13.6" y1="10.8" x2="18.4" y2="9.5" />
-      <line x1="13.6" y1="13.2" x2="18.4" y2="14.5"/>
-      <line x1="12"  y1="13.9" x2="12"  y2="18.9"/>
-      <line x1="10.4" y1="13.2" x2="5.6"  y2="14.5"/>
-      <line x1="10.4" y1="10.8" x2="5.6"  y2="9.5" />
-    </g>
+  // Together AI — logo officiel (3 cercles en triangle)
+  together: `<svg viewBox="0 0 100 100" class="provider-icon" fill="currentColor">
+    <circle cx="50" cy="18" r="18"/>
+    <circle cx="18" cy="74" r="18" opacity="0.45"/>
+    <circle cx="82" cy="74" r="18" opacity="0.45"/>
   </svg>`,
 
   // DALL-E / OpenAI Image
@@ -76,9 +63,9 @@ const ICONS = {
   </svg>`
 };
 
-/* ─── COMPUTED FACTION SVGs ─────────────────── */
+/* ─── OFFICIAL FACTION & ERA SVGs ───────────── */
 
-// Galactic Empire — 12-petal crest
+// Galactic Empire — crest impérial 12 pétales
 function _genEmpireSvg() {
   const petals = Array.from({length: 12}, (_, i) => {
     const a  = (i * 30 - 90) * Math.PI / 180;
@@ -90,29 +77,22 @@ function _genEmpireSvg() {
   return `<svg viewBox="0 0 44 44" class="choice-svg" fill="currentColor"><circle cx="22" cy="22" r="4"/>${petals}</svg>`;
 }
 
-// Rebel Alliance — real Wikimedia path (viewBox 0 0 300 300)
-const _rebelPath = `M7.42,145.986C9.185,99.193,32.899,56.035,76.25,27.516c0.128,0.048,1.251-0.361,0.738,0.61c-3.434,3.184-65.172,76.114-8.344,133.68c0,0,29.858,28.704,53.011,1.468c0,0,22.847-29.577-0.289-74.413c0,0-5.856-14.64-26.955-23.721l16.992-18.748c0,0,14.359,6.161,25.478,22.871c0,0,0.593-17.593-12.884-36.34l26.345-29.89l26.08,29.609c0,0-11.993,16.991-12.876,36.902c0,0,8.191-13.477,25.776-23.151l16.686,18.748c0,0-16.045,5.287-26.794,23.529c-9.242,16.902-16.357,53.05,0.416,75.223c0,0,18.772,26.618,51.792-1.571c0,0,60.712-54.399-6.226-133.048c0,0-3.658-3.233,0.449-1.476c29.586,21.54,65.012,49.946,68.67,120.837c-1.444,85.966-59.012,147.334-143.074,147.334C68.934,295.968,4.95,227.283,7.42,145.986`;
-
-// Jedi Order — ring + blade + wings
-const _jediSvg = `<svg viewBox="0 0 44 44" class="choice-svg" fill="currentColor">
-  <g transform="translate(22,22)">
-    <path d="M0,-17 A17,17 0 1 1 -0.01,-17 Z M0,-14 A14,14 0 1 0 0.01,-14 Z" fill-rule="evenodd"/>
-    <path d="M0,-12 L2.5,-2 L0,3 L-2.5,-2 Z"/>
-    <path d="M-1.5,1 C-5,0 -10,-1 -13,-4 C-15,-6.5 -14,-10 -11,-11 C-9,-11.5 -7,-10.5 -6,-9 C-5,-7.5 -5.5,-6 -4,-5 C-2.5,-4 -1,-3.5 -0.5,-2 Z"/>
-    <path d="M1.5,1 C5,0 10,-1 13,-4 C15,-6.5 14,-10 11,-11 C9,-11.5 7,-10.5 6,-9 C5,-7.5 5.5,-6 4,-5 C2.5,-4 1,-3.5 0.5,-2 Z"/>
-  </g>
+// Rebel Alliance — symbole officiel (Font Awesome 5 brands/rebel)
+const _rebelSvg = `<svg viewBox="0 0 512 512" class="choice-svg" fill="currentColor">
+  <path d="M256.5 504C117.2 504 9 387.8 13.2 249.9 16 170.7 56.4 97.7 129.7 49.5c.3 0 1.9-.6 1.1.8-5.8 5.5-111.3 129.8-14.1 226.4 49.8 49.5 90 2.5 90 2.5 38.5-50.1-.6-125.9-.6-125.9-10-24.9-45.7-40.1-45.7-40.1l28.8-31.8c24.4 10.5 43.2 38.7 43.2 38.7.8-29.6-21.9-61.4-21.9-61.4L255.1 8l44.3 50.1c-20.5 28.8-21.9 62.6-21.9 62.6 13.8-23 43.5-39.3 43.5-39.3l28.5 31.8c-27.4 8.9-45.4 39.9-45.4 39.9-15.8 28.5-27.1 89.4.6 127.3 32.4 44.6 87.7-2.8 87.7-2.8 102.7-91.9-10.5-225-10.5-225-6.1-5.5.8-2.8.8-2.8 50.1 36.5 114.6 84.4 116.2 204.8C500.9 400.2 399 504 256.5 504z"/>
 </svg>`;
 
-// Sith — 8-pointed double-star in ring
-const _sithSvg = `<svg viewBox="0 0 44 44" class="choice-svg" fill="currentColor">
-  <g transform="translate(22,22)">
-    <path d="M0,-17 A17,17 0 1 1 -0.01,-17 Z M0,-14 A14,14 0 1 0 0.01,-14 Z" fill-rule="evenodd"/>
-    <path d="M0,-13 L2,-2 L13,0 L2,2 L0,13 L-2,2 L-13,0 L-2,-2 Z"/>
-    <path d="M0,-13 L2,-2 L13,0 L2,2 L0,13 L-2,2 L-13,0 L-2,-2 Z" transform="rotate(45)"/>
-  </g>
+// Jedi Order — symbole officiel (svgrepo jedi-order)
+const _jediSvg = `<svg viewBox="0 0 32 32" class="choice-svg" fill="currentColor">
+  <path d="M15.486 3s-.312 11.95-.441 16.854l-1.752-2.56 1.127 3.095-3.492.508 3.492.508-1.35 2.644 1.924-2.02c-.1 3.839-.123 4.781-.123 4.781s-8.613-4-3.826-12.838c0 0-5.97-6.59-.562-10.64 0 0-9.233 5.575-3.375 15.148 0 0-4.843-4.73-2.31-9.512 0 0-4.39 6.192.961 13.004 0 0-1.462-.897-2.756-4.334 0 0 .942 10.226 12.385 10.36l.229-.001C27.05 27.866 28 17.64 28 17.64c-1.317 3.431-2.783 4.334-2.783 4.334 5.35-6.812.96-13.004.96-13.004 2.532 4.787-2.311 9.512-2.311 9.512 5.858-9.566-3.375-15.148-3.375-15.148 5.406 4.056-.562 10.64-.562 10.64 4.787 8.837-3.826 12.838-3.826 12.838s-.022-.931-.123-4.781l1.784 1.826-1.35-2.645 3.494-.508-3.494-.508 1.127-3.095-1.752 2.561C15.803 14.96 15.492 3.1 15.486 3z"/>
 </svg>`;
 
-// Mandalorian — T-visor helmet silhouette
+// Sith Order — symbole officiel (svgrepo starwars-sith)
+const _sithSvg = `<svg viewBox="0 0 76 76" class="choice-svg" fill="currentColor">
+  <path d="M30.351 23.395L38.017 19l7.662 4.424c-.28.47-.56.94-.845 1.407L38.013 20.907c-2.272 1.309-4.544 2.618-6.819 3.922l-.843-1.434zm2.928 2.553l4.703-2.932 4.709 2.93-.471.753-2.366-1.368c-.254 2.375-.524 4.749-.771 7.124 1.053.616 2.112 1.223 3.168 1.835l5.784-4.23-2.364-1.37c.138-.26.27-.526.41-.784 1.629.875 3.262 1.743 4.89 2.62l-.187 5.547-.879-.033v-2.737l-6.562 2.894v3.637l6.562 2.893v-2.736l.878-.031c.065 1.85.128 3.7.186 5.55l-4.89 2.616c-.134-.263-.275-.524-.407-.787l2.364-1.37-5.785-4.261-3.173 1.835.807 7.154 2.367-1.368.47.752-4.674 2.93-4.74-2.931.472-.752 2.395 1.369.774-7.157c.014-.037-.03-.046-.051-.06l-3.087-1.71-5.815 4.26 2.365 1.4-.44.784c-1.62-.872-3.242-1.742-4.86-2.619.051-1.849.1-3.698.155-5.547l.904.032v2.74l6.568-2.897-.001-3.667-6.567-2.895v2.738l-.904.033a1094.6 1094.6 0 01-.148-5.547l4.858-2.647.44.784-2.365 1.37 5.754 4.23c1.066-.613 2.135-1.22 3.201-1.835-.247-2.374-.518-4.748-.771-7.123l-2.395 1.368c-.16-.249-.314-.501-.471-.751zM21.546 28.494c2.553-1.47 5.105-2.943 7.655-4.419.288.465.567.937.845 1.408l-6.85 3.955-.001 7.877-1.65.001c.002-2.94-.002-5.882.001-8.822zm24.437-2.97l.842-1.439c2.545 1.472 5.084 2.95 7.629 4.42.005 2.94.001 5.88.002 8.82l-1.65.001-.001-7.877-6.822-3.925zm-24.44 11.63l1.651.001v7.87c2.344 1.375 4.82 2.79 6.853 3.962l-.84 1.437c-2.555-1.467-5.11-2.985-7.661-4.453-.005-2.95.002-5.9-.003-8.816zm31.254 0l1.65.001c-.001 2.95.003 5.901-.001 8.853-2.455 1.468-4.91 2.947-7.365 4.416l-.843-1.438c2.272-1.323 4.555-2.632 6.82-3.95l-.261-7.882zm-21.447 14.453l.844-1.438 6.817 3.955 6.822-3.955.844 1.438-7.662 4.424-7.665-4.424z"/>
+</svg>`;
+
+// Mandalorian — casque T-visor iconique
 const _mandoSvg = `<svg viewBox="0 0 44 44" class="choice-svg" fill="currentColor">
   <g transform="translate(22,22)">
     <path fill-rule="evenodd" d="
@@ -122,16 +102,10 @@ const _mandoSvg = `<svg viewBox="0 0 44 44" class="choice-svg" fill="currentColo
   </g>
 </svg>`;
 
-// Republic — 6-dot circular seal
-function _genRepublicSvg() {
-  const dots = [0,60,120,180,240,300].map(deg => {
-    const r = deg * Math.PI / 180;
-    const x = (22 + 10 * Math.cos(r)).toFixed(2);
-    const y = (22 + 10 * Math.sin(r)).toFixed(2);
-    return `<circle cx="${x}" cy="${y}" r="2.5" fill="currentColor"/>`;
-  }).join('');
-  return `<svg viewBox="0 0 44 44" class="choice-svg"><circle cx="22" cy="22" r="18" stroke="currentColor" stroke-width="1.5" fill="none"/><circle cx="22" cy="22" r="10" stroke="currentColor" stroke-width="1" fill="none"/><circle cx="22" cy="22" r="3" fill="currentColor"/>${dots}</svg>`;
-}
+// République Galactique — sceau officiel (svgrepo brand-galactic-republic)
+const _republicSvg = `<svg viewBox="0 0 14 14" class="choice-svg" fill="currentColor">
+  <path d="M 7,13 C 3.6915323,13 1,10.30847 1,7 1,3.69153 3.6915323,1 7,1 c 3.308468,0 6,2.69153 6,6 0,3.30847 -2.691532,6 -6,6 z M 7,1.39992 C 3.9121774,1.39992 1.3999193,3.91218 1.3999193,7 c 0,3.08782 2.5122581,5.60008 5.6000807,5.60008 3.087823,0 5.600081,-2.51226 5.600081,-5.60008 C 12.600081,3.91218 10.087823,1.39992 7,1.39992 Z m 0.6682258,0.52766 0,0.59565 a 4.498379,4.498379 0 0 1 2.0218548,0.83564 l 0.4207264,-0.42 C 9.4152419,2.40516 8.5793548,2.04637 7.6682258,1.92758 Z M 6.328629,1.92958 C 5.4179839,2.0491 4.5828226,2.40862 3.8879839,2.94208 l 0.4180645,0.42 0.00194,0 C 4.8903271,2.93047 5.5793593,2.63483 6.3286335,2.52329 l 0,-0.59371 z M 6.625,3.14337 l 0,2.00492 C 6.3820968,5.19739 6.1551613,5.292 5.9555645,5.42458 L 4.5373387,4.00708 4.0067742,4.53765 5.4262097,5.95708 C 5.293871,6.1562 5.1975806,6.38265 5.1487097,6.62531 l -2.0056452,0 0,0.75 2.0056452,0 c 0.048871,0.24242 0.1454032,0.46718 0.2775,0.66629 L 4.0067742,9.46152 4.5373387,9.99208 5.9555645,8.57386 A 1.8840242,1.8840242 0 0 0 6.625,8.85105 l 0,2.00564 0.75,0 0,-2.00564 C 7.6181452,8.80195 7.843629,8.70444 8.0432258,8.57161 L 9.4626613,9.99153 9.9932258,9.46097 8.5737903,8.04105 C 8.7058871,7.84194 8.8029032,7.61718 8.8520161,7.37476 l 2.0049199,0 0,-0.75 -2.0049199,0 C 8.8031451,6.38234 8.706129,6.15589 8.5737903,5.95653 L 9.9932258,4.5371 9.4626613,4.00653 8.0432258,5.42597 C 7.843629,5.29315 7.6181452,5.19685 7.375,5.14774 l 0,-2.00468 -0.75,0 z m 4.433226,0.74323 -0.42,0.42 a 4.5081532,4.5081532 0 0 1 0.83879,2.02427 l 0.595645,0 C 11.952903,5.41902 11.592903,4.58192 11.058226,3.8866 Z M 2.9400806,3.8896 C 2.406371,4.58443 2.0470968,5.42008 1.9275806,6.33097 l 0.596371,0 C 2.6352419,5.58193 2.9294355,4.89266 3.3608065,4.31032 L 2.9400806,3.8896 Z m -1.0124999,3.78 C 2.0466129,8.58024 2.4054032,9.41589 2.938871,10.11072 L 3.358871,9.69 C 2.9279839,9.1075 2.635,8.41798 2.5239516,7.66919 l -0.596371,0 z m 9.5491933,0 c -0.111532,0.74975 -0.406451,1.43951 -0.83879,2.02258 l 0.42,0.42 C 11.592177,9.41685 11.952661,8.58097 12.072419,7.6696 l -0.595645,0 z m -7.1704837,2.96879 -0.42,0.42 c 0.6950807,0.53443 1.5314516,0.89467 2.4425807,1.01443 l 0,-0.59613 C 5.5791129,11.36468 4.888629,11.07048 4.3062903,10.63839 Z m 5.3837903,0.001 C 9.1072581,11.071 8.4179839,11.36713 7.6682258,11.47818 l 0,0.59443 c 0.911371,-0.11903 1.7470161,-0.47879 2.4425812,-1.0125 l -0.4187909,-0.42072 -0.00194,0 z"/>
+</svg>`;
 
 /* ─── LLM PROVIDERS ─────────────────────────── */
 const LLM_PROVIDERS = {
@@ -256,19 +230,21 @@ const IMAGE_PROVIDERS = {
   openrouter_img: {
     id: 'openrouter_img',
     name: 'OpenRouter',
-    desc: 'FLUX · DALL-E · Imagen · Recraft',
+    desc: 'FLUX · GPT Image · Gemini · Seedream',
     free: false,
     endpoint: 'https://openrouter.ai/api/v1/images/generations',
     models: [
-      { id: 'black-forest-labs/flux-1.1-pro',              name: 'FLUX 1.1 Pro',          desc: 'Qualité maximale',        tags: ['quality'] },
-      { id: 'black-forest-labs/flux-1-schnell',            name: 'FLUX Schnell',           desc: 'Ultra-rapide',            tags: ['speed'] },
-      { id: 'black-forest-labs/flux-1-schnell:free',       name: 'FLUX Schnell (free)',    desc: 'Gratuit, rapide',         tags: ['free', 'speed'] },
-      { id: 'black-forest-labs/flux-1-dev:free',           name: 'FLUX Dev (free)',        desc: 'Gratuit, haute qualité',  tags: ['free', 'quality'] },
-      { id: 'openai/dall-e-3',                             name: 'DALL-E 3',               desc: 'Précis et créatif',       tags: ['quality'] },
-      { id: 'google/imagen-3.0-generate-002',              name: 'Imagen 3',               desc: 'Google DeepMind',         tags: ['quality'] },
-      { id: 'recraft-ai/recraft-v3',                       name: 'Recraft V3',             desc: 'Illustration HD',         tags: ['art'] },
-      { id: 'stabilityai/stable-diffusion-3-5-large',      name: 'SD 3.5 Large',           desc: 'Stable Diffusion 3.5',    tags: ['art'] },
-      { id: 'stabilityai/stable-diffusion-3-5-large:free', name: 'SD 3.5 Large (free)',    desc: 'Gratuit',                 tags: ['free', 'art'] },
+      { id: 'black-forest-labs/flux-1.1-pro',               name: 'FLUX 1.1 Pro',            desc: 'Qualité maximale',          tags: ['quality'] },
+      { id: 'black-forest-labs/flux-1.1-pro-ultra',         name: 'FLUX 1.1 Pro Ultra',      desc: 'Ultra HD 4 Mpx',            tags: ['quality'] },
+      { id: 'black-forest-labs/flux-1-schnell:free',        name: 'FLUX Schnell (Gratuit)',   desc: 'Rapide & gratuit',          tags: ['free', 'speed'] },
+      { id: 'black-forest-labs/flux-1-dev:free',            name: 'FLUX Dev (Gratuit)',       desc: 'HD & gratuit',              tags: ['free', 'quality'] },
+      { id: 'openai/gpt-image-1',                           name: 'GPT Image 1',              desc: 'OpenAI, très précis',       tags: ['quality'] },
+      { id: 'google/gemini-2.0-flash-exp:free',             name: 'Gemini Flash (Gratuit)',   desc: 'Google, rapide & gratuit',  tags: ['free', 'speed'] },
+      { id: 'google/gemini-2.5-flash-preview-05-20',        name: 'Gemini 2.5 Flash',         desc: 'Google, natif image',       tags: ['quality'] },
+      { id: 'google/imagen-3.0-generate-002',               name: 'Imagen 3',                 desc: 'Google DeepMind HD',        tags: ['quality'] },
+      { id: 'recraft-ai/recraft-v3',                        name: 'Recraft V3',               desc: 'Illustration vectorielle',  tags: ['art'] },
+      { id: 'stabilityai/stable-diffusion-3-5-large',       name: 'SD 3.5 Large',             desc: 'Stable Diffusion 3.5',      tags: ['art'] },
+      { id: 'stabilityai/stable-diffusion-3-5-large:free',  name: 'SD 3.5 Large (Gratuit)',   desc: 'Gratuit, haute qualité',    tags: ['free', 'art'] },
     ],
     icon: ICONS.openrouter
   },
@@ -340,15 +316,15 @@ const IMAGE_PROVIDERS = {
 /* ─── STORY DATA ─────────────────────────────── */
 const ERAS = [
   { id: 'old_republic',  name: 'Ancienne République', years: '25 000 – 1 000 av. BY',
-    svg: `<svg viewBox="0 0 44 44" class="choice-svg"><circle cx="22" cy="22" r="18" stroke="currentColor" stroke-width="1.5" fill="none"/><circle cx="22" cy="22" r="10" stroke="currentColor" stroke-width="1" fill="none" stroke-dasharray="3 2"/><circle cx="22" cy="22" r="3" fill="currentColor"/><line x1="22" y1="4" x2="22" y2="40" stroke="currentColor" stroke-width="0.8" opacity="0.5"/><line x1="4" y1="22" x2="40" y2="22" stroke="currentColor" stroke-width="0.8" opacity="0.5"/><line x1="9.4" y1="9.4" x2="34.6" y2="34.6" stroke="currentColor" stroke-width="0.8" opacity="0.3"/><line x1="34.6" y1="9.4" x2="9.4" y2="34.6" stroke="currentColor" stroke-width="0.8" opacity="0.3"/></svg>` },
+    svg: _republicSvg.replace('choice-svg', 'choice-svg') },
   { id: 'clone_wars',    name: 'Guerres des Clones', years: '22 – 19 av. BY',
-    svg: `<svg viewBox="0 0 44 44" class="choice-svg"><polygon points="22,4 40,34 4,34" stroke="currentColor" stroke-width="1.5" fill="none"/><polygon points="22,12 33,30 11,30" stroke="currentColor" stroke-width="0.8" fill="none" opacity="0.5"/><path d="M19 24 L22 18 L25 24" stroke="currentColor" stroke-width="1" fill="none"/><circle cx="22" cy="27" r="1.5" fill="currentColor"/></svg>` },
+    svg: _jediSvg },
   { id: 'imperial',      name: 'Ère Impériale', years: '19 av. – 5 apr. BY',
     svg: _genEmpireSvg() },
   { id: 'new_republic',  name: 'Nouvelle République', years: '5 – 34 apr. BY',
-    svg: `<svg viewBox="0 0 44 44" class="choice-svg"><polygon points="22,4 25.5,14.5 37,14.5 27.5,21 31,32 22,26 13,32 16.5,21 7,14.5 18.5,14.5" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>` },
+    svg: _rebelSvg },
   { id: 'first_order',   name: 'Premier Ordre', years: '34 apr. BY+',
-    svg: `<svg viewBox="0 0 44 44" class="choice-svg"><rect x="5" y="5" width="34" height="34" rx="2" stroke="currentColor" stroke-width="1.5" fill="none"/><line x1="22" y1="5" x2="22" y2="39" stroke="currentColor" stroke-width="1"/><line x1="5" y1="22" x2="39" y2="22" stroke="currentColor" stroke-width="1"/><rect x="14" y="14" width="16" height="16" stroke="currentColor" stroke-width="0.8" fill="none"/></svg>` },
+    svg: `<svg viewBox="0 0 448 512" class="choice-svg" fill="currentColor"><path d="M398.5 373.6c95.9-122.1 17.2-233.1 17.2-233.1 45.4 85.8-41.4 170.5-41.4 170.5 105-171.5-60.5-271.5-60.5-271.5 96.9 72.7-10.1 190.7-10.1 190.7 85.8 158.4-68.6 230.1-68.6 230.1s-.4-16.9-2.2-85.7c4.3 4.5 34.5 36.2 34.5 36.2l-24.2-47.4 62.6-9.1-62.6-9.1 20.2-55.5-31.4 45.9c-2.2-87.7-7.8-305.1-7.9-306.9v-2.4 1-1 2.4c0 1-5.6 219-7.9 306.9l-31.4-45.9 20.2 55.5-62.6 9.1 62.6 9.1-24.2 47.4 34.5-36.2c-1.8 68.8-2.2 85.7-2.2 85.7s-154.4-71.7-68.6-230.1c0 0-107-118.1-10.1-190.7 0 0-165.5 99.9-60.5 271.5 0 0-86.8-84.8-41.4-170.5 0 0-78.7 111 17.2 233.1 0 0-26.2-16.1-49.4-77.7 0 0 16.9 183.3 222 185.7h4.1c205-2.4 222-185.7 222-185.7-23.6 61.5-49.9 77.7-49.9 77.7z"/></svg>` },
 ];
 
 const FACTIONS = [
@@ -357,9 +333,9 @@ const FACTIONS = [
   { id: 'empire',    name: 'Empire Galactique',     sub: 'Paix par l\'ordre',       color: '#e0e0e0',
     svg: _genEmpireSvg() },
   { id: 'rebels',    name: 'Alliance Rebelle',      sub: 'Espoir de la galaxie',   color: '#FF6B35',
-    svg: `<svg viewBox="0 0 300 300" class="choice-svg"><path d="${_rebelPath}" fill="currentColor"/></svg>` },
+    svg: _rebelSvg },
   { id: 'republic',  name: 'République Galactique', sub: 'Démocratie & justice',   color: '#81D4FA',
-    svg: _genRepublicSvg() },
+    svg: _republicSvg },
   { id: 'mandalore', name: 'Mandalorians',          sub: 'C\'est la voie',          color: '#A5D6A7', svg: _mandoSvg },
   { id: 'hutt',      name: 'Cartel Hutt',           sub: 'Le crime paie',          color: '#FFE082',
     svg: `<svg viewBox="0 0 44 44" class="choice-svg"><ellipse cx="22" cy="27" rx="14" ry="10" stroke="currentColor" stroke-width="1.5" fill="none"/><circle cx="22" cy="15" r="8" stroke="currentColor" stroke-width="1.5" fill="none"/><line x1="14" y1="22" x2="30" y2="22" stroke="currentColor" stroke-width="0.8"/><circle cx="18" cy="13" r="1.5" fill="currentColor"/><circle cx="26" cy="13" r="1.5" fill="currentColor"/></svg>` },
