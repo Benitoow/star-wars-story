@@ -65,6 +65,8 @@ const ICONS = {
 
 /* ─── OFFICIAL FACTION & ERA SVGs ───────────── */
 
+const _assetChoiceSvg = (path) => `<span class="choice-svg choice-mask" aria-hidden="true" style="--choice-mask: url('${path}')"></span>`;
+
 // Galactic Empire — crest impérial 12 pétales
 function _genEmpireSvg() {
   const petals = Array.from({length: 12}, (_, i) => {
@@ -230,21 +232,15 @@ const IMAGE_PROVIDERS = {
   openrouter_img: {
     id: 'openrouter_img',
     name: 'OpenRouter',
-    desc: 'FLUX · GPT Image · Gemini · Seedream',
+    desc: 'Nano Banana · GPT Image · previews',
     free: false,
     endpoint: 'https://openrouter.ai/api/v1/images/generations',
     models: [
-      { id: 'black-forest-labs/flux-1.1-pro',               name: 'FLUX 1.1 Pro',            desc: 'Qualité maximale',          tags: ['quality'] },
-      { id: 'black-forest-labs/flux-1.1-pro-ultra',         name: 'FLUX 1.1 Pro Ultra',      desc: 'Ultra HD 4 Mpx',            tags: ['quality'] },
-      { id: 'black-forest-labs/flux-1-schnell:free',        name: 'FLUX Schnell (Gratuit)',   desc: 'Rapide & gratuit',          tags: ['free', 'speed'] },
-      { id: 'black-forest-labs/flux-1-dev:free',            name: 'FLUX Dev (Gratuit)',       desc: 'HD & gratuit',              tags: ['free', 'quality'] },
-      { id: 'openai/gpt-image-1',                           name: 'GPT Image 1',              desc: 'OpenAI, très précis',       tags: ['quality'] },
-      { id: 'google/gemini-2.0-flash-exp:free',             name: 'Gemini Flash (Gratuit)',   desc: 'Google, rapide & gratuit',  tags: ['free', 'speed'] },
-      { id: 'google/gemini-2.5-flash-preview-05-20',        name: 'Gemini 2.5 Flash',         desc: 'Google, natif image',       tags: ['quality'] },
-      { id: 'google/imagen-3.0-generate-002',               name: 'Imagen 3',                 desc: 'Google DeepMind HD',        tags: ['quality'] },
-      { id: 'recraft-ai/recraft-v3',                        name: 'Recraft V3',               desc: 'Illustration vectorielle',  tags: ['art'] },
-      { id: 'stabilityai/stable-diffusion-3-5-large',       name: 'SD 3.5 Large',             desc: 'Stable Diffusion 3.5',      tags: ['art'] },
-      { id: 'stabilityai/stable-diffusion-3-5-large:free',  name: 'SD 3.5 Large (Gratuit)',   desc: 'Gratuit, haute qualité',    tags: ['free', 'art'] },
+      { id: 'google/gemini-2.5-flash-image',                name: 'Nano Banana',             desc: 'Rapide et natif image',     tags: ['speed', 'quality'] },
+      { id: 'openai/gpt-5-image-mini',                      name: 'GPT-5 Image Mini',        desc: 'Rapide et économique',      tags: ['speed'] },
+      { id: 'openai/gpt-5-image',                           name: 'GPT-5 Image',             desc: 'OpenAI, rendu premium',     tags: ['quality'] },
+      { id: 'google/gemini-3.1-flash-image-preview',       name: 'Nano Banana 2',           desc: 'Édition image avancée',     tags: ['quality'] },
+      { id: 'google/gemini-3-pro-image-preview',           name: 'Nano Banana Pro',         desc: 'Qualité maximale',          tags: ['quality'] },
     ],
     icon: ICONS.openrouter
   },
@@ -328,19 +324,19 @@ const ERAS = [
 ];
 
 const FACTIONS = [
-  { id: 'jedi',      name: 'Ordre Jedi',           sub: 'Gardiens de la paix',    color: '#4FC3F7', svg: _jediSvg },
-  { id: 'sith',      name: 'Ordre Sith',            sub: 'Maîtres des ténèbres',   color: '#FF1744', svg: _sithSvg },
+  { id: 'jedi',      name: 'Ordre Jedi',           sub: 'Gardiens de la paix',    color: '#4FC3F7', svg: _assetChoiceSvg('svg/jedi-order-svgrepo-com.svg') },
+  { id: 'sith',      name: 'Ordre Sith',            sub: 'Maîtres des ténèbres',   color: '#FF1744', svg: _assetChoiceSvg('svg/starwars-sith-svgrepo-com.svg') },
   { id: 'empire',    name: 'Empire Galactique',     sub: 'Paix par l\'ordre',       color: '#e0e0e0',
-    svg: _genEmpireSvg() },
+    svg: _assetChoiceSvg('svg/noun-storm-trooper-49992.svg') },
   { id: 'rebels',    name: 'Alliance Rebelle',      sub: 'Espoir de la galaxie',   color: '#FF6B35',
-    svg: _rebelSvg },
+    svg: _assetChoiceSvg('svg/luke-skywalker-lightsaber-svgrepo-com.svg') },
   { id: 'republic',  name: 'République Galactique', sub: 'Démocratie & justice',   color: '#81D4FA',
-    svg: _republicSvg },
-  { id: 'mandalore', name: 'Mandalorians',          sub: 'C\'est la voie',          color: '#A5D6A7', svg: _mandoSvg },
+    svg: _assetChoiceSvg('svg/brand-galactic-republic-svgrepo-com.svg') },
+  { id: 'mandalore', name: 'Mandalorians',          sub: 'C\'est la voie',          color: '#A5D6A7', svg: _assetChoiceSvg('svg/mandalorian-svgrepo-com.svg') },
   { id: 'hutt',      name: 'Cartel Hutt',           sub: 'Le crime paie',          color: '#FFE082',
-    svg: `<svg viewBox="0 0 44 44" class="choice-svg"><ellipse cx="22" cy="27" rx="14" ry="10" stroke="currentColor" stroke-width="1.5" fill="none"/><circle cx="22" cy="15" r="8" stroke="currentColor" stroke-width="1.5" fill="none"/><line x1="14" y1="22" x2="30" y2="22" stroke="currentColor" stroke-width="0.8"/><circle cx="18" cy="13" r="1.5" fill="currentColor"/><circle cx="26" cy="13" r="1.5" fill="currentColor"/></svg>` },
+    svg: _assetChoiceSvg('svg/scifi-starwars-boba-fett-svgrepo-com.svg') },
   { id: 'neutral',   name: 'Indépendant',           sub: 'Libre de tout lien',     color: '#bdbdbd',
-    svg: `<svg viewBox="0 0 44 44" class="choice-svg"><circle cx="22" cy="22" r="16" stroke="currentColor" stroke-width="1.5" fill="none" stroke-dasharray="5 3"/><text x="22" y="27" text-anchor="middle" font-size="17" fill="currentColor" font-family="serif" font-weight="bold">?</text></svg>` },
+    svg: _assetChoiceSvg('svg/alone-characterized-embodied-svgrepo-com.svg') },
 ];
 
 const ROLES = [

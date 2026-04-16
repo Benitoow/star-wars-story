@@ -614,6 +614,18 @@ html, body {
   height: 48px;
   flex-shrink: 0;
   display: block;
+  pointer-events: none;
+}
+.choice-mask {
+  background-color: currentColor;
+  -webkit-mask-image: var(--choice-mask);
+  mask-image: var(--choice-mask);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
 }
 .choice-card .choice-name {
   font-family: var(--font-ui);
