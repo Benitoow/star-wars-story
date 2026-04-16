@@ -263,18 +263,6 @@ function updateAllUIText() {
     const el = document.getElementById(id);
     if (el) el[attr] = t(key, lang);
   });
-
-  // Update setup section labels
-  const setupLabels = document.querySelectorAll('.setup-label');
-  setupLabels.forEach(label => {
-    const icon = label.querySelector('.setup-icon');
-    if (icon) {
-      const key = label.getAttribute('data-i18n-key');
-      if (key) {
-        label.childNodes[label.childNodes.length - 1].textContent = ' ' + t(key, lang);
-      }
-    }
-  });
 }
 
 function updateLanguageSelector() {
