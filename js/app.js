@@ -35,14 +35,57 @@ const LAST_PROVIDER_KEY = 'sw_last_provider';
 const LAST_MODEL_KEY = 'sw_last_model';
 const LAST_IMAGE_PROVIDER_KEY = 'sw_last_image_provider';
 const LAST_IMAGE_MODEL_KEY = 'sw_last_image_model';
+const choiceSvgCache = new Map();
+
+function getChoiceSvgKey(svgRef) {
+  if (!svgRef) return '';
+  const trimmed = String(svgRef).trim();
+  if (!trimmed || trimmed.startsWith('<svg')) return '';
+  return new URL(trimmed.replace(/^\/+/, ''), document.baseURI).href;
+}
+
+function stylizeChoiceSvg(markup) {
+  return markup
+    .replace(/<svg\b([^>]*)>/i, (match, attrs) => {
+      const withViewBox = /viewBox=/i.test(attrs) ? attrs : `${attrs} viewBox="0 0 24 24"`;
+      const withPreserve = /preserveAspectRatio=/i.test(withViewBox)
+        ? withViewBox
+        : `${withViewBox} preserveAspectRatio="xMidYMid meet"`;
+      return `<svg${withPreserve}>`;
+    })
+    .replace(/\sfill="(?!none)[^"]*"/gi, ' fill="currentColor"')
+    .replace(/\sstroke="(?!none)[^"]*"/gi, ' stroke="currentColor"')
+    .replace(/\sstyle="[^"]*"/gi, '');
+}
+
+async function preloadChoiceSvgs() {
+  const refs = [
+    ...ERAS,
+    ...FACTIONS,
+    ...ROLES,
+    ...PREMISES
+  ]
+    .map(item => item.svg)
+    .filter(svg => typeof svg === 'string' && svg.trim() && !svg.trim().startsWith('<svg'));
+
+  await Promise.all([...new Set(refs)].map(async ref => {
+    const url = getChoiceSvgKey(ref);
+    if (!url || choiceSvgCache.has(url)) return;
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const text = await res.text();
+    choiceSvgCache.set(url, stylizeChoiceSvg(text));
+  }));
+}
 
 function renderChoiceIcon(svgRef, className = 'choice-mask') {
   if (!svgRef) return '';
   const trimmed = String(svgRef).trim();
   if (trimmed.startsWith('<svg')) return trimmed;
-  const normalized = /^([a-z]+:|data:)/i.test(trimmed)
-    ? trimmed
-    : new URL(trimmed.replace(/^\/+/, ''), document.baseURI).href;
+  const normalized = getChoiceSvgKey(trimmed);
+  if (normalized && choiceSvgCache.has(normalized)) {
+    return choiceSvgCache.get(normalized);
+  }
   const classes = ['choice-svg'];
   if (className && className !== 'choice-mask') {
     classes.push(className);
@@ -403,7 +446,7 @@ function renderLanguageSelector() {
 }
 
 /* ─── INIT ──────────────────────────────────── */
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   // Load saved UI language
   const savedUILang = localStorage.getItem('sw_ui_lang');
   if (savedUILang && UI_LANGUAGES.find(l => l.id === savedUILang)) {
@@ -418,6 +461,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initStarfield();
   renderProviderGrid();
   renderImageProviders();
+  await preloadChoiceSvgs().catch(console.warn);
   renderSetupScreens();
   loadSavedSettings();
   setupEventListeners();
@@ -1207,8 +1251,10 @@ function setupEventListeners() {
   // Start story
   document.getElementById('btn-start-story')?.addEventListener('click', startStory);
 
-  // Story menu button
-  document.getElementById('btn-menu-story')?.addEventListener('click', openStoryMenu);
+  // Story menu button now returns directly to the dashboard
+  document.getElementById('btn-menu-story')?.addEventListener('click', () => {
+    goTo('screen-dashboard');
+  });
 
   // Restart is handled by the inline handler in the menu.
 
