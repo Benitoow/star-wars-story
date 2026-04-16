@@ -127,7 +127,10 @@ function renderImageProviders() {
     const card = document.createElement('div');
     card.className = 'img-provider-card';
     card.dataset.id = id;
+    // Check if provider has any free models
+    const hasFree = prov.models?.some(m => m.tags?.includes('free'));
     card.innerHTML = `
+      ${hasFree ? '<span class="free-badge">FREE</span>' : ''}
       ${prov.icon}
       <div class="img-p-name">${prov.name}</div>
       <div class="img-p-desc">${prov.desc}</div>`;
@@ -163,7 +166,15 @@ function renderImgModels(providerId) {
     const item = document.createElement('div');
     item.className = 'model-item';
     item.dataset.id = m.id;
-    item.innerHTML = `<span class="model-id">${m.name}</span><span class="model-desc">${m.desc}</span>`;
+    const tagsHtml = (m.tags || []).map(t =>
+      `<span class="model-tag ${t}">${t === 'free' ? 'Gratuit' : t === 'speed' ? '⚡ Rapide' : t === 'quality' ? '★ HD' : '🎨 Art'}</span>`
+    ).join('');
+    item.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <span class="model-id">${m.name}</span>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;">${tagsHtml}</div>
+      </div>
+      <span class="model-desc">${m.desc}</span>`;
     item.addEventListener('click', () => {
       document.querySelectorAll('#img-model-list .model-item').forEach(i =>
         i.classList.toggle('selected', i.dataset.id === m.id));

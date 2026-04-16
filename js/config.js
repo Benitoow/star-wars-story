@@ -24,18 +24,29 @@ const ICONS = {
     <path d="M16.778 1.844v1.919q-.569-.026-1.138-.032-.708-.008-1.415.037c-1.93.126-4.023.728-6.149 2.237-2.911 2.066-2.731 1.95-4.14 2.75-.396.223-1.342.574-2.185.798-.841.225-1.753.333-1.751.333v4.229s.768.108 1.61.333c.842.224 1.789.575 2.185.799 1.41.798 1.228.683 4.14 2.75 2.126 1.509 4.22 2.11 6.148 2.236.88.058 1.716.041 2.555.005v1.918l7.222-4.168-7.222-4.17v2.176c-.86.038-1.611.065-2.278.021-1.364-.09-2.417-.357-3.979-1.465-2.244-1.593-2.866-2.027-3.68-2.508.889-.518 1.449-.906 3.822-2.59 1.56-1.109 2.614-1.377 3.978-1.466.667-.044 1.418-.017 2.278.02v2.176L24 6.014Z"/>
   </svg>`,
 
-  // Groq — stylized lightning bolt in a hexagon (speed/performance brand)
-  groq: `<svg viewBox="0 0 24 24" class="provider-icon" fill="none" stroke="currentColor" stroke-width="1.5">
-    <path d="M12 2L3 7v10l9 5 9-5V7L12 2z" stroke-linejoin="round"/>
-    <path d="M13.5 7l-4 5h3.5l-2 5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  // Groq — chip processeur avec éclair (inférence ultra-rapide sur silicium dédié)
+  groq: `<svg viewBox="0 0 24 24" class="provider-icon" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="6" y="6" width="12" height="12" rx="2"/>
+    <line x1="9"  y1="6"  x2="9"  y2="3" /><line x1="12" y1="6"  x2="12" y2="3" /><line x1="15" y1="6"  x2="15" y2="3" />
+    <line x1="9"  y1="18" x2="9"  y2="21"/><line x1="12" y1="18" x2="12" y2="21"/><line x1="15" y1="18" x2="15" y2="21"/>
+    <line x1="6"  y1="9"  x2="3"  y2="9" /><line x1="6"  y1="12" x2="3"  y2="12"/><line x1="6"  y1="15" x2="3"  y2="15"/>
+    <line x1="18" y1="9"  x2="21" y2="9" /><line x1="18" y1="12" x2="21" y2="12"/><line x1="18" y1="15" x2="21" y2="15"/>
+    <path d="M13.2 8.5L10.5 13H13L11 15.5" stroke-width="1.6"/>
   </svg>`,
 
-  // Together AI — interconnected nodes (collaboration theme)
+  // Together AI — réseau hexagonal de nœuds interconnectés (collaboration distribuée)
   together: `<svg viewBox="0 0 24 24" class="provider-icon" fill="currentColor">
-    <circle cx="5" cy="12" r="2.5"/>
-    <circle cx="19" cy="5" r="2.5"/>
-    <circle cx="19" cy="19" r="2.5"/>
-    <path d="M7.2 11.1L16.8 6.4M7.2 12.9L16.8 17.6M16.8 7.5v9" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <circle cx="12" cy="12" r="2.2"/>
+    <circle cx="12" cy="3.5" r="1.6"/><circle cx="19.9" cy="8"   r="1.6"/><circle cx="19.9" cy="16" r="1.6"/>
+    <circle cx="12" cy="20.5" r="1.6"/><circle cx="4.1"  cy="16" r="1.6"/><circle cx="4.1"  cy="8"  r="1.6"/>
+    <g stroke="currentColor" stroke-width="1" fill="none" opacity="0.7">
+      <line x1="12" y1="10.1" x2="12"  y2="5.1" />
+      <line x1="13.6" y1="10.8" x2="18.4" y2="9.5" />
+      <line x1="13.6" y1="13.2" x2="18.4" y2="14.5"/>
+      <line x1="12"  y1="13.9" x2="12"  y2="18.9"/>
+      <line x1="10.4" y1="13.2" x2="5.6"  y2="14.5"/>
+      <line x1="10.4" y1="10.8" x2="5.6"  y2="9.5" />
+    </g>
   </svg>`,
 
   // DALL-E / OpenAI Image
@@ -45,10 +56,17 @@ const ICONS = {
     <path d="m3 16 5-5 4 4 3-3 6 6" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`,
 
-  // Stability AI — stable diffusion triangle
+  // Stability AI — triangle SD
   stability: `<svg viewBox="0 0 24 24" class="provider-icon" fill="currentColor">
     <path d="M12 2L2 20h20L12 2zm0 4.5l7.5 13.5h-15L12 6.5z" fill-rule="evenodd"/>
     <circle cx="12" cy="15" r="1.5"/>
+  </svg>`,
+
+  // fal.ai — F stylisé avec accent vitesse
+  fal: `<svg viewBox="0 0 24 24" class="provider-icon" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M5 4h9M5 4v16M5 12h7" />
+    <path d="M16 14l3 3-3 3" stroke-width="1.4"/>
+    <path d="M14 17h5" />
   </svg>`,
 
   // Image/photo icon for None
@@ -231,53 +249,89 @@ const IMAGE_PROVIDERS = {
     id: 'none',
     name: 'Aucun',
     desc: 'Texte uniquement',
+    free: false,
     icon: ICONS.noimage
   },
+
   openrouter_img: {
     id: 'openrouter_img',
     name: 'OpenRouter',
-    desc: 'FLUX, DALL-E, Imagen…',
+    desc: 'FLUX · DALL-E · Imagen · Recraft',
+    free: false,
     endpoint: 'https://openrouter.ai/api/v1/images/generations',
     models: [
-      { id: 'black-forest-labs/flux-1.1-pro',          name: 'FLUX 1.1 Pro',        desc: 'Haute qualité, rapide' },
-      { id: 'black-forest-labs/flux-1-schnell',        name: 'FLUX Schnell',        desc: 'Ultra-rapide' },
-      { id: 'openai/dall-e-3',                         name: 'DALL-E 3',            desc: 'Précis et créatif' },
-      { id: 'google/imagen-3.0-generate-002',          name: 'Imagen 3',            desc: 'Google DeepMind' },
-      { id: 'recraft-ai/recraft-v3',                   name: 'Recraft V3',          desc: 'Style illustration' },
+      { id: 'black-forest-labs/flux-1.1-pro',              name: 'FLUX 1.1 Pro',          desc: 'Qualité maximale',        tags: ['quality'] },
+      { id: 'black-forest-labs/flux-1-schnell',            name: 'FLUX Schnell',           desc: 'Ultra-rapide',            tags: ['speed'] },
+      { id: 'black-forest-labs/flux-1-schnell:free',       name: 'FLUX Schnell (free)',    desc: 'Gratuit, rapide',         tags: ['free', 'speed'] },
+      { id: 'black-forest-labs/flux-1-dev:free',           name: 'FLUX Dev (free)',        desc: 'Gratuit, haute qualité',  tags: ['free', 'quality'] },
+      { id: 'openai/dall-e-3',                             name: 'DALL-E 3',               desc: 'Précis et créatif',       tags: ['quality'] },
+      { id: 'google/imagen-3.0-generate-002',              name: 'Imagen 3',               desc: 'Google DeepMind',         tags: ['quality'] },
+      { id: 'recraft-ai/recraft-v3',                       name: 'Recraft V3',             desc: 'Illustration HD',         tags: ['art'] },
+      { id: 'stabilityai/stable-diffusion-3-5-large',      name: 'SD 3.5 Large',           desc: 'Stable Diffusion 3.5',    tags: ['art'] },
+      { id: 'stabilityai/stable-diffusion-3-5-large:free', name: 'SD 3.5 Large (free)',    desc: 'Gratuit',                 tags: ['free', 'art'] },
     ],
     icon: ICONS.openrouter
   },
+
+  fal_img: {
+    id: 'fal_img',
+    name: 'fal.ai',
+    desc: 'FLUX · Recraft · Ideogram · SD3',
+    free: false,
+    endpoint: 'https://fal.run',
+    models: [
+      { id: 'fal-ai/flux/schnell',                   name: 'FLUX Schnell',         desc: 'Ultra-rapide 4 steps',     tags: ['speed'] },
+      { id: 'fal-ai/flux/dev',                       name: 'FLUX Dev',             desc: 'Qualité premium',          tags: ['quality'] },
+      { id: 'fal-ai/flux-pro/v1.1',                  name: 'FLUX Pro 1.1',         desc: 'Meilleure qualité',        tags: ['quality'] },
+      { id: 'fal-ai/flux-pro/v1.1-ultra',            name: 'FLUX Pro Ultra',       desc: 'Résolution maximale',      tags: ['quality'] },
+      { id: 'fal-ai/recraft-v3',                     name: 'Recraft V3',           desc: 'Illustration vectorielle', tags: ['art'] },
+      { id: 'fal-ai/ideogram/v2',                    name: 'Ideogram V2',          desc: 'Texte dans l\'image',      tags: ['quality', 'art'] },
+      { id: 'fal-ai/stable-diffusion-v3-medium',     name: 'SD3 Medium',           desc: 'Open source, artistique',  tags: ['art'] },
+      { id: 'fal-ai/aura-flow',                      name: 'AuraFlow',             desc: 'Open source rapide',       tags: ['speed', 'free'] },
+    ],
+    icon: ICONS.fal
+  },
+
   together_img: {
     id: 'together_img',
     name: 'Together AI',
-    desc: 'FLUX, SDXL…',
+    desc: 'FLUX · SDXL · SD3',
+    free: false,
     endpoint: 'https://api.together.xyz/v1/images/generations',
     models: [
-      { id: 'black-forest-labs/FLUX.1-schnell', name: 'FLUX.1 Schnell', desc: 'Rapide & haute qualité' },
-      { id: 'black-forest-labs/FLUX.1-dev',     name: 'FLUX.1 Dev',     desc: 'Meilleure qualité' },
-      { id: 'stabilityai/stable-diffusion-xl-base-1.0', name: 'SDXL 1.0', desc: 'Classique éprouvé' },
+      { id: 'black-forest-labs/FLUX.1-schnell',                    name: 'FLUX.1 Schnell',    desc: 'Rapide & efficace',        tags: ['speed'] },
+      { id: 'black-forest-labs/FLUX.1-schnell-Free',               name: 'FLUX.1 Schnell Free', desc: 'Gratuit',                tags: ['free', 'speed'] },
+      { id: 'black-forest-labs/FLUX.1-dev',                        name: 'FLUX.1 Dev',        desc: 'Haute qualité',            tags: ['quality'] },
+      { id: 'black-forest-labs/FLUX.1.1-pro',                      name: 'FLUX 1.1 Pro',      desc: 'Qualité maximale',         tags: ['quality'] },
+      { id: 'stabilityai/stable-diffusion-xl-base-1.0',            name: 'SDXL 1.0',          desc: 'Classique éprouvé',        tags: ['art'] },
+      { id: 'stabilityai/stable-diffusion-3-medium',               name: 'SD3 Medium',        desc: 'Architecture diffusion',   tags: ['art'] },
+      { id: 'prompthero/openjourney',                              name: 'OpenJourney',       desc: 'Style Midjourney',         tags: ['art'] },
     ],
     icon: ICONS.together
   },
+
   openai_img: {
     id: 'openai_img',
     name: 'DALL-E',
-    desc: 'OpenAI DALL-E 3',
+    desc: 'DALL-E 3 & DALL-E 2',
+    free: false,
     endpoint: 'https://api.openai.com/v1/images/generations',
     models: [
-      { id: 'dall-e-3', name: 'DALL-E 3', desc: 'Meilleure qualité' },
-      { id: 'dall-e-2', name: 'DALL-E 2', desc: 'Plus économique' },
+      { id: 'dall-e-3', name: 'DALL-E 3', desc: 'Compréhension avancée',     tags: ['quality'] },
+      { id: 'dall-e-2', name: 'DALL-E 2', desc: 'Rapide et économique',      tags: ['speed'] },
     ],
     icon: ICONS.dalle
   },
+
   stability: {
     id: 'stability',
     name: 'Stability AI',
-    desc: 'Stable Diffusion',
+    desc: 'SD Ultra · SD Core',
+    free: false,
     endpoint: 'https://api.stability.ai/v2beta/stable-image/generate/ultra',
     models: [
-      { id: 'ultra', name: 'SD Ultra', desc: 'Qualité maximale' },
-      { id: 'core',  name: 'SD Core',  desc: 'Rapide' },
+      { id: 'ultra', name: 'SD Ultra',  desc: 'Qualité maximale',        tags: ['quality'] },
+      { id: 'core',  name: 'SD Core',   desc: 'Rapide et fiable',        tags: ['speed'] },
     ],
     icon: ICONS.stability
   }

@@ -205,6 +205,23 @@ async function generateImage(prompt, { imgProviderId, imgModel, imgApiKey, llmAp
     return data.data?.[0]?.url || null;
   }
 
+  // ── fal.ai ───────────────────────────────────
+  if (imgProviderId === 'fal_img') {
+    const res = await fetch(`${prov.endpoint}/${imgModel}`, {
+      method: 'POST',
+      headers: { 'Authorization': `Key ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: swPrompt,
+        image_size: 'landscape_16_9',
+        num_inference_steps: 4,
+        num_images: 1
+      })
+    });
+    if (!res.ok) throw new Error(`fal.ai HTTP ${res.status}`);
+    const data = await res.json();
+    return data.images?.[0]?.url || null;
+  }
+
   if (imgProviderId === 'stability') {
     const form = new FormData();
     form.append('prompt', swPrompt);
