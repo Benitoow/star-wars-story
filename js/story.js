@@ -37,6 +37,45 @@ RÈGLES STRICTES (NON-NÉGOCIABLES):
       "faction_impact": {"empire": -10, "rebels": +10, "jedi": +5}
     }
   ],
+  "relationship_updates": [
+    {
+      "name": "Nom du lien",
+      "type": "friend|lover|master|acolyte|companion|ally|rival|community|family|mentor",
+      "level_delta": 1,
+      "xp_delta": 20,
+      "affinity_delta": 10,
+      "closeness_delta": 8,
+      "community_name": "Nom du groupe ou de la communauté",
+      "member_count": 3,
+      "members": ["Nom1", "Nom2"],
+      "notes": "Pourquoi ce lien évolue"
+    }
+  ],
+  "reputation_updates": [
+    {
+      "faction": "jedi|sith|empire|rebels|republic|mandalore|first_order|hutt|neutral",
+      "delta": 10,
+      "reason": "Pourquoi la réputation change"
+    }
+  ],
+  "camp_updates": [
+    {
+      "base_name": "Nom du camp / base / refuge",
+      "morale_delta": 4,
+      "safety_delta": 4,
+      "resources_delta": 2,
+      "crew_additions": ["Nom"],
+      "crew_removals": ["Nom"],
+      "notes": "Conséquence sur le camp ou l'équipage"
+    }
+  ],
+  "protagonist_state": {
+    "tone": "stable|hopeful|paranoid|determined|wounded|angry|nurturing",
+    "values": ["loyauté", "liberté"],
+    "fears": ["perdre un allié"],
+    "habits": ["parle peu sous pression"],
+    "notes": "Évolution progressive du personnage"
+  },
   "scene_description": "Description courte en anglais de la scène pour génération d'image (max 60 mots)",
   "user_edits_applied": "Récapitulatif des modifications utilisateur intégrées (1 phrase) ou null"
 }
@@ -48,7 +87,11 @@ RÈGLES STRICTES (NON-NÉGOCIABLES):
 8. VARIE le style d'écriture: alterne phrases courtes/longues, descriptions/action/dialogue.
 9. Les dialogues doivent avoir du caractère - chaque personnage a sa propre façon de parler. Le champ "dialogue" peut être une string OU un tableau d'objets [{"speaker": "Nom", "text": "Réplique"}] selon la scène.
 10. N'utilise JAMAIS d'identifiants techniques dans le texte narratif (pas de *lightsaber_basic*, *force_guidance*, {placeholder}, snake_case_ids, etc.). Écris TOUJOURS en langage naturel ("son entraînement au sabre laser", "la guidance de la Force", etc.).
-11. Aucun markdown (**gras**, *italique*, listes) dans les champs narratifs — uniquement du texte pur.`;
+11. Aucun markdown (**gras**, *italique*, listes) dans les champs narratifs — uniquement du texte pur.
+12. Quand le joueur envoie une "version des événements", traite-la comme un VRAI choix qui fait avancer immédiatement l'histoire.
+13. Si une action est disproportionnée (ex. tuer 50 soldats alors que le profil ne le permet pas), ne refuse pas : produis une tentative réaliste avec succès partiel, échec crédible et conséquences concrètes.
+14. Les relations, communautés, acolytes, mentors, maîtres, amis et amants doivent pouvoir évoluer en niveau et en intensité au fil du récit.
+15. Si un nouveau groupe, cercle, escouade, clan ou communauté émerge, ajoute une mise à jour relationnelle structurée dans "relationship_updates".`;
 
 const DEFAULT_LANGUAGE_ID = 'fr';
 
@@ -146,6 +189,7 @@ ${roleContext}
 
 Génère le prologue de l'histoire en ${language.promptName}. Plante le décor, introduis le personnage et crée une situation initiale captivante qui aboutit à un premier choix crucial.
 Le personnage s'appelle ${firstName}. Utilise ce prénom naturellement dans la narration et les dialogues.
+Si la situation le permet, fais émerger une base, un refuge, un vaisseau, un équipage ou une petite communauté de manière crédible.
 Le personnage doit REFLETER ses attributs (particulièrement ${getRoleConfig(setup.role)?.attributes?.force > 50 ? 'sa connexion à la Force' : 'ses compétences'}) dans ses actions et réactions initiales.`;
 }
 
@@ -161,7 +205,11 @@ ${roleContext}
 ${userEditsContext}
 
 Continue l'histoire en ${language.promptName} en tenant compte de ce choix. Les conséquences doivent être visibles et significatives. Maintiens la tension dramatique et propose de nouveaux choix.
-Si le joueur a précédemment modifié des passages ("Votre version"), INTÈGRE CES ÉLÉMENTS naturellement dans la continuation du récit.`;
+Le choix doit faire avancer concrètement la situation. Si l'action est trop ambitieuse pour le rôle/niveau du personnage, convertis-la en résolution crédible (succès partiel, coût, blessure, fuite, dette, alerte ennemie, etc.) au lieu d'un succès impossible.
+Si le joueur a précédemment modifié des passages ("Votre version"), INTÈGRE CES ÉLÉMENTS naturellement dans la continuation du récit.
+Si la scène permet la création ou l'évolution d'alliés, d'acolytes, de mentors, d'amants, d'ennemis récurrents ou d'une communauté, fais-la évoluer et reflète-la dans "relationship_updates".
+Si la scène touche une faction, une réputation, une base, un camp ou un équipage, reflète-le aussi dans "reputation_updates" et "camp_updates".
+Garde une personnalité stable pour le protagoniste: ses changements doivent être progressifs, pas des retournements soudains.`;
 }
 
 /* ─── Extract the largest well-formed JSON object from a raw string ─── */
@@ -254,6 +302,67 @@ function coerceStorySchema(parsed, languageId = DEFAULT_LANGUAGE_ID) {
 
   if (!narrativeText && !choices.length) return null;
 
+  const relationshipUpdatesRaw =
+    prologue.relationship_updates || parsed.relationship_updates ||
+    prologue.relationships || parsed.relationships || [];
+  const relationship_updates = (Array.isArray(relationshipUpdatesRaw) ? relationshipUpdatesRaw : Object.values(relationshipUpdatesRaw || {}))
+    .map(item => {
+      if (!item) return null;
+      if (typeof item === 'string') {
+        return { name: item, type: 'companion', level_delta: 0, xp_delta: 0, affinity_delta: 0, closeness_delta: 0, community_name: '', member_count: 0, members: [], notes: '' };
+      }
+      const name = item.name || item.display_name || item.character || item.community || item.label || '';
+      return name ? {
+        name: String(name).slice(0, 80),
+        type: item.type || item.relationship_type || item.kind || 'companion',
+        level_delta: Number(item.level_delta ?? item.levelDelta ?? 0) || 0,
+        xp_delta: Number(item.xp_delta ?? item.xpDelta ?? 0) || 0,
+        affinity_delta: Number(item.affinity_delta ?? item.affinityDelta ?? 0) || 0,
+        closeness_delta: Number(item.closeness_delta ?? item.closenessDelta ?? 0) || 0,
+        community_name: String(item.community_name || item.group || item.crew || '').slice(0, 80),
+        member_count: Number(item.member_count ?? item.memberCount ?? 0) || 0,
+        members: Array.isArray(item.members) ? item.members.slice(0, 12) : [],
+        notes: String(item.notes || item.note || '').slice(0, 220)
+      } : null;
+    })
+    .filter(Boolean)
+    .slice(0, 12);
+
+  const reputationUpdatesRaw = prologue.reputation_updates || parsed.reputation_updates || prologue.reputation || parsed.reputation || [];
+  const reputation_updates = (Array.isArray(reputationUpdatesRaw) ? reputationUpdatesRaw : Object.values(reputationUpdatesRaw || {}))
+    .map(item => {
+      if (!item) return null;
+      if (typeof item === 'string') return { faction: item, delta: 0, reason: '' };
+      const faction = item.faction || item.faction_id || item.id || item.target || '';
+      return faction ? {
+        faction: String(faction).slice(0, 40),
+        delta: Number(item.delta ?? item.change ?? item.value ?? 0) || 0,
+        reason: String(item.reason || item.note || item.context || '').slice(0, 180)
+      } : null;
+    })
+    .filter(Boolean)
+    .slice(0, 12);
+
+  const campUpdatesRaw = prologue.camp_updates || parsed.camp_updates || prologue.camp || parsed.camp || [];
+  const camp_updates = (Array.isArray(campUpdatesRaw) ? campUpdatesRaw : Object.values(campUpdatesRaw || {}))
+    .map(item => {
+      if (!item) return null;
+      if (typeof item === 'string') return { notes: item, morale_delta: 0, safety_delta: 0, resources_delta: 0, crew_additions: [], crew_removals: [] };
+      return {
+        base_name: String(item.base_name || item.baseName || '').slice(0, 80),
+        morale_delta: Number(item.morale_delta ?? item.moraleDelta ?? 0) || 0,
+        safety_delta: Number(item.safety_delta ?? item.safetyDelta ?? 0) || 0,
+        resources_delta: Number(item.resources_delta ?? item.resourcesDelta ?? 0) || 0,
+        crew_additions: Array.isArray(item.crew_additions) ? item.crew_additions.slice(0, 10) : [],
+        crew_removals: Array.isArray(item.crew_removals) ? item.crew_removals.slice(0, 10) : [],
+        notes: String(item.notes || item.note || '').slice(0, 180)
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 12);
+
+  const protagonistState = parsed.protagonist_state || prologue.protagonist_state || parsed.character_state || prologue.character_state || null;
+
   return {
     chapter_title: parsed.chapter_title || prologue.scene_title || parsed.title || parsed.story_metadata?.title || 'Prologue',
     chapter_number: parsed.chapter_number || 1,
@@ -266,8 +375,78 @@ function coerceStorySchema(parsed, languageId = DEFAULT_LANGUAGE_ID) {
       atmosphere: parsed.atmosphere || prologue.atmosphere || 'tense'
     },
     choices,
+    relationship_updates,
+    reputation_updates,
+    camp_updates,
+    protagonist_state: protagonistState || null,
     scene_description: parsed.scene_description || prologue.scene_description || 'Epic Star Wars cinematic scene with dramatic lighting',
     user_edits_applied: null
+  };
+}
+
+function validateStoryPayload(payload) {
+  const warnings = [];
+  if (!payload || typeof payload !== 'object') {
+    return { payload, warnings: ['invalid_payload'] };
+  }
+
+  const normalizedNarrative = payload.narrative && typeof payload.narrative === 'object'
+    ? {
+        context: String(payload.narrative.context || '').slice(0, 1200),
+        action: String(payload.narrative.action || '').slice(0, 2200),
+        dialogue: String(payload.narrative.dialogue || '').slice(0, 1600),
+        reflection: String(payload.narrative.reflection || '').slice(0, 1600),
+        atmosphere: String(payload.narrative.atmosphere || 'tense').slice(0, 80)
+      }
+    : {
+        context: '',
+        action: '',
+        dialogue: '',
+        reflection: '',
+        atmosphere: 'tense'
+      };
+
+  const uniqueChoices = [];
+  const seen = new Set();
+  for (const choice of Array.isArray(payload.choices) ? payload.choices : []) {
+    if (!choice) continue;
+    const normalized = typeof choice === 'string'
+      ? { text: choice }
+      : choice;
+    const text = String(normalized.text || '').trim();
+    if (!text) continue;
+    const key = text.toLowerCase();
+    if (seen.has(key)) {
+      warnings.push('duplicate_choice_removed');
+      continue;
+    }
+    seen.add(key);
+    uniqueChoices.push({
+      ...normalized,
+      text: text.slice(0, 220),
+      attribute: normalized.attribute || 'survival',
+      difficulty: Number.isFinite(Number(normalized.difficulty)) ? Number(normalized.difficulty) : 2,
+      faction_impact: normalized.faction_impact && typeof normalized.faction_impact === 'object' ? normalized.faction_impact : {}
+    });
+  }
+
+  if (uniqueChoices.length < 2) warnings.push('too_few_choices');
+  if (uniqueChoices.length > 4) warnings.push('choices_trimmed');
+
+  const payloadWarnings = Array.isArray(payload.validation_warnings) ? payload.validation_warnings : [];
+
+  return {
+    payload: {
+      ...payload,
+      narrative: normalizedNarrative,
+      choices: uniqueChoices.slice(0, 4),
+      relationship_updates: Array.isArray(payload.relationship_updates) ? payload.relationship_updates.slice(0, 12) : [],
+      reputation_updates: Array.isArray(payload.reputation_updates) ? payload.reputation_updates.slice(0, 12) : [],
+      camp_updates: Array.isArray(payload.camp_updates) ? payload.camp_updates.slice(0, 12) : [],
+      protagonist_state: payload.protagonist_state && typeof payload.protagonist_state === 'object' ? payload.protagonist_state : null,
+      validation_warnings: [...payloadWarnings, ...warnings]
+    },
+    warnings
   };
 }
 
@@ -327,23 +506,39 @@ function parseStoryResponse(raw, turnNumber = 1, languageId = DEFAULT_LANGUAGE_I
       return choice;
     });
 
+    const relationshipUpdates = Array.isArray(parsed.relationship_updates)
+      ? parsed.relationship_updates.slice(0, 12)
+      : (Array.isArray(parsed.relationships) ? parsed.relationships.slice(0, 12) : []);
+    const reputationUpdates = Array.isArray(parsed.reputation_updates)
+      ? parsed.reputation_updates.slice(0, 12)
+      : (Array.isArray(parsed.reputation) ? parsed.reputation.slice(0, 12) : []);
+    const campUpdates = Array.isArray(parsed.camp_updates)
+      ? parsed.camp_updates.slice(0, 12)
+      : (Array.isArray(parsed.camp) ? parsed.camp.slice(0, 12) : []);
+
     const safeTurnNumber = Number.isFinite(turnNumber) ? turnNumber : 1;
 
-    return {
-      chapter_title:     parsed.chapter_title     || 'L\'aventure continue',
-      chapter_number:    parsed.chapter_number    || safeTurnNumber,
-      section_type:      parsed.section_type      || 'action',
+    const validated = validateStoryPayload({
+      chapter_title: parsed.chapter_title || 'L\'aventure continue',
+      chapter_number: parsed.chapter_number || safeTurnNumber,
+      section_type: parsed.section_type || 'action',
       narrative: {
-        context:     narrative.context     || '',
-        action:      narrative.action      || narrative || '',
-        dialogue:    narrative.dialogue    || '',
-        reflection:  narrative.reflection  || '',
-        atmosphere:  narrative.atmosphere  || 'tense'
+        context: narrative.context || '',
+        action: narrative.action || narrative || '',
+        dialogue: narrative.dialogue || '',
+        reflection: narrative.reflection || '',
+        atmosphere: narrative.atmosphere || 'tense'
       },
-      choices:           choices.slice(0, 4),
+      choices: choices.slice(0, 4),
+      relationship_updates: relationshipUpdates,
+      reputation_updates: reputationUpdates,
+      camp_updates: campUpdates,
+      protagonist_state: parsed.protagonist_state || parsed.character_state || null,
       scene_description: parsed.scene_description || 'Epic Star Wars cinematic scene with dramatic lighting',
       user_edits_applied: parsed.user_edits_applied || null
-    };
+    });
+
+    return validated.payload;
   } catch (e) {
     // Fallback: try once more to coerce any JSON we found, else show a helpful message
     console.warn('JSON parse failed, using fallback:', e.message, { rawPreview: String(raw || '').slice(0, 400) });
@@ -362,7 +557,7 @@ function parseStoryResponse(raw, turnNumber = 1, languageId = DEFAULT_LANGUAGE_I
       .replace(/^\s*\{[\s\S]*\}\s*$/m, '')
       .trim() || 'Le modèle a renvoyé une réponse invalide. Essaie un autre modèle (ex: gpt-4o-mini, claude-3.5-sonnet) ou relance.';
 
-    return {
+    const validated = validateStoryPayload({
       chapter_title: 'Réponse non structurée',
       chapter_number: safeTurnNumber,
       section_type: 'action',
@@ -379,9 +574,15 @@ function parseStoryResponse(raw, turnNumber = 1, languageId = DEFAULT_LANGUAGE_I
         { text: 'Chercher des alliés potentiels dans les environs', attribute: 'diplomacy', difficulty: 2, faction_impact: {} },
         { text: 'Analyser la situation avant de décider', attribute: 'tech', difficulty: 1, faction_impact: {} }
       ],
+      relationship_updates: [],
+      reputation_updates: [],
+      camp_updates: [],
+      protagonist_state: null,
       scene_description: 'Epic Star Wars cinematic scene with dramatic lighting',
       user_edits_applied: null
-    };
+    });
+
+    return validated.payload;
   }
 }
 

@@ -28,7 +28,11 @@ const state = {
   isGenerating: false,
   currentChapter: null,
   imageRetryCount: 0,
-  hiddenSkillProgress: null
+  hiddenSkillProgress: null,
+  hiddenRelationshipProgress: null,
+  hiddenFactionReputation: null,
+  hiddenCampProfile: null,
+  hiddenProtagonistProfile: null
 };
 
 const STORY_STORAGE_KEY = 'sw_saved_stories';
@@ -39,7 +43,12 @@ const LAST_IMAGE_PROVIDER_KEY = 'sw_last_image_provider';
 const LAST_IMAGE_MODEL_KEY = 'sw_last_image_model';
 const STORY_MEMORY_PREFIX = 'sw_story_memory_md_';
 const STORY_SKILL_PROGRESS_PREFIX = 'sw_story_skill_progress_';
+const STORY_RELATIONSHIP_PREFIX = 'sw_story_relationship_md_';
+const STORY_FACTION_REPUTATION_PREFIX = 'sw_story_faction_reputation_md_';
+const STORY_CAMP_PREFIX = 'sw_story_camp_md_';
+const STORY_PROTAGONIST_PREFIX = 'sw_story_protagonist_md_';
 const HIDDEN_SKILL_KEYS = ['combat', 'diplomacy', 'stealth', 'tech', 'force', 'survival'];
+const RELATIONSHIP_LEVEL_KEYS = ['friend', 'lover', 'master', 'acolyte', 'companion', 'ally', 'rival', 'community', 'family', 'mentor'];
 const choiceSvgCache = new Map();
 
 function clamp(value, min, max) {
@@ -166,6 +175,30 @@ function appendSkillProgressMemory(storyId, turnNumber, event, progress) {
   const summary = summarizeSkillLevels(progress);
   const block = `\n#### Progression cachée — Tour ${turnNumber}\n- Attribut entraîné: ${event.attrKey}\n- XP gagnée: +${event.gain}\n- Niveau actuel: ${event.currentLevel}\n- Progression: ${event.currentXp}/${event.nextXp}${event.levelUps ? `\n- Level up: +${event.levelUps}` : ''}\n\n${summary}\n`;
   saveStoryMemory(storyId, `${previous}${block}`);
+  maybeCompressStoryMemory(storyId, state.setup, 'relationships');
+}
+
+function appendFactionReputationMemoryTurn(storyId, turnNumber, updates = [], textSource = '') {
+  if (!storyId) return;
+  const previous = loadStoryMemory(storyId);
+  const summary = updates.length
+    ? updates.map(update => `- ${resolveFactionConfig(update.faction)?.name || update.faction}: ${update.delta >= 0 ? '+' : ''}${update.delta}${update.reason ? ` — ${update.reason}` : ''}`).join('\n')
+    : '- Aucune évolution de réputation.';
+  const block = `\n#### Réputation et factions — Tour ${turnNumber}\n- Source: ${textSource || 'story'}\n- Mises à jour:\n${summary}\n`;
+  saveStoryMemory(storyId, `${previous}${block}`);
+  maybeCompressStoryMemory(storyId, state.setup, 'factions');
+}
+
+function appendCampMemoryTurn(storyId, turnNumber, updates = [], textSource = '') {
+  if (!storyId) return;
+  const previous = loadStoryMemory(storyId);
+  const camp = loadCampProfile(storyId, state.setup);
+  const summary = updates.length
+    ? updates.map(update => `- Moral ${update.morale || camp.morale}, Sécurité ${update.safety || camp.safety}, Ressources ${update.resources || camp.resources}, Équipage ${update.crewCount || (camp.crew || []).length}`).join('\n')
+    : `- Base: ${camp.baseName} | Moral ${camp.morale} | Sécurité ${camp.safety} | Ressources ${camp.resources}`;
+  const block = `\n#### Camp et équipage — Tour ${turnNumber}\n- Source: ${textSource || 'story'}\n- Mises à jour:\n${summary}\n`;
+  saveStoryMemory(storyId, `${previous}${block}`);
+  maybeCompressStoryMemory(storyId, state.setup, 'camp');
 }
 
 function buildSkillProgressContext(storyId, roleId) {
@@ -173,6 +206,754 @@ function buildSkillProgressContext(storyId, roleId) {
   state.hiddenSkillProgress = progress;
   const lines = summarizeSkillLevels(progress);
   return `NIVEAUX CACHÉS (invisibles pour le joueur, à utiliser pour la cohérence):\n${lines}\nPlus un niveau est élevé, plus le personnage est performant dans cet attribut.`;
+}
+
+function getRelationshipProgressKey(storyId) {
+  return `${STORY_RELATIONSHIP_PREFIX}${storyId}`;
+}
+
+function relationshipXpNeededForNextLevel(level) {
+  const safeLevel = Math.max(1, Number(level) || 1);
+  return 160 + (safeLevel - 1) * 75;
+}
+
+function normalizeRelationshipType(rawType) {
+  const key = String(rawType || '').trim().toLowerCase();
+  return RELATIONSHIP_LEVEL_KEYS.includes(key) ? key : 'companion';
+}
+
+function normalizeRelationshipName(rawName) {
+  return String(rawName || '').trim().replace(/\s+/g, ' ');
+}
+
+function buildDefaultRelationshipProgress(setup) {
+  const firstName = normalizeRelationshipName(setup?.firstName || 'Protagoniste') || 'Protagoniste';
+  const now = new Date().toISOString();
+  return {
+    links: {
+      [firstName.toLowerCase()]: {
+        name: firstName,
+        type: 'self',
+        level: 1,
+        xp: 0,
+        affinity: 100,
+        closeness: 100,
+        tags: ['self'],
+        introducedAt: now,
+        updatedAt: now,
+        notes: 'Le personnage principal'
+      }
+    },
+    communities: {},
+    updatedAt: now,
+    roleId: setup?.role || null
+  };
+}
+
+function loadRelationshipProgress(storyId, setup) {
+  if (!storyId) return buildDefaultRelationshipProgress(setup);
+  const key = getRelationshipProgressKey(storyId);
+  const raw = localStorage.getItem(key);
+
+  if (!raw) {
+    const created = buildDefaultRelationshipProgress(setup);
+    localStorage.setItem(key, JSON.stringify(created));
+    return created;
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    const fallback = buildDefaultRelationshipProgress(setup);
+    return {
+      ...fallback,
+      ...parsed,
+      links: { ...fallback.links, ...(parsed.links || {}) },
+      communities: { ...fallback.communities, ...(parsed.communities || {}) },
+      roleId: parsed.roleId || setup?.role || null,
+      updatedAt: parsed.updatedAt || fallback.updatedAt
+    };
+  } catch {
+    const repaired = buildDefaultRelationshipProgress(setup);
+    localStorage.setItem(key, JSON.stringify(repaired));
+    return repaired;
+  }
+}
+
+function saveRelationshipProgress(storyId, progress) {
+  if (!storyId || !progress) return;
+  localStorage.setItem(getRelationshipProgressKey(storyId), JSON.stringify({
+    ...progress,
+    updatedAt: new Date().toISOString()
+  }));
+}
+
+function ensureRelationshipEntry(progress, name, type = 'companion') {
+  const key = normalizeRelationshipName(name).toLowerCase();
+  if (!key) return null;
+  const now = new Date().toISOString();
+  if (!progress.links[key]) {
+    progress.links[key] = {
+      name: normalizeRelationshipName(name),
+      type: normalizeRelationshipType(type),
+      level: 1,
+      xp: 0,
+      affinity: 0,
+      closeness: 0,
+      tags: [],
+      introducedAt: now,
+      updatedAt: now,
+      notes: ''
+    };
+  }
+  return progress.links[key];
+}
+
+function normalizeRelationshipUpdates(rawUpdates) {
+  if (!rawUpdates) return [];
+  const list = Array.isArray(rawUpdates) ? rawUpdates : Object.values(rawUpdates);
+  return list
+    .map(update => {
+      if (!update) return null;
+      if (typeof update === 'string') {
+        const name = normalizeRelationshipName(update);
+        return name ? { name, type: 'companion', level_delta: 0, xp_delta: 0, affinity_delta: 0, closeness_delta: 0, notes: '' } : null;
+      }
+      const name = normalizeRelationshipName(update.name || update.display_name || update.character || update.community || update.label);
+      if (!name) return null;
+      return {
+        name,
+        type: normalizeRelationshipType(update.type || update.relationship_type || update.kind || update.role_hint),
+        level_delta: Number(update.level_delta ?? update.levelDelta ?? 0) || 0,
+        xp_delta: Number(update.xp_delta ?? update.xpDelta ?? 0) || 0,
+        affinity_delta: Number(update.affinity_delta ?? update.affinityDelta ?? 0) || 0,
+        closeness_delta: Number(update.closeness_delta ?? update.closenessDelta ?? 0) || 0,
+        community_name: normalizeRelationshipName(update.community_name || update.group || update.crew || ''),
+        member_count: Number(update.member_count ?? update.memberCount ?? 0) || 0,
+        members: Array.isArray(update.members) ? update.members : [],
+        tags: Array.isArray(update.tags) ? update.tags : [],
+        notes: String(update.notes || update.note || '').trim()
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 12);
+}
+
+function summarizeRelationshipLinks(progress, maxEntries = 8) {
+  if (!progress?.links) return '';
+  const entries = Object.values(progress.links)
+    .filter(Boolean)
+    .filter(entry => entry.type !== 'self')
+    .sort((a, b) => {
+      const levelDiff = Number(b.level || 1) - Number(a.level || 1);
+      if (levelDiff !== 0) return levelDiff;
+      return Number(b.affinity || 0) - Number(a.affinity || 0);
+    })
+    .slice(0, maxEntries);
+
+  if (!entries.length) return '- Aucun lien durable encore établi.';
+
+  return entries.map(entry => {
+    const affinity = Number(entry.affinity || 0);
+    const affinityLabel = `${affinity >= 0 ? '+' : ''}${affinity}`;
+    const tags = Array.isArray(entry.tags) && entry.tags.length ? ` (${entry.tags.join(', ')})` : '';
+    return `- ${entry.name} — ${entry.type} niv. ${Number(entry.level || 1)} | affinité ${affinityLabel}${tags}`;
+  }).join('\n');
+}
+
+function summarizeRelationshipCommunities(progress, maxEntries = 6) {
+  if (!progress?.communities) return '';
+  const entries = Object.values(progress.communities)
+    .filter(Boolean)
+    .sort((a, b) => Number(b.level || 1) - Number(a.level || 1))
+    .slice(0, maxEntries);
+
+  if (!entries.length) return '- Aucune communauté structurée pour le moment.';
+
+  return entries.map(entry => {
+    const members = Array.isArray(entry.members) ? entry.members.length : Number(entry.memberCount || 0);
+    const tags = Array.isArray(entry.tags) && entry.tags.length ? ` (${entry.tags.join(', ')})` : '';
+    return `- ${entry.name} — niveau ${Number(entry.level || 1)} | membres ${members || '—'}${tags}`;
+  }).join('\n');
+}
+
+function applyRelationshipUpdates(storyId, setup, updates, source = 'story') {
+  if (!storyId || !updates || !updates.length) return [];
+  const progress = loadRelationshipProgress(storyId, setup);
+  const results = [];
+
+  for (const update of updates) {
+    const entry = ensureRelationshipEntry(progress, update.name, update.type);
+    if (!entry) continue;
+
+    const now = new Date().toISOString();
+    entry.type = normalizeRelationshipType(update.type || entry.type);
+    entry.updatedAt = now;
+    if (update.notes) entry.notes = entry.notes ? `${entry.notes} | ${update.notes}` : update.notes;
+    if (update.tags?.length) {
+      entry.tags = Array.from(new Set([...(entry.tags || []), ...update.tags.map(tag => String(tag).trim()).filter(Boolean)]));
+    }
+
+    const gainedXp = Math.max(0, Math.round((update.xp_delta || 0) + Math.abs(update.level_delta || 0) * 85 + Math.max(0, update.affinity_delta || 0) * 0.8 + Math.max(0, update.closeness_delta || 0) * 0.5));
+    entry.xp = Number(entry.xp || 0) + gainedXp;
+    entry.affinity = clamp(Number(entry.affinity || 0) + Number(update.affinity_delta || 0), -100, 100);
+    entry.closeness = clamp(Number(entry.closeness || 0) + Number(update.closeness_delta || 0), -100, 100);
+
+    if (update.community_name) {
+      const communityKey = update.community_name.toLowerCase();
+      if (!progress.communities[communityKey]) {
+        progress.communities[communityKey] = {
+          name: update.community_name,
+          level: 1,
+          xp: 0,
+          memberCount: 0,
+          members: [],
+          tags: ['community'],
+          introducedAt: now,
+          updatedAt: now,
+          notes: ''
+        };
+      }
+      const community = progress.communities[communityKey];
+      community.memberCount = Math.max(community.memberCount || 0, Number(update.member_count || 0), (community.members || []).length);
+      if (update.members?.length) {
+        community.members = Array.from(new Set([...(community.members || []), ...update.members.map(member => String(member).trim()).filter(Boolean)]));
+        community.memberCount = Math.max(community.memberCount || 0, community.members.length);
+      }
+      community.xp += gainedXp;
+      community.updatedAt = now;
+      while (community.xp >= relationshipXpNeededForNextLevel(community.level)) {
+        community.xp -= relationshipXpNeededForNextLevel(community.level);
+        community.level += 1;
+      }
+    }
+
+    const levelDelta = Number(update.level_delta || 0);
+    if (levelDelta > 0) {
+      entry.level = clamp(Number(entry.level || 1) + levelDelta, 1, 10);
+      entry.xp = 0;
+    } else {
+      while (entry.xp >= relationshipXpNeededForNextLevel(entry.level)) {
+        entry.xp -= relationshipXpNeededForNextLevel(entry.level);
+        entry.level = clamp(Number(entry.level || 1) + 1, 1, 10);
+      }
+    }
+
+    results.push({
+      name: entry.name,
+      type: entry.type,
+      level: Number(entry.level || 1),
+      xp: Number(entry.xp || 0),
+      affinity: Number(entry.affinity || 0),
+      closeness: Number(entry.closeness || 0),
+      community: update.community_name || '',
+      source
+    });
+  }
+
+  saveRelationshipProgress(storyId, progress);
+  state.hiddenRelationshipProgress = progress;
+  return results;
+}
+
+function buildRelationshipContext(storyId, setup, maxChars = 2600) {
+  const progress = loadRelationshipProgress(storyId, setup);
+  state.hiddenRelationshipProgress = progress;
+  const links = summarizeRelationshipLinks(progress);
+  const communities = summarizeRelationshipCommunities(progress);
+
+  return `LIENS RELATIONNELS CACHÉS (invisibles pour le joueur, à faire évoluer avec cohérence):
+Relations clés:
+${links}
+
+Communautés / groupes / cercles:
+${communities}
+
+Règles de narration relationnelle:
+- Les amis, amants, mentors, maîtres, acolytes, disciples, membres d'équipage et communautés peuvent monter en niveau comme les compétences.
+- Chaque interaction marquante doit pouvoir faire progresser, fragiliser ou transformer un lien.
+- Un lien de niveau plus élevé change la façon dont les personnages parlent, se protègent, se trahissent ou se suivent.
+- Si de nouvelles personnes ou communautés sont créées, ajoute-les naturellement au tissu relationnel.`.slice(0, maxChars);
+}
+
+function inferRelationshipSignalsFromText(text) {
+  const lower = String(text || '').toLowerCase();
+  const signals = [];
+
+  if (/(communaut|cercle|clan|famille|tribu|équipage|crew|groupe|communauté)/i.test(lower)) {
+    signals.push({ name: 'Communauté du personnage', type: 'community', level_delta: 0, xp_delta: 26, affinity_delta: 8, closeness_delta: 10, community_name: 'Communauté du personnage', notes: 'Lien collectif ou cercle durable' });
+  }
+  if (/(acolyte|disciple|apprenti|élève|suiveur|suivants)/i.test(lower)) {
+    signals.push({ name: 'Acolytes', type: 'acolyte', level_delta: 0, xp_delta: 22, affinity_delta: 6, closeness_delta: 10, community_name: 'Acolytes du personnage', notes: 'Lien de transmission ou d’obédience' });
+  }
+  if (/(maître|mentor|gourou|enseignant|guide)/i.test(lower)) {
+    signals.push({ name: 'Mentor', type: 'master', level_delta: 0, xp_delta: 20, affinity_delta: 5, closeness_delta: 12, notes: 'Lien d’apprentissage ou d’autorité' });
+  }
+  if (/(amant|amants|amoureuse|amoureux|couple|tendre|désir|baiser|passion|épous|conjoint)/i.test(lower)) {
+    signals.push({ name: 'Lien intime', type: 'lover', level_delta: 0, xp_delta: 30, affinity_delta: 14, closeness_delta: 16, notes: 'Lien romantique ou sensuel' });
+  }
+  if (/(ami|amie|amis|compagnon|compagne|allié|alliés|soeur|frère|fratrie|escorte|partenaire)/i.test(lower)) {
+    signals.push({ name: 'Cercle proche', type: 'friend', level_delta: 0, xp_delta: 18, affinity_delta: 10, closeness_delta: 12, notes: 'Lien d’amitié ou de confiance' });
+  }
+  if (/(trahir|conflit|rival|ennemi|méfiance|rompre|fuir|abandonner|haine)/i.test(lower)) {
+    signals.push({ name: 'Tension relationnelle', type: 'rival', level_delta: 0, xp_delta: 16, affinity_delta: -14, closeness_delta: -12, notes: 'Conflit ou tension durable' });
+  }
+
+  return signals;
+}
+
+function applyRelationshipProgressFromText(storyId, setup, text, source = 'user') {
+  const signals = inferRelationshipSignalsFromText(text);
+  if (!signals.length) return [];
+  return applyRelationshipUpdates(storyId, setup, signals, source);
+}
+
+function appendRelationshipMemoryTurn(storyId, turnNumber, updates = [], textSource = '') {
+  if (!storyId) return;
+  const previous = loadStoryMemory(storyId);
+  const progress = loadRelationshipProgress(storyId, state.setup);
+  const relationSummary = summarizeRelationshipLinks(progress);
+  const communitySummary = summarizeRelationshipCommunities(progress);
+  const updateSummary = updates.length
+    ? updates.map(update => `- ${update.name} (${update.type}) niv. ${update.level} | affinité ${update.affinity >= 0 ? '+' : ''}${update.affinity}${update.community ? ` | communauté: ${update.community}` : ''}`).join('\n')
+    : '- Aucune mise à jour relationnelle explicite ce tour.';
+
+  const block = `
+#### Relations et communautés — Tour ${turnNumber}
+- Source: ${textSource || 'story'}
+- Mises à jour:
+${updateSummary}
+
+##### Liaisons durables
+${relationSummary}
+
+##### Communautés
+${communitySummary}
+`;
+
+  saveStoryMemory(storyId, `${previous}${block}`);
+}
+
+function applyChoiceFactionImpacts(storyId, setup, choiceObj, source = 'choice') {
+  if (!choiceObj?.faction_impact) return [];
+  const updates = Object.entries(choiceObj.faction_impact)
+    .map(([faction, delta]) => ({
+      faction,
+      delta: Number(delta) || 0,
+      reason: `Impact du choix: ${String(choiceObj.text || '').slice(0, 80)}`,
+      source
+    }))
+    .filter(update => update.delta !== 0);
+  return applyFactionReputationUpdates(storyId, setup, updates, source);
+}
+
+function inferCampSignalsFromText(text) {
+  const lower = String(text || '').toLowerCase();
+  const updates = [];
+
+  if (/(base|camp|refuge|quartier|vaisseau|navire|hangar|poste|auberge|sanctuaire|temple)/i.test(lower)) {
+    updates.push({ morale_delta: 4, safety_delta: 6, resources_delta: 2, notes: 'Le texte évoque une structure d’accueil ou de regroupement.' });
+  }
+  if (/(recrute|rejoint|suit|accompagne|reste|part avec lui|part avec elle|équipage|crew|cercle)/i.test(lower)) {
+    updates.push({ morale_delta: 5, safety_delta: 2, crew_delta: 1, notes: 'Des membres s’ajoutent ou s’agrègent autour du protagoniste.' });
+  }
+  if (/(quitte|déserte|se sépare|fuit|trahi|abandonne)/i.test(lower)) {
+    updates.push({ morale_delta: -6, safety_delta: -4, crew_delta: -1, notes: 'Une séparation ou une perte affecte le noyau.' });
+  }
+
+  return updates;
+}
+
+function applyCampUpdates(storyId, setup, updates = [], source = 'story') {
+  if (!storyId || !updates || !updates.length) return [];
+  const camp = loadCampProfile(storyId, setup);
+  const results = [];
+
+  for (const update of updates) {
+    const moraleDelta = Number(update.morale_delta ?? update.moraleDelta ?? 0) || 0;
+    const safetyDelta = Number(update.safety_delta ?? update.safetyDelta ?? 0) || 0;
+    const resourcesDelta = Number(update.resources_delta ?? update.resourcesDelta ?? 0) || 0;
+    const crewDelta = Number(update.crew_delta ?? update.crewDelta ?? 0) || 0;
+    camp.morale = clamp(Number(camp.morale || 0) + moraleDelta, 0, 100);
+    camp.safety = clamp(Number(camp.safety || 0) + safetyDelta, 0, 100);
+    camp.resources = clamp(Number(camp.resources || 0) + resourcesDelta, 0, 100);
+
+    if (Array.isArray(update.crew_additions)) {
+      camp.crew = Array.from(new Set([...(camp.crew || []), ...update.crew_additions.map(v => String(v).trim()).filter(Boolean)]));
+    }
+    if (Array.isArray(update.crew_removals)) {
+      const removals = new Set(update.crew_removals.map(v => String(v).trim()).filter(Boolean));
+      camp.crew = (camp.crew || []).filter(name => !removals.has(name));
+    }
+    if (crewDelta > 0) camp.crew.push(...Array.from({ length: crewDelta }, () => 'Membre du groupe').slice(0, crewDelta));
+    if (crewDelta < 0) camp.crew = (camp.crew || []).slice(0, Math.max(0, (camp.crew || []).length + crewDelta));
+    camp.crew = Array.from(new Set((camp.crew || []).map(name => String(name).trim()).filter(Boolean)));
+
+    if (update.base_name) camp.baseName = String(update.base_name).trim().slice(0, 80) || camp.baseName;
+    if (update.notes) camp.notes = camp.notes ? `${camp.notes} | ${update.notes}` : String(update.notes).trim();
+
+    results.push({
+      morale: camp.morale,
+      safety: camp.safety,
+      resources: camp.resources,
+      crewCount: camp.crew.length,
+      source
+    });
+  }
+
+  saveCampProfile(storyId, camp);
+  state.hiddenCampProfile = camp;
+  return results;
+}
+
+function buildCampEventFromStory(story) {
+  const narrative = story?.narrative || {};
+  const combinedText = [narrative.context, narrative.action, narrative.dialogue, narrative.reflection].filter(Boolean).join(' ');
+  return inferCampSignalsFromText(combinedText);
+}
+
+function maybeCompressStoryMemory(storyId, setup, reason = 'auto') {
+  const md = loadStoryMemory(storyId);
+  if (!md || md.length < 18000) return md;
+
+  const headerMatch = md.match(/^# Trame de l'histoire[\s\S]*?(?=\n### Tour |\n## Journal narratif|\n## Relations et communautés|\n## Progression cachée|$)/i);
+  const header = headerMatch ? headerMatch[0].trim() : `# Trame de l'histoire\n\n- ID: ${storyId}\n- Compression: ${reason}`;
+
+  const turnBlocks = md.split(/\n### Tour /i).slice(1).map(block => `### Tour ${block.trim()}`).filter(Boolean);
+  const recentTurns = turnBlocks.slice(-4).join('\n\n');
+  const relationSection = md.match(/\n#### Relations et communautés[\s\S]*?(?=\n#### Progression cachée|$)/i)?.[0] || '';
+  const skillSection = md.match(/\n#### Progression cachée[\s\S]*?(?=$)/i)?.[0] || '';
+  const reputationSection = md.match(/\n#### Réputation et factions[\s\S]*?(?=\n#### Camp|$)/i)?.[0] || '';
+  const campSection = md.match(/\n#### Camp et équipage[\s\S]*?(?=\n#### Relations|$)/i)?.[0] || '';
+
+  const summary = `\n## Résumé condensé\n- Compression automatique déclenchée (${reason}).\n- Les anciens tours ont été résumés pour garder la mémoire lisible.\n- Les sections vivantes sont conservées: relations, réputation, camp et progression.\n`;
+  const compact = [header, summary, reputationSection, campSection, relationSection, skillSection, recentTurns].filter(Boolean).join('\n\n');
+  saveStoryMemory(storyId, compact.slice(-24000));
+  return compact;
+}
+
+function normalizeFactionKey(rawKey) {
+  const key = String(rawKey || '').trim().toLowerCase();
+  return FACTIONS.some(f => f.id === key) ? key : null;
+}
+
+function getFactionReputationKey(storyId) {
+  return `${STORY_FACTION_REPUTATION_PREFIX}${storyId}`;
+}
+
+function getCampProfileKey(storyId) {
+  return `${STORY_CAMP_PREFIX}${storyId}`;
+}
+
+function getProtagonistProfileKey(storyId) {
+  return `${STORY_PROTAGONIST_PREFIX}${storyId}`;
+}
+
+function buildDefaultFactionReputation(setup) {
+  const standings = {};
+  for (const faction of FACTIONS) standings[faction.id] = 0;
+  const setupFaction = normalizeFactionKey(setup?.faction);
+  if (setupFaction) standings[setupFaction] = 18;
+  return {
+    standings,
+    notableAllies: [],
+    notableEnemies: [],
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function loadFactionReputation(storyId, setup) {
+  if (!storyId) return buildDefaultFactionReputation(setup);
+  const raw = localStorage.getItem(getFactionReputationKey(storyId));
+  if (!raw) {
+    const created = buildDefaultFactionReputation(setup);
+    localStorage.setItem(getFactionReputationKey(storyId), JSON.stringify(created));
+    return created;
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    const fallback = buildDefaultFactionReputation(setup);
+    return {
+      ...fallback,
+      ...parsed,
+      standings: { ...fallback.standings, ...(parsed.standings || {}) },
+      notableAllies: Array.isArray(parsed.notableAllies) ? parsed.notableAllies : [],
+      notableEnemies: Array.isArray(parsed.notableEnemies) ? parsed.notableEnemies : []
+    };
+  } catch {
+    const repaired = buildDefaultFactionReputation(setup);
+    localStorage.setItem(getFactionReputationKey(storyId), JSON.stringify(repaired));
+    return repaired;
+  }
+}
+
+function saveFactionReputation(storyId, reputation) {
+  if (!storyId || !reputation) return;
+  localStorage.setItem(getFactionReputationKey(storyId), JSON.stringify({
+    ...reputation,
+    updatedAt: new Date().toISOString()
+  }));
+}
+
+function summarizeFactionReputation(reputation) {
+  if (!reputation?.standings) return '- Réputation inconnue.';
+  return FACTIONS.map(faction => {
+    const value = Number(reputation.standings?.[faction.id] || 0);
+    const sign = value >= 0 ? '+' : '';
+    return `- ${faction.name}: ${sign}${value}`;
+  }).join('\n');
+}
+
+function applyFactionReputationUpdates(storyId, setup, updates = [], source = 'story') {
+  if (!storyId || !updates || !updates.length) return [];
+  const reputation = loadFactionReputation(storyId, setup);
+  const results = [];
+
+  for (const update of updates) {
+    const factionId = normalizeFactionKey(update.faction || update.faction_id || update.id || update.target);
+    if (!factionId) continue;
+    const delta = Number(update.delta ?? update.change ?? update.value ?? 0);
+    const reason = String(update.reason || update.note || update.context || '').trim();
+    reputation.standings[factionId] = clamp(Number(reputation.standings[factionId] || 0) + delta, -100, 100);
+    if (delta > 0 && !reputation.notableAllies.includes(factionId)) reputation.notableAllies.push(factionId);
+    if (delta < 0 && !reputation.notableEnemies.includes(factionId)) reputation.notableEnemies.push(factionId);
+    results.push({ faction: factionId, delta, reason, source });
+  }
+
+  saveFactionReputation(storyId, reputation);
+  state.hiddenFactionReputation = reputation;
+  return results;
+}
+
+function buildFactionReputationContext(storyId, setup, maxChars = 2400) {
+  const reputation = loadFactionReputation(storyId, setup);
+  state.hiddenFactionReputation = reputation;
+  return `RÉPUTATION ET FACTIONS (cachées, à maintenir cohérentes):\n${summarizeFactionReputation(reputation)}\nRègle: chaque choix important doit laisser une trace mesurable sur les relations inter-factions, l'accès aux ressources, la méfiance ou le soutien.`.slice(0, maxChars);
+}
+
+function buildDefaultCampProfile(setup) {
+  const roleName = resolveRoleConfig(setup?.role)?.name || setup?.role || 'protagoniste';
+  const factionName = resolveFactionConfig(setup?.faction)?.name || setup?.faction || 'indépendant';
+  const baseName = `${roleName} — ${factionName}`;
+  return {
+    baseName,
+    type: 'camp',
+    morale: 50,
+    safety: 45,
+    resources: 40,
+    crew: [],
+    allies: [],
+    mentors: [],
+    acolytes: [],
+    rivals: [],
+    notes: '',
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function loadCampProfile(storyId, setup) {
+  if (!storyId) return buildDefaultCampProfile(setup);
+  const raw = localStorage.getItem(getCampProfileKey(storyId));
+  if (!raw) {
+    const created = buildDefaultCampProfile(setup);
+    localStorage.setItem(getCampProfileKey(storyId), JSON.stringify(created));
+    return created;
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    const fallback = buildDefaultCampProfile(setup);
+    return { ...fallback, ...parsed, crew: Array.isArray(parsed.crew) ? parsed.crew : fallback.crew };
+  } catch {
+    const repaired = buildDefaultCampProfile(setup);
+    localStorage.setItem(getCampProfileKey(storyId), JSON.stringify(repaired));
+    return repaired;
+  }
+}
+
+function saveCampProfile(storyId, profile) {
+  if (!storyId || !profile) return;
+  localStorage.setItem(getCampProfileKey(storyId), JSON.stringify({
+    ...profile,
+    updatedAt: new Date().toISOString()
+  }));
+}
+
+function buildCampContext(storyId, setup, maxChars = 2200) {
+  const camp = loadCampProfile(storyId, setup);
+  state.hiddenCampProfile = camp;
+  return `CAMPEMENT / BASE / ÉQUIPAGE (stable, évolutif):\n- Base: ${camp.baseName}\n- Type: ${camp.type}\n- Moral: ${camp.morale}/100\n- Sécurité: ${camp.safety}/100\n- Ressources: ${camp.resources}/100\n- Crew: ${(camp.crew || []).join(', ') || 'aucun'}\nRègle: ce noyau relationnel doit évoluer organiquement (recrues, départs, maîtres, disciples, famille, amants, escales, refuge).`.slice(0, maxChars);
+}
+
+function buildDefaultProtagonistProfile(setup) {
+  const role = resolveRoleConfig(setup?.role);
+  return {
+    name: String(setup?.firstName || 'Personnage').trim() || 'Personnage',
+    roleId: setup?.role || null,
+    tone: role?.description || 'Déterminé',
+    values: [role?.name || 'survie'],
+    fears: [],
+    habits: [],
+    speechStyle: setup?.language ? getLanguageConfig(setup.language).promptName : 'French',
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function loadProtagonistProfile(storyId, setup) {
+  if (!storyId) return buildDefaultProtagonistProfile(setup);
+  const raw = localStorage.getItem(getProtagonistProfileKey(storyId));
+  if (!raw) {
+    const created = buildDefaultProtagonistProfile(setup);
+    localStorage.setItem(getProtagonistProfileKey(storyId), JSON.stringify(created));
+    return created;
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    const fallback = buildDefaultProtagonistProfile(setup);
+    return { ...fallback, ...parsed, values: Array.isArray(parsed.values) ? parsed.values : fallback.values, fears: Array.isArray(parsed.fears) ? parsed.fears : fallback.fears, habits: Array.isArray(parsed.habits) ? parsed.habits : fallback.habits };
+  } catch {
+    const repaired = buildDefaultProtagonistProfile(setup);
+    localStorage.setItem(getProtagonistProfileKey(storyId), JSON.stringify(repaired));
+    return repaired;
+  }
+}
+
+function saveProtagonistProfile(storyId, profile) {
+  if (!storyId || !profile) return;
+  localStorage.setItem(getProtagonistProfileKey(storyId), JSON.stringify({
+    ...profile,
+    updatedAt: new Date().toISOString()
+  }));
+}
+
+function buildProtagonistContext(storyId, setup, maxChars = 1800) {
+  const profile = loadProtagonistProfile(storyId, setup);
+  state.hiddenProtagonistProfile = profile;
+  return `PROTAGONISTE (stabilité psychologique et voix):\n- Nom: ${profile.name}\n- Rôle: ${resolveRoleConfig(profile.roleId)?.name || profile.roleId || '—'}\n- Ton: ${profile.tone}\n- Valeurs: ${(profile.values || []).join(', ') || '—'}\n- Peurs: ${(profile.fears || []).join(', ') || '—'}\n- Habitudes: ${(profile.habits || []).join(', ') || '—'}\nRègle: la personnalité reste cohérente; les changements doivent être progressifs et justifiés par de vrais événements.`.slice(0, maxChars);
+}
+
+function inferProtagonistSignalsFromText(text) {
+  const lower = String(text || '').toLowerCase();
+  const updates = {};
+
+  if (/(protège|sauve|aide|console|soigne|rassure|encadre)/i.test(lower)) {
+    updates.values = ['protection', 'responsabilité'];
+    updates.tone = 'nurturing';
+  }
+  if (/(méfiance|parano|traqué|craint|fuit|cache)/i.test(lower)) {
+    updates.tone = 'paranoid';
+    updates.fears = ['trahison', 'capture'];
+  }
+  if (/(détermin|résolu|persévère|tient bon|ne cède pas)/i.test(lower)) {
+    updates.tone = 'determined';
+  }
+  if (/(humilie|rage|furieux|colère|explose)/i.test(lower)) {
+    updates.tone = 'angry';
+  }
+  return updates;
+}
+
+function applyProtagonistState(storyId, setup, patch = {}, source = 'story') {
+  if (!storyId) return null;
+  const profile = loadProtagonistProfile(storyId, setup);
+  if (patch.tone) profile.tone = String(patch.tone).trim().slice(0, 40) || profile.tone;
+  if (Array.isArray(patch.values) && patch.values.length) {
+    profile.values = Array.from(new Set([...(profile.values || []), ...patch.values.map(v => String(v).trim()).filter(Boolean)])).slice(0, 10);
+  }
+  if (Array.isArray(patch.fears) && patch.fears.length) {
+    profile.fears = Array.from(new Set([...(profile.fears || []), ...patch.fears.map(v => String(v).trim()).filter(Boolean)])).slice(0, 10);
+  }
+  if (Array.isArray(patch.habits) && patch.habits.length) {
+    profile.habits = Array.from(new Set([...(profile.habits || []), ...patch.habits.map(v => String(v).trim()).filter(Boolean)])).slice(0, 10);
+  }
+  if (patch.notes) profile.notes = profile.notes ? `${profile.notes} | ${patch.notes}` : String(patch.notes).trim();
+  profile.updatedAt = new Date().toISOString();
+  saveProtagonistProfile(storyId, profile);
+  state.hiddenProtagonistProfile = profile;
+  return { ...profile, source };
+}
+
+function getRoleAttributeValue(roleId, attrKey) {
+  const role = resolveRoleConfig(roleId);
+  return clamp(Number(role?.attributes?.[attrKey] ?? 35), 0, 100);
+}
+
+function inferAttributeFromActionText(text) {
+  const lower = String(text || '').toLowerCase();
+
+  if (/(hacker|pirat|terminal|dro[iï]de|syst[eè]me|code|ing[ée]nier|tech)/i.test(lower)) return 'tech';
+  if (/(infiltr|furtif|discret|camouf|ombre|espion|sabotage silencieux)/i.test(lower)) return 'stealth';
+  if (/(n[ée]goci|convain|diploma|discours|parley|parlement|otage)/i.test(lower)) return 'diplomacy';
+  if (/(force|jedi|sith|t[ée]l[ée]kin|clairvoyance|mind trick)/i.test(lower)) return 'force';
+  if (/(surviv|fuir|endurer|ration|abri|soin|m[ée]dec|terrain hostile)/i.test(lower)) return 'survival';
+  if (/(tuer|abattre|massacr|fusill|duel|combat|ex[ée]cut|assaut|grenade|blaster)/i.test(lower)) return 'combat';
+
+  return 'survival';
+}
+
+function estimateActionDifficulty(text) {
+  const lower = String(text || '').toLowerCase();
+  let difficulty = 2;
+
+  const numberMatch = lower.match(/\b(\d{1,3})\b/);
+  const amount = numberMatch ? Number(numberMatch[1]) : 0;
+  if (amount >= 5) difficulty += 1;
+  if (amount >= 20) difficulty += 1;
+
+  if (/(seul|solo|sans aide|sans renfort|sans exp[ée]rience|impossible|suicidaire)/i.test(lower)) difficulty += 1;
+  if (/(destroyer|base militaire|forteresse|escadron|bataillon|garnison|flotte)/i.test(lower)) difficulty += 1;
+
+  return clamp(difficulty, 1, 5);
+}
+
+function assessUserActionBalance(actionText, roleId, progress = null) {
+  const attrKey = inferAttributeFromActionText(actionText);
+  const difficulty = estimateActionDifficulty(actionText);
+  const roleAttr = getRoleAttributeValue(roleId, attrKey);
+  const hiddenLevel = Number(progress?.levels?.[attrKey] || 1);
+  const effectivePower = roleAttr + (hiddenLevel - 1) * 6;
+
+  let abuseScore = 0;
+  const reasons = [];
+
+  const killsMatch = String(actionText || '').match(/(?:tuer|abattre|massacrer|ex[ée]cuter|[ée]liminer|neutraliser)\s+(\d{1,3})/i);
+  if (killsMatch) {
+    const kills = Number(killsMatch[1]);
+    const maxCredibleKills = Math.max(1, Math.floor((effectivePower + 20) / (difficulty * 14)));
+    if (kills > maxCredibleKills) {
+      abuseScore += 2;
+      reasons.push(`l'action vise ${kills} cibles, ce qui dépasse la capacité plausible (${maxCredibleKills}) pour ce profil`);
+    }
+  }
+
+  if (/(seul|solo|sans aide|sans exp[ée]rience)/i.test(String(actionText || '')) && effectivePower < 60) {
+    abuseScore += 1;
+    reasons.push('l’action est tentée sans soutien avec une maîtrise encore limitée');
+  }
+
+  if (/(d[ée]truire|capturer|infiltrer|pirater).*(base|forteresse|destroyer|flotte|garnison)/i.test(String(actionText || '')) && effectivePower < 65) {
+    abuseScore += 1;
+    reasons.push('l’objectif stratégique est trop ambitieux au vu du niveau actuel');
+  }
+
+  return {
+    attrKey,
+    difficulty,
+    effectivePower,
+    isAbusive: abuseScore >= 2,
+    reasons
+  };
+}
+
+function buildUserVersionConstraint(assessment, setup) {
+  const roleName = resolveRoleConfig(setup?.role)?.name || setup?.role || 'personnage';
+  const reasonLine = assessment.reasons?.length
+    ? `Points d'alerte: ${assessment.reasons.join(' ; ')}`
+    : 'Aucun abus majeur détecté.';
+
+  if (assessment.isAbusive) {
+    return `\nCONTRAINTE DE RÉALISME (OBLIGATOIRE):\n- Le joueur tente une action disproportionnée pour un ${roleName}.\n- Ne refuse pas l'action: transforme-la en tentative crédible avec résultat partiel, contre-coup, blessure, fuite, perte de ressources ou conséquence politique.\n- L'histoire DOIT avancer malgré l'échec partiel.\n- ${reasonLine}`;
+  }
+
+  return `\nCONTRAINTE DE RÉALISME (OBLIGATOIRE):\n- Action plausible pour ce profil (${roleName}), résous-la avec des conséquences concrètes.\n- Évite les succès absurdes instantanés.\n- ${reasonLine}`;
 }
 
 function getStoryMemoryKey(storyId) {
@@ -197,7 +978,7 @@ function initializeStoryMemory(storyId, setup) {
   const faction = FACTIONS.find(f => f.id === setup.faction)?.name || setup.faction || '—';
   const role = ROLES.find(r => r.id === setup.role)?.name || setup.role || '—';
   const premise = PREMISES.find(p => p.id === setup.premise)?.name || setup.premise || '—';
-  const md = `# Trame de l'histoire\n\n- ID: ${storyId}\n- Date: ${now}\n- Prénom: ${setup.firstName || '—'}\n- Ère: ${era}\n- Faction: ${faction}\n- Rôle: ${role}\n- Prémisse: ${premise}\n\n## Journal narratif\n\n## Progression cachée\n`;
+  const md = `# Trame de l'histoire\n\n- ID: ${storyId}\n- Date: ${now}\n- Prénom: ${setup.firstName || '—'}\n- Ère: ${era}\n- Faction: ${faction}\n- Rôle: ${role}\n- Prémisse: ${premise}\n\n## Journal narratif\n\n## Relations et communautés\n\n## Progression cachée\n`;
   saveStoryMemory(storyId, md);
 }
 
@@ -209,12 +990,14 @@ function appendStoryMemoryTurn(storyId, turnNumber, story, userMessage) {
   const block = `\n### Tour ${turnNumber} — ${story.chapter_title || 'Chapitre'}\n- Instruction joueur: ${String(userMessage || '').slice(0, 320)}\n- Action: ${String(narrative.action || '').slice(0, 900)}\n${narrative.context ? `- Contexte: ${String(narrative.context).slice(0, 400)}\n` : ''}${narrative.dialogue ? `- Dialogue: ${typeof narrative.dialogue === 'string' ? narrative.dialogue.slice(0, 400) : JSON.stringify(narrative.dialogue).slice(0, 400)}\n` : ''}${narrative.reflection ? `- Réflexion: ${String(narrative.reflection).slice(0, 400)}\n` : ''}${choiceLines ? `- Choix proposés:\n${choiceLines}\n` : ''}`;
   const merged = `${previous}${block}`;
   saveStoryMemory(storyId, merged);
+  maybeCompressStoryMemory(storyId, state.setup, 'narrative');
 }
 
 function buildStoryMemoryContext(storyId, maxChars = 7000) {
   const md = loadStoryMemory(storyId);
   if (!md) return '';
-  return md.length > maxChars ? md.slice(-maxChars) : md;
+  const compact = md.length > maxChars ? md.slice(-maxChars) : md;
+  return compact;
 }
 
 function getChoiceSvgKey(svgRef) {
@@ -984,6 +1767,10 @@ async function startStory() {
   state.currentStoryId = state.currentStoryId || crypto.randomUUID();
   initializeStoryMemory(state.currentStoryId, state.setup);
   state.hiddenSkillProgress = loadSkillProgress(state.currentStoryId, state.setup.role);
+  state.hiddenRelationshipProgress = loadRelationshipProgress(state.currentStoryId, state.setup);
+  state.hiddenFactionReputation = loadFactionReputation(state.currentStoryId, state.setup);
+  state.hiddenCampProfile = loadCampProfile(state.currentStoryId, state.setup);
+  state.hiddenProtagonistProfile = loadProtagonistProfile(state.currentStoryId, state.setup);
   upsertSavedStory({
     id: state.currentStoryId,
     title: buildStoryTitle(state.setup),
@@ -1012,6 +1799,24 @@ async function makeChoice(choiceInput) {
   const progressionEvent = choiceObj
     ? applyHiddenSkillProgress(state.currentStoryId, state.setup.role, choiceObj)
     : null;
+  const factionReputationEvents = choiceObj
+    ? applyChoiceFactionImpacts(state.currentStoryId, state.setup, choiceObj, 'choice')
+    : [];
+
+  if (factionReputationEvents.length) {
+    appendFactionReputationMemoryTurn(state.currentStoryId, state.turn + 1, factionReputationEvents, 'choice');
+  }
+
+  const campSignals = inferCampSignalsFromText(choiceText);
+  if (campSignals.length) {
+    const campProgress = applyCampUpdates(state.currentStoryId, state.setup, campSignals, 'choice');
+    if (campProgress.length) appendCampMemoryTurn(state.currentStoryId, state.turn + 1, campProgress, 'choice');
+  }
+
+  const protagonistPatch = inferProtagonistSignalsFromText(choiceText);
+  if (Object.keys(protagonistPatch).length) {
+    applyProtagonistState(state.currentStoryId, state.setup, protagonistPatch, 'choice');
+  }
 
   if (progressionEvent && state.hiddenSkillProgress) {
     appendSkillProgressMemory(state.currentStoryId, state.turn + 1, progressionEvent, state.hiddenSkillProgress);
@@ -1034,9 +1839,13 @@ async function generateNextTurn(userMessage, progressionEvent = null) {
 
   const memoryContext = buildStoryMemoryContext(state.currentStoryId);
   const skillContext = buildSkillProgressContext(state.currentStoryId, state.setup.role);
+  const relationshipContext = buildRelationshipContext(state.currentStoryId, state.setup);
+  const factionContext = buildFactionReputationContext(state.currentStoryId, state.setup);
+  const campContext = buildCampContext(state.currentStoryId, state.setup);
+  const protagonistContext = buildProtagonistContext(state.currentStoryId, state.setup);
   const userMessageWithMemory = memoryContext
-    ? `${userMessage}\n\nMÉMOIRE DE TRAME (.md, à respecter pour la continuité):\n${memoryContext}\n\n${skillContext}\n${progressionEvent ? `\nDernière progression cachée: ${progressionEvent.attrKey} +${progressionEvent.gain} XP.` : ''}\n\nReste cohérent avec cette trame et fais évoluer l'histoire sans contradiction.`
-    : `${userMessage}\n\n${skillContext}`;
+    ? `${userMessage}\n\nMÉMOIRE DE TRAME (.md, à respecter pour la continuité):\n${memoryContext}\n\n${skillContext}\n\n${relationshipContext}\n\n${factionContext}\n\n${campContext}\n\n${protagonistContext}\n${progressionEvent ? `\nDernière progression cachée: ${progressionEvent.attrKey} +${progressionEvent.gain} XP.` : ''}\n\nReste cohérent avec cette trame et fais évoluer l'histoire sans contradiction.`
+    : `${userMessage}\n\n${skillContext}\n\n${relationshipContext}\n\n${factionContext}\n\n${campContext}\n\n${protagonistContext}`;
 
   state.messages.push({ role: 'user', content: userMessageWithMemory });
 
@@ -1057,6 +1866,37 @@ async function generateNextTurn(userMessage, progressionEvent = null) {
     state.messages.push({ role: 'assistant', content: rawText });
     const story = resolveParseStoryResponse(rawText, state.turn, state.setup.language);
     appendStoryMemoryTurn(state.currentStoryId, state.turn, story, userMessage);
+    const relationshipUpdates = applyRelationshipUpdates(
+      state.currentStoryId,
+      state.setup,
+      normalizeRelationshipUpdates(story.relationship_updates || story.relationships || []),
+      'story'
+    );
+    if (relationshipUpdates.length) {
+      appendRelationshipMemoryTurn(state.currentStoryId, state.turn, relationshipUpdates, 'story');
+    }
+    const reputationUpdates = applyFactionReputationUpdates(
+      state.currentStoryId,
+      state.setup,
+      story.reputation_updates || story.reputation || [],
+      'story'
+    );
+    if (reputationUpdates.length) {
+      appendFactionReputationMemoryTurn(state.currentStoryId, state.turn, reputationUpdates, 'story');
+    }
+    const campUpdates = applyCampUpdates(
+      state.currentStoryId,
+      state.setup,
+      [...(story.camp_updates || story.camp || []), ...buildCampEventFromStory(story)],
+      'story'
+    );
+    if (campUpdates.length) {
+      appendCampMemoryTurn(state.currentStoryId, state.turn, campUpdates, 'story');
+    }
+    const protagonistPatch = story.protagonist_state || story.character_state || inferProtagonistSignalsFromText([story?.narrative?.context, story?.narrative?.action, story?.narrative?.dialogue, story?.narrative?.reflection].filter(Boolean).join(' '));
+    if (protagonistPatch && Object.keys(protagonistPatch).length) {
+      applyProtagonistState(state.currentStoryId, state.setup, protagonistPatch, 'story');
+    }
     state.currentChapter = story;
     if (state.currentStoryId) {
       upsertSavedStory({
@@ -1272,17 +2112,51 @@ function toggleCollaborativePanel() {
   toggle.classList.toggle('expanded');
 }
 
-function incorporateUserEdit() {
+async function incorporateUserEdit() {
+  if (state.isGenerating) return;
+
   const input = document.getElementById('user-edit-input');
   const text = input.value.trim();
 
   if (!text) return;
 
+  const currentProgress = loadSkillProgress(state.currentStoryId, state.setup.role);
+  const assessment = assessUserActionBalance(text, state.setup.role, currentProgress);
+  const relationUpdates = applyRelationshipProgressFromText(state.currentStoryId, state.setup, text, 'user');
+
+  const syntheticChoice = {
+    text,
+    attribute: assessment.attrKey,
+    difficulty: assessment.difficulty
+  };
+  const progressionEvent = applyHiddenSkillProgress(state.currentStoryId, state.setup.role, syntheticChoice);
+  if (progressionEvent && state.hiddenSkillProgress) {
+    appendSkillProgressMemory(state.currentStoryId, state.turn + 1, progressionEvent, state.hiddenSkillProgress);
+  }
+
+  const realismConstraint = buildUserVersionConstraint(assessment, state.setup);
+  const baseContinue = resolveBuildContinueMessage(text, state.turn, state.setup.language, state.setup, state.userEdits);
+  const treatedAsChoicePrompt = `${baseContinue}\n\nACTION JOUEUR SPÉCIALE ("Votre version des événements"):\n- Considère ce texte comme un vrai choix joueur qui doit modifier immédiatement la situation et faire avancer l'intrigue.\n- Action proposée: \"${text}\"${realismConstraint}`;
+
   // Save edit
   state.userEdits.push({
     turn: state.turn,
     text: text,
-    chapterTitle: state.currentChapter?.chapter_title || ''
+    chapterTitle: state.currentChapter?.chapter_title || '',
+    meta: {
+      source: 'your_version_choice',
+      attribute: assessment.attrKey,
+      difficulty: assessment.difficulty,
+      abusive: assessment.isAbusive,
+      relationUpdates: relationUpdates.map(update => ({
+        name: update.name,
+        type: update.type,
+        level: update.level,
+        affinity: update.affinity,
+        closeness: update.closeness,
+        community: update.community
+      }))
+    }
   });
 
   // Show confirmation
@@ -1305,6 +2179,12 @@ function incorporateUserEdit() {
   setTimeout(() => {
     notice.classList.add('hidden');
   }, 3000);
+
+  if (relationUpdates.length) {
+    appendRelationshipMemoryTurn(state.currentStoryId, state.turn + 1, relationUpdates, 'user');
+  }
+
+  await generateNextTurn(treatedAsChoicePrompt, progressionEvent);
 }
 
 /* ─── STORY MENU ────────────────────────────── */
