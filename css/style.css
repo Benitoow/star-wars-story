@@ -1020,7 +1020,7 @@ html, body {
 .dashboard-hero-copy {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 14px;
   position: relative;
   z-index: 1;
 }
