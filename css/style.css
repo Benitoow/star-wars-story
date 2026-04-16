@@ -800,9 +800,11 @@ html, body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 28px 32px;
-  font-size: 16px;
-  line-height: 1.9;
-  color: #d4d4d4;
+  font-size: 17px;
+  line-height: 1.85;
+  color: #e9ecf5;
+  background: rgba(12,12,28,0.94);
+  border-color: rgba(255,232,31,0.32);
   backdrop-filter: blur(8px);
   min-height: 100px;
 }
@@ -813,13 +815,13 @@ html, body {
 .narrative-container {
   display: flex;
   flex-direction: column;
-  gap: 28px;
-  max-width: 72ch;
+  gap: 24px;
+  max-width: 64ch;
   margin: 0 auto;
 }
 .narrative-section {
   position: relative;
-  padding: 4px 0 4px 20px;
+  padding: 6px 0 6px 20px;
   border-left: 2px solid var(--border);
   opacity: 0;
   transform: translateY(8px);
@@ -830,21 +832,22 @@ html, body {
   transform: translateY(0);
 }
 .narrative-section p {
-  font-family: var(--font-body, 'Exo 2', sans-serif);
-  font-size: 17px;
-  line-height: 1.75;
-  color: #e8e8f0;
+  font-family: 'Segoe UI', Inter, var(--font-body, 'Exo 2', sans-serif);
+  font-size: 18px;
+  line-height: 1.8;
+  color: #f2f4fb;
   margin: 0;
   text-align: left;
-  font-weight: 300;
+  font-weight: 400;
   letter-spacing: 0.01em;
+  text-wrap: pretty;
 }
 .narrative-section.context {
   border-left-color: rgba(79,195,247,0.5);
 }
 .narrative-section.context p {
-  color: #bcd6e8;
-  font-size: 15px;
+  color: #d1e5f2;
+  font-size: 16px;
   font-style: italic;
 }
 .narrative-section.action {
@@ -860,20 +863,20 @@ html, body {
   border-left-color: rgba(129,212,250,0.5);
 }
 .narrative-section.reflection p {
-  color: #b8d4e8;
+  color: #d4e4ef;
   font-style: italic;
   font-size: 16px;
 }
 .section-label {
   display: block;
   font-family: var(--font-ui);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 2.5px;
+  letter-spacing: 2px;
   text-transform: uppercase;
-  color: var(--gold2);
+  color: #f0cd55;
   margin-bottom: 10px;
-  opacity: 0.85;
+  opacity: 0.95;
 }
 .narrative-section.context .section-label { color: rgba(79,195,247,0.9); }
 .narrative-section.dialogue .section-label { color: var(--purple); }
@@ -885,7 +888,7 @@ html, body {
 }
 .dialogue-content p {
   margin: 0 0 10px 0;
-  font-size: 16px;
+  font-size: 17px;
 }
 .dialogue-content p:last-child {
   margin-bottom: 0;

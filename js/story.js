@@ -399,6 +399,8 @@ function escapeHtml(str) {
 function cleanNarrativeText(text) {
   if (!text || typeof text !== 'string') return '';
   return text
+    // Convert markdown emphasis to plain readable text
+    .replace(/\*{1,2}([^*\n]+)\*{1,2}/g, '$1')
     // Strip *snake_case_ids* (internal skill tokens the model leaks)
     .replace(/\*([a-z][a-z0-9_]*(?:_[a-z0-9]+)+)\*/gi, '')
     // Strip raw {placeholder} tokens
