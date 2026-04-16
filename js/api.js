@@ -1,11 +1,17 @@
 /* ═══════════════════════════════════════════════
-   api.js — LLM & Image API calls
-═══════════════════════════════════════════════ */
+   api.js — LLM & Image API calls with fallback
+══════════════════════════════════════════════ */
 
-/**
- * Call the LLM API (OpenAI-compatible or Anthropic)
- * Returns the assistant message string
- */
+/* ─── Provider fallback order for image generation ─── */
+const IMAGE_FALLBACK_ORDER = [
+  'openrouter_img',
+  'fal_img',
+  'together_img',
+  'openai_img',
+  'stability'
+];
+
+/* ─── Call the LLM API ────────────────────────── */
 async function callLLM(messages, { providerId, model, apiKey, onStream }) {
   const provider = LLM_PROVIDERS[providerId];
   if (!provider) throw new Error('Provider inconnu: ' + providerId);
@@ -37,7 +43,7 @@ async function callLLM(messages, { providerId, model, apiKey, onStream }) {
     return data.content?.[0]?.text || '';
   }
 
-  // ── OpenAI-compatible format (all other providers) ─
+  // ── OpenAI-compatible format ─
   const body = {
     model,
     messages,
@@ -58,7 +64,7 @@ async function callLLM(messages, { providerId, model, apiKey, onStream }) {
   return data.choices?.[0]?.message?.content || '';
 }
 
-/* ─── STREAMING helpers ─────────────────────── */
+/* ─── Streaming helpers ─────────────────────── */
 async function streamOpenAIResponse(res, onChunk) {
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
@@ -111,7 +117,6 @@ async function testApiConnection(providerId, apiKey) {
     : provider.models[0]?.id;
 
   if (provider.dynamicModels) {
-    // Just fetch the models list as a connectivity test
     const res = await fetch(provider.modelsUrl, {
       headers: provider.getHeaders(apiKey)
     });
@@ -122,7 +127,6 @@ async function testApiConnection(providerId, apiKey) {
     return true;
   }
 
-  // Send a minimal message
   await callLLM(
     [{ role: 'user', content: 'Say "OK" only.' }],
     { providerId, model, apiKey }
@@ -147,10 +151,10 @@ async function fetchOpenRouterModels(apiKey) {
         m.pricing?.prompt ? `$${(parseFloat(m.pricing.prompt)*1e6).toFixed(2)}/M` : ''
       ].filter(Boolean).join(' · ')
     }))
-    .slice(0, 80); // limit for UX
+    .slice(0, 80);
 }
 
-/* ─── Generate image ────────────────────────── */
+/* ─── Enhanced image generation with fallback ─── */
 async function generateImage(prompt, { imgProviderId, imgModel, imgApiKey, llmApiKey }) {
   const prov = IMAGE_PROVIDERS[imgProviderId];
   if (!prov || imgProviderId === 'none') return null;
@@ -158,83 +162,219 @@ async function generateImage(prompt, { imgProviderId, imgModel, imgApiKey, llmAp
 
   const swPrompt = `Epic Star Wars scene, cinematic lighting, highly detailed: ${prompt}`;
 
-  // ── OpenRouter image (OpenAI-compatible) ─────
-  if (imgProviderId === 'openrouter_img') {
-    const res = await fetch(prov.endpoint, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${key}`,
-        'HTTP-Referer': window.location.href,
-        'X-Title': 'Star Wars Interactive Story',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ model: imgModel, prompt: swPrompt, n: 1 })
-    });
-    if (!res.ok) throw new Error(`OpenRouter Image HTTP ${res.status}`);
-    const data = await res.json();
-    return data.data?.[0]?.url || (data.data?.[0]?.b64_json
-      ? `data:image/png;base64,${data.data[0].b64_json}` : null);
+  // Try primary provider first, then fallbacks
+  const providersToTry = imgProviderId !== 'none'
+    ? [imgProviderId, ...IMAGE_FALLBACK_ORDER.filter(p => p !== imgProviderId)]
+    : IMAGE_FALLBACK_ORDER;
+
+  for (const providerId of providersToTry) {
+    try {
+      const result = await tryImageProvider(providerId, swPrompt, key);
+      if (result) return result;
+    } catch (e) {
+      console.warn(`Image provider ${providerId} failed:`, e.message);
+    }
   }
 
-  if (imgProviderId === 'together_img') {
-    const res = await fetch(prov.endpoint, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: imgModel, prompt: swPrompt, n: 1, width: 896, height: 512 })
-    });
-    if (!res.ok) throw new Error(`Image API HTTP ${res.status}`);
-    const data = await res.json();
-    return data.data?.[0]?.url || data.data?.[0]?.b64_json
-      ? `data:image/png;base64,${data.data[0].b64_json}`
-      : null;
+  // All providers failed
+  console.warn('All image providers failed');
+  return null;
+}
+
+/* ─── Try a specific image provider ─────────── */
+async function tryImageProvider(providerId, prompt, apiKey, imgModel = null) {
+  const prov = IMAGE_PROVIDERS[providerId];
+  if (!prov) return null;
+
+  const timeout = 30000; // 30 second timeout
+
+  // OpenRouter image
+  if (providerId === 'openrouter_img') {
+    const model = imgModel || prov.models[0]?.id;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    try {
+      const res = await fetch(prov.endpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'HTTP-Referer': window.location.href,
+          'X-Title': 'Star Wars Interactive Story',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ model, prompt, n: 1 }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      if (!res.ok) throw new Error(`OpenRouter Image HTTP ${res.status}`);
+      const data = await res.json();
+      return data.data?.[0]?.url || (data.data?.[0]?.b64_json
+        ? `data:image/png;base64,${data.data[0].b64_json}` : null);
+    } catch (e) {
+      clearTimeout(timeoutId);
+      throw e;
+    }
   }
 
-  if (imgProviderId === 'openai_img') {
-    const res = await fetch(prov.endpoint, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: imgModel,
-        prompt: swPrompt,
-        n: 1, size: '1792x1024',
-        response_format: 'url'
-      })
-    });
-    if (!res.ok) throw new Error(`Image API HTTP ${res.status}`);
-    const data = await res.json();
-    return data.data?.[0]?.url || null;
+  // Together AI
+  if (providerId === 'together_img') {
+    const model = imgModel || prov.models[0]?.id;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    try {
+      const res = await fetch(prov.endpoint, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, prompt, n: 1, width: 896, height: 512 }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      if (!res.ok) throw new Error(`Together AI HTTP ${res.status}`);
+      const data = await res.json();
+      return data.data?.[0]?.url || data.data?.[0]?.b64_json
+        ? `data:image/png;base64,${data.data[0].b64_json}`
+        : null;
+    } catch (e) {
+      clearTimeout(timeoutId);
+      throw e;
+    }
   }
 
-  // ── fal.ai ───────────────────────────────────
-  if (imgProviderId === 'fal_img') {
-    const res = await fetch(`${prov.endpoint}/${imgModel}`, {
-      method: 'POST',
-      headers: { 'Authorization': `Key ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        prompt: swPrompt,
-        image_size: 'landscape_16_9',
-        num_inference_steps: 4,
-        num_images: 1
-      })
-    });
-    if (!res.ok) throw new Error(`fal.ai HTTP ${res.status}`);
-    const data = await res.json();
-    return data.images?.[0]?.url || null;
+  // DALL-E
+  if (providerId === 'openai_img') {
+    const model = imgModel || prov.models[0]?.id;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    try {
+      const res = await fetch(prov.endpoint, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model,
+          prompt,
+          n: 1, size: '1792x1024',
+          response_format: 'url'
+        }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      if (!res.ok) throw new Error(`DALL-E HTTP ${res.status}`);
+      const data = await res.json();
+      return data.data?.[0]?.url || null;
+    } catch (e) {
+      clearTimeout(timeoutId);
+      throw e;
+    }
   }
 
-  if (imgProviderId === 'stability') {
-    const form = new FormData();
-    form.append('prompt', swPrompt);
-    form.append('output_format', 'webp');
-    const res = await fetch(prov.endpoint, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${key}`, 'Accept': 'image/*' },
-      body: form
-    });
-    if (!res.ok) throw new Error(`Stability HTTP ${res.status}`);
-    const blob = await res.blob();
-    return URL.createObjectURL(blob);
+  // fal.ai
+  if (providerId === 'fal_img') {
+    const model = imgModel || prov.models[0]?.id;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    try {
+      const res = await fetch(`${prov.endpoint}/${model}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Key ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
+          image_size: 'landscape_16_9',
+          num_inference_steps: 4,
+          num_images: 1
+        }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      if (!res.ok) throw new Error(`fal.ai HTTP ${res.status}`);
+      const data = await res.json();
+      return data.images?.[0]?.url || null;
+    } catch (e) {
+      clearTimeout(timeoutId);
+      throw e;
+    }
+  }
+
+  // Stability AI
+  if (providerId === 'stability') {
+    const model = imgModel || prov.models[0]?.id;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    try {
+      const form = new FormData();
+      form.append('prompt', prompt);
+      form.append('output_format', 'webp');
+      const res = await fetch(prov.endpoint, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Accept': 'image/*' },
+        body: form,
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      if (!res.ok) throw new Error(`Stability HTTP ${res.status}`);
+      const blob = await res.blob();
+      return URL.createObjectURL(blob);
+    } catch (e) {
+      clearTimeout(timeoutId);
+      throw e;
+    }
   }
 
   return null;
+}
+
+/* ─── Retry image generation with exponential backoff ─── */
+async function generateImageWithRetry(prompt, options, maxRetries = 3) {
+  let lastError;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const result = await generateImage(prompt, options);
+      if (result) return result;
+
+      // If result is null but no error, wait and retry
+      lastError = new Error('No image returned');
+    } catch (e) {
+      lastError = e;
+    }
+
+    // Exponential backoff: 1s, 2s, 4s
+    if (attempt < maxRetries - 1) {
+      await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+    }
+  }
+
+  throw lastError || new Error('Image generation failed after retries');
+}
+
+/* ─── Generate placeholder SVG for failed images ─── */
+function generatePlaceholderSVG(text, factionColor) {
+  const color = factionColor || '#FFE81F';
+  return `data:image/svg+xml,${encodeURIComponent(`
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400">
+      <defs>
+        <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style="stop-color:#0a0a1a"/>
+          <stop offset="100%" style="stop-color:#1a1a3a"/>
+        </linearGradient>
+        <filter id="glow">
+          <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+          <feMerge>
+            <feMergeNode in="coloredBlur"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+      </defs>
+      <rect fill="url(#bg)" width="800" height="400"/>
+      <circle cx="400" cy="200" r="60" fill="none" stroke="${color}" stroke-width="2" opacity="0.5"/>
+      <text x="400" y="195" text-anchor="middle" fill="${color}" font-family="sans-serif" font-size="14" opacity="0.8">STAR WARS</text>
+      <text x="400" y="215" text-anchor="middle" fill="#888" font-family="sans-serif" font-size="11">${text}</text>
+      <path d="M370 180 L400 150 L430 180" fill="none" stroke="${color}" stroke-width="2" filter="url(#glow)"/>
+      <circle cx="400" cy="250" r="80" fill="none" stroke="${color}" stroke-width="1" stroke-dasharray="5,5" opacity="0.3"/>
+    </svg>
+  `)}`;
 }

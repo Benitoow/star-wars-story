@@ -1,6 +1,7 @@
 /* ═══════════════════════════════════════════════
    app.js — Main application logic
-═══════════════════════════════════════════════ */
+   Enhanced with UI language switching, collaborative mode, and role details
+══════════════════════════════════════════════ */
 
 /* ─── APP STATE ─────────────────────────────── */
 const state = {
@@ -10,20 +11,171 @@ const state = {
   imgProvider: 'none',
   imgModel: null,
   imgApiKey: '',
-  setup: { language: null, era: null, faction: null, role: null, premise: null },
+  uiLang: 'fr',                    // UI language
+  setup: {
+    language: null,                // Narration language
+    era: null,
+    faction: null,
+    role: null,
+    premise: null
+  },
+  userEdits: [],                    // Collaborative mode edits
   messages: [],
   turn: 0,
-  isGenerating: false
+  isGenerating: false,
+  currentChapter: null,
+  imageRetryCount: 0
 };
+
+/* ─── UI LANGUAGE SYSTEM ─────────────────────── */
+function switchUILanguage(langId) {
+  state.uiLang = langId;
+  localStorage.setItem('sw_ui_lang', langId);
+  window.__UI_LANG__ = langId;
+
+  // Update all UI text elements
+  updateAllUIText();
+
+  // Update language selector UI
+  updateLanguageSelector();
+
+  // Update document lang attribute
+  document.documentElement.lang = langId;
+}
+
+function updateAllUIText() {
+  const lang = state.uiLang;
+
+  // Update elements with data-i18n attribute
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (el.tagName === 'INPUT' && el.placeholder) {
+      el.placeholder = t(key, lang);
+    } else if (el.tagName === 'BUTTON' || el.tagName === 'SPAN') {
+      el.textContent = t(key, lang);
+    } else {
+      el.textContent = t(key, lang);
+    }
+  });
+
+  // Update specific elements by ID
+  const elementsToUpdate = {
+    'provider-name-label': { attr: 'textContent', key: 'apiKeyLabel' },
+    'btn-test-api-text': { attr: 'textContent', key: 'testContinue' },
+    'api-error-text': { attr: 'textContent', key: 'aiError' },
+    'model-search-placeholder': { attr: 'placeholder', key: 'searchModel' },
+    'btn-confirm-model-text': { attr: 'textContent', key: 'confirm' },
+    'img-key-label-text': { attr: 'textContent', key: 'imageKeyLabel' },
+    'img-api-key-placeholder': { attr: 'placeholder', key: 'imageKeyPlaceholder' },
+    'btn-skip-text': { attr: 'textContent', key: 'skip' },
+    'btn-confirm-image-text': { attr: 'textContent', key: 'confirm' },
+    'btn-start-story-text': { attr: 'textContent', key: 'startStory' },
+    'story-loading-text': { attr: 'textContent', key: 'weavingFate' },
+    'btn-menu-text': { attr: 'textContent', key: 'menu' },
+    'btn-continue-text': { attr: 'textContent', key: 'continue' },
+    'btn-restart-text': { attr: 'textContent', key: 'newStory' },
+    'your-version-placeholder': { attr: 'placeholder', key: 'yourVersionPlaceholder' },
+    'btn-incorporate-text': { attr: 'textContent', key: 'incorporate' },
+    'your-version-title': { attr: 'textContent', key: 'yourVersion' },
+  };
+
+  Object.entries(elementsToUpdate).forEach(([id, { attr, key }]) => {
+    const el = document.getElementById(id);
+    if (el) el[attr] = t(key, lang);
+  });
+
+  // Update setup section labels
+  const setupLabels = document.querySelectorAll('.setup-label');
+  setupLabels.forEach(label => {
+    const icon = label.querySelector('.setup-icon');
+    if (icon) {
+      const key = label.getAttribute('data-i18n-key');
+      if (key) {
+        label.childNodes[label.childNodes.length - 1].textContent = ' ' + t(key, lang);
+      }
+    }
+  });
+}
+
+function updateLanguageSelector() {
+  const selector = document.getElementById('ui-lang-selector');
+  if (!selector) return;
+
+  const currentLang = UI_LANGUAGES.find(l => l.id === state.uiLang);
+  const currentBtn = selector.querySelector('.current-lang');
+  if (currentBtn) {
+    currentBtn.innerHTML = `${currentLang.native} ${SVG.chevronDown}`;
+  }
+
+  // Update dropdown items
+  selector.querySelectorAll('.lang-option').forEach(option => {
+    option.classList.toggle('selected', option.dataset.lang === state.uiLang);
+  });
+}
+
+function renderLanguageSelector() {
+  const header = document.querySelector('.story-header');
+  if (!header) return;
+
+  // Create language selector if not exists
+  let selector = document.getElementById('ui-lang-selector');
+  if (!selector) {
+    selector = document.createElement('div');
+    selector.id = 'ui-lang-selector';
+    selector.className = 'ui-lang-selector';
+    selector.innerHTML = `
+      <button class="current-lang" title="${t('selectLanguage', state.uiLang)}">
+        ${UI_LANGUAGES.find(l => l.id === state.uiLang)?.native || 'FR'} ${SVG.chevronDown}
+      </button>
+      <div class="lang-dropdown hidden">
+        ${UI_LANGUAGES.map(lang => `
+          <button class="lang-option ${lang.id === state.uiLang ? 'selected' : ''}" data-lang="${lang.id}">
+            ${lang.label}
+          </button>
+        `).join('')}
+      </div>
+    `;
+    header.appendChild(selector);
+
+    // Add event listeners
+    const currentBtn = selector.querySelector('.current-lang');
+    const dropdown = selector.querySelector('.lang-dropdown');
+
+    currentBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdown.classList.toggle('hidden');
+    });
+
+    selector.querySelectorAll('.lang-option').forEach(option => {
+      option.addEventListener('click', () => {
+        switchUILanguage(option.dataset.lang);
+        dropdown.classList.add('hidden');
+      });
+    });
+
+    // Close on outside click
+    document.addEventListener('click', () => {
+      dropdown.classList.add('hidden');
+    });
+  }
+}
 
 /* ─── INIT ──────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
+  // Load saved UI language
+  const savedUILang = localStorage.getItem('sw_ui_lang');
+  if (savedUILang && UI_LANGUAGES.find(l => l.id === savedUILang)) {
+    state.uiLang = savedUILang;
+    window.__UI_LANG__ = savedUILang;
+  }
+
   initStarfield();
   renderProviderGrid();
   renderImageProviders();
   renderSetupScreens();
   loadSavedSettings();
   setupEventListeners();
+  updateAllUIText();
 });
 
 /* ─── STARFIELD CANVAS ──────────────────────── */
@@ -82,6 +234,11 @@ function goTo(screenId) {
     next.style.opacity = '';
   });
   setTimeout(() => next.classList.remove('slide-in'), 450);
+
+  // Show language selector on story screen
+  if (screenId === 'screen-story') {
+    setTimeout(renderLanguageSelector, 500);
+  }
 }
 
 /* ─── PROVIDER GRID ─────────────────────────── */
@@ -110,7 +267,6 @@ function selectProvider(id) {
   section.classList.remove('hidden');
   document.getElementById('provider-name-label').textContent = LLM_PROVIDERS[id].name;
 
-  // Load saved key if any
   const saved = localStorage.getItem(`sw_key_${id}`);
   if (saved) {
     document.getElementById('api-key-input').value = saved;
@@ -127,7 +283,6 @@ function renderImageProviders() {
     const card = document.createElement('div');
     card.className = 'img-provider-card';
     card.dataset.id = id;
-    // Check if provider has any free models
     const hasFree = prov.models?.some(m => m.tags?.includes('free'));
     card.innerHTML = `
       ${hasFree ? '<span class="free-badge">FREE</span>' : ''}
@@ -182,7 +337,6 @@ function renderImgModels(providerId) {
     });
     list.appendChild(item);
   }
-  // Auto-select first
   list.firstChild?.click();
 }
 
@@ -205,18 +359,109 @@ function renderChoiceGrid(containerId, items, key) {
     card.dataset.id  = item.id;
     if (item.id && key === 'faction') card.dataset.faction = item.id;
     card.style.setProperty('color', item.color || 'var(--gold)');
-    card.innerHTML = `
-      ${item.svg}
-      <span class="choice-name">${item.name}</span>
-      <span class="choice-sub">${item.sub || item.years || ''}</span>`;
+
+    // Special rendering for roles - show faction badge and attributes preview
+    if (key === 'role' && item.attributes) {
+      card.innerHTML = `
+        <div class="role-card-header">
+          ${item.svg}
+          <span class="faction-badge" style="background:${FACTIONS.find(f=>f.id===item.faction)?.color || '#666'}">
+            ${FACTIONS.find(f=>f.id===item.faction)?.name || ''}
+          </span>
+        </div>
+        <span class="choice-name">${item.name}</span>
+        <span class="choice-sub">${item.sub || ''}</span>
+        <div class="role-attr-preview">
+          <div class="attr-bar" title="${t('combat')}: ${item.attributes.combat}">
+            <div class="attr-fill" style="width:${item.attributes.combat}%; background:#FF6B35"></div>
+          </div>
+        </div>
+      `;
+    } else {
+      card.innerHTML = `
+        ${item.svg}
+        <span class="choice-name">${item.name}</span>
+        <span class="choice-sub">${item.sub || item.years || item.members || ''}</span>
+      `;
+    }
+
+    // Add click handler
     card.addEventListener('click', () => {
       document.querySelectorAll(`.choice-card[data-key="${key}"]`).forEach(c =>
         c.classList.toggle('selected', c.dataset.id === item.id));
       state.setup[key] = item.id;
       checkSetupComplete();
+
+      // Show role detail panel if role is selected
+      if (key === 'role') {
+        showRoleDetail(item.id);
+      }
     });
+
     grid.appendChild(card);
   }
+}
+
+function showRoleDetail(roleId) {
+  const role = getRoleConfig(roleId);
+  if (!role) return;
+
+  // Create or update role detail panel
+  let panel = document.getElementById('role-detail-panel');
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = 'role-detail-panel';
+    panel.className = 'role-detail-panel';
+    document.querySelector('#screen-setup .screen-inner').appendChild(panel);
+  }
+
+  const faction = getFactionConfig(role.faction);
+
+  panel.innerHTML = `
+    <div class="role-detail-header">
+      <div class="role-detail-icon" style="color: ${role.color}">${role.svg}</div>
+      <div class="role-detail-info">
+        <h3>${role.name}</h3>
+        <span class="faction-badge" style="background:${faction?.color || '#666'}">${faction?.name || ''}</span>
+      </div>
+      <button class="btn-close" onclick="closeRoleDetail()">×</button>
+    </div>
+    <p class="role-description">${role.description}</p>
+    <div class="role-attributes">
+      <h4>${t('attributes', state.uiLang)}</h4>
+      <div class="attributes-grid">
+        ${Object.entries(role.attributes).map(([attr, val]) => `
+          <div class="attribute-row">
+            <span class="attr-name">${t(attr, state.uiLang)}</span>
+            <div class="attr-bar-container">
+              <div class="attr-bar">
+                <div class="attr-fill ${attr === 'force' && val > 0 ? 'force' : ''}" style="width:${val}%"></div>
+              </div>
+              <span class="attr-value">${val}</span>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    <div class="role-skills">
+      <h4>${t('skills', state.uiLang)}</h4>
+      <div class="skills-list">
+        ${Object.entries(role.skills).map(([skill, desc]) => `
+          <div class="skill-item">
+            <span class="skill-name">${skill.replace(/_/g, ' ')}</span>
+            <span class="skill-desc">${desc}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+
+  panel.classList.add('active');
+}
+
+function closeRoleDetail() {
+  const panel = document.getElementById('role-detail-panel');
+  if (panel) panel.classList.remove('active');
 }
 
 function checkSetupComplete() {
@@ -225,7 +470,7 @@ function checkSetupComplete() {
 }
 
 /* ─── MODEL SELECTION ───────────────────────── */
-let _allModels = []; // keep full list for search filtering
+let _allModels = [];
 
 async function populateModels() {
   const list   = document.getElementById('model-list');
@@ -269,7 +514,6 @@ function renderModelList(models) {
     });
     list.appendChild(item);
   }
-  // Auto-select first
   list.firstChild?.click();
 }
 
@@ -291,38 +535,37 @@ function filterModels(query) {
 async function startStory() {
   state.messages = [{ role: 'system', content: buildSystemPrompt(state.setup.language) }];
   state.turn = 0;
+  state.userEdits = [];
+  state.currentChapter = null;
   goTo('screen-story');
   await generateNextTurn(buildStartMessage(state.setup));
 }
 
 async function makeChoice(choiceText) {
   if (state.isGenerating) return;
-  await generateNextTurn(buildContinueMessage(choiceText, state.turn, state.setup.language));
+  await generateNextTurn(buildContinueMessage(choiceText, state.turn, state.setup.language, state.setup, state.userEdits));
 }
 
 async function generateNextTurn(userMessage) {
   state.isGenerating = true;
   state.turn++;
 
-  // Update UI
-  document.getElementById('story-turn-counter').textContent = `Tour ${state.turn}`;
+  document.getElementById('story-turn-counter').textContent = `${t('turn', state.uiLang)} ${state.turn}`;
   setChoicesEnabled(false);
   showLoading(true);
   clearNarrative();
 
-  // Build messages
   state.messages.push({ role: 'user', content: userMessage });
 
   try {
     let rawText = '';
 
-    // Try streaming first
     try {
       rawText = await callLLM(state.messages, {
         providerId: state.provider,
         model:      state.model,
         apiKey:     state.apiKey,
-        onStream:   null // disable streaming for JSON parsing reliability
+        onStream:   null
       });
     } catch (e) {
       throw e;
@@ -330,48 +573,70 @@ async function generateNextTurn(userMessage) {
 
     state.messages.push({ role: 'assistant', content: rawText });
     const story = parseStoryResponse(rawText);
+    state.currentChapter = story;
 
     // Update chapter title
     document.getElementById('story-chapter-title').textContent = story.chapter_title;
 
     // Type narrative
     showLoading(false);
-    await typeNarrative(formatNarrative(story.narrative));
+    await typeNarrative(formatNarrative(story));
 
-    // Render choices
-    renderChoices(story.choices);
+    // Render choices with attribute info
+    renderChoicesWithAttributes(story.choices);
 
-    // Generate image if configured
+    // Show collaborative panel
+    showCollaborativePanel();
+
+    // Generate image
     if (state.imgProvider !== 'none') {
-      generateStoryImage(story.scene_description).catch(console.warn);
+      state.imageRetryCount = 0;
+      generateStoryImageWithFallback(story.scene_description).catch(console.warn);
     }
 
   } catch (e) {
     showLoading(false);
     document.getElementById('story-narrative').innerHTML =
-      `<p style="color:var(--red)">Erreur IA: ${e.message}</p>
-       <p style="color:#666;font-size:13px">Vérifiez votre clé API et réessayez.</p>`;
-    renderChoices(['Réessayer cette action']);
+      `<p style="color:var(--red)">${t('aiError')}: ${e.message}</p>
+       <p style="color:#666;font-size:13px">${t('retry')}</p>`;
+    renderChoices([t('retryAction', state.uiLang)]);
   }
 
   state.isGenerating = false;
 }
 
-async function generateStoryImage(prompt) {
+async function generateStoryImageWithFallback(prompt) {
+  const container = document.getElementById('story-image-container');
+  const img = document.getElementById('story-image');
+
+  // Show loading state
+  container.classList.remove('hidden');
+  container.classList.add('loading');
+  img.src = '';
+  document.getElementById('image-status')?.classList.remove('hidden');
+
   try {
-    const url = await generateImage(prompt, {
+    const url = await generateImageWithRetry(prompt, {
       imgProviderId: state.imgProvider,
       imgModel:      state.imgModel,
       imgApiKey:     state.imgApiKey,
       llmApiKey:     state.apiKey
     });
+
+    container.classList.remove('loading');
+
     if (url) {
-      const container = document.getElementById('story-image-container');
-      const img       = document.getElementById('story-image');
       img.src = url;
-      container.classList.remove('hidden');
+      document.getElementById('image-status')?.classList.add('hidden');
+    } else {
+      // Use placeholder
+      const faction = getFactionConfig(state.setup.faction);
+      img.src = generatePlaceholderSVG(t('imageFailed', state.uiLang), faction?.color);
     }
   } catch (e) {
+    container.classList.remove('loading');
+    const faction = getFactionConfig(state.setup.faction);
+    img.src = generatePlaceholderSVG(t('imageFailed', state.uiLang), faction?.color);
     console.warn('Image generation failed:', e.message);
   }
 }
@@ -380,6 +645,7 @@ async function generateStoryImage(prompt) {
 function clearNarrative() {
   document.getElementById('story-narrative').innerHTML = '';
   document.getElementById('story-choices').innerHTML = '';
+  document.getElementById('collaborative-panel')?.classList.remove('active');
 }
 
 async function typeNarrative(html) {
@@ -404,9 +670,35 @@ function sleep(ms) {
 }
 
 /* ─── CHOICES ───────────────────────────────── */
+function renderChoicesWithAttributes(choices) {
+  const container = document.getElementById('story-choices');
+  container.innerHTML = '';
+  choices.forEach((choice, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'choice-btn';
+
+    const attrLabel = t(choice.attribute || 'survival', state.uiLang);
+    const difficultyStars = '★'.repeat(choice.difficulty || 1);
+
+    btn.innerHTML = `
+      <span class="choice-num">${String.fromCharCode(65 + i)}.</span>
+      <span class="choice-text">${choice.text}</span>
+      <span class="choice-meta">
+        <span class="choice-attr">${attrLabel}</span>
+        <span class="choice-diff">${difficultyStars}</span>
+      </span>
+    `;
+    btn.addEventListener('click', () => makeChoice(choice.text));
+    container.appendChild(btn);
+  });
+}
+
 function renderChoices(choices) {
   const container = document.getElementById('story-choices');
   container.innerHTML = '';
+  if (typeof choices === 'string') {
+    choices = [choices];
+  }
   choices.forEach((text, i) => {
     const btn = document.createElement('button');
     btn.className = 'choice-btn';
@@ -424,6 +716,95 @@ function showLoading(show) {
   document.getElementById('story-loading').classList.toggle('hidden', !show);
 }
 
+/* ─── COLLABORATIVE MODE ─────────────────────── */
+function showCollaborativePanel() {
+  let panel = document.getElementById('collaborative-panel');
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = 'collaborative-panel';
+    panel.className = 'collaborative-panel';
+    panel.innerHTML = `
+      <button class="collaborative-toggle" onclick="toggleCollaborativePanel()">
+        ${SVG.edit}
+        <span data-i18n="yourVersion">${t('yourVersion', state.uiLang)}</span>
+        ${SVG.chevronDown}
+      </button>
+      <div class="collaborative-content hidden">
+        <textarea
+          id="user-edit-input"
+          class="user-edit-textarea"
+          placeholder="${t('yourVersionPlaceholder', state.uiLang)}"
+        ></textarea>
+        <div class="collaborative-actions">
+          <button class="sw-btn primary" id="btn-incorporate" onclick="incorporateUserEdit()">
+            <span data-i18n="incorporate">${t('incorporate', state.uiLang)}</span>
+          </button>
+          <span class="incorporated-notice hidden" id="incorporated-notice">
+            ${SVG.check} <span data-i18n="incorporated">${t('incorporated', state.uiLang)}</span>
+          </span>
+        </div>
+        ${state.userEdits.length > 0 ? `
+          <div class="edit-history">
+            <h4 data-i18n="editHistory">${t('editHistory', state.uiLang)}</h4>
+            ${state.userEdits.map((edit, i) => `
+              <div class="edit-item">
+                <span class="edit-turn">Tour ${edit.turn}</span>
+                <span class="edit-preview">${edit.text.substring(0, 50)}...</span>
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+      </div>
+    `;
+    document.getElementById('story-body').appendChild(panel);
+  }
+  panel.classList.add('active');
+}
+
+function toggleCollaborativePanel() {
+  const panel = document.getElementById('collaborative-panel');
+  const content = panel.querySelector('.collaborative-content');
+  const toggle = panel.querySelector('.collaborative-toggle');
+
+  content.classList.toggle('hidden');
+  toggle.classList.toggle('expanded');
+}
+
+function incorporateUserEdit() {
+  const input = document.getElementById('user-edit-input');
+  const text = input.value.trim();
+
+  if (!text) return;
+
+  // Save edit
+  state.userEdits.push({
+    turn: state.turn,
+    text: text,
+    chapterTitle: state.currentChapter?.chapter_title || ''
+  });
+
+  // Show confirmation
+  const notice = document.getElementById('incorporated-notice');
+  notice.classList.remove('hidden');
+  input.value = '';
+
+  // Update edit history
+  const history = document.querySelector('.edit-history');
+  if (history) {
+    history.innerHTML += `
+      <div class="edit-item">
+        <span class="edit-turn">Tour ${state.turn}</span>
+        <span class="edit-preview">${text.substring(0, 50)}...</span>
+      </div>
+    `;
+  }
+
+  // Clear notice after 3 seconds
+  setTimeout(() => {
+    notice.classList.add('hidden');
+  }, 3000);
+}
+
 /* ─── STORY MENU ────────────────────────────── */
 function closeStoryMenu() {
   document.getElementById('story-menu-overlay').classList.add('hidden');
@@ -432,12 +813,12 @@ function closeStoryMenu() {
 function openStoryMenu() {
   const { language, era, faction, role, premise } = state.setup;
   const info = [
-    `Langue: ${LANGUAGES.find(l=>l.id===language)?.name || language || '—'}`,
-    `Ère: ${ERAS.find(e=>e.id===era)?.name || era || '—'}`,
-    `Faction: ${FACTIONS.find(f=>f.id===faction)?.name || faction || '—'}`,
-    `Rôle: ${ROLES.find(r=>r.id===role)?.name || role || '—'}`,
-    `Prémisse: ${PREMISES.find(p=>p.id===premise)?.name || premise || '—'}`,
-    `Tour: ${state.turn}`
+    `${t('narrationLang', state.uiLang)}: ${LANGUAGES.find(l=>l.id===language)?.name || language || '—'}`,
+    `${t('era', state.uiLang)}: ${ERAS.find(e=>e.id===era)?.name || era || '—'}`,
+    `${t('faction', state.uiLang)}: ${FACTIONS.find(f=>f.id===faction)?.name || faction || '—'}`,
+    `${t('role', state.uiLang)}: ${ROLES.find(r=>r.id===role)?.name || role || '—'}`,
+    `${t('premise', state.uiLang)}: ${PREMISES.find(p=>p.id===premise)?.name || premise || '—'}`,
+    `${t('turn', state.uiLang)}: ${state.turn}`
   ].join('<br>');
   document.getElementById('overlay-story-info').innerHTML = info;
   document.getElementById('story-menu-overlay').classList.remove('hidden');
@@ -544,10 +925,8 @@ function setupEventListeners() {
 
 /* ─── PERSIST SETTINGS ──────────────────────── */
 function loadSavedSettings() {
-  // Auto-select saved provider if any
   for (const id of Object.keys(LLM_PROVIDERS)) {
     if (localStorage.getItem(`sw_key_${id}`)) {
-      // Don't auto-select to avoid confusion, just hint
       break;
     }
   }

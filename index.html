@@ -23,15 +23,17 @@
     <div class="screen-inner">
       <div class="logo-title">
         <h1 class="sw-logo-text">STAR WARS</h1>
-        <p class="subtitle">Histoire Interactive IA</p>
+        <p class="subtitle" data-i18n="subtitle">Histoire Interactive IA</p>
       </div>
 
       <div class="card">
-        <h2 class="card-title">Choisissez votre fournisseur IA</h2>
+        <h2 class="card-title" data-i18n="chooseProvider">Choisissez votre fournisseur IA</h2>
         <div id="provider-grid" class="provider-grid"></div>
 
         <div id="api-key-section" class="api-key-section hidden">
-          <label class="field-label">Clé API <span id="provider-name-label"></span></label>
+          <label class="field-label">
+            <span data-i18n="apiKeyLabel">Clé API</span> <span id="provider-name-label"></span>
+          </label>
           <div class="input-group">
             <input type="password" id="api-key-input" class="sw-input" placeholder="sk-…" autocomplete="off" />
             <button id="toggle-key-visibility" class="btn-icon" title="Afficher/Masquer">
@@ -45,34 +47,40 @@
             <label class="checkbox-label">
               <input type="checkbox" id="save-key-checkbox" />
               <span class="checkmark"></span>
-              Mémoriser la clé (stockage local)
+              <span data-i18n="rememberKey">Mémoriser la clé (stockage local)</span>
             </label>
           </div>
           <button id="btn-test-api" class="sw-btn primary" disabled>
-            <span class="btn-text">Tester & Continuer</span>
+            <span class="btn-text" id="btn-test-api-text" data-i18n="testContinue">Tester & Continuer</span>
             <span class="btn-loader hidden"></span>
           </button>
-          <p id="api-error" class="error-msg hidden"></p>
+          <p id="api-error" class="error-msg hidden">
+            <span id="api-error-text" data-i18n="aiError">Erreur IA</span>
+          </p>
         </div>
       </div>
 
-      <p class="hint-text">Votre clé API ne quitte jamais votre navigateur.</p>
+      <p class="hint-text" data-i18n="hintKey">Votre clé API ne quitte jamais votre navigateur.</p>
     </div>
   </div>
 
   <!-- ═══════════════════════ SCREEN 2 — MODEL SELECTION ═══════════════════════ -->
   <div id="screen-model" class="screen">
     <div class="screen-inner">
-      <h2 class="screen-title">Choisissez votre modèle</h2>
-      <p class="screen-subtitle">Le modèle qui donnera vie à votre histoire</p>
+      <h2 class="screen-title" data-i18n="chooseModel">Choisissez votre modèle</h2>
+      <p class="screen-subtitle" data-i18n="chooseModelSub">Le modèle qui donnera vie à votre histoire</p>
       <div class="search-wrap">
         <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         <input type="text" id="model-search" class="sw-input search-input" placeholder="Rechercher un modèle…" autocomplete="off" />
       </div>
       <div id="model-list" class="model-list"></div>
       <div class="nav-buttons">
-        <button class="sw-btn secondary" onclick="goTo('screen-api')">← Retour</button>
-        <button id="btn-confirm-model" class="sw-btn primary" disabled>Confirmer →</button>
+        <button class="sw-btn secondary" onclick="goTo('screen-api')">
+          <span data-i18n="back">← Retour</span>
+        </button>
+        <button id="btn-confirm-model" class="sw-btn primary" disabled>
+          <span id="btn-confirm-model-text" data-i18n="confirm">Confirmer →</span>
+        </button>
       </div>
     </div>
   </div>
@@ -80,19 +88,25 @@
   <!-- ═══════════════════════ SCREEN 3 — IMAGE GENERATOR ═══════════════════════ -->
   <div id="screen-image" class="screen">
     <div class="screen-inner">
-      <h2 class="screen-title">Générateur d'images</h2>
-      <p class="screen-subtitle">Optionnel — illustrez chaque scène de votre aventure</p>
+      <h2 class="screen-title" data-i18n="imageGen">Générateur d'images</h2>
+      <p class="screen-subtitle" data-i18n="imageGenSub">Optionnel — illustrez chaque scène de votre aventure</p>
       <div class="image-providers-grid" id="image-providers-grid"></div>
       <div id="img-model-section" class="hidden">
-        <label class="field-label">Modèle d'image</label>
+        <label class="field-label" id="img-key-label-text" data-i18n="imageModelLabel">Modèle d'image</label>
         <div id="img-model-list" class="model-list compact"></div>
-        <label class="field-label" id="img-key-label">Clé API (si différente)</label>
+        <label class="field-label" id="img-key-label-text-2" data-i18n="imageKeyLabel">Clé API (si différente)</label>
         <input type="password" id="img-api-key" class="sw-input" placeholder="Laisser vide pour réutiliser la clé principale" />
       </div>
       <div class="nav-buttons">
-        <button class="sw-btn secondary" onclick="goTo('screen-model')">← Retour</button>
-        <button id="btn-skip-image" class="sw-btn ghost">Passer cette étape</button>
-        <button id="btn-confirm-image" class="sw-btn primary hidden">Confirmer →</button>
+        <button class="sw-btn secondary" onclick="goTo('screen-model')">
+          <span data-i18n="back">← Retour</span>
+        </button>
+        <button id="btn-skip-image" class="sw-btn ghost">
+          <span id="btn-skip-text" data-i18n="skip">Passer cette étape</span>
+        </button>
+        <button id="btn-confirm-image" class="sw-btn primary hidden">
+          <span id="btn-confirm-image-text" data-i18n="confirm">Confirmer →</span>
+        </button>
       </div>
     </div>
   </div>
@@ -100,59 +114,61 @@
   <!-- ═══════════════════════ SCREEN 4 — STORY SETUP ═══════════════════════ -->
   <div id="screen-setup" class="screen">
     <div class="screen-inner wide">
-      <h2 class="screen-title">Forgez votre destin</h2>
-      <p class="screen-subtitle">Chaque choix façonne une galaxie différente</p>
+      <h2 class="screen-title" data-i18n="forgeDestiny">Forgez votre destin</h2>
+      <p class="screen-subtitle" data-i18n="forgeDestinySub">Chaque choix façonne une galaxie différente</p>
 
       <!-- LANGUAGE -->
       <div class="setup-section">
-        <h3 class="setup-label">
+        <h3 class="setup-label" data-i18n-key="narrationLang">
           <svg class="setup-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M3 12h18M12 3a13 13 0 0 1 0 18M12 3a13 13 0 0 0 0 18" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>
-          Langue de narration
+          <span data-i18n="narrationLang">Langue de narration</span>
         </h3>
         <div id="language-grid" class="choice-grid languages"></div>
       </div>
 
       <!-- ERA -->
       <div class="setup-section">
-        <h3 class="setup-label">
+        <h3 class="setup-label" data-i18n-key="era">
           <svg class="setup-icon" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
-          Ère
+          <span data-i18n="era">Ère</span>
         </h3>
         <div id="era-grid" class="choice-grid"></div>
       </div>
 
       <!-- FACTION -->
       <div class="setup-section">
-        <h3 class="setup-label">
+        <h3 class="setup-label" data-i18n-key="faction">
           <svg class="setup-icon" viewBox="0 0 24 24"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
-          Faction
+          <span data-i18n="faction">Faction</span>
         </h3>
         <div id="faction-grid" class="choice-grid factions"></div>
       </div>
 
       <!-- ROLE -->
       <div class="setup-section">
-        <h3 class="setup-label">
+        <h3 class="setup-label" data-i18n-key="role">
           <svg class="setup-icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
-          Rôle
+          <span data-i18n="role">Rôle</span>
         </h3>
-        <div id="role-grid" class="choice-grid"></div>
+        <div id="role-grid" class="choice-grid roles"></div>
       </div>
 
       <!-- PREMISE -->
       <div class="setup-section">
-        <h3 class="setup-label">
+        <h3 class="setup-label" data-i18n-key="premise">
           <svg class="setup-icon" viewBox="0 0 24 24"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" stroke="currentColor" stroke-width="1.5" fill="none"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
-          Point de départ
+          <span data-i18n="premise">Point de départ</span>
         </h3>
         <div id="premise-grid" class="choice-grid premises"></div>
       </div>
 
       <div class="nav-buttons center">
-        <button class="sw-btn secondary" onclick="goTo('screen-image')">← Retour</button>
+        <button class="sw-btn secondary" onclick="goTo('screen-image')">
+          <span data-i18n="back">← Retour</span>
+        </button>
         <button id="btn-start-story" class="sw-btn primary large" disabled>
           <svg viewBox="0 0 24 24" width="20" height="20"><polygon points="5,3 19,12 5,21" fill="currentColor"/></svg>
-          Commencer l'histoire
+          <span id="btn-start-story-text" data-i18n="startStory">Commencer l'histoire</span>
         </button>
       </div>
     </div>
@@ -161,16 +177,20 @@
   <!-- ═══════════════════════ SCREEN 5 — STORY ═══════════════════════ -->
   <div id="screen-story" class="screen">
     <div class="story-header">
-      <button class="btn-icon" id="btn-menu-story" title="Menu principal">
+      <button class="btn-icon" id="btn-menu-story" title="Menu">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
-      <div id="story-chapter-title" class="chapter-title">Prologue</div>
+      <div id="story-chapter-title" class="chapter-title" data-i18n="prologue">Prologue</div>
       <div id="story-turn-counter" class="turn-counter">Tour 1</div>
     </div>
 
-    <div class="story-body">
+    <div class="story-body" id="story-body">
       <div id="story-image-container" class="story-image-container hidden">
         <img id="story-image" src="" alt="Illustration de scène" />
+        <div id="image-status" class="image-status hidden">
+          <div class="image-loading-spinner"></div>
+          <span data-i18n="generatingImage">Génération de l'image…</span>
+        </div>
       </div>
       <div id="story-narrative" class="story-narrative"></div>
       <div id="story-choices" class="story-choices"></div>
@@ -179,16 +199,20 @@
           <div class="saber-handle"></div>
           <div class="saber-blade"></div>
         </div>
-        <span>L'IA tisse votre destin…</span>
+        <span id="story-loading-text" data-i18n="weavingFate">L'IA tisse votre destin…</span>
       </div>
     </div>
 
     <!-- Story menu overlay -->
     <div id="story-menu-overlay" class="overlay hidden">
       <div class="overlay-card">
-        <h3>Menu</h3>
-        <button class="sw-btn secondary" onclick="closeStoryMenu()">Continuer</button>
-        <button class="sw-btn ghost" id="btn-restart">Nouvelle histoire</button>
+        <h3 id="btn-menu-text" data-i18n="menu">Menu</h3>
+        <button class="sw-btn secondary" id="btn-continue-text" onclick="closeStoryMenu()">
+          <span data-i18n="continue">Continuer</span>
+        </button>
+        <button class="sw-btn ghost" id="btn-restart-text" onclick="restartStory()">
+          <span data-i18n="newStory">Nouvelle histoire</span>
+        </button>
         <div class="overlay-info" id="overlay-story-info"></div>
       </div>
     </div>
