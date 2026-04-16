@@ -654,10 +654,6 @@ html, body {
   color: #000;
   text-transform: uppercase;
 }
-.role-attr-preview {
-  width: 100%;
-  max-width: 80px;
-}
 .attr-bar {
   width: 100%;
   height: 4px;
@@ -671,151 +667,6 @@ html, body {
   transition: width 0.3s ease;
 }
 
-/* ─── ROLE DETAIL PANEL ────────────────────── */
-.role-detail-panel {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%) scale(0.9);
-  width: 90%;
-  max-width: 500px;
-  max-height: 80vh;
-  background: var(--dark3);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 24px;
-  z-index: 200;
-  opacity: 0;
-  pointer-events: none;
-  transition: all 0.3s ease;
-  overflow-y: auto;
-}
-.role-detail-panel.active {
-  opacity: 1;
-  pointer-events: all;
-  transform: translate(-50%, -50%) scale(1);
-}
-.role-detail-header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-.role-detail-icon {
-  width: 64px;
-  height: 64px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.role-detail-icon svg {
-  width: 100%;
-  height: 100%;
-}
-.role-detail-icon .choice-mask {
-  width: 100%;
-  height: 100%;
-}
-.role-detail-info {
-  flex: 1;
-}
-.role-detail-info h3 {
-  font-family: var(--font-title);
-  font-size: 18px;
-  color: var(--gold);
-  margin-bottom: 6px;
-}
-.role-detail-info .faction-badge {
-  font-size: 10px;
-  padding: 4px 10px;
-}
-.btn-close {
-  background: none;
-  border: none;
-  color: #888;
-  font-size: 24px;
-  cursor: pointer;
-  padding: 4px 8px;
-  line-height: 1;
-}
-.btn-close:hover { color: var(--gold); }
-.role-description {
-  font-size: 14px;
-  color: #aaa;
-  line-height: 1.6;
-  margin-bottom: 20px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--border);
-}
-.role-attributes h4,
-.role-skills h4 {
-  font-family: var(--font-ui);
-  font-size: 11px;
-  letter-spacing: 2px;
-  color: var(--gold2);
-  text-transform: uppercase;
-  margin-bottom: 12px;
-}
-.attributes-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 24px;
-}
-.attribute-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.attr-name {
-  font-family: var(--font-ui);
-  font-size: 10px;
-  color: #888;
-  width: 80px;
-  text-transform: uppercase;
-}
-.attr-bar-container {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.attr-bar-container .attr-bar {
-  flex: 1;
-  height: 6px;
-  background: rgba(255,255,255,0.1);
-  border-radius: 3px;
-  overflow: hidden;
-}
-.attr-bar-container .attr-fill {
-  height: 100%;
-  border-radius: 3px;
-}
-.attr-bar-container .attr-fill.force {
-  background: linear-gradient(90deg, #4FC3F7, #81D4FA);
-  box-shadow: 0 0 8px rgba(79,195,247,0.5);
-}
-.attr-bar-container .attr-value {
-  font-family: var(--font-ui);
-  font-size: 11px;
-  color: var(--gold);
-  min-width: 28px;
-  text-align: right;
-}
-.skills-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.skill-item {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 8px 12px;
-  background: rgba(255,255,255,0.03);
-  border-radius: 6px;
-  border-left: 2px solid var(--gold);
-}
 .skill-name {
   font-family: var(--font-ui);
   font-size: 10px;
@@ -849,6 +700,31 @@ html, body {
   justify-content: space-between;
   gap: 16px;
 }
+
+.story-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.story-menu-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.story-menu-btn span {
+  font-size: 11px;
+  letter-spacing: 1px;
+}
+
+.story-menu-btn:hover {
+  color: var(--gold);
+  border-color: var(--gold);
+}
+
 .chapter-title {
   font-family: var(--font-ui);
   font-size: 12px;
@@ -1665,10 +1541,6 @@ html, body {
   .nav-buttons { flex-direction: column; }
   .story-narrative { padding: 20px; font-size: 14px; }
   .image-providers-grid { grid-template-columns: repeat(2, 1fr); }
-  .role-detail-panel {
-    width: 95%;
-    max-height: 90vh;
-  }
   .dashboard-hero {
     flex-direction: column;
     align-items: stretch;

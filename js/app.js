@@ -43,11 +43,11 @@ function renderChoiceIcon(svgRef, className = 'choice-mask') {
   const normalized = /^([a-z]+:|data:)/i.test(trimmed)
     ? trimmed
     : new URL(trimmed.replace(/^\/+/, ''), document.baseURI).href;
-  const classes = ['choice-mask'];
+  const classes = ['choice-svg'];
   if (className && className !== 'choice-mask') {
     classes.push(className);
   }
-  return `<span class="${classes.join(' ')}" style="--choice-mask: url('${normalized}')"></span>`;
+  return `<img class="${classes.join(' ')}" src="${normalized}" alt="" aria-hidden="true" loading="lazy" decoding="async" />`;
 }
 
 function resolveRoleConfig(roleId) {
@@ -199,7 +199,6 @@ function resetStorySetup() {
   state.currentStoryId = null;
 
   document.querySelectorAll('.choice-card.selected').forEach(el => el.classList.remove('selected'));
-  closeRoleDetail();
   checkSetupComplete();
   renderSetupScreens();
 }
@@ -643,77 +642,10 @@ function renderChoiceGrid(containerId, items, key) {
       if (key === 'era' || key === 'faction' || key === 'role' || key === 'premise') {
         renderDashboard();
       }
-
-      // Show role detail panel if role is selected
-      if (key === 'role') {
-        showRoleDetail(item.id);
-      }
     });
 
     grid.appendChild(card);
   }
-}
-
-function showRoleDetail(roleId) {
-  const role = resolveRoleConfig(roleId);
-  if (!role) return;
-
-  // Create or update role detail panel
-  let panel = document.getElementById('role-detail-panel');
-  if (!panel) {
-    panel = document.createElement('div');
-    panel.id = 'role-detail-panel';
-    panel.className = 'role-detail-panel';
-    document.querySelector('#screen-setup .screen-inner').appendChild(panel);
-  }
-
-  const faction = resolveFactionConfig(role.faction);
-
-  panel.innerHTML = `
-    <div class="role-detail-header">
-      <div class="role-detail-icon" style="color: ${role.color}">${renderChoiceIcon(role.svg)}</div>
-      <div class="role-detail-info">
-        <h3>${role.name}</h3>
-        <span class="faction-badge" style="background:${faction?.color || '#666'}">${faction?.name || ''}</span>
-      </div>
-      <button class="btn-close" onclick="closeRoleDetail()">×</button>
-    </div>
-    <p class="role-description">${role.description}</p>
-    <div class="role-attributes">
-      <h4>${t('attributes', state.uiLang)}</h4>
-      <div class="attributes-grid">
-        ${Object.entries(role.attributes).map(([attr, val]) => `
-          <div class="attribute-row">
-            <span class="attr-name">${t(attr, state.uiLang)}</span>
-            <div class="attr-bar-container">
-              <div class="attr-bar">
-                <div class="attr-fill ${attr === 'force' && val > 0 ? 'force' : ''}" style="width:${val}%"></div>
-              </div>
-              <span class="attr-value">${val}</span>
-            </div>
-          </div>
-        `).join('')}
-      </div>
-    </div>
-    <div class="role-skills">
-      <h4>${t('skills', state.uiLang)}</h4>
-      <div class="skills-list">
-        ${Object.entries(role.skills).map(([skill, desc]) => `
-          <div class="skill-item">
-            <span class="skill-name">${skill.replace(/_/g, ' ')}</span>
-            <span class="skill-desc">${desc}</span>
-          </div>
-        `).join('')}
-      </div>
-    </div>
-  `;
-
-  panel.classList.add('active');
-}
-
-function closeRoleDetail() {
-  const panel = document.getElementById('role-detail-panel');
-  if (panel) panel.classList.remove('active');
 }
 
 function checkSetupComplete() {
@@ -1310,10 +1242,15 @@ function loadSavedSettings() {
     state.model = lastModel;
   }
   if (lastImageProvider) {
-    state.imgProvider = lastImageProvider;
-  }
-  if (lastImageModel) {
-    state.imgModel = lastImageModel;
+    if (lastImageProvider === 'openrouter_img' && state.provider === 'openrouter' && state.apiKey) {
+      state.imgProvider = lastImageProvider;
+      if (lastImageModel) {
+        state.imgModel = lastImageModel;
+      }
+    } else {
+      state.imgProvider = 'none';
+      state.imgModel = null;
+    }
   }
 
   if (localStorage.getItem(FLOW_READY_KEY) === '1') {

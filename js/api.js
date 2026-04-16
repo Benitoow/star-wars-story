@@ -2,15 +2,6 @@
    api.js — LLM & Image API calls with fallback
 ══════════════════════════════════════════════ */
 
-/* ─── Provider fallback order for image generation ─── */
-const IMAGE_FALLBACK_ORDER = [
-  'openrouter_img',
-  'fal_img',
-  'together_img',
-  'openai_img',
-  'stability'
-];
-
 function ensureApiKey(providerId, apiKey, resource = 'IA') {
   if (providerId === 'none') return;
 
@@ -170,29 +161,20 @@ async function fetchOpenRouterModels(apiKey) {
 async function generateImage(prompt, { imgProviderId, imgModel, imgApiKey, llmApiKey }) {
   const prov = IMAGE_PROVIDERS[imgProviderId];
   if (!prov || imgProviderId === 'none') return null;
-  const key = imgApiKey || llmApiKey;
+  const key = imgProviderId === 'openrouter_img'
+    ? (imgApiKey || llmApiKey)
+    : imgApiKey;
 
   ensureApiKey(imgProviderId, key, "la génération d'image");
 
   const swPrompt = `Epic Star Wars scene, cinematic lighting, highly detailed: ${prompt}`;
 
-  // Try primary provider first, then fallbacks
-  const providersToTry = imgProviderId !== 'none'
-    ? [imgProviderId, ...IMAGE_FALLBACK_ORDER.filter(p => p !== imgProviderId)]
-    : IMAGE_FALLBACK_ORDER;
-
-  for (const providerId of providersToTry) {
-    try {
-      const result = await tryImageProvider(providerId, swPrompt, key);
-      if (result) return result;
-    } catch (e) {
-      console.warn(`Image provider ${providerId} failed:`, e.message);
-    }
+  try {
+    return await tryImageProvider(imgProviderId, swPrompt, key, imgModel);
+  } catch (e) {
+    console.warn(`Image provider ${imgProviderId} failed:`, e.message);
+    throw e;
   }
-
-  // All providers failed
-  console.warn('All image providers failed');
-  return null;
 }
 
 /* ─── Try a specific image provider ─────────── */
@@ -345,6 +327,11 @@ async function tryImageProvider(providerId, prompt, apiKey, imgModel = null) {
 async function generateImageWithRetry(prompt, options, maxRetries = 3) {
   let lastError;
 
+  function isRetryableImageError(error) {
+    const message = String(error?.message || error || '');
+    return !/401|403|CORS|blocked by CORS|Failed to fetch|Missing Authentication header/i.test(message);
+  }
+
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       const result = await generateImage(prompt, options);
@@ -354,6 +341,7 @@ async function generateImageWithRetry(prompt, options, maxRetries = 3) {
       lastError = new Error('No image returned');
     } catch (e) {
       lastError = e;
+      if (!isRetryableImageError(e)) break;
     }
 
     // Exponential backoff: 1s, 2s, 4s
