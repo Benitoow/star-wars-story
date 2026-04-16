@@ -218,49 +218,73 @@ async function tryImageProvider(providerId, prompt, apiKey, imgModel = null) {
 
   const timeout = 30000; // 30 second timeout
 
-  // OpenRouter image — uses /chat/completions with modalities:["image","text"]
+  // OpenRouter image — uses /chat/completions with modalities
+  // FLUX models want ["image"], Gemini/GPT image models want ["image","text"]
   if (providerId === 'openrouter_img') {
     const model = imgModel || prov.models[0]?.id;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-    try {
-      const res = await fetch(prov.endpoint, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'HTTP-Referer': window.location.href,
-          'X-Title': 'Star Wars Interactive Story',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model,
-          modalities: ['image', 'text'],
-          messages: [{ role: 'user', content: prompt }]
-        }),
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.error?.message || `OpenRouter Image HTTP ${res.status}`);
-      }
-      const data = await res.json();
-      const msg = data.choices?.[0]?.message || {};
-      // Images are returned under message.images (array of { type, image_url: { url } })
+    // Pick default modalities based on model family
+    const modelLower = String(model || '').toLowerCase();
+    const isImageOnly = /flux|stable-diffusion|sdxl|recraft|ideogram|aura-flow|schnell|openjourney/.test(modelLower);
+    const modalityAttempts = isImageOnly
+      ? [['image'], ['image', 'text']]
+      : [['image', 'text'], ['image']];
+
+    const extractImageUrl = (data) => {
+      const msg = data?.choices?.[0]?.message || {};
       const imgEntry = Array.isArray(msg.images) ? msg.images[0] : null;
       const url = imgEntry?.image_url?.url || imgEntry?.url || null;
       if (url) return url;
-      // Fallback: some models embed the image as base64 inside content
       if (typeof msg.content === 'string') {
         const m = msg.content.match(/data:image\/[a-z]+;base64,[A-Za-z0-9+/=]+/);
         if (m) return m[0];
       }
       return null;
-    } catch (e) {
-      clearTimeout(timeoutId);
-      throw e;
+    };
+
+    let lastErr;
+    for (const modalities of modalityAttempts) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+      try {
+        const res = await fetch(prov.endpoint, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'HTTP-Referer': window.location.href,
+            'X-Title': 'Star Wars Interactive Story',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model,
+            modalities,
+            messages: [{ role: 'user', content: prompt }]
+          }),
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          const message = err?.error?.message || `OpenRouter Image HTTP ${res.status}`;
+          // If the error is specifically about modalities, try the other combo
+          if (/modalities/i.test(message) && modalityAttempts.indexOf(modalities) < modalityAttempts.length - 1) {
+            lastErr = new Error(message);
+            continue;
+          }
+          throw new Error(message);
+        }
+        const data = await res.json();
+        const url = extractImageUrl(data);
+        if (url) return url;
+        lastErr = new Error('No image in response');
+      } catch (e) {
+        clearTimeout(timeoutId);
+        lastErr = e;
+        // Only retry with other modalities if the error mentions modalities
+        if (!/modalities/i.test(String(e.message || ''))) throw e;
+      }
     }
+    throw lastErr || new Error('OpenRouter image generation failed');
   }
 
   // Together AI

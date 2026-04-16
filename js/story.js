@@ -37,7 +37,9 @@ RÈGLES STRICTES (NON-NÉGOCIABLES):
 6. La narration est à la 2ème personne du singulier ("vous découvrez", "vous ressentez").
 7. SI l'utilisateur a fourni des modifications personnelles dans son espace "Votre version", INTÈGRE-LES au récit de manière organique.
 8. VARIE le style d'écriture: alterne phrases courtes/longues, descriptions/action/dialogue.
-9. Les dialogues doivent avoir du caractère - chaque personnage a sa propre façon de parler.`;
+9. Les dialogues doivent avoir du caractère - chaque personnage a sa propre façon de parler. Dans "dialogue", utilise un TABLEAU d'objets [{"speaker": "Nom", "text": "Réplique"}], pas une string.
+10. N'utilise JAMAIS d'identifiants techniques dans le texte narratif (pas de *lightsaber_basic*, *force_guidance*, {placeholder}, snake_case_ids, etc.). Écris TOUJOURS en langage naturel ("son entraînement au sabre laser", "la guidance de la Force", etc.).
+11. Aucun markdown (**gras**, *italique*, listes) dans les champs narratifs — uniquement du texte pur.`;
 
 const DEFAULT_LANGUAGE_ID = 'fr';
 
@@ -371,42 +373,96 @@ function parseStoryResponse(raw, turnNumber = 1, languageId = DEFAULT_LANGUAGE_I
   }
 }
 
+/* ─── HTML-escape a string to safely inject into innerHTML ─── */
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/* ─── Clean narrative text: strip internal skill IDs, fix whitespace ─── */
+function cleanNarrativeText(text) {
+  if (!text || typeof text !== 'string') return '';
+  return text
+    // Strip *snake_case_ids* (internal skill tokens the model leaks)
+    .replace(/\*([a-z][a-z0-9_]*(?:_[a-z0-9]+)+)\*/gi, '')
+    // Strip raw {placeholder} tokens
+    .replace(/\{[a-z_][a-z0-9_]*\}/gi, '')
+    // Collapse multiple spaces
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
+
+/* ─── Normalize dialogue (string | array | object) into HTML ─── */
+function formatDialogue(dialogue) {
+  if (!dialogue) return '';
+  // Array of exchanges: [{speaker, text} | {name, line} | "raw"]
+  if (Array.isArray(dialogue)) {
+    return dialogue.map(entry => {
+      if (!entry) return '';
+      if (typeof entry === 'string') return `<p>${escapeHtml(cleanNarrativeText(entry))}</p>`;
+      const speaker = entry.speaker || entry.name || entry.character || entry.who || '';
+      const line = entry.text || entry.line || entry.dialogue || entry.say || '';
+      if (!line) return '';
+      return speaker
+        ? `<p><strong class="dialogue-speaker">${escapeHtml(speaker)} :</strong> ${escapeHtml(cleanNarrativeText(line))}</p>`
+        : `<p>${escapeHtml(cleanNarrativeText(line))}</p>`;
+    }).filter(Boolean).join('');
+  }
+  // Single exchange object
+  if (typeof dialogue === 'object') {
+    const speaker = dialogue.speaker || dialogue.name || dialogue.character || '';
+    const line = dialogue.text || dialogue.line || dialogue.dialogue || '';
+    if (!line && !speaker) return '';
+    return speaker
+      ? `<p><strong class="dialogue-speaker">${escapeHtml(speaker)} :</strong> ${escapeHtml(cleanNarrativeText(line))}</p>`
+      : `<p>${escapeHtml(cleanNarrativeText(line))}</p>`;
+  }
+  // Plain string — split on newlines for readability
+  const cleaned = cleanNarrativeText(dialogue);
+  return cleaned.split(/\n+/).filter(Boolean).map(l => `<p>${escapeHtml(l)}</p>`).join('');
+}
+
 /* ─── Format narrative for display ───────────── */
 function formatNarrative(story) {
   const { context, action, dialogue, reflection, atmosphere } = story.narrative;
   const atmosphereClass = `atmosphere-${atmosphere}`;
 
+  const cContext    = cleanNarrativeText(context);
+  const cAction     = cleanNarrativeText(action);
+  const cReflection = cleanNarrativeText(reflection);
+  const dialogueHtml = formatDialogue(dialogue);
+
   let html = `<div class="narrative-container ${atmosphereClass}">`;
 
-  // Context section
-  if (context) {
+  if (cContext) {
     html += `<div class="narrative-section context">
       <span class="section-label">${t('context')}</span>
-      <p>${context}</p>
+      <p>${escapeHtml(cContext)}</p>
     </div>`;
   }
 
-  // Action section
-  if (action) {
+  if (cAction) {
     html += `<div class="narrative-section action">
       <span class="section-label">${t('action')}</span>
-      <p>${action}</p>
+      <p>${escapeHtml(cAction)}</p>
     </div>`;
   }
 
-  // Dialogue section (if present)
-  if (dialogue) {
+  if (dialogueHtml) {
     html += `<div class="narrative-section dialogue">
       <span class="section-label">${t('dialogue')}</span>
-      <div class="dialogue-content">${dialogue}</div>
+      <div class="dialogue-content">${dialogueHtml}</div>
     </div>`;
   }
 
-  // Reflection section (if present)
-  if (reflection) {
+  if (cReflection) {
     html += `<div class="narrative-section reflection">
       <span class="section-label">${t('reflection')}</span>
-      <p><em>${reflection}</em></p>
+      <p><em>${escapeHtml(cReflection)}</em></p>
     </div>`;
   }
 

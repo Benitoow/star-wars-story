@@ -926,18 +926,24 @@ function clearNarrative() {
 
 async function typeNarrative(html) {
   const el = document.getElementById('story-narrative');
-  const tmp = document.createElement('div');
-  tmp.innerHTML = html;
-  el.innerHTML = '';
+  el.innerHTML = html;
 
-  for (const child of Array.from(tmp.children)) {
-    const p = document.createElement('p');
-    el.appendChild(p);
-    const text = child.textContent;
-    for (let i = 0; i < text.length; i++) {
-      p.textContent = text.slice(0, i + 1);
-      if (i % 3 === 0) await sleep(12);
+  // Animate in: fade + slide each section, typewriter each paragraph text
+  const sections = Array.from(el.querySelectorAll('.narrative-section'));
+  for (const section of sections) {
+    section.classList.add('narrative-enter');
+    // Typewriter effect on the paragraph inside this section only
+    const paragraphs = section.querySelectorAll('p');
+    for (const p of paragraphs) {
+      const fullText = p.textContent;
+      p.textContent = '';
+      for (let i = 0; i < fullText.length; i++) {
+        p.textContent = fullText.slice(0, i + 1);
+        if (i % 4 === 0) await sleep(10);
+      }
     }
+    section.classList.add('narrative-shown');
+    await sleep(80);
   }
 }
 

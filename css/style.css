@@ -813,48 +813,88 @@ html, body {
 .narrative-container {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 28px;
+  max-width: 72ch;
+  margin: 0 auto;
 }
 .narrative-section {
   position: relative;
-  padding-left: 16px;
+  padding: 4px 0 4px 20px;
   border-left: 2px solid var(--border);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 400ms ease, transform 400ms ease;
+}
+.narrative-section.narrative-enter {
+  opacity: 1;
+  transform: translateY(0);
+}
+.narrative-section p {
+  font-family: var(--font-body, 'Exo 2', sans-serif);
+  font-size: 17px;
+  line-height: 1.75;
+  color: #e8e8f0;
+  margin: 0;
+  text-align: left;
+  font-weight: 300;
+  letter-spacing: 0.01em;
 }
 .narrative-section.context {
-  border-left-color: rgba(79,195,247,0.4);
+  border-left-color: rgba(79,195,247,0.5);
+}
+.narrative-section.context p {
+  color: #bcd6e8;
+  font-size: 15px;
+  font-style: italic;
 }
 .narrative-section.action {
   border-left-color: var(--gold);
 }
 .narrative-section.dialogue {
   border-left-color: var(--purple);
-  background: rgba(206,147,216,0.05);
-  padding: 12px 16px;
-  border-radius: 0 8px 8px 0;
+  background: linear-gradient(90deg, rgba(206,147,216,0.08), rgba(206,147,216,0.02));
+  padding: 14px 20px;
+  border-radius: 0 10px 10px 0;
 }
 .narrative-section.reflection {
-  border-left-color: rgba(129,212,250,0.4);
+  border-left-color: rgba(129,212,250,0.5);
+}
+.narrative-section.reflection p {
+  color: #b8d4e8;
   font-style: italic;
+  font-size: 16px;
 }
 .section-label {
-  display: inline-block;
+  display: block;
   font-family: var(--font-ui);
-  font-size: 9px;
-  letter-spacing: 2px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 2.5px;
   text-transform: uppercase;
   color: var(--gold2);
-  margin-bottom: 6px;
-  opacity: 0.7;
+  margin-bottom: 10px;
+  opacity: 0.85;
 }
+.narrative-section.context .section-label { color: rgba(79,195,247,0.9); }
+.narrative-section.dialogue .section-label { color: var(--purple); }
+.narrative-section.reflection .section-label { color: rgba(129,212,250,0.9); }
+
 .dialogue-content {
   font-style: normal;
   line-height: 1.7;
 }
 .dialogue-content p {
-  margin-bottom: 8px;
+  margin: 0 0 10px 0;
+  font-size: 16px;
 }
 .dialogue-content p:last-child {
   margin-bottom: 0;
+}
+.dialogue-speaker {
+  color: var(--purple);
+  font-weight: 600;
+  margin-right: 4px;
+  letter-spacing: 0.5px;
 }
 
 /* ─── DASHBOARD ─────────────────────────────── */
