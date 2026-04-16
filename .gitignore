@@ -1,0 +1,28 @@
+# System
+.DS_Store
+Thumbs.db
+
+# Editor / local settings
+.vscode/
+.idea/
+*.swp
+
+# Environment secrets
+.env
+.env.*
+!.env.example
+
+# Node / frontend build artifacts
+node_modules/
+.svelte-kit/
+dist/
+build/
+coverage/
+.vite/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*

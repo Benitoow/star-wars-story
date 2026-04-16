@@ -11,6 +11,7 @@ const state = {
   imgProvider: 'none',
   imgModel: null,
   imgApiKey: '',
+  currentStoryId: null,
   uiLang: 'fr',                    // UI language
   setup: {
     language: null,                // Narration language
@@ -26,6 +27,151 @@ const state = {
   currentChapter: null,
   imageRetryCount: 0
 };
+
+const STORY_STORAGE_KEY = 'sw_saved_stories';
+const FLOW_READY_KEY = 'sw_flow_ready';
+const LAST_PROVIDER_KEY = 'sw_last_provider';
+const LAST_MODEL_KEY = 'sw_last_model';
+const LAST_IMAGE_PROVIDER_KEY = 'sw_last_image_provider';
+const LAST_IMAGE_MODEL_KEY = 'sw_last_image_model';
+
+function renderChoiceIcon(svgRef, className = 'choice-mask') {
+  if (!svgRef) return '';
+  const trimmed = String(svgRef).trim();
+  if (trimmed.startsWith('<svg')) return trimmed;
+  const classes = ['choice-mask'];
+  if (className && className !== 'choice-mask') {
+    classes.push(className);
+  }
+  return `<span class="${classes.join(' ')}" style="--choice-mask: url('${svgRef}')"></span>`;
+}
+
+function getSavedStories() {
+  try {
+    return JSON.parse(localStorage.getItem(STORY_STORAGE_KEY) || '[]');
+  } catch {
+    return [];
+  }
+}
+
+function persistSavedStories(stories) {
+  localStorage.setItem(STORY_STORAGE_KEY, JSON.stringify(stories));
+}
+
+function buildStoryTitle(setup) {
+  const era = ERAS.find(e => e.id === setup.era)?.name || setup.era || 'Histoire Star Wars';
+  const faction = FACTIONS.find(f => f.id === setup.faction)?.name || setup.faction || '';
+  const role = ROLES.find(r => r.id === setup.role)?.name || setup.role || '';
+  return [era, faction, role].filter(Boolean).join(' · ');
+}
+
+function upsertSavedStory(patch) {
+  const now = new Date().toISOString();
+  const stories = getSavedStories();
+  const existingIndex = stories.findIndex(story => story.id === patch.id);
+  const existing = existingIndex >= 0 ? stories[existingIndex] : null;
+  const story = {
+    id: patch.id || existing?.id || crypto.randomUUID(),
+    title: patch.title ?? existing?.title ?? 'Nouvelle histoire',
+    summary: patch.summary ?? existing?.summary ?? '',
+    createdAt: existing?.createdAt || now,
+    updatedAt: now,
+    status: patch.status ?? existing?.status ?? 'draft',
+    chapterTitle: patch.chapterTitle ?? existing?.chapterTitle ?? 'Prologue',
+    setup: patch.setup ?? existing?.setup ?? state.setup,
+    provider: patch.provider ?? existing?.provider ?? state.provider,
+    model: patch.model ?? existing?.model ?? state.model,
+    imgProvider: patch.imgProvider ?? existing?.imgProvider ?? state.imgProvider,
+    imgModel: patch.imgModel ?? existing?.imgModel ?? state.imgModel
+  };
+
+  if (existingIndex >= 0) {
+    stories[existingIndex] = story;
+  } else {
+    stories.unshift(story);
+  }
+
+  persistSavedStories(stories);
+  return story;
+}
+
+function deleteSavedStory(id) {
+  const stories = getSavedStories().filter(story => story.id !== id);
+  persistSavedStories(stories);
+  if (state.currentStoryId === id) {
+    state.currentStoryId = null;
+  }
+  renderDashboard();
+}
+
+function resetStorySetup() {
+  state.setup = {
+    language: null,
+    era: null,
+    faction: null,
+    role: null,
+    premise: null
+  };
+  state.currentChapter = null;
+  state.turn = 0;
+  state.userEdits = [];
+  state.currentStoryId = null;
+
+  document.querySelectorAll('.choice-card.selected').forEach(el => el.classList.remove('selected'));
+  closeRoleDetail();
+  checkSetupComplete();
+  renderSetupScreens();
+}
+
+function renderDashboard() {
+  const grid = document.getElementById('dashboard-story-grid');
+  const count = document.getElementById('dashboard-story-count');
+  const modelLabel = document.getElementById('dashboard-model-label');
+  if (!grid || !count) return;
+
+  const stories = getSavedStories().sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  count.textContent = `${stories.length}`;
+  if (modelLabel) {
+    modelLabel.textContent = state.model || localStorage.getItem(LAST_MODEL_KEY) || '—';
+  }
+  grid.innerHTML = '';
+
+  if (!stories.length) {
+    grid.innerHTML = `
+      <div class="dashboard-empty">
+        <div class="dashboard-empty-icon">${renderChoiceIcon('svg/grok-ai-icon.svg', 'dashboard-empty-mask')}</div>
+        <h3>Aucune histoire pour l’instant</h3>
+        <p>Créez votre première histoire et elle apparaîtra ici.</p>
+      </div>
+    `;
+    return;
+  }
+
+  stories.forEach(story => {
+    const card = document.createElement('article');
+    card.className = 'dashboard-story-card';
+    card.dataset.id = story.id;
+    card.innerHTML = `
+      <div class="dashboard-story-icon">${renderChoiceIcon('svg/together-ai-icon.svg', 'dashboard-story-mask')}</div>
+      <div class="dashboard-story-body">
+        <div class="dashboard-story-topline">
+          <h3>${story.title}</h3>
+          <span class="dashboard-story-status ${story.status}">${story.status === 'active' ? 'En cours' : 'Brouillon'}</span>
+        </div>
+        <p>${story.summary || story.setup?.premise || 'Aucune prémisse enregistrée.'}</p>
+        <div class="dashboard-story-meta">
+          <span>${story.chapterTitle || 'Prologue'}</span>
+          <span>${new Date(story.updatedAt).toLocaleDateString('fr-FR')}</span>
+        </div>
+      </div>
+      <div class="dashboard-story-actions">
+        <button class="sw-btn secondary dashboard-open-story" data-action="open">Ouvrir</button>
+        <button class="sw-btn ghost dashboard-delete-story" data-action="delete">Supprimer</button>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+}
 
 /* ─── UI LANGUAGE SYSTEM ─────────────────────── */
 function switchUILanguage(langId) {
@@ -176,6 +322,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadSavedSettings();
   setupEventListeners();
   updateAllUIText();
+  renderDashboard();
 });
 
 /* ─── STARFIELD CANVAS ──────────────────────── */
@@ -260,6 +407,7 @@ function renderProviderGrid() {
 
 function selectProvider(id) {
   state.provider = id;
+  localStorage.setItem(LAST_PROVIDER_KEY, id);
   document.querySelectorAll('.provider-card').forEach(c => {
     c.classList.toggle('selected', c.dataset.id === id);
   });
@@ -296,6 +444,7 @@ function renderImageProviders() {
 
 function selectImgProvider(id) {
   state.imgProvider = id;
+  localStorage.setItem(LAST_IMAGE_PROVIDER_KEY, id);
   document.querySelectorAll('.img-provider-card').forEach(c => {
     c.classList.toggle('selected', c.dataset.id === id);
   });
@@ -334,6 +483,7 @@ function renderImgModels(providerId) {
       document.querySelectorAll('#img-model-list .model-item').forEach(i =>
         i.classList.toggle('selected', i.dataset.id === m.id));
       state.imgModel = m.id;
+      localStorage.setItem(LAST_IMAGE_MODEL_KEY, m.id);
     });
     list.appendChild(item);
   }
@@ -358,12 +508,13 @@ function renderChoiceGrid(containerId, items, key) {
     card.dataset.id  = item.id;
     if (item.id && key === 'faction') card.dataset.faction = item.id;
     card.style.setProperty('color', item.color || 'var(--gold)');
+    card.classList.toggle('selected', state.setup[key] === item.id);
 
     // Special rendering for roles - show faction badge
     if (key === 'role' && item.attributes) {
       card.innerHTML = `
         <div class="role-card-header">
-          ${item.svg}
+          ${renderChoiceIcon(item.svg)}
           <span class="faction-badge" style="background:${FACTIONS.find(f=>f.id===item.faction)?.color || '#666'}">
             ${FACTIONS.find(f=>f.id===item.faction)?.name || ''}
           </span>
@@ -373,7 +524,7 @@ function renderChoiceGrid(containerId, items, key) {
       `;
     } else {
       card.innerHTML = `
-        ${item.svg}
+        ${renderChoiceIcon(item.svg)}
         <span class="choice-name">${item.name}</span>
         <span class="choice-sub">${item.sub || item.years || item.members || ''}</span>
       `;
@@ -385,6 +536,10 @@ function renderChoiceGrid(containerId, items, key) {
         c.classList.toggle('selected', c.dataset.id === item.id));
       state.setup[key] = item.id;
       checkSetupComplete();
+
+      if (key === 'era' || key === 'faction' || key === 'role' || key === 'premise') {
+        renderDashboard();
+      }
 
       // Show role detail panel if role is selected
       if (key === 'role') {
@@ -413,7 +568,7 @@ function showRoleDetail(roleId) {
 
   panel.innerHTML = `
     <div class="role-detail-header">
-      <div class="role-detail-icon" style="color: ${role.color}">${role.svg}</div>
+      <div class="role-detail-icon" style="color: ${role.color}">${renderChoiceIcon(role.svg)}</div>
       <div class="role-detail-info">
         <h3>${role.name}</h3>
         <span class="faction-badge" style="background:${faction?.color || '#666'}">${faction?.name || ''}</span>
@@ -529,6 +684,19 @@ function filterModels(query) {
 async function startStory() {
   // Use UI language as story language
   state.setup.language = state.uiLang;
+  state.currentStoryId = state.currentStoryId || crypto.randomUUID();
+  upsertSavedStory({
+    id: state.currentStoryId,
+    title: buildStoryTitle(state.setup),
+    summary: state.setup.premise,
+    setup: { ...state.setup },
+    provider: state.provider,
+    model: state.model,
+    imgProvider: state.imgProvider,
+    imgModel: state.imgModel,
+    status: 'active',
+    chapterTitle: 'Prologue'
+  });
   state.messages = [{ role: 'system', content: buildSystemPrompt(state.setup.language) }];
   state.turn = 0;
   state.userEdits = [];
@@ -570,6 +738,21 @@ async function generateNextTurn(userMessage) {
     state.messages.push({ role: 'assistant', content: rawText });
     const story = parseStoryResponse(rawText);
     state.currentChapter = story;
+    if (state.currentStoryId) {
+      upsertSavedStory({
+        id: state.currentStoryId,
+        title: buildStoryTitle(state.setup),
+        summary: state.setup.premise,
+        setup: { ...state.setup },
+        provider: state.provider,
+        model: state.model,
+        imgProvider: state.imgProvider,
+        imgModel: state.imgModel,
+        status: 'active',
+        chapterTitle: story.chapter_title
+      });
+      renderDashboard();
+    }
 
     // Update chapter title
     document.getElementById('story-chapter-title').textContent = story.chapter_title;
@@ -821,25 +1004,80 @@ function openStoryMenu() {
 
 /* ─── EVENT LISTENERS ───────────────────────── */
 function setupEventListeners() {
+  const dashboardGrid = document.getElementById('dashboard-story-grid');
+  if (dashboardGrid) {
+    dashboardGrid.addEventListener('click', (event) => {
+      const target = event.target;
+      const card = target instanceof HTMLElement ? target.closest('.dashboard-story-card') : null;
+      if (!card) return;
+
+      const storyId = card.dataset.id;
+      const story = getSavedStories().find(entry => entry.id === storyId);
+      if (!story) return;
+
+      if (target instanceof HTMLElement && target.dataset.action === 'delete') {
+        event.stopPropagation();
+        if (confirm(`Supprimer « ${story.title} » ?`)) {
+          deleteSavedStory(story.id);
+        }
+        return;
+      }
+
+      if (target instanceof HTMLElement && target.dataset.action === 'open') {
+        event.stopPropagation();
+      }
+
+      state.currentStoryId = story.id;
+      state.provider = story.provider || state.provider;
+      state.model = story.model || state.model;
+      state.imgProvider = story.imgProvider || state.imgProvider;
+      state.imgModel = story.imgModel || state.imgModel;
+      state.setup = { ...story.setup };
+      renderSetupScreens();
+      checkSetupComplete();
+      goTo('screen-setup');
+    });
+  }
+
+  const createStoryBtn = document.getElementById('btn-create-story');
+  if (createStoryBtn) {
+    createStoryBtn.addEventListener('click', () => {
+      resetStorySetup();
+      goTo('screen-setup');
+    });
+  }
+
+  const editImageModelBtn = document.getElementById('btn-edit-image-model');
+  if (editImageModelBtn) {
+    editImageModelBtn.addEventListener('click', () => goTo('screen-image'));
+  }
+
   // Model search
-  document.getElementById('model-search').addEventListener('input', (e) => {
-    filterModels(e.target.value);
-  });
+  const modelSearch = document.getElementById('model-search');
+  if (modelSearch) {
+    modelSearch.addEventListener('input', (e) => {
+      filterModels(e.target.value);
+    });
+  }
 
   // API Key input
   const keyInput = document.getElementById('api-key-input');
-  keyInput.addEventListener('input', () => {
-    document.getElementById('btn-test-api').disabled = keyInput.value.trim().length < 10;
-    document.getElementById('api-error').classList.add('hidden');
-  });
+  if (keyInput) {
+    keyInput.addEventListener('input', () => {
+      const testBtn = document.getElementById('btn-test-api');
+      if (testBtn) testBtn.disabled = keyInput.value.trim().length < 10;
+      document.getElementById('api-error')?.classList.add('hidden');
+    });
+  }
 
   // Toggle key visibility
-  document.getElementById('toggle-key-visibility').addEventListener('click', () => {
+  document.getElementById('toggle-key-visibility')?.addEventListener('click', () => {
+    if (!keyInput) return;
     keyInput.type = keyInput.type === 'password' ? 'text' : 'password';
   });
 
   // Test API button
-  document.getElementById('btn-test-api').addEventListener('click', async () => {
+  document.getElementById('btn-test-api')?.addEventListener('click', async () => {
     const btn  = document.getElementById('btn-test-api');
     const err  = document.getElementById('api-error');
     const text = btn.querySelector('.btn-text');
@@ -861,6 +1099,7 @@ function setupEventListeners() {
       }
 
       await populateModels();
+      localStorage.setItem(LAST_PROVIDER_KEY, state.provider);
       goTo('screen-model');
     } catch (e) {
       err.textContent = `Connexion échouée: ${e.message}`;
@@ -873,35 +1112,40 @@ function setupEventListeners() {
   });
 
   // Confirm model
-  document.getElementById('btn-confirm-model').addEventListener('click', () => {
+  document.getElementById('btn-confirm-model')?.addEventListener('click', () => {
+    localStorage.setItem(LAST_MODEL_KEY, state.model || '');
     goTo('screen-image');
   });
 
   // Skip image
-  document.getElementById('btn-skip-image').addEventListener('click', () => {
+  document.getElementById('btn-skip-image')?.addEventListener('click', () => {
     state.imgProvider = 'none';
-    goTo('screen-setup');
+    state.imgModel = null;
+    localStorage.setItem(LAST_IMAGE_PROVIDER_KEY, state.imgProvider);
+    localStorage.removeItem(LAST_IMAGE_MODEL_KEY);
+    localStorage.setItem(FLOW_READY_KEY, '1');
+    renderDashboard();
+    goTo('screen-dashboard');
   });
 
   // Confirm image provider
-  document.getElementById('btn-confirm-image').addEventListener('click', () => {
+  document.getElementById('btn-confirm-image')?.addEventListener('click', () => {
     const imgKey = document.getElementById('img-api-key').value.trim();
     if (imgKey) state.imgApiKey = imgKey;
-    goTo('screen-setup');
+    localStorage.setItem(LAST_IMAGE_PROVIDER_KEY, state.imgProvider);
+    if (state.imgModel) localStorage.setItem(LAST_IMAGE_MODEL_KEY, state.imgModel);
+    localStorage.setItem(FLOW_READY_KEY, '1');
+    renderDashboard();
+    goTo('screen-dashboard');
   });
 
   // Start story
-  document.getElementById('btn-start-story').addEventListener('click', startStory);
+  document.getElementById('btn-start-story')?.addEventListener('click', startStory);
 
   // Story menu button
-  document.getElementById('btn-menu-story').addEventListener('click', openStoryMenu);
+  document.getElementById('btn-menu-story')?.addEventListener('click', openStoryMenu);
 
-  // Restart
-  document.getElementById('btn-restart').addEventListener('click', () => {
-    closeStoryMenu();
-    document.getElementById('story-image-container').classList.add('hidden');
-    goTo('screen-setup');
-  });
+  // Restart is handled by the inline handler in the menu.
 
   // Keyboard shortcuts for choices
   document.addEventListener('keydown', (e) => {
@@ -920,9 +1164,38 @@ function setupEventListeners() {
 
 /* ─── PERSIST SETTINGS ──────────────────────── */
 function loadSavedSettings() {
-  for (const id of Object.keys(LLM_PROVIDERS)) {
-    if (localStorage.getItem(`sw_key_${id}`)) {
-      break;
-    }
+  const lastProvider = localStorage.getItem(LAST_PROVIDER_KEY);
+  const lastModel = localStorage.getItem(LAST_MODEL_KEY);
+  const lastImageProvider = localStorage.getItem(LAST_IMAGE_PROVIDER_KEY);
+  const lastImageModel = localStorage.getItem(LAST_IMAGE_MODEL_KEY);
+
+  if (lastProvider && LLM_PROVIDERS[lastProvider]) {
+    state.provider = lastProvider;
   }
+  if (lastModel) {
+    state.model = lastModel;
+  }
+  if (lastImageProvider) {
+    state.imgProvider = lastImageProvider;
+  }
+  if (lastImageModel) {
+    state.imgModel = lastImageModel;
+  }
+
+  if (localStorage.getItem(FLOW_READY_KEY) === '1') {
+    renderDashboard();
+    goTo('screen-dashboard');
+  }
+}
+
+function restartStory() {
+  closeStoryMenu();
+  document.getElementById('story-image-container')?.classList.add('hidden');
+  state.messages = [];
+  state.turn = 0;
+  state.currentChapter = null;
+  state.userEdits = [];
+  state.currentStoryId = null;
+  renderDashboard();
+  goTo('screen-dashboard');
 }

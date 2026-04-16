@@ -111,6 +111,49 @@
     </div>
   </div>
 
+  <!-- ═══════════════════════ SCREEN 4 — DASHBOARD ═══════════════════════ -->
+  <div id="screen-dashboard" class="screen">
+    <div class="screen-inner wide dashboard-screen-inner">
+      <div class="dashboard-hero card">
+        <div class="dashboard-hero-copy">
+          <h2 class="screen-title">Tableau de bord</h2>
+          <p class="screen-subtitle">Créez, ouvrez ou supprimez vos histoires depuis un seul endroit.</p>
+        </div>
+        <div class="dashboard-hero-actions">
+          <button id="btn-create-story" class="sw-btn primary large">
+            <span>Créer une histoire</span>
+          </button>
+          <button id="btn-edit-image-model" class="sw-btn secondary">
+            <span>Modifier l’image</span>
+          </button>
+        </div>
+      </div>
+
+      <section class="dashboard-summary-grid">
+        <article class="dashboard-summary-card">
+          <span class="dashboard-summary-label">Histoires</span>
+          <strong id="dashboard-story-count">0</strong>
+        </article>
+        <article class="dashboard-summary-card accent">
+          <span class="dashboard-summary-label">Dernier modèle</span>
+          <strong id="dashboard-model-label">—</strong>
+        </article>
+        <article class="dashboard-summary-card alt">
+          <span class="dashboard-summary-label">État</span>
+          <strong>Prêt à écrire</strong>
+        </article>
+      </section>
+
+      <section class="dashboard-section card">
+        <div class="dashboard-section-header">
+          <h3>Mes histoires</h3>
+          <span>Gérez vos brouillons et vos campagnes</span>
+        </div>
+        <div id="dashboard-story-grid" class="dashboard-story-grid"></div>
+      </section>
+    </div>
+  </div>
+
   <!-- ═══════════════════════ SCREEN 4 — STORY SETUP ═══════════════════════ -->
   <div id="screen-setup" class="screen">
     <div class="screen-inner wide">
@@ -154,8 +197,8 @@
       </div>
 
       <div class="nav-buttons center">
-        <button class="sw-btn secondary" onclick="goTo('screen-image')">
-          <span data-i18n="back">← Retour</span>
+        <button class="sw-btn secondary" onclick="goTo('screen-dashboard')">
+          <span>← Tableau de bord</span>
         </button>
         <button id="btn-start-story" class="sw-btn primary large" disabled>
           <svg viewBox="0 0 24 24" width="20" height="20"><polygon points="5,3 19,12 5,21" fill="currentColor"/></svg>
