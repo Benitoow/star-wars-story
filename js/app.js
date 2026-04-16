@@ -40,11 +40,9 @@ function renderChoiceIcon(svgRef, className = 'choice-mask') {
   if (!svgRef) return '';
   const trimmed = String(svgRef).trim();
   if (trimmed.startsWith('<svg')) return trimmed;
-  const normalized = /^([a-z]+:|\/|data:)/i.test(trimmed)
+  const normalized = /^([a-z]+:|data:)/i.test(trimmed)
     ? trimmed
-    : trimmed.startsWith('svg/')
-      ? `/${trimmed}`
-      : `/svg/${trimmed.replace(/^\/+/, '')}`;
+    : new URL(trimmed.replace(/^\/+/, ''), document.baseURI).href;
   const classes = ['choice-mask'];
   if (className && className !== 'choice-mask') {
     classes.push(className);
