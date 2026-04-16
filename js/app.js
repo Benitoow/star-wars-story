@@ -36,15 +36,15 @@ const LAST_MODEL_KEY = 'sw_last_model';
 const LAST_IMAGE_PROVIDER_KEY = 'sw_last_image_provider';
 const LAST_IMAGE_MODEL_KEY = 'sw_last_image_model';
 
-function renderChoiceIcon(svgRef, className = 'choice-mask') {
+function renderChoiceIcon(svgRef, className = '') {
   if (!svgRef) return '';
   const trimmed = String(svgRef).trim();
   if (trimmed.startsWith('<svg')) return trimmed;
-  const classes = ['choice-mask'];
-  if (className && className !== 'choice-mask') {
+  const classes = ['choice-svg'];
+  if (className) {
     classes.push(className);
   }
-  return `<span class="${classes.join(' ')}" style="--choice-mask: url('${svgRef}')"></span>`;
+  return `<img src="${trimmed}" alt="" class="${classes.join(' ')}" loading="lazy" decoding="async"/>`;
 }
 
 function getSavedStories() {
@@ -758,7 +758,7 @@ async function generateNextTurn(userMessage) {
     }
 
     state.messages.push({ role: 'assistant', content: rawText });
-    const story = parseStoryResponse(rawText);
+    const story = parseStoryResponse(rawText, state.turn);
     state.currentChapter = story;
     if (state.currentStoryId) {
       upsertSavedStory({

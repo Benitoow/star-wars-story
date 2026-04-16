@@ -150,7 +150,7 @@ Si le joueur a précédemment modifié des passages ("Votre version"), INTÈGRE 
 }
 
 /* ─── Parse LLM response with enhanced structure ─── */
-function parseStoryResponse(raw) {
+function parseStoryResponse(raw, turnNumber = 1) {
   // Remove potential markdown code blocks
   let cleaned = raw
     .replace(/^```json\s*/i, '')
@@ -194,9 +194,11 @@ function parseStoryResponse(raw) {
       return choice;
     });
 
+    const safeTurnNumber = Number.isFinite(turnNumber) ? turnNumber : 1;
+
     return {
       chapter_title:     parsed.chapter_title     || 'L\'aventure continue',
-      chapter_number:    parsed.chapter_number    || turnNumber || 1,
+      chapter_number:    parsed.chapter_number    || safeTurnNumber,
       section_type:      parsed.section_type      || 'action',
       narrative: {
         context:     narrative.context     || '',
@@ -212,9 +214,11 @@ function parseStoryResponse(raw) {
   } catch (e) {
     // Fallback: return raw text with generic choices
     console.warn('JSON parse failed, using fallback:', e.message);
+    const safeTurnNumber = Number.isFinite(turnNumber) ? turnNumber : 1;
+
     return {
       chapter_title: 'L\'aventure continue',
-      chapter_number: turnNumber || 1,
+      chapter_number: safeTurnNumber,
       section_type: 'action',
       narrative: {
         context: cleaned.substring(0, 300),
