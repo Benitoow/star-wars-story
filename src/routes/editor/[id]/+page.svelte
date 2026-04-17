@@ -1116,57 +1116,54 @@
           {#if currentChapter}
             <!-- ── Chapter card ──────────────────────────── -->
             {#key currentChapter.chapter_number}
-              <article class="chapter-card" in:fly={{ y: 24, duration: 320, opacity: 0 }}>
+              <article class="chapter-card" in:fly={{ y: 20, duration: 280, opacity: 0 }}>
 
-                <header class="chapter-meta">
-                  <span class="chapter-num">Chapitre {currentChapter.chapter_number || turnNumber}</span>
+                <!-- Eyebrow + title -->
+                <header class="chapter-header">
+                  <div class="chapter-eyebrow">
+                    <span class="chapter-num">Chapitre {currentChapter.chapter_number || turnNumber}</span>
+                    <span class="chapter-sep">·</span>
+                    <span class="chapter-type">{currentChapter.section_type}</span>
+                  </div>
                   <h2 class="chapter-title">{currentChapter.chapter_title}</h2>
-                  <span class="chapter-type">{currentChapter.section_type}</span>
                 </header>
 
-                <div class="story-body">
+                <!-- Narrative flow -->
+                <div class="narrative">
 
                   {#if currentChapter.narrative.context}
-                    <div class="story-scene">
-                      <span class="scene-label">Contexte</span>
-                      <div class="scene-text scene-context">
-                        {#each textToParagraphs(currentChapter.narrative.context) as para}
-                          <p>{para}</p>
-                        {/each}
-                      </div>
+                    <div class="n-block n-context">
+                      <span class="n-tag">Contexte</span>
+                      {#each textToParagraphs(currentChapter.narrative.context) as para}
+                        <p>{para}</p>
+                      {/each}
                     </div>
                   {/if}
 
                   {#if currentChapter.narrative.action}
-                    <div class="story-scene">
-                      <span class="scene-label scene-label--action">Action</span>
-                      <div class="scene-text scene-action">
-                        {#each textToParagraphs(currentChapter.narrative.action) as para}
-                          <p>{para}</p>
-                        {/each}
-                      </div>
+                    <div class="n-block n-action">
+                      <span class="n-tag n-tag--action">Action</span>
+                      {#each textToParagraphs(currentChapter.narrative.action) as para}
+                        <p>{para}</p>
+                      {/each}
                     </div>
                   {/if}
 
                   {#if currentChapter.narrative.dialogue}
-                    <div class="story-scene">
-                      <span class="scene-label scene-label--dialogue">Dialogue</span>
-                      <div class="scene-text scene-dialogue">
-                        {#each textToParagraphs(currentChapter.narrative.dialogue) as para}
-                          <p>{para}</p>
-                        {/each}
-                      </div>
+                    <div class="n-block n-dialogue">
+                      <span class="n-tag n-tag--dialogue">Dialogue</span>
+                      {#each textToParagraphs(currentChapter.narrative.dialogue) as para}
+                        <p>{para}</p>
+                      {/each}
                     </div>
                   {/if}
 
                   {#if currentChapter.narrative.reflection}
-                    <div class="story-scene story-scene--reflection">
-                      <span class="scene-label scene-label--reflection">Réflexion</span>
-                      <div class="scene-text scene-reflection">
-                        {#each textToParagraphs(currentChapter.narrative.reflection) as para}
-                          <p><em>{para}</em></p>
-                        {/each}
-                      </div>
+                    <div class="n-block n-reflection">
+                      <span class="n-tag n-tag--reflection">Réflexion</span>
+                      {#each textToParagraphs(currentChapter.narrative.reflection) as para}
+                        <p>{para}</p>
+                      {/each}
                     </div>
                   {/if}
 
@@ -1177,26 +1174,22 @@
             <!-- ── Choices ────────────────────────────────── -->
             {#if currentChapter.choices.length > 0}
               <section class="choices-section">
-                <p class="choices-heading">
-                  <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 1.414L10.586 9H7a1 1 0 100 2h3.586l-1.293 1.293a1 1 0 101.414 1.414l3-3a1 1 0 000-1.414z" clip-rule="evenodd"/></svg>
-                  Que faites-vous ?
-                </p>
-
-                <div class="choice-grid">
+                <h3 class="choices-heading">Que faites-vous ?</h3>
+                <div class="choice-list">
                   {#each currentChapter.choices as choice, i}
                     <button
-                      class="choice-card"
+                      class="choice-btn"
                       on:click={() => handleChoice(choice)}
                       disabled={generating}
                     >
-                      <span class="choice-letter">{String.fromCharCode(65 + i)}</span>
-                      <span class="choice-body">
+                      <span class="choice-key">{String.fromCharCode(65 + i)}</span>
+                      <span class="choice-content">
                         <span class="choice-text">{choice.text}</span>
-                        <span class="choice-tags">
+                        <span class="choice-meta">
                           <span class="choice-attr">{choice.attribute}</span>
-                          <span class="choice-diff" data-diff={choice.difficulty}>
+                          <span class="choice-pips">
                             {#each Array(5) as _, d}
-                              <span class="diff-pip" class:filled={d < choice.difficulty}></span>
+                              <span class="pip" class:on={d < choice.difficulty}></span>
                             {/each}
                           </span>
                         </span>
@@ -1209,26 +1202,26 @@
 
             <!-- ── Custom action ──────────────────────────── -->
             <form class="custom-form" on:submit|preventDefault={handleCustomActionSubmit}>
-              <label class="custom-form-label" for="custom-action">
-                <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
-                Ou écrivez votre propre action
-              </label>
-              <div class="custom-form-row">
+              <label class="custom-label" for="custom-action">— ou jouez librement</label>
+              <div class="custom-row">
                 <textarea
                   id="custom-action"
-                  class="custom-action-input"
+                  class="custom-input"
                   bind:value={customAction}
-                  placeholder="Je tente de négocier un passage sûr…"
+                  placeholder="Décrivez votre action…"
                   rows="2"
                   disabled={generating}
                 ></textarea>
                 <button
-                  class="custom-send-btn"
+                  class="custom-send"
                   type="submit"
                   disabled={generating || !customAction.trim()}
                   title="Envoyer"
                 >
-                  <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"/></svg>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16">
+                    <line x1="22" y1="2" x2="11" y2="13"/>
+                    <polygon points="22,2 15,22 11,13 2,9"/>
+                  </svg>
                 </button>
               </div>
             </form>
@@ -1746,20 +1739,20 @@
     font-size: 0.9rem;
   }
 
-  /* ─────────────────────────────────────────────────
+  /* ═══════════════════════════════════════════
      PLAY SHELL
-  ───────────────────────────────────────────────── */
+  ═══════════════════════════════════════════ */
   .play-shell {
     display: flex;
     flex-direction: column;
-    gap: var(--space-lg);
-    max-width: 820px;
+    gap: var(--space-xl);
+    max-width: 740px;
     margin: 0 auto;
-    padding-bottom: calc(var(--space-xl) * 2);
     width: 100%;
+    padding-bottom: calc(var(--space-xl) * 2);
   }
 
-  /* Topbar */
+  /* ── Topbar ─────────────────────────────── */
   .play-topbar {
     display: flex;
     align-items: center;
@@ -1771,34 +1764,34 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     color: var(--color-text-muted);
   }
 
   .turn-dot {
-    width: 7px;
-    height: 7px;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
     background: var(--color-gold);
-    box-shadow: 0 0 6px var(--color-gold);
-    animation: pulse-dot 2s ease-in-out infinite;
+    box-shadow: 0 0 5px var(--color-gold);
+    animation: pulse-dot 2.4s ease-in-out infinite;
   }
 
   @keyframes pulse-dot {
     0%, 100% { opacity: 1; }
-    50% { opacity: 0.35; }
+    50%       { opacity: 0.3; }
   }
 
   .mem-badge {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    font-size: 0.72rem;
+    font-size: 0.7rem;
     color: var(--color-text-muted);
     border: 1px solid var(--color-border);
     border-radius: 999px;
     padding: 2px 8px;
-    opacity: 0.7;
+    opacity: 0.6;
   }
 
   .topbar-link {
@@ -1806,52 +1799,56 @@
     background: none;
     border: none;
     color: var(--color-text-muted);
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     cursor: pointer;
-    padding: 4px 8px;
+    padding: 3px 8px;
     border-radius: var(--radius-sm);
     transition: color var(--transition-fast);
+    text-decoration: underline;
+    text-decoration-color: transparent;
+    text-underline-offset: 3px;
   }
 
   .topbar-link:hover:not(:disabled) {
-    color: var(--color-text-primary);
+    color: var(--color-text-secondary);
+    text-decoration-color: currentColor;
   }
 
-  /* Generating indicator */
+  /* ── Generating ─────────────────────────── */
   .play-generating {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: var(--space-sm);
+    gap: 10px;
     padding: var(--space-lg);
     color: var(--color-text-muted);
-    font-size: 0.85rem;
+    font-size: 0.82rem;
   }
 
   .gen-dot-row {
     display: flex;
-    gap: 6px;
+    gap: 5px;
   }
 
   .gen-dot-row span {
-    width: 8px;
-    height: 8px;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
     background: var(--color-gold);
-    animation: gen-bounce 1.2s ease-in-out infinite;
+    animation: gen-bounce 1.3s ease-in-out infinite;
   }
 
-  .gen-dot-row span:nth-child(2) { animation-delay: 0.2s; }
-  .gen-dot-row span:nth-child(3) { animation-delay: 0.4s; }
+  .gen-dot-row span:nth-child(2) { animation-delay: 0.18s; }
+  .gen-dot-row span:nth-child(3) { animation-delay: 0.36s; }
 
   @keyframes gen-bounce {
-    0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
-    40% { transform: scale(1); opacity: 1; }
+    0%, 80%, 100% { transform: translateY(0)    scale(0.6); opacity: 0.35; }
+    40%           { transform: translateY(-5px) scale(1);   opacity: 1; }
   }
 
-  /* ─────────────────────────────────────────────────
+  /* ═══════════════════════════════════════════
      CHAPTER CARD
-  ───────────────────────────────────────────────── */
+  ═══════════════════════════════════════════ */
   .chapter-card {
     background: var(--color-bg-secondary);
     border: 1px solid var(--color-border);
@@ -1859,129 +1856,129 @@
     overflow: hidden;
   }
 
-  .chapter-meta {
-    padding: var(--space-lg) var(--space-xl) var(--space-md);
-    border-bottom: 1px solid var(--color-border);
+  /* Header */
+  .chapter-header {
+    padding: var(--space-xl) var(--space-xl) var(--space-lg);
+    border-bottom: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  }
+
+  .chapter-eyebrow {
     display: flex;
-    flex-direction: column;
-    gap: 4px;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
   }
 
   .chapter-num {
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 1.5px;
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 2px;
     text-transform: uppercase;
     color: var(--color-gold);
-    opacity: 0.7;
+  }
+
+  .chapter-sep {
+    color: var(--color-text-muted);
+    opacity: 0.4;
+  }
+
+  .chapter-type {
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
   }
 
   .chapter-title {
     margin: 0;
-    font-size: 1.5rem;
-    font-weight: 700;
+    font-size: 1.75rem;
+    font-weight: 800;
     color: var(--color-text-primary);
-    line-height: 1.25;
-    letter-spacing: -0.02em;
+    line-height: 1.2;
+    letter-spacing: -0.025em;
   }
 
-  .chapter-type {
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--color-text-muted);
+  /* ── Narrative flow ─────────────────────── */
+  .narrative {
+    padding: 0 var(--space-xl);
   }
 
-  /* Story body */
-  .story-body {
-    padding: 0;
+  /* Each block: label floats as a small chip, then prose below */
+  .n-block {
+    padding: var(--space-lg) 0;
+    position: relative;
   }
 
-  .story-scene {
-    display: grid;
-    grid-template-columns: 90px 1fr;
-    border-bottom: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
+  .n-block + .n-block {
+    border-top: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent);
   }
 
-  .story-scene:last-child {
-    border-bottom: none;
-  }
-
-  .story-scene--reflection {
-    background: color-mix(in srgb, var(--color-bg-tertiary) 60%, transparent);
-  }
-
-  .scene-label {
-    padding: var(--space-md) var(--space-sm) var(--space-md) var(--space-lg);
-    font-size: 0.65rem;
+  .n-tag {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.6rem;
     font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 1.2px;
+    letter-spacing: 1.5px;
     color: var(--color-gold);
-    border-right: 2px solid color-mix(in srgb, var(--color-gold) 25%, transparent);
-    display: flex;
-    align-items: flex-start;
-    padding-top: calc(var(--space-md) + 2px);
-    line-height: 1;
+    margin-bottom: var(--space-sm);
+    opacity: 0.75;
   }
 
-  .scene-label--action {
-    color: #e8c84a;
-  }
+  .n-tag--action     { color: #d4a017; }
+  .n-tag--dialogue   { color: #6ab4d8; }
+  .n-tag--reflection { color: #9b8ec4; }
 
-  .scene-label--dialogue {
-    color: #7ecff5;
-  }
-
-  .scene-label--dialogue + .scene-text {
-    border-left-color: color-mix(in srgb, #7ecff5 30%, transparent);
-  }
-
-  .scene-label--reflection {
-    color: #b5a0d4;
-    opacity: 0.9;
-  }
-
-  .scene-text {
-    padding: var(--space-md) var(--space-xl) var(--space-md) var(--space-lg);
-  }
-
-  .scene-text p {
+  /* Prose text shared */
+  .n-block p {
     margin: 0;
-    line-height: 1.75;
-    color: var(--color-text-secondary);
+    line-height: 1.8;
     font-size: 1rem;
   }
 
-  .scene-text p + p {
-    margin-top: 0.8em;
-  }
+  .n-block p + p { margin-top: 0.9em; }
 
-  .scene-context p {
-    color: var(--color-text-secondary);
-  }
+  /* Context: standard prose */
+  .n-context p { color: var(--color-text-secondary); }
 
-  .scene-action p {
+  /* Action: bolder, slightly larger */
+  .n-action p {
     color: var(--color-text-primary);
-    font-size: 1.02rem;
+    font-size: 1.025rem;
+    font-weight: 450;
   }
 
-  .scene-dialogue p {
+  /* Dialogue: indented, italic, subtle left bar */
+  .n-dialogue {
+    padding-left: var(--space-lg);
+    border-left: 2px solid color-mix(in srgb, #6ab4d8 35%, transparent);
+    margin-left: var(--space-xs);
+  }
+
+  .n-dialogue p {
     color: var(--color-text-primary);
     font-style: italic;
-    padding-left: var(--space-md);
-    border-left: 2px solid color-mix(in srgb, #7ecff5 40%, transparent);
   }
 
-  .scene-reflection p {
+  /* Reflection: dimmed italic, subtle background */
+  .n-reflection {
+    background: color-mix(in srgb, var(--color-bg-tertiary) 45%, transparent);
+    border-radius: var(--radius-md);
+    padding: var(--space-md) var(--space-lg);
+    margin-bottom: var(--space-sm);
+    border-top: none !important;
+  }
+
+  .n-reflection p {
     color: var(--color-text-muted);
     font-style: italic;
     font-size: 0.95rem;
   }
 
-  /* ─────────────────────────────────────────────────
+  /* ═══════════════════════════════════════════
      CHOICES
-  ───────────────────────────────────────────────── */
+  ═══════════════════════════════════════════ */
   .choices-section {
     display: flex;
     flex-direction: column;
@@ -1990,164 +1987,159 @@
 
   .choices-heading {
     margin: 0;
-    font-size: 0.8rem;
+    font-size: 0.95rem;
     font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--color-text-muted);
+    color: var(--color-text-primary);
+    letter-spacing: -0.01em;
+  }
+
+  .choice-list {
     display: flex;
-    align-items: center;
+    flex-direction: column;
     gap: 6px;
   }
 
-  .choice-grid {
+  .choice-btn {
     display: flex;
-    flex-direction: column;
-    gap: var(--space-xs);
-  }
-
-  .choice-card {
-    display: grid;
-    grid-template-columns: 36px 1fr;
-    align-items: start;
-    gap: 0;
+    align-items: stretch;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
     background: var(--color-bg-secondary);
     cursor: pointer;
     text-align: left;
-    transition: all var(--transition-fast);
     overflow: hidden;
+    transition:
+      border-color var(--transition-fast),
+      background   var(--transition-fast),
+      transform    var(--transition-fast);
   }
 
-  .choice-card:hover:not(:disabled) {
+  .choice-btn:hover:not(:disabled) {
     border-color: var(--color-gold);
-    background: color-mix(in srgb, var(--color-gold) 6%, var(--color-bg-secondary));
-    transform: translateX(2px);
+    background: color-mix(in srgb, var(--color-gold) 5%, var(--color-bg-secondary));
+    transform: translateX(3px);
   }
 
-  .choice-card:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-  }
+  .choice-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
-  .choice-letter {
+  /* Letter key */
+  .choice-key {
+    flex-shrink: 0;
+    width: 38px;
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 100%;
-    background: color-mix(in srgb, var(--color-gold) 12%, transparent);
-    border-right: 1px solid var(--color-border);
-    font-size: 0.75rem;
-    font-weight: 800;
+    background: color-mix(in srgb, var(--color-gold) 15%, transparent);
+    border-right: 1px solid color-mix(in srgb, var(--color-gold) 20%, transparent);
+    font-size: 0.72rem;
+    font-weight: 900;
     color: var(--color-gold);
-    min-height: 52px;
     letter-spacing: 0.5px;
+    font-variant-numeric: tabular-nums;
   }
 
-  .choice-body {
+  .choice-btn:hover:not(:disabled) .choice-key {
+    background: color-mix(in srgb, var(--color-gold) 22%, transparent);
+  }
+
+  /* Content */
+  .choice-content {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    padding: var(--space-sm) var(--space-md);
+    gap: 5px;
+    padding: 10px var(--space-md);
+    min-width: 0;
   }
 
   .choice-text {
     color: var(--color-text-primary);
-    font-size: 0.95rem;
+    font-size: 0.92rem;
     line-height: 1.45;
   }
 
-  .choice-tags {
+  .choice-meta {
     display: flex;
     align-items: center;
-    gap: var(--space-sm);
+    gap: 8px;
   }
 
   .choice-attr {
-    font-size: 0.68rem;
-    font-weight: 700;
-    letter-spacing: 0.8px;
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 1px;
     text-transform: uppercase;
     color: var(--color-text-muted);
     background: var(--color-bg-tertiary);
     border: 1px solid var(--color-border);
-    border-radius: 4px;
-    padding: 2px 6px;
+    border-radius: 3px;
+    padding: 1px 5px;
   }
 
-  .choice-diff {
+  .choice-pips {
     display: flex;
     align-items: center;
     gap: 3px;
   }
 
-  .diff-pip {
-    width: 6px;
-    height: 6px;
+  .pip {
+    width: 5px;
+    height: 5px;
     border-radius: 50%;
     background: var(--color-border);
-    transition: background var(--transition-fast);
   }
 
-  .diff-pip.filled {
-    background: var(--color-gold);
-  }
+  .pip.on { background: var(--color-gold); }
 
-  /* ─────────────────────────────────────────────────
+  /* ═══════════════════════════════════════════
      CUSTOM ACTION
-  ───────────────────────────────────────────────── */
+  ═══════════════════════════════════════════ */
   .custom-form {
     display: flex;
     flex-direction: column;
-    gap: var(--space-xs);
-  }
-
-  .custom-form-label {
-    display: flex;
-    align-items: center;
     gap: 6px;
-    font-size: 0.78rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    color: var(--color-text-muted);
   }
 
-  .custom-form-row {
+  .custom-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    letter-spacing: 0.5px;
+  }
+
+  .custom-row {
     display: flex;
-    gap: var(--space-xs);
+    gap: 8px;
     align-items: flex-end;
   }
 
-  .custom-action-input {
+  .custom-input {
     flex: 1;
     border: 1px solid var(--color-border);
     background: var(--color-bg-secondary);
     color: var(--color-text-primary);
     border-radius: var(--radius-lg);
-    padding: var(--space-sm) var(--space-md);
+    padding: 10px var(--space-md);
     resize: none;
     font: inherit;
-    font-size: 0.95rem;
+    font-size: 0.93rem;
     line-height: 1.55;
     transition: border-color var(--transition-fast);
   }
 
-  .custom-action-input:focus {
+  .custom-input:focus {
     outline: none;
     border-color: var(--color-gold);
   }
 
-  .custom-action-input::placeholder {
+  .custom-input::placeholder {
     color: var(--color-text-muted);
-    opacity: 0.6;
+    opacity: 0.55;
   }
 
-  .custom-send-btn {
+  .custom-send {
     flex-shrink: 0;
-    width: 44px;
-    height: 44px;
+    width: 42px;
+    height: 42px;
     border-radius: var(--radius-lg);
     border: 1px solid var(--color-gold);
     background: var(--color-gold);
@@ -2156,21 +2148,15 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all var(--transition-fast);
+    transition: opacity var(--transition-fast), transform var(--transition-fast);
   }
 
-  .custom-send-btn:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--color-gold) 80%, white);
-  }
+  .custom-send:hover:not(:disabled) { opacity: 0.85; transform: scale(1.05); }
+  .custom-send:disabled { opacity: 0.3; cursor: not-allowed; }
 
-  .custom-send-btn:disabled {
-    opacity: 0.35;
-    cursor: not-allowed;
-  }
-
-  /* ─────────────────────────────────────────────────
+  /* ═══════════════════════════════════════════
      MEMORY PANEL
-  ───────────────────────────────────────────────── */
+  ═══════════════════════════════════════════ */
   .memory-panel {
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
@@ -2181,9 +2167,9 @@
   .memory-panel summary {
     cursor: pointer;
     color: var(--color-text-muted);
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     font-weight: 600;
-    padding: var(--space-sm) var(--space-md);
+    padding: 10px var(--space-md);
     display: flex;
     align-items: center;
     gap: 6px;
@@ -2192,10 +2178,7 @@
   }
 
   .memory-panel summary::-webkit-details-marker { display: none; }
-
-  .mem-count {
-    opacity: 0.65;
-  }
+  .mem-count { opacity: 0.6; }
 
   .mem-list {
     margin: 0;
@@ -2205,21 +2188,18 @@
     flex-direction: column;
     gap: 4px;
     color: var(--color-text-muted);
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     list-style: none;
   }
 
-  .mem-list li::before {
-    content: '—  ';
-    opacity: 0.4;
-  }
+  .mem-list li::before { content: '— '; opacity: 0.4; }
 
   .memory-empty {
     margin: 0;
-    padding: var(--space-xs) var(--space-md) var(--space-sm);
+    padding: 8px var(--space-md) var(--space-sm);
     border-top: 1px solid var(--color-border);
     color: var(--color-text-muted);
-    font-size: 0.82rem;
+    font-size: 0.8rem;
   }
 
   @media (max-width: 920px) {
