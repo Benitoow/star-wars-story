@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased (V1.2 technical)
+
+### 🧩 Narrative Contract Hardening
+- Added strict schema controls in `js/story.js` for section type and choice attribute normalization.
+- Added bounded/normalized narrative and choice sanitization before rendering and downstream updates.
+- Added parser diagnostics state (`getLastStoryParseDiagnostics`) to trace parse/coercion/fallback modes with warnings.
+- Wired `story.js` as the global source of truth for prompt/parse/format helpers (`window.*`) so `app.js` uses the hardened pipeline.
+- Added runtime diagnostics logging in `js/app.js` when parse warnings are present.
+
 ## v1.1.1 — 2026-04-17
 
 ### 🐛 Hotfix

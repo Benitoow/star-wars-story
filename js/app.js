@@ -2209,6 +2209,12 @@ async function generateNextTurn(userMessage, progressionEvent = null) {
 
     state.messages.push({ role: 'assistant', content: rawText });
     const story = resolveParseStoryResponse(rawText, state.turn, state.setup.language);
+    const parseDiagnostics = typeof window.getLastStoryParseDiagnostics === 'function'
+      ? window.getLastStoryParseDiagnostics()
+      : null;
+    if (parseDiagnostics?.warnings?.length) {
+      console.warn('[story-parse-diagnostics]', parseDiagnostics);
+    }
     appendStoryMemoryTurn(state.currentStoryId, state.turn, story, userMessage);
     const relationshipUpdates = applyRelationshipUpdates(
       state.currentStoryId,

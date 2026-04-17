@@ -100,6 +100,50 @@ RÈGLES STRICTES (NON-NÉGOCIABLES):
 18. Si un nouveau groupe, cercle, escouade, clan ou communauté émerge, ajoute une mise à jour relationnelle structurée dans "relationship_updates".`;
 
 const DEFAULT_LANGUAGE_ID = 'fr';
+const STORY_SCHEMA_VERSION = 2;
+const ALLOWED_SECTION_TYPES = ['confrontation', 'exploration', 'dialogue', 'reflection', 'action'];
+const ALLOWED_CHOICE_ATTRIBUTES = ['combat', 'diplomacy', 'stealth', 'tech', 'force', 'survival'];
+let LAST_PARSE_DIAGNOSTICS = null;
+
+function setLastParseDiagnostics(input = {}) {
+  LAST_PARSE_DIAGNOSTICS = {
+    schemaVersion: STORY_SCHEMA_VERSION,
+    timestamp: new Date().toISOString(),
+    mode: input.mode || 'unknown',
+    warnings: Array.isArray(input.warnings) ? input.warnings.slice(0, 30) : [],
+    turnNumber: Number.isFinite(Number(input.turnNumber)) ? Number(input.turnNumber) : null,
+    languageId: input.languageId || DEFAULT_LANGUAGE_ID,
+    rawPreview: String(input.rawPreview || '').slice(0, 240)
+  };
+}
+
+function getLastStoryParseDiagnostics() {
+  return LAST_PARSE_DIAGNOSTICS
+    ? { ...LAST_PARSE_DIAGNOSTICS, warnings: [...(LAST_PARSE_DIAGNOSTICS.warnings || [])] }
+    : null;
+}
+
+function normalizeSectionType(rawType) {
+  const type = String(rawType || '').trim().toLowerCase();
+  return ALLOWED_SECTION_TYPES.includes(type) ? type : 'action';
+}
+
+function normalizeChoiceAttribute(rawAttribute) {
+  const attr = String(rawAttribute || '').trim().toLowerCase();
+  return ALLOWED_CHOICE_ATTRIBUTES.includes(attr) ? attr : 'survival';
+}
+
+function sanitizeNarrativePlainText(value, maxLen = 1600) {
+  const raw = extractNarrativeText(value);
+  if (!raw) return '';
+  return raw
+    .replace(/\*{1,2}([^*\n]+)\*{1,2}/g, '$1')
+    .replace(/\*([a-z][a-z0-9_]*(?:_[a-z0-9]+)+)\*/gi, '')
+    .replace(/\{[a-z_][a-z0-9_]*\}/gi, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim()
+    .slice(0, maxLen);
+}
 
 /* ─── Language configuration ─────────────────── */
 function getLanguageConfig(languageId) {
@@ -542,6 +586,7 @@ function coerceStorySchema(parsed, languageId = DEFAULT_LANGUAGE_ID) {
 function validateStoryPayload(payload) {
   const warnings = [];
   if (!payload || typeof payload !== 'object') {
+    setLastParseDiagnostics({ mode: 'invalid_payload', warnings: ['invalid_payload'] });
     return { payload, warnings: ['invalid_payload'] };
   }
 
@@ -564,9 +609,9 @@ function validateStoryPayload(payload) {
     seen.add(key);
     uniqueChoices.push({
       ...normalized,
-      text: text.slice(0, 220),
-      attribute: normalized.attribute || 'survival',
-      difficulty: Number.isFinite(Number(normalized.difficulty)) ? Number(normalized.difficulty) : 2,
+      text: sanitizeNarrativePlainText(text, 220),
+      attribute: normalizeChoiceAttribute(normalized.attribute),
+      difficulty: Math.min(5, Math.max(1, Number.isFinite(Number(normalized.difficulty)) ? Number(normalized.difficulty) : 2)),
       faction_impact: normalized.faction_impact && typeof normalized.faction_impact === 'object' ? normalized.faction_impact : {}
     });
   }
@@ -575,12 +620,32 @@ function validateStoryPayload(payload) {
   if (uniqueChoices.length > 4) warnings.push('choices_trimmed');
 
   const payloadWarnings = Array.isArray(payload.validation_warnings) ? payload.validation_warnings : [];
+  const chapterNumber = Number.isFinite(Number(payload.chapter_number)) ? Number(payload.chapter_number) : 1;
+  const chapterTitle = sanitizeNarrativePlainText(payload.chapter_title || 'L\'aventure continue', 90) || 'L\'aventure continue';
+  const sectionType = normalizeSectionType(payload.section_type || 'action');
+  const storyWarnings = [...payloadWarnings, ...warnings];
+
+  setLastParseDiagnostics({
+    mode: 'validated',
+    warnings: storyWarnings,
+    turnNumber: chapterNumber,
+    rawPreview: chapterTitle
+  });
 
   return {
     payload: {
       ...payload,
+      schema_version: STORY_SCHEMA_VERSION,
+      chapter_title: chapterTitle,
+      chapter_number: chapterNumber,
+      section_type: sectionType,
       narrative: {
         ...normalizedNarrative,
+        context: sanitizeNarrativePlainText(normalizedNarrative.context, 1200),
+        action: sanitizeNarrativePlainText(normalizedNarrative.action, 2200),
+        dialogue: sanitizeNarrativePlainText(normalizedNarrative.dialogue, 1600),
+        reflection: sanitizeNarrativePlainText(normalizedNarrative.reflection, 1600),
+        atmosphere: sanitizeNarrativePlainText(normalizedNarrative.atmosphere || 'tense', 80),
         blocks: normalizeNarrativeBlocks(payload.narrative)
       },
       choices: uniqueChoices.slice(0, 4),
@@ -588,7 +653,7 @@ function validateStoryPayload(payload) {
       reputation_updates: Array.isArray(payload.reputation_updates) ? payload.reputation_updates.slice(0, 12) : [],
       camp_updates: Array.isArray(payload.camp_updates) ? payload.camp_updates.slice(0, 12) : [],
       protagonist_state: payload.protagonist_state && typeof payload.protagonist_state === 'object' ? payload.protagonist_state : null,
-      validation_warnings: [...payloadWarnings, ...warnings]
+      validation_warnings: storyWarnings
     },
     warnings
   };
@@ -665,7 +730,7 @@ function parseStoryResponse(raw, turnNumber = 1, languageId = DEFAULT_LANGUAGE_I
     const validated = validateStoryPayload({
       chapter_title: parsed.chapter_title || 'L\'aventure continue',
       chapter_number: parsed.chapter_number || safeTurnNumber,
-      section_type: parsed.section_type || 'action',
+      section_type: normalizeSectionType(parsed.section_type || 'action'),
       narrative: {
         context: narrative.context || '',
         action: narrative.action || narrative || '',
@@ -682,6 +747,14 @@ function parseStoryResponse(raw, turnNumber = 1, languageId = DEFAULT_LANGUAGE_I
       user_edits_applied: parsed.user_edits_applied || null
     });
 
+    setLastParseDiagnostics({
+      mode: 'parsed',
+      warnings: validated.warnings || [],
+      turnNumber: safeTurnNumber,
+      languageId,
+      rawPreview: String(raw || '').slice(0, 240)
+    });
+
     return validated.payload;
   } catch (e) {
     // Fallback: try once more to coerce any JSON we found, else show a helpful message
@@ -692,7 +765,17 @@ function parseStoryResponse(raw, turnNumber = 1, languageId = DEFAULT_LANGUAGE_I
     const best = extractBestJson(raw);
     if (best?.parsed) {
       const coerced = coerceStorySchema(best.parsed, languageId);
-      if (coerced && coerced.choices.length) return coerced;
+      if (coerced && coerced.choices.length) {
+        const validated = validateStoryPayload(coerced);
+        setLastParseDiagnostics({
+          mode: 'coerced',
+          warnings: ['fallback_coercion', ...(validated.warnings || [])],
+          turnNumber: safeTurnNumber,
+          languageId,
+          rawPreview: String(raw || '').slice(0, 240)
+        });
+        return validated.payload;
+      }
     }
 
     // Strip any JSON-looking garbage so the user sees readable text, not a dump
@@ -724,6 +807,14 @@ function parseStoryResponse(raw, turnNumber = 1, languageId = DEFAULT_LANGUAGE_I
       protagonist_state: null,
       scene_description: 'Epic Star Wars cinematic scene with dramatic lighting',
       user_edits_applied: null
+    });
+
+    setLastParseDiagnostics({
+      mode: 'fallback',
+      warnings: ['fallback_response', ...(validated.warnings || [])],
+      turnNumber: safeTurnNumber,
+      languageId,
+      rawPreview: String(raw || '').slice(0, 240)
     });
 
     return validated.payload;
@@ -904,4 +995,13 @@ Réponds avec:
   "integrated_text": "Le texte modifié ou adapté",
   "note": "Brief note on integration"
 }`;
+}
+
+if (typeof window !== 'undefined') {
+  window.buildSystemPrompt = buildSystemPrompt;
+  window.buildStartMessage = buildStartMessage;
+  window.buildContinueMessage = buildContinueMessage;
+  window.parseStoryResponse = parseStoryResponse;
+  window.formatNarrative = formatNarrative;
+  window.getLastStoryParseDiagnostics = getLastStoryParseDiagnostics;
 }
