@@ -16,10 +16,12 @@ const state = {
   setup: {
     language: null,                // Narration language
     firstName: '',
+    lastName: '',
     era: null,
     faction: null,
     role: null,
-    premise: null
+    premise: null,
+    contentIntensity: 'cinematic'
   },
   userEdits: [],                    // Collaborative mode edits
   messages: [],
@@ -49,7 +51,23 @@ const STORY_CAMP_PREFIX = 'sw_story_camp_md_';
 const STORY_PROTAGONIST_PREFIX = 'sw_story_protagonist_md_';
 const HIDDEN_SKILL_KEYS = ['combat', 'diplomacy', 'stealth', 'tech', 'force', 'survival'];
 const RELATIONSHIP_LEVEL_KEYS = ['friend', 'lover', 'master', 'acolyte', 'companion', 'ally', 'rival', 'community', 'family', 'mentor'];
+const CONTENT_INTENSITY_OPTIONS = [
+  { id: 'cinematic', name: 'Cinéma', sub: 'Intense mais équilibré', color: 'var(--blue)' },
+  { id: 'dark', name: 'Sombre', sub: 'Ambiance dure et tendue', color: 'var(--purple)' },
+  { id: 'adult', name: 'Adulte', sub: 'Mature et sans édulcoration', color: 'var(--red)' },
+  { id: 'raw', name: 'Brut', sub: 'Très frontal et sans concession', color: 'var(--gold)' }
+];
 const choiceSvgCache = new Map();
+
+function getCharacterDisplayName(setup = state.setup) {
+  const first = String(setup?.firstName || '').trim();
+  const last = String(setup?.lastName || '').trim();
+  return [first, last].filter(Boolean).join(' ').trim();
+}
+
+function getIntensityConfig(intensityId) {
+  return CONTENT_INTENSITY_OPTIONS.find(option => option.id === intensityId) || CONTENT_INTENSITY_OPTIONS[0];
+}
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -1082,18 +1100,20 @@ function resolveBuildSystemPrompt(languageId) {
 
 function resolveBuildStartMessage(setup) {
   if (typeof window.buildStartMessage === 'function') return window.buildStartMessage(setup);
-  const firstName = String(setup.firstName || '').trim() || 'Personnage';
+  const firstName = String(setup.displayName || setup.firstName || '').trim() || 'Personnage';
   const era = ERAS.find(e => e.id === setup.era)?.name || setup.era || 'Histoire Star Wars';
   const faction = FACTIONS.find(f => f.id === setup.faction)?.name || setup.faction || '';
   const role = ROLES.find(r => r.id === setup.role)?.name || setup.role || '';
   const premise = PREMISES.find(p => p.id === setup.premise)?.name || setup.premise || '';
-  return `Commence une histoire interactive Star Wars avec ces paramètres:\n- Prénom du personnage: ${firstName}\n- Ère: ${era}\n- Faction: ${faction}\n- Rôle: ${role}\n- Prémisse: ${premise}\n\nLe personnage principal s'appelle ${firstName}.\nGénère le prologue de l'histoire en ${LANGUAGES.find(l => l.id === setup.language)?.promptName || 'French'}. Réponds avec le JSON attendu.`;
+  const intensity = getIntensityConfig(setup.contentIntensity || 'cinematic').name;
+  return `Commence une histoire interactive Star Wars avec ces paramètres:\n- Nom du personnage: ${firstName}\n- Ère: ${era}\n- Faction: ${faction}\n- Rôle: ${role}\n- Prémisse: ${premise}\n- Intensité narrative: ${intensity}\n\nLe personnage principal s'appelle ${firstName}.\nGénère le prologue de l'histoire en ${LANGUAGES.find(l => l.id === setup.language)?.promptName || 'French'}. Réponds avec le JSON attendu.`;
 }
 
 function resolveBuildContinueMessage(choiceText, turnNumber, languageId, setup, userEdits = []) {
   if (typeof window.buildContinueMessage === 'function') return window.buildContinueMessage(choiceText, turnNumber, languageId, setup, userEdits);
   const language = LANGUAGES.find(l => l.id === languageId) || LANGUAGES[0] || { promptName: 'French' };
-  return `Tour ${turnNumber} — Le joueur choisit: "${choiceText}"\n\nContinue l'histoire en ${language.promptName} en tenant compte de ce choix. Les conséquences doivent être visibles et significatives.`;
+  const intensity = getIntensityConfig(setup?.contentIntensity || 'cinematic').name;
+  return `Tour ${turnNumber} — Le joueur choisit: "${choiceText}"\n\nContinue l'histoire en ${language.promptName} en tenant compte de ce choix. Les conséquences doivent être visibles et significatives. Intensité narrative: ${intensity}.`;
 }
 
 function resolveParseStoryResponse(raw, turnNumber, languageId) {
@@ -1137,9 +1157,120 @@ function resolveParseStoryResponse(raw, turnNumber, languageId) {
 
 function resolveFormatNarrative(story) {
   if (typeof window.formatNarrative === 'function') return window.formatNarrative(story);
+
+  const escapeHtmlLocal = (str) => String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+  const stringifyNarrativeValue = (value, key = '') => {
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
+
+    if (Array.isArray(value)) {
+      return value.map(entry => stringifyNarrativeValue(entry, key)).filter(Boolean).join('\n');
+    }
+
+    if (typeof value === 'object') {
+      const speaker = value.speaker || value.name || value.character || value.who || '';
+      const line = value.text || value.line || value.dialogue || value.say || value.content || value.message || value.utterance || value.quote || '';
+      if (key === 'dialogue' && (speaker || line)) {
+        return speaker ? `${speaker}: ${line}` : String(line);
+      }
+      return Object.values(value).map(v => stringifyNarrativeValue(v, key)).filter(Boolean).join(' ');
+    }
+
+    return String(value);
+  };
+
   const narrative = story?.narrative || {};
-  const parts = [narrative.context, narrative.action, narrative.dialogue, narrative.reflection].filter(Boolean);
-  return `<div class="narrative-container"><div class="narrative-section"><p>${parts.join('</p><p>')}</p></div></div>`;
+  const sections = [
+    { key: 'context', label: t('context', state.uiLang) || 'Contexte', value: narrative.context },
+    { key: 'action', label: t('action', state.uiLang) || 'Action', value: narrative.action },
+    { key: 'dialogue', label: t('dialogue', state.uiLang) || 'Dialogue', value: narrative.dialogue },
+    { key: 'reflection', label: t('reflection', state.uiLang) || 'Réflexion', value: narrative.reflection }
+  ];
+
+  const htmlSections = sections
+    .map(section => {
+      const text = stringifyNarrativeValue(section.value, section.key).trim();
+      if (!text) return '';
+      const lines = text.split(/\n+/).map(line => line.trim()).filter(Boolean);
+      if (!lines.length) return '';
+      const content = lines.map(line => `<p>${escapeHtmlLocal(line)}</p>`).join('');
+      return `<div class="narrative-section ${section.key}"><span class="section-label">${escapeHtmlLocal(section.label)}</span>${content}</div>`;
+    })
+    .filter(Boolean)
+    .join('');
+
+  return `<div class="narrative-container">${htmlSections || '<div class="narrative-section action"><p>...</p></div>'}</div>`;
+}
+
+function captureStorySessionSnapshot() {
+  return {
+    turn: Number(state.turn || 0),
+    currentChapter: state.currentChapter ? { ...state.currentChapter } : null,
+    messages: Array.isArray(state.messages) ? state.messages.slice(-30) : [],
+    userEdits: Array.isArray(state.userEdits) ? state.userEdits.slice(-20) : []
+  };
+}
+
+async function openSavedStory(story) {
+  if (!story?.id) return;
+
+  state.currentStoryId = story.id;
+  state.provider = story.provider || state.provider;
+  state.model = story.model || state.model;
+  state.imgProvider = story.imgProvider || state.imgProvider;
+  state.imgModel = story.imgModel || state.imgModel;
+
+  const restoredSetup = {
+    language: state.uiLang,
+    firstName: '',
+    lastName: '',
+    era: null,
+    faction: null,
+    role: null,
+    premise: null,
+    contentIntensity: 'cinematic',
+    ...(story.setup || {})
+  };
+  restoredSetup.displayName = String(restoredSetup.displayName || getCharacterDisplayName(restoredSetup) || restoredSetup.firstName || 'Personnage').trim();
+  state.setup = restoredSetup;
+
+  state.turn = Number(story.turn || 0);
+  state.userEdits = Array.isArray(story.userEdits) ? story.userEdits : [];
+  state.messages = Array.isArray(story.messages) && story.messages.length
+    ? story.messages
+    : [{ role: 'system', content: resolveBuildSystemPrompt(state.setup.language || state.uiLang) }];
+  state.currentChapter = story.currentChapter || null;
+
+  state.hiddenSkillProgress = loadSkillProgress(state.currentStoryId, state.setup.role);
+  state.hiddenRelationshipProgress = loadRelationshipProgress(state.currentStoryId, state.setup);
+  state.hiddenFactionReputation = loadFactionReputation(state.currentStoryId, state.setup);
+  state.hiddenCampProfile = loadCampProfile(state.currentStoryId, state.setup);
+  state.hiddenProtagonistProfile = loadProtagonistProfile(state.currentStoryId, state.setup);
+
+  if (!state.currentChapter) {
+    renderSetupScreens();
+    checkSetupComplete();
+    goTo('screen-identity');
+    return;
+  }
+
+  goTo('screen-story');
+  document.getElementById('story-chapter-title').textContent = state.currentChapter.chapter_title || story.chapterTitle || 'Prologue';
+  document.getElementById('story-turn-counter').textContent = `${t('turn', state.uiLang)} ${Math.max(1, state.turn)}`;
+
+  showLoading(false);
+  clearNarrative();
+  await typeNarrative(resolveFormatNarrative(state.currentChapter));
+  renderChoicesWithAttributes(Array.isArray(state.currentChapter.choices) ? state.currentChapter.choices : []);
+  setChoicesEnabled(true);
+  showCollaborativePanel();
+  document.getElementById('story-image-container')?.classList.add('hidden');
 }
 
 function getSavedStories() {
@@ -1204,10 +1335,12 @@ function resetStorySetup() {
   state.setup = {
     language: null,
     firstName: '',
+    lastName: '',
     era: null,
     faction: null,
     role: null,
-    premise: null
+    premise: null,
+    contentIntensity: 'cinematic'
   };
   state.currentChapter = null;
   state.turn = 0;
@@ -1615,10 +1748,45 @@ function renderSetupScreens() {
   if (firstNameInput) {
     firstNameInput.value = state.setup.firstName || '';
   }
+  const lastNameInput = document.getElementById('player-last-name');
+  if (lastNameInput) {
+    lastNameInput.value = state.setup.lastName || '';
+  }
+
+  if (!state.setup.contentIntensity) {
+    state.setup.contentIntensity = 'cinematic';
+  }
+
+  renderIntensityGrid();
   renderChoiceGrid('era-grid',     ERAS,     'era');
   renderChoiceGrid('faction-grid', FACTIONS, 'faction');
   renderChoiceGrid('role-grid',    ROLES,    'role');
   renderChoiceGrid('premise-grid', PREMISES, 'premise');
+}
+
+function renderIntensityGrid() {
+  const grid = document.getElementById('intensity-grid');
+  if (!grid) return;
+
+  grid.innerHTML = '';
+  for (const item of CONTENT_INTENSITY_OPTIONS) {
+    const card = document.createElement('div');
+    card.className = 'choice-card intensity-card';
+    card.dataset.key = 'contentIntensity';
+    card.dataset.id = item.id;
+    card.style.setProperty('color', item.color || 'var(--gold)');
+    card.classList.toggle('selected', state.setup.contentIntensity === item.id);
+    card.innerHTML = `
+      <span class="intensity-chip">${item.id === 'raw' ? 'Sans filtre' : item.id === 'adult' ? 'Très adulte' : item.id === 'dark' ? 'Sombre' : 'Cinématique'}</span>
+      <span class="choice-name">${item.name}</span>
+      <span class="choice-sub">${item.sub}</span>
+    `;
+    card.addEventListener('click', () => {
+      document.querySelectorAll('.intensity-card').forEach(c => c.classList.toggle('selected', c.dataset.id === item.id));
+      state.setup.contentIntensity = item.id;
+    });
+    grid.appendChild(card);
+  }
 }
 
 function renderChoiceGrid(containerId, items, key) {
@@ -1670,8 +1838,8 @@ function renderChoiceGrid(containerId, items, key) {
 }
 
 function checkSetupComplete() {
-  const { firstName, era, faction, role, premise } = state.setup;
-  document.getElementById('btn-start-story').disabled = !(String(firstName || '').trim() && era && faction && role && premise);
+  const { era, faction, role, premise, contentIntensity } = state.setup;
+  document.getElementById('btn-start-story').disabled = !(era && faction && role && premise && contentIntensity);
 }
 
 /* ─── MODEL SELECTION ───────────────────────── */
@@ -1748,13 +1916,8 @@ async function startStory() {
 
   state.apiKey = resolvedApiKey.trim();
 
-  const firstName = String(state.setup.firstName || '').trim();
-  if (!firstName) {
-    alert('Entre un prénom pour ton personnage avant de lancer l’histoire.');
-    goTo('screen-setup');
-    return;
-  }
-  state.setup.firstName = firstName;
+  const displayName = getCharacterDisplayName(state.setup);
+  state.setup.firstName = displayName;
 
   // Images temporarily disabled by request
   state.imgProvider = 'none';
@@ -1781,7 +1944,8 @@ async function startStory() {
     imgProvider: state.imgProvider,
     imgModel: state.imgModel,
     status: 'active',
-    chapterTitle: 'Prologue'
+    chapterTitle: 'Prologue',
+    ...captureStorySessionSnapshot()
   });
   state.messages = [{ role: 'system', content: resolveBuildSystemPrompt(state.setup.language) }];
   state.turn = 0;
@@ -1909,7 +2073,8 @@ async function generateNextTurn(userMessage, progressionEvent = null) {
         imgProvider: state.imgProvider,
         imgModel: state.imgModel,
         status: 'active',
-        chapterTitle: story.chapter_title
+        chapterTitle: story.chapter_title,
+        ...captureStorySessionSnapshot()
       });
       renderDashboard();
     }
@@ -2195,10 +2360,12 @@ function closeStoryMenu() {
 function openStoryMenu() {
   const { era, faction, role, premise } = state.setup;
   const info = [
+    `Nom: ${getCharacterDisplayName(state.setup) || '—'}`,
     `${t('era', state.uiLang)}: ${ERAS.find(e=>e.id===era)?.name || era || '—'}`,
     `${t('faction', state.uiLang)}: ${FACTIONS.find(f=>f.id===faction)?.name || faction || '—'}`,
     `${t('role', state.uiLang)}: ${ROLES.find(r=>r.id===role)?.name || role || '—'}`,
     `${t('premise', state.uiLang)}: ${PREMISES.find(p=>p.id===premise)?.name || premise || '—'}`,
+    `Intensité: ${getIntensityConfig(state.setup.contentIntensity || 'cinematic').name}`,
     `${t('turn', state.uiLang)}: ${state.turn}`
   ].join('<br>');
   document.getElementById('overlay-story-info').innerHTML = info;
@@ -2214,6 +2381,25 @@ function setupEventListeners() {
       checkSetupComplete();
     });
   }
+
+  const lastNameInput = document.getElementById('player-last-name');
+  if (lastNameInput) {
+    lastNameInput.addEventListener('input', (e) => {
+      state.setup.lastName = String(e.target?.value || '').trimStart();
+      checkSetupComplete();
+    });
+  }
+
+  document.getElementById('btn-identity-next')?.addEventListener('click', () => {
+    state.setup.firstName = String(document.getElementById('player-first-name')?.value || '').trim();
+    state.setup.lastName = String(document.getElementById('player-last-name')?.value || '').trim();
+    goTo('screen-tone');
+  });
+
+  document.getElementById('btn-intensity-next')?.addEventListener('click', () => {
+    if (!state.setup.contentIntensity) state.setup.contentIntensity = 'cinematic';
+    goTo('screen-setup');
+  });
 
   const dashboardGrid = document.getElementById('dashboard-story-grid');
   if (dashboardGrid) {
@@ -2238,15 +2424,10 @@ function setupEventListeners() {
         event.stopPropagation();
       }
 
-      state.currentStoryId = story.id;
-      state.provider = story.provider || state.provider;
-      state.model = story.model || state.model;
-      state.imgProvider = story.imgProvider || state.imgProvider;
-      state.imgModel = story.imgModel || state.imgModel;
-      state.setup = { ...story.setup };
-      renderSetupScreens();
-      checkSetupComplete();
-      goTo('screen-setup');
+      openSavedStory(story).catch((error) => {
+        console.error(error);
+        alert('Impossible de reprendre cette histoire pour le moment.');
+      });
     });
   }
 
@@ -2254,7 +2435,7 @@ function setupEventListeners() {
   if (createStoryBtn) {
     createStoryBtn.addEventListener('click', () => {
       resetStorySetup();
-      goTo('screen-setup');
+      goTo('screen-identity');
     });
   }
 
@@ -2349,7 +2530,7 @@ function setupEventListeners() {
     localStorage.removeItem(LAST_IMAGE_MODEL_KEY);
     localStorage.setItem(FLOW_READY_KEY, '1');
     renderDashboard();
-    goTo('screen-setup');
+    goTo('screen-dashboard');
   });
 
   // Skip image

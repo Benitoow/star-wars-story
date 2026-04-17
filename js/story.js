@@ -124,6 +124,11 @@ function buildSystemPrompt(languageId = DEFAULT_LANGUAGE_ID) {
 - Garde "scene_description" en anglais pour la génération d'image.
 - N'utilise jamais un mélange de langues dans le même champ.
 
+INTENSITÉ NARRATIVE:
+- Respecte l'intensité choisie par l'utilisateur quand elle est fournie dans le setup.
+- Ajuste la noirceur, la dureté et la frontalité du récit sans perdre la cohérence du personnage.
+- La maturité est un réglage de narration, pas une déduction d'âge.
+
 ${SYSTEM_PROMPT}`;
 }
 
@@ -177,14 +182,16 @@ function buildStartMessage(setup) {
   const premSub = PREMISES.find(p => p.id === setup.premise)?.sub  || '';
 
   const roleContext = buildRoleContext(setup.role);
-  const firstName = String(setup.firstName || '').trim() || 'Personnage';
+  const firstName = String(setup.displayName || setup.firstName || '').trim() || 'Personnage';
+  const intensity = String(setup.contentIntensity || 'cinematic').trim();
 
   return `Commence une histoire interactive Star Wars avec ces paramètres:
-- Prénom du personnage: ${firstName}
+  - Nom du personnage: ${firstName}
 - Ère: ${era}
 - Faction: ${faction}
 - Rôle: ${role}
 - Prémisse: ${premise} — ${premSub}
+- Intensité narrative: ${intensity}
 ${roleContext}
 
 Génère le prologue de l'histoire en ${language.promptName}. Plante le décor, introduis le personnage et crée une situation initiale captivante qui aboutit à un premier choix crucial.
@@ -198,6 +205,7 @@ function buildContinueMessage(choiceText, turnNumber, languageId, setup, userEdi
   const language = getLanguageConfig(languageId);
   const roleContext = buildRoleContext(setup.role);
   const userEditsContext = buildUserEditsContext(userEdits);
+  const intensity = String(setup.contentIntensity || 'cinematic').trim();
 
   return `Tour ${turnNumber} — Le joueur choisit: "${choiceText}"
 
@@ -205,6 +213,7 @@ ${roleContext}
 ${userEditsContext}
 
 Continue l'histoire en ${language.promptName} en tenant compte de ce choix. Les conséquences doivent être visibles et significatives. Maintiens la tension dramatique et propose de nouveaux choix.
+Intensité narrative: ${intensity}.
 Le choix doit faire avancer concrètement la situation. Si l'action est trop ambitieuse pour le rôle/niveau du personnage, convertis-la en résolution crédible (succès partiel, coût, blessure, fuite, dette, alerte ennemie, etc.) au lieu d'un succès impossible.
 Si le joueur a précédemment modifié des passages ("Votre version"), INTÈGRE CES ÉLÉMENTS naturellement dans la continuation du récit.
 Si la scène permet la création ou l'évolution d'alliés, d'acolytes, de mentors, d'amants, d'ennemis récurrents ou d'une communauté, fais-la évoluer et reflète-la dans "relationship_updates".
@@ -620,7 +629,7 @@ function formatDialogue(dialogue) {
       if (!entry) return '';
       if (typeof entry === 'string') return `<p>${escapeHtml(cleanNarrativeText(entry))}</p>`;
       const speaker = entry.speaker || entry.name || entry.character || entry.who || '';
-      const line = entry.text || entry.line || entry.dialogue || entry.say || '';
+      const line = entry.text || entry.line || entry.dialogue || entry.say || entry.content || entry.message || entry.utterance || entry.quote || '';
       if (!line) return '';
       return speaker
         ? `<p><strong class="dialogue-speaker">${escapeHtml(speaker)} :</strong> ${escapeHtml(cleanNarrativeText(line))}</p>`
@@ -630,7 +639,7 @@ function formatDialogue(dialogue) {
   // Single exchange object
   if (typeof dialogue === 'object') {
     const speaker = dialogue.speaker || dialogue.name || dialogue.character || '';
-    const line = dialogue.text || dialogue.line || dialogue.dialogue || '';
+    const line = dialogue.text || dialogue.line || dialogue.dialogue || dialogue.say || dialogue.content || dialogue.message || dialogue.utterance || dialogue.quote || '';
     if (!line && !speaker) return '';
     return speaker
       ? `<p><strong class="dialogue-speaker">${escapeHtml(speaker)} :</strong> ${escapeHtml(cleanNarrativeText(line))}</p>`

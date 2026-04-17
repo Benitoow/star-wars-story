@@ -576,6 +576,7 @@ html, body {
 .choice-grid.factions { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
 .choice-grid.premises { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
 .choice-grid.roles { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+.choice-grid.intensity-grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
 
 /* ─── CHOICE CARDS ─────────────────── */
 .choice-card {
@@ -638,6 +639,25 @@ html, body {
   line-height: 1.3;
 }
 
+.intensity-card {
+  min-height: 138px;
+}
+.intensity-chip {
+  font-family: var(--font-ui);
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: currentColor;
+  padding: 2px 6px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.04);
+}
+.intensity-card .choice-sub {
+  color: #8f96ab;
+  max-width: 20ch;
+}
+
 /* ─── ROLE CARD SPECIFIC ────────────────────── */
 .role-card-header {
   display: flex;
@@ -680,6 +700,8 @@ html, body {
 
 /* ─── STORY SCREEN ──────────────────────────── */
 #screen-dashboard,
+#screen-identity,
+#screen-tone,
 #screen-setup,
 #screen-story {
   flex-direction: column;
