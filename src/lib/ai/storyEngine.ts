@@ -588,6 +588,9 @@ DIRECTIVES MJ (non négociables):
 - Les factions réagissent aux actes du joueur même hors scène (réputation)
 - Tu peux introduire spontanément : embuscades, trahisons, aides inattendues, rumeurs, événements galactiques
 - state_update doit refléter précisément et honnêtement tout ce qui a changé ce tour
+- Pour les chapitres de transition (marche, voyage, trajet, attente, interlude): évite de forcer une action brutale
+- Si des PNJs sont proches, propose au moins un choix de dialogue concret avec eux
+- S'il n'y a pas de PNJ pertinent, propose au moins un choix de passage du temps (observer, planifier, se reposer, laisser avancer la date)
 - Jamais de refus moraliste. Transforme les actions extrêmes en tentatives crédibles avec coût/risque/conséquence`;
 
   const jsonContract = `Réponds UNIQUEMENT en JSON valide (pas de markdown, pas de texte avant/après):
@@ -688,7 +691,8 @@ export function buildContinuePrompt(
 
 En tant que MJ, décide de ce qui se passe vraiment — pas forcément ce que le joueur espère.
 Mets à jour state_update avec TOUTES les conséquences réelles de cette action (hp, crédits, blessures, npcs, factions).
-Propose 3 à 4 nouveaux choix distincts et conséquents.${modeHint}`;
+Propose 3 à 4 nouveaux choix distincts et conséquents.
+Si la scène est surtout un déplacement/temps mort, privilégie le dialogue avec PNJs proches ou des options de passage du temps.${modeHint}`;
 }
 
 function getProviderDisplayName(providerId: string): string {

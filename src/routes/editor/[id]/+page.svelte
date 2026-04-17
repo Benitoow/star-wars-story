@@ -152,6 +152,52 @@
     chronology: []
   };
 
+  const TRANSITION_CHAPTER_REGEX = /(transition|transit|travel|journey|voyage|trajet|marche|route|en route|approche|attente|interlude|repos|pause|accalmie|campement|surveillance|transfert|navette)/i;
+  const DIALOGUE_CHOICE_REGEX = /(parler|discuter|dialogue|dialoguer|interroger|questionner|négocier|convaincre|échanger|demander|écouter|sonder)/i;
+  const TIME_PASS_CHOICE_REGEX = /(attendre|patienter|passer le temps|se reposer|méditer|observer|planifier|faire le point|préparer|laisser avancer|laisser filer|récupérer)/i;
+  const ACTION_HEAVY_CHOICE_REGEX = /(attaquer|assaut|fusillade|duel|foncer|abattre|détruire|exploser|charge|combat|sabre|blaster|éliminer)/i;
+
+  function normalizeSearchText(value: string): string {
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+  }
+
+  function escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  function chapterCorpusForNpcDetection(chapter: StoryChapter): string {
+    return [
+      chapter.chapter_title,
+      chapter.narrative.context,
+      chapter.narrative.action,
+      chapter.narrative.dialogue,
+      chapter.narrative.reflection,
+      ...chapter.choices.map(choice => choice.text)
+    ].join(' ');
+  }
+
+  function textMentionsNpc(corpus: string, npcName: string): boolean {
+    const haystack = ` ${normalizeSearchText(corpus)} `;
+    const normalizedName = normalizeSearchText(npcName).trim();
+    if (!normalizedName) return false;
+
+    const fullNamePattern = new RegExp(`(^|[^a-z0-9])${escapeRegExp(normalizedName)}([^a-z0-9]|$)`);
+    if (fullNamePattern.test(haystack)) return true;
+
+    const parts = normalizedName
+      .split(/\s+/)
+      .map(part => part.trim())
+      .filter(part => part.length >= 4);
+
+    return parts.some(part => {
+      const partPattern = new RegExp(`(^|[^a-z0-9])${escapeRegExp(part)}([^a-z0-9]|$)`);
+      return partPattern.test(haystack);
+    });
+  }
+
   function applyStateUpdate(chapter: StoryChapter): void {
     const upd = chapter.state_update;
     if (!upd) return;
@@ -255,6 +301,111 @@
     }
 
     return { warning, diffBonus, disabled };
+  }
+
+  function chapterLooksLikeTransition(chapter: StoryChapter): boolean {
+    const sectionType = chapter.section_type || '';
+    if (TRANSITION_CHAPTER_REGEX.test(sectionType)) return true;
+
+    const corpus = [
+      chapter.chapter_title,
+      chapter.narrative.context,
+      chapter.narrative.action,
+      chapter.narrative.dialogue,
+      chapter.narrative.reflection
+    ].join(' ');
+
+    return TRANSITION_CHAPTER_REGEX.test(corpus);
+  }
+
+  function getNearbyNpcNames(chapter: StoryChapter, max = 2): string[] {
+    const location = normalizeSearchText((worldState.player.location || '').trim());
+    const aliveNpcs = worldState.npcs.filter(npc => npc.alive !== false && npc.status !== 'dead' && npc.name.trim());
+    if (!aliveNpcs.length) return [];
+
+    const chapterCorpus = chapterCorpusForNpcDetection(chapter);
+
+    const mentionedNpcs = aliveNpcs.filter(npc => textMentionsNpc(chapterCorpus, npc.name));
+
+    const localNpcs = aliveNpcs.filter(npc => {
+      const lastSeen = normalizeSearchText((npc.last_seen || '').trim());
+      if (!lastSeen || !location || location === 'inconnu') return false;
+      return lastSeen.includes(location) || location.includes(lastSeen);
+    });
+
+    const sociallyRelevantNpcs = aliveNpcs
+      .filter(npc => npc.status === 'ally' || npc.status === 'neutral')
+      .sort((left, right) => (right.affinity ?? 0) - (left.affinity ?? 0));
+
+    const rankedNpcs = [
+      ...localNpcs,
+      ...mentionedNpcs,
+      ...((!location || location === 'inconnu') ? sociallyRelevantNpcs : [])
+    ];
+
+    const unique = Array.from(new Map(
+      rankedNpcs.map(npc => [normalizeSearchText(npc.name), npc])
+    ).values());
+
+    return unique
+      .map(npc => npc.name.trim())
+      .filter(Boolean)
+      .slice(0, max);
+  }
+
+  function enforceTransitionChoiceQuality(chapter: StoryChapter): StoryChapter {
+    if (!chapterLooksLikeTransition(chapter)) return chapter;
+
+    const choices = [...chapter.choices];
+    if (!choices.length) return chapter;
+
+    const hasDialogueChoice = choices.some(choice => DIALOGUE_CHOICE_REGEX.test(choice.text));
+    const hasTimePassChoice = choices.some(choice => TIME_PASS_CHOICE_REGEX.test(choice.text));
+
+    const nearbyNpcs = getNearbyNpcNames(chapter);
+    let injectedChoice: StoryChoice | null = null;
+
+    if (nearbyNpcs.length > 0 && !hasDialogueChoice) {
+      const npcLabel = nearbyNpcs.length > 1
+        ? `${nearbyNpcs[0]} et ${nearbyNpcs[1]}`
+        : nearbyNpcs[0];
+
+      injectedChoice = {
+        text: `Engager la conversation avec ${npcLabel} pour clarifier la situation avant d'agir.`,
+        attribute: 'diplomacy',
+        difficulty: 2,
+        faction_impact: {}
+      };
+    } else if (!hasTimePassChoice) {
+      injectedChoice = {
+        text: 'Profiter du trajet pour observer, planifier la suite et laisser le temps avancer.',
+        attribute: 'survival',
+        difficulty: 1,
+        faction_impact: {}
+      };
+    }
+
+    if (!injectedChoice) return chapter;
+
+    const dedup = new Set(choices.map(choice => choice.text.trim().toLowerCase()));
+    if (dedup.has(injectedChoice.text.trim().toLowerCase())) return chapter;
+
+    if (choices.length >= 4) {
+      const replaceIndex = choices.findIndex(choice =>
+        choice.attribute === 'combat' ||
+        choice.attribute === 'force' ||
+        ACTION_HEAVY_CHOICE_REGEX.test(choice.text)
+      );
+      const targetIndex = replaceIndex >= 0 ? replaceIndex : choices.length - 1;
+      choices[targetIndex] = injectedChoice;
+    } else {
+      choices.push(injectedChoice);
+    }
+
+    return {
+      ...chapter,
+      choices
+    };
   }
 
   let providerConfig: StoryProviderConfig | null = null;
@@ -705,7 +856,7 @@
     ]);
 
     const generation = await generateStoryTurn(requestMessages, providerConfig, turn);
-    const chapter = generation.chapter;
+    const chapter = enforceTransitionChoiceQuality(generation.chapter);
     const assistantContent = generation.rawResponse || JSON.stringify(chapter);
 
     aiMessages = trimMessages([
