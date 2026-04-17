@@ -2,7 +2,7 @@
 
 declare const self: ServiceWorkerGlobalScope;
 
-const CACHE_NAME = 'star-wars-story-v1';
+const CACHE_NAME = 'star-wars-story-v2';
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
