@@ -148,7 +148,8 @@ export async function loadRecentStories() {
 export const filteredStories = derived(
   [stories, filters, sortBy, sortDirection, searchQuery],
   ([$stories, $filters, $sortBy, $sortDir, $query]) => {
-    let result = [...$stories];
+    // Always exclude deleted and archived stories from the main list
+    let result = $stories.filter(s => !s.isDeleted && !s.isArchived);
 
     // Apply search
     if ($query.trim()) {

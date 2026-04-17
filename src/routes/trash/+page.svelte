@@ -261,8 +261,8 @@
 
 <!-- Empty Trash Confirmation Modal -->
 {#if showEmptyTrashModal}
-  <div class="modal-overlay" on:click={() => showEmptyTrashModal = false}>
-    <div class="modal" on:click|stopPropagation>
+  <button class="modal-overlay" on:click={() => showEmptyTrashModal = false} aria-label="Fermer">
+    <div class="modal" on:click|stopPropagation role="dialog" aria-modal="true">
       <div class="modal-header">
         <h2>Vider la corbeille</h2>
         <button class="modal-close" on:click={() => showEmptyTrashModal = false}>
@@ -294,7 +294,7 @@
         </button>
       </div>
     </div>
-  </div>
+  </button>
 {/if}
 
 <style>
