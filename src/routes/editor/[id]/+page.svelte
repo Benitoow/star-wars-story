@@ -1963,7 +1963,7 @@
     border-radius: var(--radius-md);
     padding: var(--space-sm) var(--space-md);
     border-top: none !important;
-    margin-top: 2px;
+    margin-top: var(--space-lg);
   }
 
   .n-reflection p {
