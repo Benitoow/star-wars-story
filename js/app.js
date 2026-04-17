@@ -1173,12 +1173,13 @@ function resolveParseStoryResponse(raw, turnNumber, languageId) {
       chapter_number: parsed.chapter_number || turnNumber || 1,
       section_type: parsed.section_type || 'action',
       narrative: typeof parsed.narrative === 'string'
-        ? { context: parsed.narrative.substring(0, 300), action: parsed.narrative, dialogue: '', reflection: '', atmosphere: 'tense' }
+        ? { context: parsed.narrative.substring(0, 300), action: parsed.narrative, dialogue: '', reflection: '', blocks: [{ type: 'action', text: parsed.narrative.substring(0, 1200), order: 0 }], atmosphere: 'tense' }
         : {
             context: parsed.narrative?.context || '',
             action: parsed.narrative?.action || '',
             dialogue: parsed.narrative?.dialogue || '',
             reflection: parsed.narrative?.reflection || '',
+            blocks: Array.isArray(parsed.narrative?.blocks) ? parsed.narrative.blocks : (Array.isArray(parsed.blocks) ? parsed.blocks : []),
             atmosphere: parsed.narrative?.atmosphere || 'tense'
           },
       choices: Array.isArray(parsed.choices) ? parsed.choices.slice(0, 4) : [],
@@ -1190,7 +1191,7 @@ function resolveParseStoryResponse(raw, turnNumber, languageId) {
       chapter_title: 'L\'aventure continue',
       chapter_number: turnNumber || 1,
       section_type: 'action',
-      narrative: { context: cleaned.substring(0, 300), action: cleaned, dialogue: '', reflection: '', atmosphere: 'tense' },
+      narrative: { context: cleaned.substring(0, 300), action: cleaned, dialogue: '', reflection: '', blocks: [{ type: 'action', text: cleaned.substring(0, 1200), order: 0 }], atmosphere: 'tense' },
       choices: [],
       scene_description: 'Epic Star Wars cinematic scene with dramatic lighting',
       user_edits_applied: null
@@ -1251,17 +1252,81 @@ function resolveFormatNarrative(story) {
     return String(value);
   };
 
+  const normalizeNarrativeBlockType = (rawType) => {
+    const type = String(rawType || '').trim().toLowerCase();
+    if (['context', 'action', 'dialogue', 'reflection'].includes(type)) return type;
+    if (type === 'narration' || type === 'narrative') return 'action';
+    return type || 'action';
+  };
+
+  const renderNarrativeBlockText = (block, type) => {
+    if (block === null || block === undefined) return '';
+    if (typeof block === 'string' || typeof block === 'number' || typeof block === 'boolean') return String(block).trim();
+
+    if (Array.isArray(block)) {
+      return block.map(item => renderNarrativeBlockText(item, type)).filter(Boolean).join('\n');
+    }
+
+    if (typeof block === 'object') {
+      const speaker = extractNarrativeText(block.speaker || block.name || block.character || block.who || '');
+      const text = extractNarrativeText(block.text || block.content || block.value || block.line || block.dialogue || block.action || block.context || block.reflection || '');
+      if ((type === 'dialogue' || speaker) && (speaker || text)) {
+        return speaker ? `${speaker}: ${text}` : text;
+      }
+      return text || extractNarrativeText(block);
+    }
+
+    return String(block).trim();
+  };
+
+  const normalizeNarrativeBlocks = (narrative) => {
+    const rawBlocks = Array.isArray(narrative?.blocks) ? narrative.blocks : [];
+    if (rawBlocks.length) {
+      return rawBlocks
+        .map((block, index) => ({
+          type: normalizeNarrativeBlockType(block?.type || block?.kind || block?.section_type || block?.section || block?.role),
+          text: renderNarrativeBlockText(block, normalizeNarrativeBlockType(block?.type || block?.kind || block?.section_type || block?.section || block?.role)),
+          speaker: extractNarrativeText(block?.speaker || block?.name || block?.character || block?.who || ''),
+          order: Number.isFinite(Number(block?.order)) ? Number(block.order) : index
+        }))
+        .filter(block => block.text)
+        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    }
+
+    const fallbackBlocks = [];
+    const sectionOrder = [
+      ['context', narrative?.context],
+      ['dialogue', narrative?.dialogue],
+      ['action', narrative?.action],
+      ['reflection', narrative?.reflection]
+    ];
+    sectionOrder.forEach(([type, value], index) => {
+      const text = renderNarrativeBlockText(value, type).trim();
+      if (text) fallbackBlocks.push({ type, text, order: index });
+    });
+    return fallbackBlocks;
+  };
+
   const narrative = story?.narrative || {};
-  const sections = [
-    { key: 'context', label: t('context', state.uiLang) || 'Contexte', value: narrative.context },
-    { key: 'action', label: t('action', state.uiLang) || 'Action', value: narrative.action },
-    { key: 'dialogue', label: t('dialogue', state.uiLang) || 'Dialogue', value: narrative.dialogue },
-    { key: 'reflection', label: t('reflection', state.uiLang) || 'Réflexion', value: narrative.reflection }
-  ];
+  const narrativeBlocks = normalizeNarrativeBlocks(narrative);
+  const sections = narrativeBlocks.length
+    ? narrativeBlocks.map(block => ({
+        key: block.type,
+        label: t(block.type, state.uiLang) || block.type.charAt(0).toUpperCase() + block.type.slice(1),
+        value: block
+      }))
+    : [
+        { key: 'context', label: t('context', state.uiLang) || 'Contexte', value: narrative.context },
+        { key: 'action', label: t('action', state.uiLang) || 'Action', value: narrative.action },
+        { key: 'dialogue', label: t('dialogue', state.uiLang) || 'Dialogue', value: narrative.dialogue },
+        { key: 'reflection', label: t('reflection', state.uiLang) || 'Réflexion', value: narrative.reflection }
+      ];
 
   const htmlSections = sections
     .map(section => {
-      const text = stringifyNarrativeValue(section.value, section.key).trim();
+      const text = section.value?.text !== undefined
+        ? String(section.value.text || '').trim()
+        : stringifyNarrativeValue(section.value, section.key).trim();
       if (!text) return '';
       const lines = text.split(/\n+/).map(line => line.trim()).filter(Boolean);
       if (!lines.length) return '';

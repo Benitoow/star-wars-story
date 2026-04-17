@@ -27,6 +27,9 @@ RÈGLES STRICTES (NON-NÉGOCIABLES):
     "action": "OPTIONNEL — Événements en cours avec descriptions sensorielles",
     "dialogue": "OPTIONNEL — string, objet, ou tableau de répliques",
     "reflection": "OPTIONNEL — monologue intérieur",
+    "blocks": [
+      { "type": "dialogue|action|reflection|context", "text": "Texte du bloc", "speaker": "Nom optionnel" }
+    ],
     "atmosphere": "OPTIONNEL — lumineux|sombre|tense|mystique|apocalyptique|nostalgique"
   },
   "choices": [
@@ -90,10 +93,11 @@ RÈGLES STRICTES (NON-NÉGOCIABLES):
 11. Aucun markdown (**gras**, *italique*, listes) dans les champs narratifs — uniquement du texte pur.
 12. Le champ "context" ne doit contenir AUCUN dialogue direct: toute réplique, citation ou prise de parole doit aller dans "dialogue".
 13. Les personnages secondaires doivent avoir des noms distincts, cohérents avec l'univers, et ne jamais réutiliser un nom passe-partout pour plusieurs PNJ.
-14. Quand le joueur envoie une "version des événements", traite-la comme un VRAI choix qui fait avancer immédiatement l'histoire.
-15. Si une action est disproportionnée (ex. tuer 50 soldats alors que le profil ne le permet pas), ne refuse pas : produis une tentative réaliste avec succès partiel, échec crédible et conséquences concrètes.
-16. Les relations, communautés, acolytes, mentors, maîtres, amis et amants doivent pouvoir évoluer en niveau et en intensité au fil du récit.
-17. Si un nouveau groupe, cercle, escouade, clan ou communauté émerge, ajoute une mise à jour relationnelle structurée dans "relationship_updates".`;
+14. La structure narrative peut contenir plusieurs blocs dans un seul chapitre. Quand c'est pertinent, préfère une séquence comme dialogue > action > dialogue > réflexion > action plutôt qu'un seul bloc massif.
+15. Quand le joueur envoie une "version des événements", traite-la comme un VRAI choix qui fait avancer immédiatement l'histoire.
+16. Si une action est disproportionnée (ex. tuer 50 soldats alors que le profil ne le permet pas), ne refuse pas : produis une tentative réaliste avec succès partiel, échec crédible et conséquences concrètes.
+17. Les relations, communautés, acolytes, mentors, maîtres, amis et amants doivent pouvoir évoluer en niveau et en intensité au fil du récit.
+18. Si un nouveau groupe, cercle, escouade, clan ou communauté émerge, ajoute une mise à jour relationnelle structurée dans "relationship_updates".`;
 
 const DEFAULT_LANGUAGE_ID = 'fr';
 
@@ -194,6 +198,58 @@ function sanitizeNpcName(rawName, fallback = 'Personnage secondaire') {
   if (!name) return fallback;
   if (/^kael$/i.test(name)) return fallback;
   return name;
+}
+
+function normalizeNarrativeBlockType(rawType) {
+  const type = String(rawType || '').trim().toLowerCase();
+  if (['context', 'action', 'dialogue', 'reflection'].includes(type)) return type;
+  if (type === 'narration' || type === 'narrative') return 'action';
+  return type || 'action';
+}
+
+function normalizeNarrativeBlock(block, index = 0) {
+  if (!block) return null;
+
+  if (typeof block === 'string') {
+    const text = extractNarrativeText(block).trim();
+    return text ? { type: 'action', text, order: index } : null;
+  }
+
+  const type = normalizeNarrativeBlockType(block.type || block.kind || block.section_type || block.section || block.role);
+  const speaker = sanitizeNpcName(block.speaker || block.name || block.character || block.who || '');
+  const text = extractNarrativeText(
+    block.text || block.content || block.value || block.line || block.dialogue || block.action || block.context || block.reflection || ''
+  ).trim();
+
+  if (!text && !speaker) return null;
+
+  return {
+    type,
+    speaker: speaker || '',
+    text,
+    order: Number.isFinite(Number(block.order)) ? Number(block.order) : index
+  };
+}
+
+function normalizeNarrativeBlocks(narrative) {
+  const sourceBlocks = Array.isArray(narrative?.blocks)
+    ? narrative.blocks
+    : (Array.isArray(narrative) ? narrative : []);
+
+  if (sourceBlocks.length) {
+    return sourceBlocks
+      .map((block, index) => normalizeNarrativeBlock(block, index))
+      .filter(Boolean)
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  }
+
+  const normalized = normalizeNarrativeSections(narrative);
+  const blocks = [];
+  if (normalized.context) blocks.push({ type: 'context', text: normalized.context, order: 0 });
+  if (normalized.dialogue) blocks.push({ type: 'dialogue', text: normalized.dialogue, order: 1 });
+  if (normalized.action) blocks.push({ type: 'action', text: normalized.action, order: 2 });
+  if (normalized.reflection) blocks.push({ type: 'reflection', text: normalized.reflection, order: 3 });
+  return blocks;
 }
 
 /* ─── Build enhanced system prompt ────────────── */
@@ -470,6 +526,7 @@ function coerceStorySchema(parsed, languageId = DEFAULT_LANGUAGE_ID) {
       action: narrativeText,
       dialogue: splitNarrativeText.dialogue || '',
       reflection: '',
+      blocks: normalizeNarrativeBlocks(parsed.narrative || prologue),
       atmosphere: parsed.atmosphere || prologue.atmosphere || 'tense'
     },
     choices,
@@ -522,7 +579,10 @@ function validateStoryPayload(payload) {
   return {
     payload: {
       ...payload,
-      narrative: normalizedNarrative,
+      narrative: {
+        ...normalizedNarrative,
+        blocks: normalizeNarrativeBlocks(payload.narrative)
+      },
       choices: uniqueChoices.slice(0, 4),
       relationship_updates: Array.isArray(payload.relationship_updates) ? payload.relationship_updates.slice(0, 12) : [],
       reputation_updates: Array.isArray(payload.reputation_updates) ? payload.reputation_updates.slice(0, 12) : [],

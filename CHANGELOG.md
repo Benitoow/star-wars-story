@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.1.0 — 2026-04-17
+
+Cloudflare-only release cleanup and legacy archival pass.
+
+### ✨ Highlights
+- Archived the classic vanilla JS prototype in `archives/legacy-js/`.
+- Clarified that the playable version lives on the Cloudflare-hosted site, not GitHub Pages.
+- Removed the GitHub Pages deployment workflow from the active path.
+
+### 🧹 Technical Cleanup
+- Reframed the repository as the source/reference tree for the modernized app.
+- Updated public documentation to match the real play endpoint.
+- Kept release notes aligned with the current deployment model.
+
 ## v1.0.0 — 2026-04-17
 
 First official release of **Star Wars Story**.

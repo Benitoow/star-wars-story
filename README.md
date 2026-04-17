@@ -1,15 +1,16 @@
-# Star Wars Story — v1.0.0
+# Star Wars Story — v1.1.0
 
-An open-source, static web app for creating interactive Star Wars stories. The public repository is ready for GitHub Pages and can be tested here:
+An open-source Star Wars story project whose playable deployment lives on the project's Cloudflare-hosted site. This repository now focuses on source, release notes, and archived legacy material.
 
-- **Live demo:** https://star-wars-story.pages.dev/
+- **Play the game:** the Cloudflare-hosted site used for the project
 - **Release notes:** [`CHANGELOG.md`](./CHANGELOG.md)
+- **Legacy archive:** [`archives/legacy-js/`](./archives/legacy-js/)
 
 ## English
 
 ### Status
 
-- ✅ **Official release:** v1.0.0
+- ✅ **Official release:** v1.1.0
 - 🗓️ **Release date:** 2026-04-17
 - 🌍 **Open source:** the repository is public, so the project is fully open for inspection and contribution.
 
@@ -31,23 +32,27 @@ An open-source, static web app for creating interactive Star Wars stories. The p
 - Era, faction, role, and premise selection via the SVG assets in `svg/`.
 - AI-powered story generation.
 
-### GitHub Pages deployment
+### Hosting
 
-This repository is designed to be deployed as-is as a static site.
+The playable version is no longer served from GitHub Pages.
 
-- GitHub Actions publishes the repository content to Pages.
+- The active build is hosted on the project's Cloudflare site.
 - API secrets stay in the browser and are not committed.
 - User data is stored locally in the browser.
 
+The classic vanilla JS prototype has been archived under `archives/legacy-js/` for reference.
+
 ### Development
 
-Open `index.html` in a modern browser to test the static version locally.
+Use the Cloudflare-hosted deployment to play the game.
+
+The repository source remains useful for inspection and maintenance, but it is not the public play endpoint.
 
 ## Français
 
 ### Statut
 
-- ✅ **Version officielle :** v1.0.0
+- ✅ **Version officielle :** v1.1.0
 - 🗓️ **Date de release :** 2026-04-17
 - 🌍 **Open source :** le dépôt est public, donc le projet est librement consultable et partageable.
 
@@ -69,15 +74,19 @@ Open `index.html` in a modern browser to test the static version locally.
 - Sélection des eras, factions, rôles et prémisses via les SVG du dossier `svg/`.
 - Démarrage d’histoire avec génération IA.
 
-### Déploiement GitHub Pages
+### Hébergement
 
-Le dépôt est conçu pour être publié tel quel comme site statique.
+La version jouable n’est plus servie via GitHub Pages.
 
-- Le workflow GitHub Actions publie le contenu du dépôt sur Pages.
+- La version active est hébergée sur le site Cloudflare du projet.
 - Les secrets API restent côté navigateur et ne sont pas commis.
 - Les données utilisateur sont stockées localement dans le navigateur.
 
+Le prototype JavaScript classique a été archivé dans `archives/legacy-js/` pour référence.
+
 ### Développement
 
-Ouvrir `index.html` dans un navigateur moderne pour tester la version statique en local.
+Utiliser le déploiement Cloudflare pour jouer au projet.
+
+Le dépôt reste utile pour la consultation et la maintenance, mais il n’est plus le point d’entrée public pour jouer.
 
