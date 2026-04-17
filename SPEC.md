@@ -156,6 +156,13 @@ db.version(1).stores({
 });
 ```
 
+### 3.3 Persistence Contract (V1.1)
+- Canonical data schema version: `2`
+- Story, folder, preferences, and app state records are normalized before storage
+- Full-app backup/import uses versioned JSON envelopes with strict payload validation
+- Older backups are accepted when compatible; newer unsupported schema versions fail loudly
+- IndexedDB migration upgrades existing records to normalized shapes on open
+
 ## 4. Core Features
 
 ### 4.1 Dashboard

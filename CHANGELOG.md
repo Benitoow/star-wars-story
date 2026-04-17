@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### 🧩 Technical Stabilization
+- Added a versioned Dexie migration to normalize existing saved records on open.
+- Formalized the persistence contract with schema version `2`.
+- Documented the import/export and backup contract in `SPEC.md`.
+- Kept the shared data layer aligned with the V1.1 refactor.
+
 ## v1.1.0 — 2026-04-17
 
 Cloudflare-only release cleanup and legacy archival pass.

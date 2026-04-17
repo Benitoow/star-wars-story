@@ -144,6 +144,46 @@ export class StarWarsDB extends Dexie {
       preferences: 'id',
       appState: 'id'
     });
+
+    this.version(2).stores({
+      stories: 'id, title, folderId, *tags, createdAt=[metadata.createdAt], updatedAt=[metadata.updatedAt], isArchived, isDeleted',
+      folders: 'id, parentId, name',
+      storyVersions: 'id, storyId, savedAt, version',
+      preferences: 'id',
+      appState: 'id'
+    }).upgrade(async tx => {
+      const normalizedStories = (await tx.table('stories').toArray()).map(story => normalizeStoryForStorage(story));
+      const normalizedFolders = (await tx.table('folders').toArray()).map(folder => normalizeFolderForStorage(folder));
+      const normalizedVersions = (await tx.table('storyVersions').toArray()).map(version => ({
+        ...version,
+        savedAt: version.savedAt instanceof Date ? version.savedAt : new Date(version.savedAt)
+      }));
+
+      if (normalizedStories.length) {
+        await tx.table('stories').clear();
+        await tx.table('stories').bulkPut(normalizedStories);
+      }
+
+      if (normalizedFolders.length) {
+        await tx.table('folders').clear();
+        await tx.table('folders').bulkPut(normalizedFolders);
+      }
+
+      if (normalizedVersions.length) {
+        await tx.table('storyVersions').clear();
+        await tx.table('storyVersions').bulkPut(normalizedVersions);
+      }
+
+      const prefs = await tx.table('preferences').get('preferences');
+      if (prefs) {
+        await tx.table('preferences').put(normalizePreferencesForStorage(prefs));
+      }
+
+      const appState = await tx.table('appState').get('appState');
+      if (appState) {
+        await tx.table('appState').put(normalizeAppStateForStorage(appState));
+      }
+    });
   }
 }
 
