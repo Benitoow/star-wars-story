@@ -1,6 +1,6 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { toggleSidebar, searchOpen, searchQuery, uiLanguage, viewMode } from '$lib/stores/ui';
+  import { sidebarOpen, toggleSidebar, searchOpen, searchQuery, uiLanguage, viewMode } from '$lib/stores/ui';
   import { UI_LANGUAGE_OPTIONS, type UiLanguageCode } from '$lib/config/languages';
 
   function handleNewStory() {
@@ -15,12 +15,18 @@
 
 <header class="header">
   <div class="header-left">
-    <button class="menu-toggle hide-desktop" on:click={toggleSidebar}>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <line x1="3" y1="6" x2="21" y2="6"/>
-        <line x1="3" y1="12" x2="21" y2="12"/>
-        <line x1="3" y1="18" x2="21" y2="18"/>
-      </svg>
+    <button
+      class="menu-toggle"
+      class:active={$sidebarOpen}
+      type="button"
+      on:click={toggleSidebar}
+      aria-label={$sidebarOpen ? 'Fermer le menu latéral' : 'Ouvrir le menu latéral'}
+      aria-expanded={$sidebarOpen}
+      aria-controls="app-sidebar"
+    >
+      <span class="menu-toggle-box" aria-hidden="true">
+        <span class="menu-toggle-inner"></span>
+      </span>
     </button>
 
     <div class="search-bar" class:open={$searchOpen}>
@@ -126,21 +132,92 @@
     height: 40px;
     padding: 0;
     background: none;
-    border: none;
+    border: 1px solid transparent;
     color: var(--color-text-secondary);
     cursor: pointer;
     border-radius: var(--radius-md);
     transition: all var(--transition-fast);
+    position: relative;
+    overflow: hidden;
   }
 
   .menu-toggle:hover {
     background: var(--color-bg-hover);
     color: var(--color-gold);
+    border-color: var(--color-border-hover);
   }
 
-  .menu-toggle svg {
+  .menu-toggle:focus-visible {
+    outline: 2px solid var(--color-gold);
+    outline-offset: 2px;
+  }
+
+  .menu-toggle.active {
+    color: var(--color-gold);
+    border-color: var(--color-border-hover);
+    background: rgba(255, 232, 31, 0.08);
+  }
+
+  .menu-toggle-box {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     width: 24px;
     height: 24px;
+    pointer-events: none;
+  }
+
+  .menu-toggle-inner,
+  .menu-toggle-inner::before,
+  .menu-toggle-inner::after {
+    position: absolute;
+    width: 18px;
+    height: 2px;
+    border-radius: 99px;
+    background: currentColor;
+    transition:
+      transform var(--transition-normal),
+      opacity var(--transition-fast),
+      width var(--transition-fast),
+      box-shadow var(--transition-normal),
+      background-color var(--transition-fast);
+  }
+
+  .menu-toggle-inner {
+    top: 11px;
+    left: 3px;
+    box-shadow: 0 0 8px rgba(255, 232, 31, 0.2);
+  }
+
+  .menu-toggle-inner::before,
+  .menu-toggle-inner::after {
+    content: '';
+    left: 0;
+  }
+
+  .menu-toggle-inner::before {
+    top: -6px;
+  }
+
+  .menu-toggle-inner::after {
+    top: 6px;
+  }
+
+  .menu-toggle.active .menu-toggle-inner {
+    width: 0;
+    left: 12px;
+    box-shadow: 0 0 16px rgba(255, 232, 31, 0.45);
+  }
+
+  .menu-toggle.active .menu-toggle-inner::before {
+    width: 18px;
+    transform: translate(-9px, 6px) rotate(45deg);
+  }
+
+  .menu-toggle.active .menu-toggle-inner::after {
+    width: 18px;
+    transform: translate(-9px, -6px) rotate(-45deg);
   }
 
   .search-bar {

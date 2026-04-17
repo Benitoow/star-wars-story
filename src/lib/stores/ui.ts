@@ -87,6 +87,14 @@ export function toggleSidebar() {
   sidebarOpen.update(v => !v);
 }
 
+export function openSidebar() {
+  sidebarOpen.set(true);
+}
+
+export function closeSidebar() {
+  sidebarOpen.set(false);
+}
+
 // ─── Modals ───────────────────────────────
 interface ModalState {
   isOpen: boolean;

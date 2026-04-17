@@ -2,7 +2,7 @@
   import '../app.css';
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { theme, uiLanguage, sidebarOpen, searchOpen, toggleSidebar, toasts } from '$lib/stores/ui';
+  import { theme, uiLanguage, sidebarOpen, searchOpen, toggleSidebar } from '$lib/stores/ui';
   import { initializeDB, cleanupOldTrash } from '$lib/db';
   import Toast from '$lib/components/Toast.svelte';
   import Sidebar from '$lib/components/Sidebar.svelte';
@@ -96,7 +96,7 @@
 
   /* push content when sidebar is open on desktop */
   @media (min-width: 769px) {
-    .main-content {
+    .app.sidebar-open .main-content {
       margin-left: var(--sidebar-width);
     }
   }

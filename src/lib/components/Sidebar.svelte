@@ -1,6 +1,6 @@
 <script lang="ts">
   import { page } from '$app/stores';
-  import { sidebarOpen, toggleSidebar, uiLanguage } from '$lib/stores/ui';
+  import { sidebarOpen, toggleSidebar, closeSidebar, uiLanguage } from '$lib/stores/ui';
   import { folders } from '$lib/stores/stories';
   import { getLanguageLabel } from '$lib/config/languages';
 
@@ -14,8 +14,8 @@
 
   $: currentPath = $page.url.pathname;
 
-  function closeMobile() {
-    if (window.innerWidth < 769) toggleSidebar();
+  function handleNavClick() {
+    if (window.innerWidth < 769) closeSidebar();
   }
 
   async function loadFolders() {
@@ -25,7 +25,7 @@
   loadFolders();
 </script>
 
-<aside class="sidebar" class:open={$sidebarOpen}>
+<aside id="app-sidebar" class="sidebar" class:open={$sidebarOpen}>
   <div class="sidebar-header">
     <a href="/" class="logo">
       <svg class="logo-icon" viewBox="0 0 24 24" fill="currentColor">
@@ -33,7 +33,7 @@
       </svg>
       <span class="logo-text">Star Wars</span>
     </a>
-    <button class="sidebar-close hide-desktop" on:click={toggleSidebar}>
+    <button class="sidebar-close" type="button" aria-label="Fermer le menu latéral" on:click={closeSidebar}>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <line x1="18" y1="6" x2="6" y2="18"/>
         <line x1="6" y1="6" x2="18" y2="18"/>
@@ -47,7 +47,7 @@
         href={item.href}
         class="nav-item"
         class:active={currentPath === item.href || (item.href !== '/' && currentPath.startsWith(item.href))}
-        on:click={closeMobile}
+        on:click={handleNavClick}
       >
         <span class="nav-icon">
           {#if item.icon === 'home'}
@@ -117,7 +117,7 @@
 
 <!-- Mobile overlay -->
 {#if $sidebarOpen}
-  <div class="sidebar-overlay hide-desktop" on:click={toggleSidebar}></div>
+  <button class="sidebar-overlay hide-desktop" type="button" aria-label="Fermer le menu latéral" on:click={closeSidebar}></button>
 {/if}
 
 <style>
@@ -134,22 +134,20 @@
     z-index: 100;
     transform: translateX(-100%);
     transition: transform var(--transition-normal);
+    will-change: transform;
   }
 
   .sidebar.open {
     transform: translateX(0);
   }
 
-  @media (min-width: 769px) {
-    .sidebar {
-      transform: translateX(0);
-    }
-  }
-
   .sidebar-overlay {
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.5);
+    border: none;
+    cursor: pointer;
+    padding: 0;
     z-index: 99;
   }
 
@@ -190,6 +188,13 @@
     border: none;
     color: var(--color-text-secondary);
     cursor: pointer;
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+  }
+
+  .sidebar-close:hover {
+    color: var(--color-gold);
+    background: var(--color-bg-hover);
   }
 
   .sidebar-close svg {
