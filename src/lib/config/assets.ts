@@ -458,7 +458,8 @@ export const ERAS = [
     id: 'old_republic',
     name: 'Ancienne République',
     years: '25 000 - 1000 AVBY',
-    description: 'Les Guerres Mandaloriennes et les conflits Jedi-Sith'
+    description: 'Les Guerres Mandaloriennes et les conflits Jedi-Sith',
+    icon: 'AncientRepublic.svg'
   },
   {
     id: 'clone_wars',
@@ -483,7 +484,8 @@ export const ERAS = [
     id: 'first_order',
     name: 'Premier Ordre',
     years: '28 - 35 APBY',
-    description: 'Le successor de l Empire et la Résistance'
+    description: 'Le successor de l Empire et la Résistance',
+    icon: 'Emblem_of_the_First_Order.svg'
   }
 ];
 

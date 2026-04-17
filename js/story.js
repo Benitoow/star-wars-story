@@ -88,10 +88,12 @@ RÈGLES STRICTES (NON-NÉGOCIABLES):
 9. Les dialogues doivent avoir du caractère - chaque personnage a sa propre façon de parler. Le champ "dialogue" peut être une string OU un tableau d'objets [{"speaker": "Nom", "text": "Réplique"}] selon la scène.
 10. N'utilise JAMAIS d'identifiants techniques dans le texte narratif (pas de *lightsaber_basic*, *force_guidance*, {placeholder}, snake_case_ids, etc.). Écris TOUJOURS en langage naturel ("son entraînement au sabre laser", "la guidance de la Force", etc.).
 11. Aucun markdown (**gras**, *italique*, listes) dans les champs narratifs — uniquement du texte pur.
-12. Quand le joueur envoie une "version des événements", traite-la comme un VRAI choix qui fait avancer immédiatement l'histoire.
-13. Si une action est disproportionnée (ex. tuer 50 soldats alors que le profil ne le permet pas), ne refuse pas : produis une tentative réaliste avec succès partiel, échec crédible et conséquences concrètes.
-14. Les relations, communautés, acolytes, mentors, maîtres, amis et amants doivent pouvoir évoluer en niveau et en intensité au fil du récit.
-15. Si un nouveau groupe, cercle, escouade, clan ou communauté émerge, ajoute une mise à jour relationnelle structurée dans "relationship_updates".`;
+12. Le champ "context" ne doit contenir AUCUN dialogue direct: toute réplique, citation ou prise de parole doit aller dans "dialogue".
+13. Les personnages secondaires doivent avoir des noms distincts, cohérents avec l'univers, et ne jamais réutiliser un nom passe-partout pour plusieurs PNJ.
+14. Quand le joueur envoie une "version des événements", traite-la comme un VRAI choix qui fait avancer immédiatement l'histoire.
+15. Si une action est disproportionnée (ex. tuer 50 soldats alors que le profil ne le permet pas), ne refuse pas : produis une tentative réaliste avec succès partiel, échec crédible et conséquences concrètes.
+16. Les relations, communautés, acolytes, mentors, maîtres, amis et amants doivent pouvoir évoluer en niveau et en intensité au fil du récit.
+17. Si un nouveau groupe, cercle, escouade, clan ou communauté émerge, ajoute une mise à jour relationnelle structurée dans "relationship_updates".`;
 
 const DEFAULT_LANGUAGE_ID = 'fr';
 
@@ -113,6 +115,85 @@ function getRoleConfig(roleId) {
 /* ─── Faction configuration helper ───────────── */
 function getFactionConfig(factionId) {
   return FACTIONS.find(f => f.id === factionId) || null;
+}
+
+function extractNarrativeText(value) {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
+
+  if (Array.isArray(value)) {
+    return value.map(extractNarrativeText).filter(Boolean).join('\n');
+  }
+
+  if (typeof value === 'object') {
+    const preferredKeys = ['text', 'line', 'dialogue', 'say', 'content', 'message', 'utterance', 'quote', 'speaker', 'name', 'character', 'who'];
+    for (const key of preferredKeys) {
+      if (value[key] !== undefined && value[key] !== null && value[key] !== '') {
+        const extracted = extractNarrativeText(value[key]);
+        if (extracted) return extracted;
+      }
+    }
+
+    return Object.values(value).map(extractNarrativeText).filter(Boolean).join(' ');
+  }
+
+  return String(value);
+}
+
+function splitMixedNarrativeText(text) {
+  const source = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!source) return { text: '', dialogue: '' };
+
+  const dialogueParts = [];
+  let stripped = source;
+
+  const patterns = [
+    /(^|[\s(])["«“](.{10,220}?)["»”](?=$|[\s).,!?:;])/g,
+    /(^|[\s(])'([^'\n]{10,220})'(?=$|[\s).,!?:;])/g
+  ];
+
+  for (const pattern of patterns) {
+    stripped = stripped.replace(pattern, (match, prefix, content) => {
+      const line = String(content || '').trim();
+      if (line && /\s/.test(line)) dialogueParts.push(line);
+      return prefix || ' ';
+    });
+  }
+
+  stripped = stripped.replace(/\s+/g, ' ').trim();
+  return {
+    text: stripped,
+    dialogue: dialogueParts.join('\n')
+  };
+}
+
+function normalizeNarrativeSections(narrative) {
+  const rawContext = extractNarrativeText(narrative?.context);
+  const rawAction = extractNarrativeText(narrative?.action);
+  const rawDialogue = extractNarrativeText(narrative?.dialogue);
+  const rawReflection = extractNarrativeText(narrative?.reflection);
+
+  const contextSplit = splitMixedNarrativeText(rawContext);
+  const actionSplit = splitMixedNarrativeText(rawAction);
+
+  const dialogue = [rawDialogue, contextSplit.dialogue, actionSplit.dialogue].filter(Boolean).join('\n').trim();
+  const context = contextSplit.text.replace(/\s+/g, ' ').trim();
+  const action = actionSplit.text.replace(/\s+/g, ' ').trim();
+
+  return {
+    context: context.slice(0, 1200),
+    action: action.slice(0, 2200),
+    dialogue: dialogue.slice(0, 1600),
+    reflection: rawReflection.slice(0, 1600),
+    atmosphere: String(narrative?.atmosphere || 'tense').slice(0, 80)
+  };
+}
+
+function sanitizeNpcName(rawName, fallback = 'Personnage secondaire') {
+  const name = extractNarrativeText(rawName).trim();
+  if (!name) return fallback;
+  if (/^kael$/i.test(name)) return fallback;
+  return name;
 }
 
 /* ─── Build enhanced system prompt ────────────── */
@@ -196,6 +277,8 @@ ${roleContext}
 
 Génère le prologue de l'histoire en ${language.promptName}. Plante le décor, introduis le personnage et crée une situation initiale captivante qui aboutit à un premier choix crucial.
 Le personnage s'appelle ${firstName}. Utilise ce prénom naturellement dans la narration et les dialogues.
+N'attribue pas de prénom générique récurrent aux personnages secondaires: crée des noms distincts, cohérents avec l'univers, ou décris-les par leur rôle si aucun nom n'est nécessaire.
+Ne mets jamais de dialogue dans le champ "context"; réserve tout échange verbal au champ "dialogue".
 Si la situation le permet, fais émerger une base, un refuge, un vaisseau, un équipage ou une petite communauté de manière crédible.
 Le personnage doit REFLETER ses attributs (particulièrement ${getRoleConfig(setup.role)?.attributes?.force > 50 ? 'sa connexion à la Force' : 'ses compétences'}) dans ses actions et réactions initiales.`;
 }
@@ -215,6 +298,8 @@ ${userEditsContext}
 Continue l'histoire en ${language.promptName} en tenant compte de ce choix. Les conséquences doivent être visibles et significatives. Maintiens la tension dramatique et propose de nouveaux choix.
 Intensité narrative: ${intensity}.
 Le choix doit faire avancer concrètement la situation. Si l'action est trop ambitieuse pour le rôle/niveau du personnage, convertis-la en résolution crédible (succès partiel, coût, blessure, fuite, dette, alerte ennemie, etc.) au lieu d'un succès impossible.
+Garde les sections narratives propres: "context" = situation/ambiance, "action" = événements, "dialogue" = paroles uniquement, "reflection" = intériorité.
+Les personnages secondaires doivent recevoir des noms variés et cohérents; ne recycle pas un même nom pour plusieurs PNJ.
 Si le joueur a précédemment modifié des passages ("Votre version"), INTÈGRE CES ÉLÉMENTS naturellement dans la continuation du récit.
 Si la scène permet la création ou l'évolution d'alliés, d'acolytes, de mentors, d'amants, d'ennemis récurrents ou d'une communauté, fais-la évoluer et reflète-la dans "relationship_updates".
 Si la scène touche une faction, une réputation, une base, un camp ou un équipage, reflète-le aussi dans "reputation_updates" et "camp_updates".
@@ -276,6 +361,8 @@ function coerceStorySchema(parsed, languageId = DEFAULT_LANGUAGE_ID) {
     narrativeText = narrCandidate[languageId] || narrCandidate.fr || narrCandidate.en || Object.values(narrCandidate)[0] || '';
   }
 
+  const splitNarrativeText = splitMixedNarrativeText(narrativeText);
+
   // Find choices — could be array, object keyed by numbers, or nested
   let choicesRaw =
     prologue.choices || parsed.choices ||
@@ -318,9 +405,9 @@ function coerceStorySchema(parsed, languageId = DEFAULT_LANGUAGE_ID) {
     .map(item => {
       if (!item) return null;
       if (typeof item === 'string') {
-        return { name: item, type: 'companion', level_delta: 0, xp_delta: 0, affinity_delta: 0, closeness_delta: 0, community_name: '', member_count: 0, members: [], notes: '' };
+        return { name: sanitizeNpcName(item), type: 'companion', level_delta: 0, xp_delta: 0, affinity_delta: 0, closeness_delta: 0, community_name: '', member_count: 0, members: [], notes: '' };
       }
-      const name = item.name || item.display_name || item.character || item.community || item.label || '';
+      const name = sanitizeNpcName(item.name || item.display_name || item.character || item.community || item.label || '');
       return name ? {
         name: String(name).slice(0, 80),
         type: item.type || item.relationship_type || item.kind || 'companion',
@@ -357,13 +444,15 @@ function coerceStorySchema(parsed, languageId = DEFAULT_LANGUAGE_ID) {
     .map(item => {
       if (!item) return null;
       if (typeof item === 'string') return { notes: item, morale_delta: 0, safety_delta: 0, resources_delta: 0, crew_additions: [], crew_removals: [] };
+      const crewAdditions = Array.isArray(item.crew_additions) ? item.crew_additions.map(member => sanitizeNpcName(member)).filter(Boolean).slice(0, 10) : [];
+      const crewRemovals = Array.isArray(item.crew_removals) ? item.crew_removals.map(member => sanitizeNpcName(member)).filter(Boolean).slice(0, 10) : [];
       return {
         base_name: String(item.base_name || item.baseName || '').slice(0, 80),
         morale_delta: Number(item.morale_delta ?? item.moraleDelta ?? 0) || 0,
         safety_delta: Number(item.safety_delta ?? item.safetyDelta ?? 0) || 0,
         resources_delta: Number(item.resources_delta ?? item.resourcesDelta ?? 0) || 0,
-        crew_additions: Array.isArray(item.crew_additions) ? item.crew_additions.slice(0, 10) : [],
-        crew_removals: Array.isArray(item.crew_removals) ? item.crew_removals.slice(0, 10) : [],
+        crew_additions: crewAdditions,
+        crew_removals: crewRemovals,
         notes: String(item.notes || item.note || '').slice(0, 180)
       };
     })
@@ -377,9 +466,9 @@ function coerceStorySchema(parsed, languageId = DEFAULT_LANGUAGE_ID) {
     chapter_number: parsed.chapter_number || 1,
     section_type: parsed.section_type || 'action',
     narrative: {
-      context: '',
+      context: splitNarrativeText.text || '',
       action: narrativeText,
-      dialogue: '',
+      dialogue: splitNarrativeText.dialogue || '',
       reflection: '',
       atmosphere: parsed.atmosphere || prologue.atmosphere || 'tense'
     },
@@ -399,21 +488,7 @@ function validateStoryPayload(payload) {
     return { payload, warnings: ['invalid_payload'] };
   }
 
-  const normalizedNarrative = payload.narrative && typeof payload.narrative === 'object'
-    ? {
-        context: String(payload.narrative.context || '').slice(0, 1200),
-        action: String(payload.narrative.action || '').slice(0, 2200),
-        dialogue: String(payload.narrative.dialogue || '').slice(0, 1600),
-        reflection: String(payload.narrative.reflection || '').slice(0, 1600),
-        atmosphere: String(payload.narrative.atmosphere || 'tense').slice(0, 80)
-      }
-    : {
-        context: '',
-        action: '',
-        dialogue: '',
-        reflection: '',
-        atmosphere: 'tense'
-      };
+  const normalizedNarrative = normalizeNarrativeSections(payload.narrative);
 
   const uniqueChoices = [];
   const seen = new Set();
@@ -605,10 +680,35 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
+/* ─── Extract readable text from nested narrative values ─── */
+function extractNarrativeText(value) {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
+
+  if (Array.isArray(value)) {
+    return value.map(extractNarrativeText).filter(Boolean).join('\n');
+  }
+
+  if (typeof value === 'object') {
+    const preferredKeys = ['text', 'line', 'dialogue', 'say', 'content', 'message', 'utterance', 'quote', 'speaker', 'name', 'character', 'who'];
+    for (const key of preferredKeys) {
+      if (value[key] !== undefined && value[key] !== null && value[key] !== '') {
+        const extracted = extractNarrativeText(value[key]);
+        if (extracted) return extracted;
+      }
+    }
+
+    return Object.values(value).map(extractNarrativeText).filter(Boolean).join(' ');
+  }
+
+  return String(value);
+}
+
 /* ─── Clean narrative text: strip internal skill IDs, fix whitespace ─── */
 function cleanNarrativeText(text) {
-  if (!text || typeof text !== 'string') return '';
-  return text
+  const normalized = extractNarrativeText(text);
+  if (!normalized) return '';
+  return normalized
     // Convert markdown emphasis to plain readable text
     .replace(/\*{1,2}([^*\n]+)\*{1,2}/g, '$1')
     // Strip *snake_case_ids* (internal skill tokens the model leaks)
@@ -628,8 +728,8 @@ function formatDialogue(dialogue) {
     return dialogue.map(entry => {
       if (!entry) return '';
       if (typeof entry === 'string') return `<p>${escapeHtml(cleanNarrativeText(entry))}</p>`;
-      const speaker = entry.speaker || entry.name || entry.character || entry.who || '';
-      const line = entry.text || entry.line || entry.dialogue || entry.say || entry.content || entry.message || entry.utterance || entry.quote || '';
+      const speaker = extractNarrativeText(entry.speaker || entry.name || entry.character || entry.who || '');
+      const line = extractNarrativeText(entry.text || entry.line || entry.dialogue || entry.say || entry.content || entry.message || entry.utterance || entry.quote || '');
       if (!line) return '';
       return speaker
         ? `<p><strong class="dialogue-speaker">${escapeHtml(speaker)} :</strong> ${escapeHtml(cleanNarrativeText(line))}</p>`
@@ -638,8 +738,8 @@ function formatDialogue(dialogue) {
   }
   // Single exchange object
   if (typeof dialogue === 'object') {
-    const speaker = dialogue.speaker || dialogue.name || dialogue.character || '';
-    const line = dialogue.text || dialogue.line || dialogue.dialogue || dialogue.say || dialogue.content || dialogue.message || dialogue.utterance || dialogue.quote || '';
+    const speaker = extractNarrativeText(dialogue.speaker || dialogue.name || dialogue.character || dialogue.who || '');
+    const line = extractNarrativeText(dialogue.text || dialogue.line || dialogue.dialogue || dialogue.say || dialogue.content || dialogue.message || dialogue.utterance || dialogue.quote || '');
     if (!line && !speaker) return '';
     return speaker
       ? `<p><strong class="dialogue-speaker">${escapeHtml(speaker)} :</strong> ${escapeHtml(cleanNarrativeText(line))}</p>`

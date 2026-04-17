@@ -57,6 +57,38 @@ const CONTENT_INTENSITY_OPTIONS = [
   { id: 'adult', name: 'Adulte', sub: 'Mature et sans édulcoration', color: 'var(--red)' },
   { id: 'raw', name: 'Brut', sub: 'Très frontal et sans concession', color: 'var(--gold)' }
 ];
+const DASHBOARD_LOCALES = {
+  fr: 'fr-FR',
+  en: 'en-US',
+  es: 'es-ES',
+  de: 'de-DE',
+  it: 'it-IT',
+  pt: 'pt-PT',
+  ja: 'ja-JP',
+  zh: 'zh-CN'
+};
+const DASHBOARD_COPY = {
+  fr: {
+    emptyTitle: 'Aucune histoire pour l’instant',
+    emptyText: 'Créez votre première histoire et elle apparaîtra ici.',
+    statusActive: 'En cours',
+    statusDraft: 'Brouillon',
+    prologue: 'Prologue',
+    noPremise: 'Aucune prémisse enregistrée.',
+    open: 'Ouvrir',
+    delete: 'Supprimer'
+  },
+  en: {
+    emptyTitle: 'No stories yet',
+    emptyText: 'Create your first story and it will appear here.',
+    statusActive: 'Active',
+    statusDraft: 'Draft',
+    prologue: 'Prologue',
+    noPremise: 'No premise saved.',
+    open: 'Open',
+    delete: 'Delete'
+  }
+};
 const choiceSvgCache = new Map();
 
 function getCharacterDisplayName(setup = state.setup) {
@@ -67,6 +99,14 @@ function getCharacterDisplayName(setup = state.setup) {
 
 function getIntensityConfig(intensityId) {
   return CONTENT_INTENSITY_OPTIONS.find(option => option.id === intensityId) || CONTENT_INTENSITY_OPTIONS[0];
+}
+
+function getDashboardCopy(lang = 'fr') {
+  return DASHBOARD_COPY[lang] || DASHBOARD_COPY.en;
+}
+
+function getDashboardLocale(lang = 'fr') {
+  return DASHBOARD_LOCALES[lang] || 'en-US';
 }
 
 function clamp(value, min, max) {
@@ -625,7 +665,10 @@ function applyCampUpdates(storyId, setup, updates = [], source = 'story') {
 
 function buildCampEventFromStory(story) {
   const narrative = story?.narrative || {};
-  const combinedText = [narrative.context, narrative.action, narrative.dialogue, narrative.reflection].filter(Boolean).join(' ');
+  const combinedText = [narrative.context, narrative.action, narrative.dialogue, narrative.reflection]
+    .map(value => stringifyNarrativeValue(value, 'dialogue'))
+    .filter(Boolean)
+    .join(' ');
   return inferCampSignalsFromText(combinedText);
 }
 
@@ -1005,7 +1048,7 @@ function appendStoryMemoryTurn(storyId, turnNumber, story, userMessage) {
   const previous = loadStoryMemory(storyId);
   const narrative = story?.narrative || {};
   const choiceLines = (story.choices || []).slice(0, 4).map((c, idx) => `  ${idx + 1}. ${c?.text || ''}`).join('\n');
-  const block = `\n### Tour ${turnNumber} — ${story.chapter_title || 'Chapitre'}\n- Instruction joueur: ${String(userMessage || '').slice(0, 320)}\n- Action: ${String(narrative.action || '').slice(0, 900)}\n${narrative.context ? `- Contexte: ${String(narrative.context).slice(0, 400)}\n` : ''}${narrative.dialogue ? `- Dialogue: ${typeof narrative.dialogue === 'string' ? narrative.dialogue.slice(0, 400) : JSON.stringify(narrative.dialogue).slice(0, 400)}\n` : ''}${narrative.reflection ? `- Réflexion: ${String(narrative.reflection).slice(0, 400)}\n` : ''}${choiceLines ? `- Choix proposés:\n${choiceLines}\n` : ''}`;
+  const block = `\n### Tour ${turnNumber} — ${story.chapter_title || 'Chapitre'}\n- Instruction joueur: ${String(userMessage || '').slice(0, 320)}\n- Action: ${String(narrative.action || '').slice(0, 900)}\n${narrative.context ? `- Contexte: ${String(narrative.context).slice(0, 400)}\n` : ''}${narrative.dialogue ? `- Dialogue: ${stringifyNarrativeValue(narrative.dialogue, 'dialogue').slice(0, 400)}\n` : ''}${narrative.reflection ? `- Réflexion: ${String(narrative.reflection).slice(0, 400)}\n` : ''}${choiceLines ? `- Choix proposés:\n${choiceLines}\n` : ''}`;
   const merged = `${previous}${block}`;
   saveStoryMemory(storyId, merged);
   maybeCompressStoryMemory(storyId, state.setup, 'narrative');
@@ -1165,6 +1208,29 @@ function resolveFormatNarrative(story) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
+  const extractNarrativeText = (value) => {
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
+
+    if (Array.isArray(value)) {
+      return value.map(extractNarrativeText).filter(Boolean).join('\n');
+    }
+
+    if (typeof value === 'object') {
+      const preferredKeys = ['text', 'line', 'dialogue', 'say', 'content', 'message', 'utterance', 'quote', 'speaker', 'name', 'character', 'who'];
+      for (const key of preferredKeys) {
+        if (value[key] !== undefined && value[key] !== null && value[key] !== '') {
+          const extracted = extractNarrativeText(value[key]);
+          if (extracted) return extracted;
+        }
+      }
+
+      return Object.values(value).map(extractNarrativeText).filter(Boolean).join(' ');
+    }
+
+    return String(value);
+  };
+
   const stringifyNarrativeValue = (value, key = '') => {
     if (value === null || value === undefined) return '';
     if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
@@ -1174,8 +1240,8 @@ function resolveFormatNarrative(story) {
     }
 
     if (typeof value === 'object') {
-      const speaker = value.speaker || value.name || value.character || value.who || '';
-      const line = value.text || value.line || value.dialogue || value.say || value.content || value.message || value.utterance || value.quote || '';
+      const speaker = extractNarrativeText(value.speaker || value.name || value.character || value.who || '');
+      const line = extractNarrativeText(value.text || value.line || value.dialogue || value.say || value.content || value.message || value.utterance || value.quote || '');
       if (key === 'dialogue' && (speaker || line)) {
         return speaker ? `${speaker}: ${line}` : String(line);
       }
@@ -1358,6 +1424,9 @@ function renderDashboard() {
   const modelLabel = document.getElementById('dashboard-model-label');
   if (!grid || !count) return;
 
+  const copy = getDashboardCopy(state.uiLang);
+  const locale = getDashboardLocale(state.uiLang);
+
   const stories = getSavedStories().sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
   count.textContent = `${stories.length}`;
   if (modelLabel) {
@@ -1368,8 +1437,8 @@ function renderDashboard() {
   if (!stories.length) {
     grid.innerHTML = `
       <div class="dashboard-empty">
-        <h3>Aucune histoire pour l’instant</h3>
-        <p>Créez votre première histoire et elle apparaîtra ici.</p>
+        <h3>${copy.emptyTitle}</h3>
+        <p>${copy.emptyText}</p>
       </div>
     `;
     return;
@@ -1383,17 +1452,17 @@ function renderDashboard() {
       <div class="dashboard-story-body">
         <div class="dashboard-story-topline">
           <h3>${story.title}</h3>
-          <span class="dashboard-story-status ${story.status}">${story.status === 'active' ? 'En cours' : 'Brouillon'}</span>
+          <span class="dashboard-story-status ${story.status}">${story.status === 'active' ? copy.statusActive : copy.statusDraft}</span>
         </div>
-        <p>${story.summary || story.setup?.premise || 'Aucune prémisse enregistrée.'}</p>
+        <p>${story.summary || story.setup?.premise || copy.noPremise}</p>
         <div class="dashboard-story-meta">
-          <span>${story.chapterTitle || 'Prologue'}</span>
-          <span>${new Date(story.updatedAt).toLocaleDateString('fr-FR')}</span>
+          <span>${story.chapterTitle || copy.prologue}</span>
+          <span>${new Date(story.updatedAt).toLocaleDateString(locale)}</span>
         </div>
       </div>
       <div class="dashboard-story-actions">
-        <button class="sw-btn secondary dashboard-open-story" data-action="open">Ouvrir</button>
-        <button class="sw-btn ghost dashboard-delete-story" data-action="delete">Supprimer</button>
+        <button class="sw-btn secondary dashboard-open-story" data-action="open">${copy.open}</button>
+        <button class="sw-btn ghost dashboard-delete-story" data-action="delete">${copy.delete}</button>
       </div>
     `;
     grid.appendChild(card);
@@ -1444,6 +1513,9 @@ function switchUILanguage(langId) {
 
   // Update language selector UI
   updateLanguageSelector();
+
+  // Refresh dashboard labels/content in the new language
+  renderDashboard();
 
   // Update document lang attribute
   document.documentElement.lang = langId;
