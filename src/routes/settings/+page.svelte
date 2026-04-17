@@ -4,20 +4,12 @@
   import { getPreferences, savePreferences, exportAllData, importAllData, emptyTrash, type UserPreferences } from '$lib/db';
   import { showToast, theme, uiLanguage } from '$lib/stores/ui';
   import { UI_LANGUAGE_OPTIONS, type UiLanguageCode } from '$lib/config/languages';
-  import Header from '$lib/components/Header.svelte';
-  import Sidebar from '$lib/components/Sidebar.svelte';
+  import PageHeader from '$lib/components/PageHeader.svelte';
 
   let preferences: UserPreferences | null = null;
   let loading = true;
   let saving = false;
   let importInput: HTMLInputElement | null = null;
-
-  const IMAGE_PROVIDERS = [
-    { id: 'openai', name: 'DALL-E (OpenAI)' },
-    { id: 'stability', name: 'Stable Diffusion (Stability AI)' },
-    { id: 'midjourney', name: 'Midjourney' },
-    { id: 'none', name: 'Aucun (mode texte uniquement)' }
-  ];
 
   onMount(async () => {
     preferences = await getPreferences();
@@ -157,29 +149,26 @@
 </svelte:head>
 
 <div class="settings-layout">
-  <Sidebar />
-  
+  <PageHeader
+    title="Paramètres"
+    showBack={true}
+    on:back={() => goto('/')}
+  >
+    <button class="btn btn-primary" on:click={handleSave} disabled={saving}>
+      {#if saving}
+        <span class="spinner"></span>
+      {:else}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+          <polyline points="17,21 17,13 7,13 7,21"/>
+          <polyline points="7,3 7,8 15,8"/>
+        </svg>
+      {/if}
+      Sauvegarder
+    </button>
+  </PageHeader>
+
   <main class="settings-main">
-    <Header 
-      title="Paramètres"
-      showBack={true}
-      on:back={() => goto('/')}
-    >
-      <div class="header-actions">
-        <button class="btn btn-primary" on:click={handleSave} disabled={saving}>
-          {#if saving}
-            <span class="spinner"></span>
-          {:else}
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
-              <polyline points="17,21 17,13 7,13 7,21"/>
-              <polyline points="7,3 7,8 15,8"/>
-            </svg>
-          {/if}
-          Sauvegarder
-        </button>
-      </div>
-    </Header>
 
     <div class="settings-content">
       {#if loading}
@@ -327,53 +316,6 @@
                 <option value={120000}>2 minutes</option>
                 <option value={300000}>5 minutes</option>
               </select>
-            </div>
-          </section>
-
-          <!-- Image Generation -->
-          <section class="settings-section">
-            <div class="section-header">
-              <div class="section-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                  <circle cx="8.5" cy="8.5" r="1.5"/>
-                  <polyline points="21,15 16,10 5,21"/>
-                </svg>
-              </div>
-              <div>
-                <h2>Génération d'images</h2>
-                <p>Configurez le fournisseur d'images par défaut</p>
-              </div>
-            </div>
-
-            <div class="setting-item">
-              <div class="setting-info">
-                <label for="image-provider">Fournisseur par défaut</label>
-                <span class="setting-description">Service utilisé pour générer les illustrations</span>
-              </div>
-              <select 
-                id="image-provider" 
-                class="select"
-                bind:value={preferences.defaultImageProvider}
-              >
-                {#each IMAGE_PROVIDERS as provider}
-                  <option value={provider.id}>{provider.name}</option>
-                {/each}
-              </select>
-            </div>
-
-            <div class="setting-item">
-              <div class="setting-info">
-                <label for="img-model">Modèle d'image</label>
-                <span class="setting-description">Modèle spécifique au fournisseur sélectionné</span>
-              </div>
-              <input 
-                type="text" 
-                id="img-model"
-                class="input"
-                placeholder="dall-e-3, sd-xl, midjourney-v6..."
-                bind:value={preferences.defaultImgModel}
-              />
             </div>
           </section>
 
@@ -567,23 +509,18 @@
   </main>
 </div>
 
+
 <style>
   .settings-layout {
     display: flex;
-    min-height: 100vh;
-    background: var(--color-bg-primary);
+    flex-direction: column;
+    flex: 1;
   }
 
   .settings-main {
     flex: 1;
     display: flex;
     flex-direction: column;
-    margin-left: var(--sidebar-width);
-  }
-
-  .header-actions .btn svg {
-    width: 18px;
-    height: 18px;
   }
 
   .spinner {
@@ -979,10 +916,6 @@
   }
 
   @media (max-width: 768px) {
-    .settings-main {
-      margin-left: 0;
-    }
-
     .setting-item {
       flex-direction: column;
       align-items: flex-start;

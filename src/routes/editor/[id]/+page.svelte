@@ -2,11 +2,11 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
-  import { story, saveStory, createStory, loadStory, currentSetup, updateSetup } from '$lib/stores/editor';
+  import { get } from 'svelte/store';
+  import { story, saveStory, createStory, loadStory, currentSetup, updateSetupField, updateContent } from '$lib/stores/editor';
   import { showToast } from '$lib/stores/ui';
-  import Header from '$lib/components/Header.svelte';
-  import Sidebar from '$lib/components/Sidebar.svelte';
   import SvgIcon from '$lib/components/SvgIcon.svelte';
+  import PageHeader from '$lib/components/PageHeader.svelte';
 
   let loading = true;
   let saving = false;
@@ -62,33 +62,31 @@
       storyId = id;
       await loadStory(id);
       step = 'edit';
-    } else {
-      story.reset();
     }
     loading = false;
   });
 
   function selectEra(eraId: string) {
-    currentSetup.era = eraId;
+    updateSetupField('era', eraId);
   }
 
   function selectFaction(factionId: string) {
-    currentSetup.faction = factionId;
-    // Filter roles by selected faction
-    currentSetup.role = '';
+    updateSetupField('faction', factionId);
+    updateSetupField('role', '');
   }
 
   function selectRole(roleId: string) {
-    currentSetup.role = roleId;
+    updateSetupField('role', roleId);
   }
 
-  function updatePremise(e: Event) {
+  function handlePremiseInput(e: Event) {
     const target = e.target as HTMLTextAreaElement;
-    currentSetup.premise = target.value;
+    updateSetupField('premise', target.value);
   }
 
   function canProceedToEdit(): boolean {
-    return !!(currentSetup.era && currentSetup.faction && currentSetup.role && currentSetup.premise);
+    const setup = get(currentSetup);
+    return !!(setup.era && setup.faction && setup.role && setup.premise);
   }
 
   function proceedToEdit() {
@@ -121,32 +119,25 @@
   }
 
   function addSection(type: 'narration' | 'dialogue' | 'action' | 'reflection') {
-    const section = {
-      id: crypto.randomUUID(),
-      type,
-      content: ''
-    };
-    story.update(s => ({
-      ...s,
-      content: s.content + `\n[${type.toUpperCase()}]\n\n[/${type.toUpperCase()}]\n`
-    }));
+    const appended = get(story).content + `\n[${type.toUpperCase()}]\n\n[/${type.toUpperCase()}]\n`;
+    updateContent(appended);
   }
 
   function getCurrentEra() {
-    return ERAS.find(e => e.id === currentSetup.era);
+    return ERAS.find(e => e.id === $currentSetup.era);
   }
 
   function getCurrentFaction() {
-    return FACTIONS.find(f => f.id === currentSetup.faction);
+    return FACTIONS.find(f => f.id === $currentSetup.faction);
   }
 
   function getCurrentRole() {
-    return ROLES.find(r => r.id === currentSetup.role);
+    return ROLES.find(r => r.id === $currentSetup.role);
   }
 
   function getFilteredRoles() {
-    if (!currentSetup.faction) return ROLES;
-    return ROLES.filter(r => r.faction === currentSetup.faction);
+    if (!$currentSetup.faction) return ROLES;
+    return ROLES.filter(r => r.faction === $currentSetup.faction);
   }
 </script>
 
@@ -155,29 +146,25 @@
 </svelte:head>
 
 <div class="editor-layout">
-  <Sidebar />
-  
   <main class="editor-main">
-    <Header 
+    <PageHeader
       title={storyId ? 'Modifier l\'histoire' : 'Nouvelle histoire'}
       showBack={true}
       on:back={() => goto('/')}
     >
-      <div class="header-actions">
-        <button class="btn btn-secondary" on:click={handleSave} disabled={saving}>
-          {#if saving}
-            <span class="spinner"></span>
-          {:else}
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
-              <polyline points="17,21 17,13 7,13 7,21"/>
-              <polyline points="7,3 7,8 15,8"/>
-            </svg>
-          {/if}
-          Sauvegarder
-        </button>
-      </div>
-    </Header>
+      <button class="btn btn-secondary" on:click={handleSave} disabled={saving}>
+        {#if saving}
+          <span class="spinner"></span>
+        {:else}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+            <polyline points="17,21 17,13 7,13 7,21"/>
+            <polyline points="7,3 7,8 15,8"/>
+          </svg>
+        {/if}
+        Sauvegarder
+      </button>
+    </PageHeader>
 
     <div class="editor-content">
       {#if loading}
@@ -202,7 +189,7 @@
               {#each ERAS as era}
                 <button
                   class="era-card"
-                  class:selected={currentSetup.era === era.id}
+                  class:selected={$currentSetup.era === era.id}
                   on:click={() => selectEra(era.id)}
                 >
                   <span class="era-icon">
@@ -225,7 +212,7 @@
               {#each FACTIONS as faction}
                 <button
                   class="faction-card"
-                  class:selected={currentSetup.faction === faction.id}
+                  class:selected={$currentSetup.faction === faction.id}
                   style="--faction-color: {faction.color}"
                   on:click={() => selectFaction(faction.id)}
                 >
@@ -244,14 +231,14 @@
               <span class="step-number">3</span>
               Choisissez votre personnage
             </h2>
-            {#if !currentSetup.faction}
+            {#if !$currentSetup.faction}
               <p class="hint">Sélectionnez d'abord une faction</p>
             {:else}
               <div class="role-grid">
                 {#each getFilteredRoles() as role}
                   <button
                     class="role-card"
-                    class:selected={currentSetup.role === role.id}
+                    class:selected={$currentSetup.role === role.id}
                     on:click={() => selectRole(role.id)}
                   >
                     <span class="role-icon">
@@ -273,8 +260,8 @@
             <textarea
               class="premise-input"
               placeholder="Ex: Vous êtes un Jedi exilé qui découvre une menace cachée au cœur de la galaxie..."
-              value={currentSetup.premise}
-              on:input={updatePremise}
+              value={$currentSetup.premise}
+              on:input={handlePremiseInput}
               rows="4"
             ></textarea>
           </section>
@@ -356,7 +343,8 @@ Utilisez les boutons ci-dessus pour ajouter des sections:
 - [DIALOGUE] pour les dialogues
 - [ACTION] pour les scènes d'action
 - [REFLECTION] pour les moments de réflexion"
-              bind:value={$story.content}
+              value={$story.content}
+              on:input={(e) => updateContent((e.currentTarget as HTMLTextAreaElement).value)}
             ></textarea>
           </div>
 
@@ -375,25 +363,14 @@ Utilisez les boutons ci-dessus pour ajouter des sections:
 <style>
   .editor-layout {
     display: flex;
-    min-height: 100vh;
-    background: var(--color-bg-primary);
+    flex-direction: column;
+    flex: 1;
   }
 
   .editor-main {
     flex: 1;
     display: flex;
     flex-direction: column;
-    margin-left: var(--sidebar-width);
-  }
-
-  .header-actions {
-    display: flex;
-    gap: var(--space-sm);
-  }
-
-  .header-actions .btn svg {
-    width: 18px;
-    height: 18px;
   }
 
   .spinner {
@@ -801,10 +778,6 @@ Utilisez les boutons ci-dessus pour ajouter des sections:
   }
 
   @media (max-width: 768px) {
-    .editor-main {
-      margin-left: 0;
-    }
-
     .era-grid,
     .faction-grid,
     .role-grid {

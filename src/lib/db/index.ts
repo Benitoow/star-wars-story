@@ -184,6 +184,15 @@ export class StarWarsDB extends Dexie {
         await tx.table('appState').put(normalizeAppStateForStorage(appState));
       }
     });
+
+    // v3: add setup.era and setup.faction indexes for dashboard filters
+    this.version(3).stores({
+      stories: 'id, title, folderId, *tags, createdAt=[metadata.createdAt], updatedAt=[metadata.updatedAt], isArchived, isDeleted, [setup.era], [setup.faction]',
+      folders: 'id, parentId, name',
+      storyVersions: 'id, storyId, savedAt, version',
+      preferences: 'id',
+      appState: 'id'
+    });
   }
 }
 

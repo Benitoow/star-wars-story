@@ -3,8 +3,7 @@
   import { goto } from '$app/navigation';
   import { getAllStories, deleteStory, restoreStory, emptyTrash } from '$lib/db';
   import { showToast } from '$lib/stores/ui';
-  import Header from '$lib/components/Header.svelte';
-  import Sidebar from '$lib/components/Sidebar.svelte';
+  import PageHeader from '$lib/components/PageHeader.svelte';
   import type { Story } from '$lib/db';
 
   let trashedStories: Story[] = [];
@@ -18,7 +17,8 @@
 
   async function loadTrash() {
     loading = true;
-    trashedStories = await getAllStories({ includeDeleted: true });
+    const all = await getAllStories({ includeDeleted: true, includeArchived: true });
+    trashedStories = all.filter(s => s.isDeleted);
     loading = false;
   }
 
@@ -125,14 +125,12 @@
 </svelte:head>
 
 <div class="trash-layout">
-  <Sidebar />
-  
+  <PageHeader
+    title="Corbeille"
+    showBack={true}
+    on:back={() => goto('/')}
+  />
   <main class="trash-main">
-    <Header 
-      title="Corbeille"
-      showBack={true}
-      on:back={() => goto('/')}
-    />
 
     <div class="trash-content">
       {#if loading}
@@ -311,15 +309,14 @@
 <style>
   .trash-layout {
     display: flex;
-    min-height: 100vh;
-    background: var(--color-bg-primary);
+    flex-direction: column;
+    flex: 1;
   }
 
   .trash-main {
     flex: 1;
     display: flex;
     flex-direction: column;
-    margin-left: var(--sidebar-width);
   }
 
   .trash-content {
@@ -695,10 +692,6 @@
   }
 
   @media (max-width: 768px) {
-    .trash-main {
-      margin-left: 0;
-    }
-
     .trash-header {
       flex-direction: column;
     }

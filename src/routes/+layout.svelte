@@ -1,7 +1,8 @@
 <script lang="ts">
   import '../app.css';
   import { onMount } from 'svelte';
-  import { theme, uiLanguage, sidebarOpen, toasts } from '$lib/stores/ui';
+  import { goto } from '$app/navigation';
+  import { theme, uiLanguage, sidebarOpen, searchOpen, toggleSidebar, toasts } from '$lib/stores/ui';
   import { initializeDB } from '$lib/db';
   import Toast from '$lib/components/Toast.svelte';
   import Sidebar from '$lib/components/Sidebar.svelte';
@@ -15,7 +16,33 @@
     await uiLanguage.init();
     initialized = true;
   });
+
+  function handleKeydown(e: KeyboardEvent) {
+    const ctrl = e.ctrlKey || e.metaKey;
+    if (!ctrl) return;
+
+    switch (e.key) {
+      case 'n':
+        e.preventDefault();
+        goto('/editor/new');
+        break;
+      case 'f':
+        e.preventDefault();
+        searchOpen.set(true);
+        break;
+      case 'b':
+        e.preventDefault();
+        toggleSidebar();
+        break;
+      case ',':
+        e.preventDefault();
+        goto('/settings');
+        break;
+    }
+  }
 </script>
+
+<svelte:window on:keydown={handleKeydown} />
 
 <div class="app" class:sidebar-open={$sidebarOpen}>
   <Sidebar />

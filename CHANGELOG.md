@@ -1,75 +1,46 @@
 # Changelog
 
+## v1.2.0 — 2026-04-17
+
+### Bugfixes & cleanup (SvelteKit app)
+
+- **Added `showToast` helper** to `ui.ts` — was used in every route but never exported, breaking all notifications.
+- **Fixed editor store usage** — `currentSetup` was mutated directly (invalid on a derived store); replaced with `updateSetupField()`. `story.update()` on a derived store replaced with `updateContent()`. Textarea `bind:value` on a read-only store replaced with controlled `value` + `on:input`.
+- **Fixed trash page** — `loadTrash()` returned all stories (deleted and active); now filters to `isDeleted === true` only.
+- **Removed duplicate `<Sidebar>` and `<Header>`** from settings, editor, and trash pages — the layout already renders them, causing double sidebars and headers.
+- **Created `PageHeader.svelte`** component — per-page title bar with back button and actions slot, used by settings, editor, and trash.
+- **Removed phantom Image Generation settings** — DALL-E / Stable Diffusion / Midjourney UI options had no implementation behind them.
+- **Wired keyboard shortcuts** in layout — `Ctrl+N` (new story), `Ctrl+F` (search), `Ctrl+B` (sidebar), `Ctrl+,` (settings) now actually work.
+- **Added Dexie v3 index** for `setup.era` and `setup.faction` — dashboard filters previously triggered full table scans.
+- **Fixed `index.html`** — replaced invalid double-`<html>` document (legacy app stub prepended to full HTML) with a clean dev instructions page.
+- **Cleaned up `sw.js`** — removed dead background sync stub (`syncStories`) that only logged to console.
+- **Added build config** — `package.json`, `svelte.config.js`, `vite.config.ts`, `tsconfig.json` were missing from the repository, making the project impossible to install or build.
+
 ## v1.1.2 — 2026-04-17
 
-### 🧱 Technical reset (legacy retirement)
-- Physically moved the legacy vanilla JS runtime from repository root into `archives/legacy-js/`:
-	- `index.html`
-	- `css/style.css`
-	- `js/api.js`
-	- `js/app.js`
-	- `js/config.js`
-	- `js/story.js`
-- Added a new root `index.html` transition stub so the root no longer boots the legacy runtime.
-- Updated repository documentation to reflect a Svelte-first codebase with legacy kept as historical archive only.
-
-## Unreleased (V1.2 technical)
-
-### 🧩 Narrative Contract Hardening
-- Added strict schema controls in `js/story.js` for section type and choice attribute normalization.
-- Added bounded/normalized narrative and choice sanitization before rendering and downstream updates.
-- Added parser diagnostics state (`getLastStoryParseDiagnostics`) to trace parse/coercion/fallback modes with warnings.
-- Wired `story.js` as the global source of truth for prompt/parse/format helpers (`window.*`) so `app.js` uses the hardened pipeline.
-- Added runtime diagnostics logging in `js/app.js` when parse warnings are present.
+### Technical reset (legacy retirement)
+- Moved the legacy vanilla JS runtime from repository root into `archives/legacy-js/`.
+- Added a root `index.html` transition stub.
+- Updated documentation to reflect a Svelte-first codebase.
 
 ## v1.1.1 — 2026-04-17
 
-### 🐛 Hotfix
-- Fixed the runtime error where `stringifyNarrativeValue` was not available in the camp summary path.
-- Exposed the narrative stringifier at module scope so legacy story rendering can safely reuse it.
-- Kept the V1.1 release metadata aligned with the fix.
+### Hotfix
+- Fixed `stringifyNarrativeValue` not available in the camp summary path (legacy runtime).
 
 ## v1.1.0 — 2026-04-17
 
-Cloudflare-only release cleanup and legacy archival pass.
-
-### ✨ Highlights
-- Archived the classic vanilla JS prototype in `archives/legacy-js/`.
-- Clarified that the playable version lives on the Cloudflare-hosted site, not GitHub Pages.
-- Removed the GitHub Pages deployment workflow from the active path.
-
-### 🧹 Technical Cleanup
-- Reframed the repository as the source/reference tree for the modernized app.
-- Updated public documentation to match the real play endpoint.
-- Kept release notes aligned with the current deployment model.
+### Cloudflare release cleanup
+- Archived the classic vanilla JS prototype.
+- Clarified that the playable version lives on the Cloudflare-hosted site.
+- Removed the GitHub Pages deployment workflow.
 
 ## v1.0.0 — 2026-04-17
 
-First official release of **Star Wars Story**.
+First official release of **Star Wars Story** (legacy vanilla JS runtime).
 
-### ✨ Highlights
-- New multi-step story onboarding (identity, tone intensity, setup).
+- Multi-step story onboarding (identity, tone intensity, setup).
 - Local-first dashboard to create, open, and manage stories.
-- Full session resume support from dashboard (turn, chapter, messages, and choices).
-- Richer long-term story memory with hidden progression systems.
-
-### 🎭 Story & UX Improvements
-- Better narrative rendering with clearer section structure.
-- Improved dialogue formatting and safer fallback rendering.
-- More robust continuity for relationships, faction alignment, and protagonist state.
-- Readability and layout improvements across key story screens.
-
-### 🖼️ Providers & Media
-- Improved multi-provider text/image handling.
-- Stronger fallback behavior for image generation failures.
-- Better SVG/icon reliability and rendering consistency.
-
-### 🧠 AI Reliability
-- Stronger JSON parsing and schema coercion.
-- Additional payload validation for weaker model outputs.
-- Better error handling and diagnostics for API/provider failures.
-
-### ⚙️ Platform Notes
-- Static app deployment-ready for GitHub Pages.
-- PWA metadata/version aligned for release.
-- User data remains local (`localStorage`) by design.
+- Full session resume support (turn, chapter, messages, choices).
+- Multi-provider text/image handling with fallback behavior.
+- Stronger JSON parsing and schema coercion for API responses.

@@ -161,6 +161,10 @@ function createToastStore() {
 
 export const toasts = createToastStore();
 
+export function showToast(message: string, type: Toast['type'] = 'info', duration?: number) {
+  toasts.add({ type, message, ...(duration !== undefined ? { duration } : {}) });
+}
+
 // ─── Search ────────────────────────────────
 export const searchQuery = writable('');
 export const searchOpen = writable(false);

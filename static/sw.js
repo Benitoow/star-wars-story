@@ -89,17 +89,4 @@ self.addEventListener('message', (event) => {
   }
 });
 
-// Background sync for offline story saves
-self.addEventListener('sync', (event) => {
-  if (event.tag === 'sync-stories') {
-    event.waitUntil(syncStories());
-  }
-});
-
-async function syncStories(): Promise<void> {
-  // Get pending story updates from IndexedDB
-  // This would be implemented if we have offline-first story editing
-  console.log('Syncing stories...');
-}
-
 export {};
