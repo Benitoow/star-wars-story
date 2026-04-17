@@ -1081,108 +1081,175 @@
         </div>
       {:else}
         <div class="play-shell">
+
+          <!-- ── Topbar ──────────────────────────────────── -->
           <div class="play-topbar">
-            <div class="status-badge">Tour {turnNumber || 1}</div>
-            <div class="status-badge muted">Mémoire active: {memoryLog.length}</div>
-            <button class="btn btn-ghost" on:click={goBackToSetupFromPlay} disabled={generating}>Modifier la config</button>
+            <div class="turn-indicator">
+              <span class="turn-dot"></span>
+              Tour&nbsp;<strong>{turnNumber || 1}</strong>
+            </div>
+            {#if memoryLog.length > 0}
+              <div class="mem-badge" title="Faits mémorisés par l’IA">
+                <svg viewBox="0 0 16 16" fill="currentColor" width="12" height="12"><path d="M8 1a7 7 0 100 14A7 7 0 008 1zm.75 10.5h-1.5v-5h1.5v5zm0-6.5h-1.5V3.5h1.5V5z"/></svg>
+                {memoryLog.length}
+              </div>
+            {/if}
+            <button class="topbar-link" on:click={goBackToSetupFromPlay} disabled={generating}>
+              Modifier la config
+            </button>
           </div>
 
           {#if generationError}
             <div class="error-banner">{generationError}</div>
           {/if}
 
+          <!-- ── Loading overlay ─────────────────────────── -->
           {#if generating}
-            <div class="play-loading">
-              <div class="loading-spinner"></div>
-              <p>L’IA écrit la suite de votre histoire…</p>
+            <div class="play-generating" in:fly={{ y: 6, duration: 180 }}>
+              <div class="gen-dot-row">
+                <span></span><span></span><span></span>
+              </div>
+              <p>L’IA compose la suite…</p>
             </div>
           {/if}
 
           {#if currentChapter}
-            <article class="chapter-card">
-              <header class="chapter-header">
-                <h2>{currentChapter.chapter_title}</h2>
-                <span>{currentChapter.section_type}</span>
-              </header>
+            <!-- ── Chapter card ──────────────────────────── -->
+            {#key currentChapter.chapter_number}
+              <article class="chapter-card" in:fly={{ y: 24, duration: 320, opacity: 0 }}>
 
-              <div class="narrative-grid">
-                {#if currentChapter.narrative.context}
-                  <section class="narrative-block context">
-                    <h3>Contexte</h3>
-                    {#each textToParagraphs(currentChapter.narrative.context) as paragraph}
-                      <p>{paragraph}</p>
-                    {/each}
-                  </section>
-                {/if}
+                <header class="chapter-meta">
+                  <span class="chapter-num">Chapitre {currentChapter.chapter_number || turnNumber}</span>
+                  <h2 class="chapter-title">{currentChapter.chapter_title}</h2>
+                  <span class="chapter-type">{currentChapter.section_type}</span>
+                </header>
 
-                {#if currentChapter.narrative.action}
-                  <section class="narrative-block action">
-                    <h3>Action</h3>
-                    {#each textToParagraphs(currentChapter.narrative.action) as paragraph}
-                      <p>{paragraph}</p>
-                    {/each}
-                  </section>
-                {/if}
+                <div class="story-body">
 
-                {#if currentChapter.narrative.dialogue}
-                  <section class="narrative-block dialogue">
-                    <h3>Dialogue</h3>
-                    {#each textToParagraphs(currentChapter.narrative.dialogue) as paragraph}
-                      <p>{paragraph}</p>
-                    {/each}
-                  </section>
-                {/if}
+                  {#if currentChapter.narrative.context}
+                    <div class="story-scene">
+                      <span class="scene-label">Contexte</span>
+                      <div class="scene-text scene-context">
+                        {#each textToParagraphs(currentChapter.narrative.context) as para}
+                          <p>{para}</p>
+                        {/each}
+                      </div>
+                    </div>
+                  {/if}
 
-                {#if currentChapter.narrative.reflection}
-                  <section class="narrative-block reflection">
-                    <h3>Réflexion</h3>
-                    {#each textToParagraphs(currentChapter.narrative.reflection) as paragraph}
-                      <p><em>{paragraph}</em></p>
-                    {/each}
-                  </section>
-                {/if}
+                  {#if currentChapter.narrative.action}
+                    <div class="story-scene">
+                      <span class="scene-label scene-label--action">Action</span>
+                      <div class="scene-text scene-action">
+                        {#each textToParagraphs(currentChapter.narrative.action) as para}
+                          <p>{para}</p>
+                        {/each}
+                      </div>
+                    </div>
+                  {/if}
+
+                  {#if currentChapter.narrative.dialogue}
+                    <div class="story-scene">
+                      <span class="scene-label scene-label--dialogue">Dialogue</span>
+                      <div class="scene-text scene-dialogue">
+                        {#each textToParagraphs(currentChapter.narrative.dialogue) as para}
+                          <p>{para}</p>
+                        {/each}
+                      </div>
+                    </div>
+                  {/if}
+
+                  {#if currentChapter.narrative.reflection}
+                    <div class="story-scene story-scene--reflection">
+                      <span class="scene-label scene-label--reflection">Réflexion</span>
+                      <div class="scene-text scene-reflection">
+                        {#each textToParagraphs(currentChapter.narrative.reflection) as para}
+                          <p><em>{para}</em></p>
+                        {/each}
+                      </div>
+                    </div>
+                  {/if}
+
+                </div>
+              </article>
+            {/key}
+
+            <!-- ── Choices ────────────────────────────────── -->
+            {#if currentChapter.choices.length > 0}
+              <section class="choices-section">
+                <p class="choices-heading">
+                  <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 1.414L10.586 9H7a1 1 0 100 2h3.586l-1.293 1.293a1 1 0 101.414 1.414l3-3a1 1 0 000-1.414z" clip-rule="evenodd"/></svg>
+                  Que faites-vous ?
+                </p>
+
+                <div class="choice-grid">
+                  {#each currentChapter.choices as choice, i}
+                    <button
+                      class="choice-card"
+                      on:click={() => handleChoice(choice)}
+                      disabled={generating}
+                    >
+                      <span class="choice-letter">{String.fromCharCode(65 + i)}</span>
+                      <span class="choice-body">
+                        <span class="choice-text">{choice.text}</span>
+                        <span class="choice-tags">
+                          <span class="choice-attr">{choice.attribute}</span>
+                          <span class="choice-diff" data-diff={choice.difficulty}>
+                            {#each Array(5) as _, d}
+                              <span class="diff-pip" class:filled={d < choice.difficulty}></span>
+                            {/each}
+                          </span>
+                        </span>
+                      </span>
+                    </button>
+                  {/each}
+                </div>
+              </section>
+            {/if}
+
+            <!-- ── Custom action ──────────────────────────── -->
+            <form class="custom-form" on:submit|preventDefault={handleCustomActionSubmit}>
+              <label class="custom-form-label" for="custom-action">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
+                Ou écrivez votre propre action
+              </label>
+              <div class="custom-form-row">
+                <textarea
+                  id="custom-action"
+                  class="custom-action-input"
+                  bind:value={customAction}
+                  placeholder="Je tente de négocier un passage sûr…"
+                  rows="2"
+                  disabled={generating}
+                ></textarea>
+                <button
+                  class="custom-send-btn"
+                  type="submit"
+                  disabled={generating || !customAction.trim()}
+                  title="Envoyer"
+                >
+                  <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"/></svg>
+                </button>
               </div>
-            </article>
-
-            <section class="choices-section">
-              <h3>Que faites-vous ?</h3>
-              <div class="choice-list">
-                {#each currentChapter.choices as choice}
-                  <button class="choice-button" on:click={() => handleChoice(choice)} disabled={generating}>
-                    <span class="choice-text">{choice.text}</span>
-                    <span class="choice-meta">{choice.attribute} · difficulté {choice.difficulty}</span>
-                  </button>
-                {/each}
-              </div>
-            </section>
-
-            <form class="custom-action-form" on:submit|preventDefault={handleCustomActionSubmit}>
-              <label for="custom-action">Ou écrivez votre propre action</label>
-              <textarea
-                id="custom-action"
-                class="custom-action-input"
-                bind:value={customAction}
-                placeholder="Ex: Je tente de négocier un passage sûr en promettant une faveur à la contrepartie."
-                rows="3"
-                disabled={generating}
-              ></textarea>
-              <button class="btn btn-primary" type="submit" disabled={generating || !customAction.trim()}>
-                Envoyer ma réponse personnalisée
-              </button>
             </form>
 
+            <!-- ── Memory panel ───────────────────────────── -->
             <details class="memory-panel">
-              <summary>Mémoire IA ({memoryLog.length})</summary>
+              <summary>
+                <svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13"><path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"/></svg>
+                Mémoire IA <span class="mem-count">({memoryLog.length})</span>
+              </summary>
               {#if memoryLog.length}
-                <ul>
+                <ul class="mem-list">
                   {#each [...memoryLog].reverse().slice(0, 25) as item}
                     <li>{item}</li>
                   {/each}
                 </ul>
               {:else}
-                <p class="memory-empty">La mémoire va se remplir au fil des tours.</p>
+                <p class="memory-empty">La mémoire se remplit au fil des tours.</p>
               {/if}
             </details>
+
           {:else}
             <div class="play-empty">
               <p>Aucun chapitre actif. Retournez à la configuration pour lancer l’aventure.</p>
@@ -1679,179 +1746,480 @@
     font-size: 0.9rem;
   }
 
+  /* ─────────────────────────────────────────────────
+     PLAY SHELL
+  ───────────────────────────────────────────────── */
   .play-shell {
     display: flex;
     flex-direction: column;
-    gap: var(--space-md);
-    max-width: 980px;
+    gap: var(--space-lg);
+    max-width: 820px;
     margin: 0 auto;
-    padding-bottom: var(--space-xl);
+    padding-bottom: calc(var(--space-xl) * 2);
+    width: 100%;
   }
 
+  /* Topbar */
   .play-topbar {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    gap: var(--space-xs);
+    gap: var(--space-sm);
+    flex-wrap: wrap;
   }
 
-  .status-badge {
+  .turn-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+  }
+
+  .turn-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--color-gold);
+    box-shadow: 0 0 6px var(--color-gold);
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+
+  .mem-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.72rem;
+    color: var(--color-text-muted);
     border: 1px solid var(--color-border);
     border-radius: 999px;
-    padding: 4px 10px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--color-gold);
-    background: rgba(255, 232, 31, 0.1);
+    padding: 2px 8px;
+    opacity: 0.7;
   }
 
-  .status-badge.muted {
+  .topbar-link {
+    margin-left: auto;
+    background: none;
+    border: none;
     color: var(--color-text-muted);
-    background: var(--color-bg-secondary);
-  }
-
-  .chapter-card {
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    background: var(--color-bg-secondary);
-    padding: var(--space-md);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-md);
-  }
-
-  .chapter-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: var(--space-sm);
-  }
-
-  .chapter-header h2 {
-    margin: 0;
-    color: var(--color-text-primary);
-  }
-
-  .chapter-header span {
-    color: var(--color-text-muted);
-    font-size: 0.78rem;
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-  }
-
-  .narrative-grid {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-sm);
-  }
-
-  .narrative-block {
-    border: 1px solid var(--color-border);
-    background: var(--color-bg-tertiary);
-    border-radius: var(--radius-md);
-    padding: var(--space-sm) var(--space-md);
-  }
-
-  .narrative-block h3 {
-    margin: 0 0 var(--space-xs);
-    color: var(--color-gold);
     font-size: 0.8rem;
-    letter-spacing: 0.45px;
-    text-transform: uppercase;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    transition: color var(--transition-fast);
   }
 
-  .narrative-block p {
-    margin: 0;
-    line-height: 1.65;
-    color: var(--color-text-secondary);
-  }
-
-  .narrative-block p + p {
-    margin-top: var(--space-sm);
-  }
-
-  .choices-section h3 {
-    margin: 0 0 var(--space-sm);
+  .topbar-link:hover:not(:disabled) {
     color: var(--color-text-primary);
   }
 
-  .choice-list {
-    display: grid;
-    gap: var(--space-xs);
+  /* Generating indicator */
+  .play-generating {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-lg);
+    color: var(--color-text-muted);
+    font-size: 0.85rem;
   }
 
-  .choice-button {
-    border: 1px solid var(--color-border);
+  .gen-dot-row {
+    display: flex;
+    gap: 6px;
+  }
+
+  .gen-dot-row span {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--color-gold);
+    animation: gen-bounce 1.2s ease-in-out infinite;
+  }
+
+  .gen-dot-row span:nth-child(2) { animation-delay: 0.2s; }
+  .gen-dot-row span:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes gen-bounce {
+    0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+    40% { transform: scale(1); opacity: 1; }
+  }
+
+  /* ─────────────────────────────────────────────────
+     CHAPTER CARD
+  ───────────────────────────────────────────────── */
+  .chapter-card {
     background: var(--color-bg-secondary);
-    border-radius: var(--radius-md);
-    padding: var(--space-sm) var(--space-md);
-    text-align: left;
-    cursor: pointer;
-    transition: all var(--transition-fast);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+  }
+
+  .chapter-meta {
+    padding: var(--space-lg) var(--space-xl) var(--space-md);
+    border-bottom: 1px solid var(--color-border);
     display: flex;
     flex-direction: column;
     gap: 4px;
   }
 
-  .choice-button:hover:not(:disabled) {
-    border-color: var(--color-gold);
-    background: rgba(255, 232, 31, 0.08);
+  .chapter-num {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--color-gold);
+    opacity: 0.7;
   }
 
-  .choice-button:disabled {
-    opacity: 0.6;
+  .chapter-title {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+  }
+
+  .chapter-type {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--color-text-muted);
+  }
+
+  /* Story body */
+  .story-body {
+    padding: 0;
+  }
+
+  .story-scene {
+    display: grid;
+    grid-template-columns: 90px 1fr;
+    border-bottom: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
+  }
+
+  .story-scene:last-child {
+    border-bottom: none;
+  }
+
+  .story-scene--reflection {
+    background: color-mix(in srgb, var(--color-bg-tertiary) 60%, transparent);
+  }
+
+  .scene-label {
+    padding: var(--space-md) var(--space-sm) var(--space-md) var(--space-lg);
+    font-size: 0.65rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--color-gold);
+    border-right: 2px solid color-mix(in srgb, var(--color-gold) 25%, transparent);
+    display: flex;
+    align-items: flex-start;
+    padding-top: calc(var(--space-md) + 2px);
+    line-height: 1;
+  }
+
+  .scene-label--action {
+    color: #e8c84a;
+  }
+
+  .scene-label--dialogue {
+    color: #7ecff5;
+  }
+
+  .scene-label--dialogue + .scene-text {
+    border-left-color: color-mix(in srgb, #7ecff5 30%, transparent);
+  }
+
+  .scene-label--reflection {
+    color: #b5a0d4;
+    opacity: 0.9;
+  }
+
+  .scene-text {
+    padding: var(--space-md) var(--space-xl) var(--space-md) var(--space-lg);
+  }
+
+  .scene-text p {
+    margin: 0;
+    line-height: 1.75;
+    color: var(--color-text-secondary);
+    font-size: 1rem;
+  }
+
+  .scene-text p + p {
+    margin-top: 0.8em;
+  }
+
+  .scene-context p {
+    color: var(--color-text-secondary);
+  }
+
+  .scene-action p {
+    color: var(--color-text-primary);
+    font-size: 1.02rem;
+  }
+
+  .scene-dialogue p {
+    color: var(--color-text-primary);
+    font-style: italic;
+    padding-left: var(--space-md);
+    border-left: 2px solid color-mix(in srgb, #7ecff5 40%, transparent);
+  }
+
+  .scene-reflection p {
+    color: var(--color-text-muted);
+    font-style: italic;
+    font-size: 0.95rem;
+  }
+
+  /* ─────────────────────────────────────────────────
+     CHOICES
+  ───────────────────────────────────────────────── */
+  .choices-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .choices-heading {
+    margin: 0;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--color-text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .choice-grid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
+  .choice-card {
+    display: grid;
+    grid-template-columns: 36px 1fr;
+    align-items: start;
+    gap: 0;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg-secondary);
+    cursor: pointer;
+    text-align: left;
+    transition: all var(--transition-fast);
+    overflow: hidden;
+  }
+
+  .choice-card:hover:not(:disabled) {
+    border-color: var(--color-gold);
+    background: color-mix(in srgb, var(--color-gold) 6%, var(--color-bg-secondary));
+    transform: translateX(2px);
+  }
+
+  .choice-card:disabled {
+    opacity: 0.45;
     cursor: not-allowed;
+  }
+
+  .choice-letter {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    background: color-mix(in srgb, var(--color-gold) 12%, transparent);
+    border-right: 1px solid var(--color-border);
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: var(--color-gold);
+    min-height: 52px;
+    letter-spacing: 0.5px;
+  }
+
+  .choice-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: var(--space-sm) var(--space-md);
   }
 
   .choice-text {
     color: var(--color-text-primary);
+    font-size: 0.95rem;
     line-height: 1.45;
   }
 
-  .choice-meta {
-    color: var(--color-text-muted);
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.45px;
-  }
-
-  .custom-action-form {
+  .choice-tags {
     display: flex;
-    flex-direction: column;
+    align-items: center;
     gap: var(--space-sm);
   }
 
-  .custom-action-form label {
-    color: var(--color-text-primary);
-    font-weight: 600;
+  .choice-attr {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    background: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    padding: 2px 6px;
   }
 
+  .choice-diff {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+
+  .diff-pip {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-border);
+    transition: background var(--transition-fast);
+  }
+
+  .diff-pip.filled {
+    background: var(--color-gold);
+  }
+
+  /* ─────────────────────────────────────────────────
+     CUSTOM ACTION
+  ───────────────────────────────────────────────── */
+  .custom-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
+  .custom-form-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--color-text-muted);
+  }
+
+  .custom-form-row {
+    display: flex;
+    gap: var(--space-xs);
+    align-items: flex-end;
+  }
+
+  .custom-action-input {
+    flex: 1;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-secondary);
+    color: var(--color-text-primary);
+    border-radius: var(--radius-lg);
+    padding: var(--space-sm) var(--space-md);
+    resize: none;
+    font: inherit;
+    font-size: 0.95rem;
+    line-height: 1.55;
+    transition: border-color var(--transition-fast);
+  }
+
+  .custom-action-input:focus {
+    outline: none;
+    border-color: var(--color-gold);
+  }
+
+  .custom-action-input::placeholder {
+    color: var(--color-text-muted);
+    opacity: 0.6;
+  }
+
+  .custom-send-btn {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-gold);
+    background: var(--color-gold);
+    color: #0a0a0a;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-fast);
+  }
+
+  .custom-send-btn:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--color-gold) 80%, white);
+  }
+
+  .custom-send-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  /* ─────────────────────────────────────────────────
+     MEMORY PANEL
+  ───────────────────────────────────────────────── */
   .memory-panel {
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
     background: var(--color-bg-secondary);
-    padding: var(--space-sm) var(--space-md);
+    overflow: hidden;
   }
 
   .memory-panel summary {
     cursor: pointer;
-    color: var(--color-text-secondary);
+    color: var(--color-text-muted);
+    font-size: 0.8rem;
     font-weight: 600;
+    padding: var(--space-sm) var(--space-md);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    list-style: none;
+    user-select: none;
   }
 
-  .memory-panel ul {
-    margin: var(--space-sm) 0 0;
-    padding-left: 1.1rem;
+  .memory-panel summary::-webkit-details-marker { display: none; }
+
+  .mem-count {
+    opacity: 0.65;
+  }
+
+  .mem-list {
+    margin: 0;
+    padding: var(--space-xs) var(--space-md) var(--space-sm);
+    border-top: 1px solid var(--color-border);
     display: flex;
     flex-direction: column;
     gap: 4px;
     color: var(--color-text-muted);
+    font-size: 0.8rem;
+    list-style: none;
+  }
+
+  .mem-list li::before {
+    content: '—  ';
+    opacity: 0.4;
   }
 
   .memory-empty {
-    margin: var(--space-sm) 0 0;
+    margin: 0;
+    padding: var(--space-xs) var(--space-md) var(--space-sm);
+    border-top: 1px solid var(--color-border);
     color: var(--color-text-muted);
-    font-size: 0.85rem;
+    font-size: 0.82rem;
   }
 
   @media (max-width: 920px) {
