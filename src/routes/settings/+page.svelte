@@ -41,6 +41,8 @@
     name: string;
     models: string[];
     icon: string;
+    recommended?: boolean;
+    badges?: string[];
   };
 
   const PROVIDER_ICONS: Record<string, string> = {
@@ -67,13 +69,17 @@
       id: 'openrouter',
       name: 'OpenRouter',
       models: [
+        'google/gemma-4-26b-a4b-it',
+        'xiaomi/mimo-v2-omni',
         'openai/gpt-5-mini',
         'openai/gpt-5',
         'anthropic/claude-sonnet-4.5',
         'google/gemini-2.5-pro',
         'meta-llama/llama-3.3-70b-instruct'
       ],
-      icon: providerIconSvg('openrouter')
+      icon: providerIconSvg('openrouter'),
+      recommended: true,
+      badges: ['Tool calling natif', 'Multi-provider']
     },
     {
       id: 'openai',
@@ -196,6 +202,8 @@
   const IMAGE_MODEL_PATTERN = /(image|flux|sdxl|stable[-_\s]?diffusion|sd3|gpt-image|ideogram|recraft|kandinsky|sana|lumina|dall)/i;
   const TEXT_MODEL_PRIORITIES: Record<string, RegExp[]> = {
     openrouter: [
+      /google\/gemma-4-26b-a4b-it/i,
+      /xiaomi\/mimo-v2-omni/i,
       /openai\/gpt-5/i,
       /anthropic\/claude-(opus|sonnet)-4/i,
       /x-ai\/grok-4/i,
@@ -242,6 +250,13 @@
   $: imageProviderModels = activeImageProviderId
     ? (dynamicImageModels[activeImageProviderId] ?? IMAGE_PROVIDERS.find(p => p.id === activeImageProviderId)?.models ?? [])
     : [];
+
+  $: providerModelCounts = Object.fromEntries(
+    TEXT_PROVIDERS.map(p => [p.id, (dynamicTextModels[p.id] ?? p.models).length])
+  );
+  $: imageProviderModelCounts = Object.fromEntries(
+    IMAGE_PROVIDERS.map(p => [p.id, (dynamicImageModels[p.id] ?? p.models).length])
+  );
 
   $: normalizedTextSearch = textModelSearch.trim().toLowerCase();
   $: normalizedImageSearch = imageModelSearch.trim().toLowerCase();
@@ -908,7 +923,7 @@
             {:else if currentScreen === 'ai_text'}
               <div class="screen-header">
                 <h2>Modèle de texte</h2>
-                <p>Choisissez l'IA qui générera vos histoires. Profil, style et contenu se règlent désormais pendant la création.</p>
+                <p>OpenRouter est recommandé (mode agentique + modèles récents). Profil, style et contenu se règlent désormais pendant la création.</p>
               </div>
 
               <div class="provider-grid">
@@ -922,7 +937,19 @@
                       <span class="provider-logo" aria-hidden="true">{@html p.icon}</span>
                       <span class="provider-name">{p.name}</span>
                     </span>
-                    <span class="provider-models">{getTextProviderModels(p.id).length} modèles</span>
+                    <span class="provider-models">{providerModelCounts[p.id] ?? p.models.length} modèles</span>
+                    {#if p.recommended || (p.badges && p.badges.length)}
+                      <span class="provider-badges">
+                        {#if p.recommended}
+                          <span class="provider-badge provider-badge-recommended">Recommandé</span>
+                        {/if}
+                        {#if p.badges}
+                          {#each p.badges as badge}
+                            <span class="provider-badge">{badge}</span>
+                          {/each}
+                        {/if}
+                      </span>
+                    {/if}
                   </button>
                 {/each}
               </div>
@@ -1019,7 +1046,7 @@
                       <span class="provider-logo" aria-hidden="true">{@html p.icon}</span>
                       <span class="provider-name">{p.name}</span>
                     </span>
-                    <span class="provider-models">{getImageProviderModels(p.id).length} modèles</span>
+                    <span class="provider-models">{imageProviderModelCounts[p.id] ?? p.models.length} modèles</span>
                   </button>
                 {/each}
               </div>
@@ -1706,6 +1733,31 @@
   .provider-models {
     font-size: 0.75rem;
     color: var(--color-text-muted);
+  }
+
+  .provider-badges {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 2px;
+  }
+
+  .provider-badge {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 0.68rem;
+    line-height: 1.2;
+    color: var(--color-text-muted);
+    background: var(--color-bg-tertiary);
+  }
+
+  .provider-badge-recommended {
+    border-color: rgba(255, 232, 31, 0.5);
+    color: var(--color-gold);
+    background: rgba(255, 232, 31, 0.12);
   }
 
   .provider-tools {

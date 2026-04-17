@@ -189,7 +189,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   uiLanguage: 'auto',
   theme: 'dark',
   textProvider: 'openrouter',
-  textModel: 'openai/gpt-5-mini',
+  textModel: 'google/gemma-4-26b-a4b-it',
   textApiKey: '',
   ollamaUrl: 'http://localhost:11434',
   imageProvider: 'none',

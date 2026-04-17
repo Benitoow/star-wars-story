@@ -22,18 +22,21 @@
   import { getPreferences, type UserPreferences } from '$lib/db';
   import SvgIcon from '$lib/components/SvgIcon.svelte';
   import PageHeader from '$lib/components/PageHeader.svelte';
+  import GameHUD from '$lib/components/GameHUD.svelte';
   import {
     buildContinuePrompt,
     buildStartPrompt,
     buildSystemPrompt,
-    callTextModel,
+    generateStoryTurn,
     normalizeProviderId,
-    parseStoryResponse,
     summarizeChapterForPrompt,
+    supportsAgenticToolCalling,
     type ChatMessage,
     type StoryChapter,
     type StoryChoice,
-    type StoryProviderConfig
+    type StoryProviderConfig,
+    type WorldState,
+    type NpcRelation
   } from '$lib/ai/storyEngine';
 
   let loading = true;
@@ -69,6 +72,7 @@
     aiMessages: ChatMessage[];
     memoryLog: string[];
     setupSnapshot: StorySetup;
+    worldState?: WorldState;
   }
 
   let setupScreenIndex = 0;
@@ -84,6 +88,161 @@
   let aiMessages: ChatMessage[] = [];
   let memoryLog: string[] = [];
   let customAction = '';
+  let hudCollapsed = false;
+
+  const ERA_START_DATES: Record<string, string> = {
+    old_republic: '3950 AVBY, Jour 1',
+    clone_wars: '22 AVBY, Jour 1',
+    imperial: '19 AVBY, Jour 1',
+    new_republic: '4 APBY, Jour 1',
+    first_order: '34 APBY, Jour 1'
+  };
+
+  const FACTION_CREDITS: Record<string, number> = {
+    imperial_officer: 3000, bounty_hunter: 1500, hutt_enforcer: 2000,
+    smuggler: 800, rebel_pilot: 600, rebel_leader: 900,
+    jedi_knight: 500, jedi_master: 800, sith_lord: 2500, sith_apprentice: 1000,
+    mandalorian_warrior: 1200, senator: 5000, scavenger: 300, default: 1000
+  };
+
+  function initWorldState(setup: StorySetup): WorldState {
+    const startCredits = FACTION_CREDITS[setup.role] ?? FACTION_CREDITS.default;
+    const factions: Record<string, number> = {
+      empire: 0, rebel_alliance: 0, jedi_order: 0, sith: 0, hutt: 0, mandalore: 0
+    };
+    const factionMap: Record<string, string> = {
+      jedi: 'jedi_order', sith: 'sith', empire: 'empire',
+      rebels: 'rebel_alliance', hutt: 'hutt', mandalore: 'mandalore'
+    };
+    const playerFaction = factionMap[setup.faction];
+    if (playerFaction) factions[playerFaction] = 50;
+
+    return {
+      player: {
+        hp: 100,
+        credits: startCredits,
+        location: 'Inconnu',
+        date: ERA_START_DATES[setup.era] ?? 'Ère inconnue, Jour 1',
+        injuries: [],
+        inventory: []
+      },
+      npcs: [],
+      factions,
+      chronology: []
+    };
+  }
+
+  let worldState: WorldState = {
+    player: { hp: 100, credits: 1000, location: 'Inconnu', date: '', injuries: [], inventory: [] },
+    npcs: [],
+    factions: {},
+    chronology: []
+  };
+
+  function applyStateUpdate(chapter: StoryChapter): void {
+    const upd = chapter.state_update;
+    if (!upd) return;
+
+    const p = worldState.player;
+
+    // Player vitals
+    const newHp = upd.hp !== undefined ? Math.max(0, Math.min(100, p.hp + upd.hp)) : p.hp;
+    const newCredits = upd.credits !== undefined ? p.credits + upd.credits : p.credits;
+    const newLocation = upd.location || p.location;
+    const newDate = upd.date_advance ? `${p.date.replace(/ \+.*$/, '')} +${upd.date_advance}` : p.date;
+
+    // Injuries: resolve then add new
+    const resolvedKeywords = upd.injuries_resolved ?? [];
+    const survivingInjuries = p.injuries.filter(inj =>
+      !resolvedKeywords.some(r => inj.description.toLowerCase().includes(r.toLowerCase()))
+    );
+    const newInjuries = [...survivingInjuries, ...(upd.injuries_new ?? [])];
+
+    // Inventory
+    let inventory = [...p.inventory];
+    for (const gained of upd.inventory_gained ?? []) {
+      const existing = inventory.find(i => i.name.toLowerCase() === gained.name.toLowerCase());
+      if (existing) existing.qty += gained.qty;
+      else inventory.push({ ...gained });
+    }
+    for (const lost of upd.inventory_lost ?? []) {
+      inventory = inventory
+        .map(i => i.name.toLowerCase() === lost.name.toLowerCase() ? { ...i, qty: i.qty - lost.qty } : i)
+        .filter(i => i.qty > 0);
+    }
+
+    // NPCs: upsert by name
+    let npcs = [...worldState.npcs];
+    for (const npcUpd of upd.npcs ?? []) {
+      const idx = npcs.findIndex(n => n.name.toLowerCase() === npcUpd.name.toLowerCase());
+      if (idx >= 0) {
+        npcs[idx] = { ...npcs[idx], ...npcUpd } as NpcRelation;
+      } else {
+        npcs.push({
+          name: npcUpd.name,
+          affinity: npcUpd.affinity ?? 0,
+          status: npcUpd.status ?? 'neutral',
+          faction: npcUpd.faction,
+          last_seen: npcUpd.last_seen,
+          alive: npcUpd.alive !== false,
+          note: npcUpd.note
+        });
+      }
+    }
+
+    // Factions: apply deltas, clamp -100..100
+    const factions = { ...worldState.factions };
+    for (const [id, delta] of Object.entries(upd.factions ?? {})) {
+      factions[id] = Math.max(-100, Math.min(100, (factions[id] ?? 0) + delta));
+    }
+
+    // Chronology entry
+    const chronology = [
+      ...worldState.chronology,
+      {
+        chapter: chapter.chapter_number,
+        date: newDate,
+        location: newLocation,
+        summary: chapter.chapter_title
+      }
+    ].slice(-40);
+
+    worldState = {
+      player: { hp: newHp, credits: newCredits, location: newLocation, date: newDate, injuries: newInjuries, inventory },
+      npcs,
+      factions,
+      chronology
+    };
+  }
+
+  // Mechanical consequences: returns display modifiers for a choice
+  function choiceConsequences(choice: StoryChoice): { warning: string; diffBonus: number; disabled: boolean } {
+    let warning = '';
+    let diffBonus = 0;
+    let disabled = false;
+
+    const critical = worldState.player.hp < 20;
+    const heavyInjury = worldState.player.injuries.some(i => i.severity === 'severe');
+    const broke = worldState.player.credits <= 0;
+
+    if (critical && (choice.attribute === 'combat' || choice.attribute === 'force')) {
+      warning = '⚠ État critique';
+      diffBonus = 2;
+    } else if (heavyInjury && (choice.attribute === 'combat' || choice.attribute === 'stealth')) {
+      warning = '⚠ Blessure grave';
+      diffBonus = 1;
+    }
+
+    if (broke) {
+      const payWords = ['payer', 'acheter', 'crédits', 'louer', 'soudoyer', 'corrompre', 'prix', 'coût'];
+      if (payWords.some(w => choice.text.toLowerCase().includes(w))) {
+        warning = '✖ Sans crédits';
+        disabled = true;
+      }
+    }
+
+    return { warning, diffBonus, disabled };
+  }
 
   let providerConfig: StoryProviderConfig | null = null;
   let providerStatus = 'Aucun provider texte configuré.';
@@ -202,7 +361,8 @@
       actionHistory,
       aiMessages,
       memoryLog,
-      setupSnapshot: get(currentSetup)
+      setupSnapshot: get(currentSetup),
+      worldState
     };
 
     localStorage.setItem(storySessionKey(storyId), JSON.stringify(payload));
@@ -227,7 +387,8 @@
         actionHistory: Array.isArray(parsed.actionHistory) ? parsed.actionHistory : [],
         aiMessages: Array.isArray(parsed.aiMessages) ? parsed.aiMessages : [],
         memoryLog: Array.isArray(parsed.memoryLog) ? parsed.memoryLog : [],
-        setupSnapshot: (parsed.setupSnapshot as StorySetup) || get(currentSetup)
+        setupSnapshot: (parsed.setupSnapshot as StorySetup) || get(currentSetup),
+        worldState: parsed.worldState as WorldState | undefined
       };
     } catch {
       return null;
@@ -314,7 +475,14 @@
   function providerSummary(config: StoryProviderConfig | null): string {
     if (!config) return 'Aucun provider texte configuré.';
     const modelLabel = config.model || 'modèle auto';
-    return `${config.providerId} · ${modelLabel}`;
+    const modeLabel = supportsAgenticToolCalling(config.providerId) ? ' · agentique' : '';
+    return `${config.providerId} · ${modelLabel}${modeLabel}`;
+  }
+
+  function resolvePromptMode(): 'json' | 'tool-calls' {
+    return providerConfig && supportsAgenticToolCalling(providerConfig.providerId)
+      ? 'tool-calls'
+      : 'json';
   }
 
   function trimMessages(messages: ChatMessage[], maxWithoutSystem = 18): ChatMessage[] {
@@ -415,7 +583,8 @@
       throw new Error('Aucun provider IA configuré. Ouvre les paramètres IA texte.');
     }
 
-    const systemPrompt = buildSystemPrompt(setup, memoryLog.slice(-25));
+    const promptMode = resolvePromptMode();
+    const systemPrompt = buildSystemPrompt(setup, memoryLog.slice(-20), worldState, promptMode);
     aiMessages = [{ role: 'system', content: systemPrompt }, ...aiMessages.filter(message => message.role !== 'system')];
 
     const requestMessages = trimMessages([
@@ -423,12 +592,13 @@
       { role: 'user', content: prompt }
     ]);
 
-    const rawResponse = await callTextModel(requestMessages, providerConfig);
-    const chapter = parseStoryResponse(rawResponse, turn);
+    const generation = await generateStoryTurn(requestMessages, providerConfig, turn);
+    const chapter = generation.chapter;
+    const assistantContent = generation.rawResponse || JSON.stringify(chapter);
 
     aiMessages = trimMessages([
       ...requestMessages,
-      { role: 'assistant', content: JSON.stringify(chapter) }
+      { role: 'assistant', content: assistantContent }
     ]);
 
     return chapter;
@@ -458,15 +628,17 @@
       aiMessages = [];
       memoryLog = [];
       customAction = '';
+      worldState = initWorldState(setup);
 
       const trameLabel = TRAMES.find(item => item.id === selectedTrame)?.name || null;
-      const prompt = buildStartPrompt(setup, trameLabel);
+      const prompt = buildStartPrompt(setup, trameLabel, resolvePromptMode());
       const chapter = await requestStoryChapter(prompt, setup, 1);
 
       currentChapter = chapter;
       chapterHistory = [chapter];
       actionHistory = ['Prologue IA'];
 
+      applyStateUpdate(chapter);
       appendMemoryFromChapter(chapter);
       await persistInteractiveState(setup);
 
@@ -494,7 +666,7 @@
 
       const nextTurn = turnNumber + 1;
       const recentSummary = chapterHistory.slice(-3).map(chapter => summarizeChapterForPrompt(chapter));
-      const prompt = buildContinuePrompt(action, nextTurn, recentSummary);
+      const prompt = buildContinuePrompt(action, nextTurn, recentSummary, resolvePromptMode());
 
       const chapter = await requestStoryChapter(prompt, setup, nextTurn);
 
@@ -503,6 +675,7 @@
       chapterHistory = [...chapterHistory, chapter].slice(-60);
       actionHistory = [...actionHistory, action].slice(-60);
 
+      applyStateUpdate(chapter);
       appendMemoryFromChapter(chapter);
       await persistInteractiveState(setup);
     } catch (error) {
@@ -740,6 +913,7 @@
         setSetupField('writingLength', snapshot.writingLength || get(currentSetup).writingLength);
         setSetupField('contentMode', snapshot.contentMode || get(currentSetup).contentMode);
 
+        if (session.worldState) worldState = session.worldState;
         mode = session.currentChapter ? 'play' : 'setup';
       }
     }
@@ -1103,6 +1277,9 @@
             <div class="error-banner">{generationError}</div>
           {/if}
 
+          <!-- ── Living World HUD ───────────────────────── -->
+          <GameHUD {worldState} bind:collapsed={hudCollapsed} />
+
           <!-- ── Loading overlay ─────────────────────────── -->
           {#if generating}
             <div class="play-generating" in:fly={{ y: 6, duration: 180 }}>
@@ -1177,10 +1354,13 @@
                 <h3 class="choices-heading">Que faites-vous ?</h3>
                 <div class="choice-list">
                   {#each currentChapter.choices as choice, i}
+                    {@const cons = choiceConsequences(choice)}
                     <button
                       class="choice-btn"
-                      on:click={() => handleChoice(choice)}
-                      disabled={generating}
+                      class:choice-danger={cons.diffBonus > 0}
+                      class:choice-disabled={cons.disabled}
+                      on:click={() => !cons.disabled && handleChoice(choice)}
+                      disabled={generating || cons.disabled}
                     >
                       <span class="choice-key">{String.fromCharCode(65 + i)}</span>
                       <span class="choice-content">
@@ -1189,9 +1369,13 @@
                           <span class="choice-attr">{choice.attribute}</span>
                           <span class="choice-pips">
                             {#each Array(5) as _, d}
-                              <span class="pip" class:on={d < choice.difficulty}></span>
+                              <span class="pip" class:on={d < choice.difficulty + cons.diffBonus}
+                                class:pip-bonus={d >= choice.difficulty && d < choice.difficulty + cons.diffBonus}></span>
                             {/each}
                           </span>
+                          {#if cons.warning}
+                            <span class="choice-warning">{cons.warning}</span>
+                          {/if}
                         </span>
                       </span>
                     </button>
@@ -2017,6 +2201,31 @@
   }
 
   .choice-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .choice-btn.choice-danger {
+    border-color: rgba(248, 113, 113, 0.4);
+  }
+
+  .choice-btn.choice-danger .choice-key {
+    background: color-mix(in srgb, #f87171 15%, transparent);
+    border-right-color: color-mix(in srgb, #f87171 20%, transparent);
+    color: #f87171;
+  }
+
+  .choice-btn.choice-disabled {
+    border-color: rgba(255,255,255,0.06);
+    opacity: 0.38;
+  }
+
+  .choice-warning {
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: #f87171;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+
+  .pip.pip-bonus { background: #f87171; }
 
   /* Letter key */
   .choice-key {

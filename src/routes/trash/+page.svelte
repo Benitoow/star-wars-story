@@ -261,10 +261,11 @@
 
 <!-- Empty Trash Confirmation Modal -->
 {#if showEmptyTrashModal}
-  <button class="modal-overlay" on:click={() => showEmptyTrashModal = false} aria-label="Fermer">
-    <div class="modal" on:click|stopPropagation role="dialog" aria-modal="true">
+  <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+  <div class="modal-overlay" on:click={() => showEmptyTrashModal = false}>
+    <div class="modal" on:click|stopPropagation role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <div class="modal-header">
-        <h2>Vider la corbeille</h2>
+        <h2 id="modal-title">Vider la corbeille</h2>
         <button class="modal-close" on:click={() => showEmptyTrashModal = false}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="18" y1="6" x2="6" y2="18"/>
@@ -294,7 +295,7 @@
         </button>
       </div>
     </div>
-  </button>
+  </div>
 {/if}
 
 <style>

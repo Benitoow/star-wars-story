@@ -18,9 +18,6 @@
   let confirmDanger = false;
   let pendingAction: (() => Promise<void>) | null = null;
 
-  // ── i18n ──────────────────────────────────────
-  $: lang = resolveUiLanguage($uiLanguage) === 'fr' ? 'fr' : 'en';
-
   const COPY = {
     fr: {
       edit:           'Modifier',
@@ -52,6 +49,11 @@
     },
   } as const;
 
+  // ── i18n ──────────────────────────────────────
+  let lang: keyof typeof COPY = 'fr';
+  let t: (typeof COPY)[keyof typeof COPY] = COPY[lang];
+
+  $: lang = resolveUiLanguage($uiLanguage) === 'fr' ? 'fr' : 'en';
   $: t = COPY[lang];
 
   const ERA_NAMES: Record<string, Record<string, string>> = {
