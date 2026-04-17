@@ -66,8 +66,30 @@ export interface StoryVersion {
 
 export interface UserPreferences {
   id: 'preferences';
+  // Profile
+  firstName?: string;
+  lastName?: string;
+  avatarEmoji?: string;
+  // Appearance
   uiLanguage: UiLanguageCode;
   theme: 'light' | 'dark' | 'auto';
+  // AI Text
+  textProvider?: string;
+  textModel?: string;
+  textApiKey?: string;
+  ollamaUrl?: string;
+  // AI Image
+  imageProvider?: string;
+  imageModel?: string;
+  imageApiKey?: string;
+  // Writing style
+  writingStyle?: string;
+  writingPov?: string;
+  writingTone?: string;
+  writingLength?: string;
+  // Content mode
+  contentMode?: string;
+  // Legacy
   defaultImageProvider?: string;
   defaultImgModel?: string;
   autoSave: boolean;
@@ -153,8 +175,25 @@ export const db = new StarWarsDB();
 // ─── Default Data ──────────────────────────────
 export const DEFAULT_PREFERENCES: UserPreferences = {
   id: 'preferences',
+  firstName: '',
+  lastName: '',
+  avatarEmoji: '🧑‍🚀',
   uiLanguage: 'auto',
   theme: 'dark',
+  textProvider: 'openrouter',
+  textModel: 'openai/gpt-5-mini',
+  textApiKey: '',
+  ollamaUrl: 'http://localhost:11434',
+  imageProvider: 'none',
+  imageModel: '',
+  imageApiKey: '',
+  writingStyle: 'cinematique',
+  writingPov: 'troisieme',
+  writingTone: 'aventure',
+  writingLength: 'moyen',
+  contentMode: 'cinematic',
+  defaultImageProvider: 'none',
+  defaultImgModel: '',
   autoSave: true,
   autoSaveInterval: 30000,
   showOnboarding: true,
@@ -482,7 +521,7 @@ export async function cleanupOldTrash(daysOld = 30): Promise<void> {
   cutoff.setDate(cutoff.getDate() - daysOld);
 
   const oldTrash = await db.stories
-    .filter(s => s.isDeleted && s.deletedAt && s.deletedAt < cutoff)
+    .filter(s => s.isDeleted === true && s.deletedAt !== undefined && s.deletedAt < cutoff)
     .toArray();
 
   for (const story of oldTrash) {
@@ -537,7 +576,7 @@ export async function importAllData(jsonString: string): Promise<{
 }> {
   const payload = parseAllDataImportEnvelope(jsonString);
 
-  await db.transaction('rw', db.stories, db.folders, db.storyVersions, db.preferences, db.appState, async () => {
+  await db.transaction('rw', [db.stories, db.folders, db.storyVersions, db.preferences, db.appState], async () => {
     await db.stories.clear();
     await db.folders.clear();
     await db.storyVersions.clear();

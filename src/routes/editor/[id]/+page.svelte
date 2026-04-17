@@ -134,7 +134,7 @@
         await saveStory();
         showToast('Histoire sauvegardée', 'success');
       } else {
-        const newStory = await createStory(currentSetup);
+        const newStory = await createStory(get(currentSetup));
         storyId = newStory.id;
         goto(`/editor/${newStory.id}`, { replaceState: true });
         showToast('Histoire créée', 'success');

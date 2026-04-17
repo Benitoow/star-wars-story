@@ -103,6 +103,8 @@
   $: copy = COPY[currentLang === 'fr' ? 'fr' : 'en'];
   $: eraNames = ERA_NAMES[currentLang === 'fr' ? 'fr' : 'en'];
   $: factionNames = FACTION_NAMES[currentLang === 'fr' ? 'fr' : 'en'];
+  $: eraNameMap = eraNames as Record<string, string>;
+  $: factionNameMap = factionNames as Record<string, string>;
 
   async function handleDelete() {
     if (!confirm(copy.confirmDelete)) return;
@@ -141,8 +143,8 @@
 <article class="story-card">
   <div class="card-header">
     <div class="badges">
-      <span class="badge">{eraNames[story.setup.era] || story.setup.era}</span>
-      <span class="badge badge-gold">{factionNames[story.setup.faction] || story.setup.faction}</span>
+      <span class="badge">{eraNameMap[story.setup.era] || story.setup.era}</span>
+      <span class="badge badge-gold">{factionNameMap[story.setup.faction] || story.setup.faction}</span>
     </div>
     <div class="menu-wrapper">
       <button class="menu-btn" on:click|stopPropagation={() => showMenu = !showMenu}>

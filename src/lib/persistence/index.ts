@@ -1,4 +1,18 @@
+import type { UiLanguageCode } from '$lib/config/languages';
+
 export const DATA_SCHEMA_VERSION = 2;
+
+type ThemeMode = 'light' | 'dark' | 'auto';
+
+const SUPPORTED_UI_LANGUAGES: UiLanguageCode[] = ['auto', 'fr', 'en', 'es', 'de', 'it', 'pt', 'ja', 'zh'];
+
+function isUiLanguageCode(value: unknown): value is UiLanguageCode {
+  return typeof value === 'string' && SUPPORTED_UI_LANGUAGES.includes(value as UiLanguageCode);
+}
+
+function isThemeMode(value: unknown): value is ThemeMode {
+  return value === 'light' || value === 'dark' || value === 'auto';
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -113,12 +127,51 @@ function normalizePreferencesRecord(preferences: unknown) {
     throw new Error('Invalid preferences payload');
   }
 
+  const uiLanguage: UiLanguageCode = isUiLanguageCode(preferences.uiLanguage)
+    ? preferences.uiLanguage
+    : 'auto';
+
+  const theme: ThemeMode = isThemeMode(preferences.theme)
+    ? preferences.theme
+    : 'dark';
+
+  const imageProvider = typeof preferences.imageProvider === 'string'
+    ? preferences.imageProvider
+    : (typeof preferences.defaultImageProvider === 'string' ? preferences.defaultImageProvider : undefined);
+
+  const imageModel = typeof preferences.imageModel === 'string'
+    ? preferences.imageModel
+    : (typeof preferences.defaultImgModel === 'string' ? preferences.defaultImgModel : undefined);
+
+  const contentMode = typeof preferences.contentMode === 'string'
+    ? preferences.contentMode
+    : (typeof preferences.contentIntensity === 'string' ? preferences.contentIntensity : undefined);
+
   return {
     id: 'preferences' as const,
-    uiLanguage: typeof preferences.uiLanguage === 'string' ? preferences.uiLanguage : 'auto',
-    theme: preferences.theme === 'light' || preferences.theme === 'dark' || preferences.theme === 'auto' ? preferences.theme : 'dark',
-    defaultImageProvider: typeof preferences.defaultImageProvider === 'string' ? preferences.defaultImageProvider : undefined,
-    defaultImgModel: typeof preferences.defaultImgModel === 'string' ? preferences.defaultImgModel : undefined,
+    firstName: typeof preferences.firstName === 'string' ? preferences.firstName : undefined,
+    lastName: typeof preferences.lastName === 'string' ? preferences.lastName : undefined,
+    avatarEmoji: typeof preferences.avatarEmoji === 'string' ? preferences.avatarEmoji : undefined,
+    uiLanguage,
+    theme,
+    textProvider: typeof preferences.textProvider === 'string' ? preferences.textProvider : undefined,
+    textModel: typeof preferences.textModel === 'string' ? preferences.textModel : undefined,
+    textApiKey: typeof preferences.textApiKey === 'string' ? preferences.textApiKey : undefined,
+    ollamaUrl: typeof preferences.ollamaUrl === 'string' ? preferences.ollamaUrl : undefined,
+    imageProvider,
+    imageModel,
+    imageApiKey: typeof preferences.imageApiKey === 'string' ? preferences.imageApiKey : undefined,
+    writingStyle: typeof preferences.writingStyle === 'string' ? preferences.writingStyle : undefined,
+    writingPov: typeof preferences.writingPov === 'string' ? preferences.writingPov : undefined,
+    writingTone: typeof preferences.writingTone === 'string' ? preferences.writingTone : undefined,
+    writingLength: typeof preferences.writingLength === 'string' ? preferences.writingLength : undefined,
+    contentMode,
+    defaultImageProvider: typeof preferences.defaultImageProvider === 'string'
+      ? preferences.defaultImageProvider
+      : imageProvider,
+    defaultImgModel: typeof preferences.defaultImgModel === 'string'
+      ? preferences.defaultImgModel
+      : imageModel,
     autoSave: typeof preferences.autoSave === 'boolean' ? preferences.autoSave : true,
     autoSaveInterval: typeof preferences.autoSaveInterval === 'number' ? preferences.autoSaveInterval : 30000,
     showOnboarding: typeof preferences.showOnboarding === 'boolean' ? preferences.showOnboarding : true,
