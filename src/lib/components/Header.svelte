@@ -15,19 +15,22 @@
 
 <header class="header">
   <div class="header-left">
-    <button
-      class="menu-toggle"
-      class:active={$sidebarOpen}
-      type="button"
-      on:click={toggleSidebar}
-      aria-label={$sidebarOpen ? 'Fermer le menu latéral' : 'Ouvrir le menu latéral'}
-      aria-expanded={$sidebarOpen}
-      aria-controls="app-sidebar"
-    >
-      <span class="menu-toggle-box" aria-hidden="true">
-        <span class="menu-toggle-inner"></span>
-      </span>
-    </button>
+    {#if !$sidebarOpen}
+      <button
+        class="menu-toggle"
+        type="button"
+        on:click={toggleSidebar}
+        aria-label="Ouvrir le menu latéral"
+        aria-expanded="false"
+        aria-controls="app-sidebar"
+      >
+        <span class="menu-toggle-box" aria-hidden="true">
+          <span class="menu-toggle-inner"></span>
+        </span>
+      </button>
+    {:else}
+      <span class="menu-toggle-spacer" aria-hidden="true"></span>
+    {/if}
 
     <div class="search-bar" class:open={$searchOpen}>
       <button class="search-toggle" on:click={() => searchOpen.update(v => !v)}>
@@ -141,6 +144,13 @@
     overflow: hidden;
   }
 
+  .menu-toggle-spacer {
+    width: 40px;
+    height: 40px;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+
   .menu-toggle:hover {
     background: var(--color-bg-hover);
     color: var(--color-gold);
@@ -150,12 +160,6 @@
   .menu-toggle:focus-visible {
     outline: 2px solid var(--color-gold);
     outline-offset: 2px;
-  }
-
-  .menu-toggle.active {
-    color: var(--color-gold);
-    border-color: var(--color-border-hover);
-    background: rgba(255, 232, 31, 0.08);
   }
 
   .menu-toggle-box {
@@ -202,22 +206,6 @@
 
   .menu-toggle-inner::after {
     top: 6px;
-  }
-
-  .menu-toggle.active .menu-toggle-inner {
-    width: 0;
-    left: 12px;
-    box-shadow: 0 0 16px rgba(255, 232, 31, 0.45);
-  }
-
-  .menu-toggle.active .menu-toggle-inner::before {
-    width: 18px;
-    transform: translate(-9px, 6px) rotate(45deg);
-  }
-
-  .menu-toggle.active .menu-toggle-inner::after {
-    width: 18px;
-    transform: translate(-9px, -6px) rotate(-45deg);
   }
 
   .search-bar {

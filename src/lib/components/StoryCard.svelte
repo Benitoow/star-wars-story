@@ -9,6 +9,7 @@
 
   let showMenu = false;
   let isDeleting = false;
+  let menuWrapperElement: HTMLDivElement | null = null;
 
   const ERA_NAMES = {
     fr: {
@@ -132,13 +133,30 @@
   }
 
   function handlePlay() {
+    showMenu = false;
     goto(`/editor/${story.id}`);
   }
 
   function handleEdit() {
+    showMenu = false;
     goto(`/editor/${story.id}`);
   }
+
+  function toggleMenu(event: MouseEvent) {
+    event.stopPropagation();
+    showMenu = !showMenu;
+  }
+
+  function handleWindowClick(event: MouseEvent) {
+    if (!showMenu) return;
+    const target = event.target;
+    if (!(target instanceof Node)) return;
+    if (menuWrapperElement?.contains(target)) return;
+    showMenu = false;
+  }
 </script>
+
+<svelte:window on:click={handleWindowClick} />
 
 <article class="story-card">
   <div class="card-header">
@@ -146,8 +164,8 @@
       <span class="badge">{eraNameMap[story.setup.era] || story.setup.era}</span>
       <span class="badge badge-gold">{factionNameMap[story.setup.faction] || story.setup.faction}</span>
     </div>
-    <div class="menu-wrapper">
-      <button class="menu-btn" on:click|stopPropagation={() => showMenu = !showMenu}>
+    <div class="menu-wrapper" bind:this={menuWrapperElement}>
+      <button class="menu-btn" on:click={toggleMenu}>
         <svg viewBox="0 0 24 24" fill="currentColor">
           <circle cx="12" cy="6" r="2"/>
           <circle cx="12" cy="12" r="2"/>
@@ -232,11 +250,6 @@
     </div>
   {/if}
 </article>
-
-<!-- Click outside to close menu -->
-{#if showMenu}
-  <div class="click-outside" on:click={() => showMenu = false}></div>
-{/if}
 
 <style>
   .story-card {
@@ -447,12 +460,6 @@
   .tag-more {
     background: var(--color-bg-tertiary);
     color: var(--color-text-muted);
-  }
-
-  .click-outside {
-    position: fixed;
-    inset: 0;
-    z-index: 40;
   }
 
   @keyframes fadeIn {
