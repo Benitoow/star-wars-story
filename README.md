@@ -1,6 +1,12 @@
-# Star Wars Story
+# Star Wars Story — v1.0.0
 
 Une application web statique pour créer des histoires interactives Star Wars, directement compatible avec GitHub Pages.
+
+## Statut
+
+- ✅ **Version officielle publiée : v1.0.0**
+- 🗓️ Date de release : **2026-04-17**
+- 📝 Notes complètes : voir [`CHANGELOG.md`](./CHANGELOG.md)
 
 ## Flux de l'application
 
@@ -16,6 +22,7 @@ Une application web statique pour créer des histoires interactives Star Wars, d
 - Tableau de bord simple après la configuration initiale.
 - Gestion des histoires sauvegardées localement.
 - Suppression d’histoires depuis le dashboard.
+- Reprise d’une histoire au bon état depuis le dashboard (session restaurée).
 - Sélection des eras, factions, rôles et prémisses via les SVG du dossier `svg/`.
 - Démarrage d’histoire avec génération IA.
 

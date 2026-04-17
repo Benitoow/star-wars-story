@@ -1,6 +1,7 @@
 {
   "name": "Star Wars Story Manager",
   "short_name": "SW Stories",
+  "version": "1.0.0",
   "description": "Créez et gérez vos propres histoires interactives Star Wars",
   "start_url": "/",
   "scope": "/",
