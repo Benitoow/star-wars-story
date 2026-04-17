@@ -23,6 +23,14 @@ export interface Story {
     faction: string;
     role: string;
     premise: string;
+    protagonistFirstName?: string;
+    protagonistLastName?: string;
+    protagonistAvatar?: string;
+    writingStyle?: string;
+    writingTone?: string;
+    writingPov?: string;
+    writingLength?: string;
+    contentMode?: string;
   };
   metadata: {
     createdAt: Date;

@@ -57,7 +57,15 @@ function normalizeSetup(setup: unknown) {
     era: typeof source.era === 'string' ? source.era : '',
     faction: typeof source.faction === 'string' ? source.faction : '',
     role: typeof source.role === 'string' ? source.role : '',
-    premise: typeof source.premise === 'string' ? source.premise : ''
+    premise: typeof source.premise === 'string' ? source.premise : '',
+    protagonistFirstName: typeof source.protagonistFirstName === 'string' ? source.protagonistFirstName : undefined,
+    protagonistLastName: typeof source.protagonistLastName === 'string' ? source.protagonistLastName : undefined,
+    protagonistAvatar: typeof source.protagonistAvatar === 'string' ? source.protagonistAvatar : undefined,
+    writingStyle: typeof source.writingStyle === 'string' ? source.writingStyle : undefined,
+    writingTone: typeof source.writingTone === 'string' ? source.writingTone : undefined,
+    writingPov: typeof source.writingPov === 'string' ? source.writingPov : undefined,
+    writingLength: typeof source.writingLength === 'string' ? source.writingLength : undefined,
+    contentMode: typeof source.contentMode === 'string' ? source.contentMode : undefined
   };
 }
 

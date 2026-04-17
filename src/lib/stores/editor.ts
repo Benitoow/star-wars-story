@@ -12,6 +12,14 @@ export interface StorySetup {
   faction: string;
   role: string;
   premise: string;
+  protagonistFirstName?: string;
+  protagonistLastName?: string;
+  protagonistAvatar?: string;
+  writingStyle?: string;
+  writingTone?: string;
+  writingPov?: string;
+  writingLength?: string;
+  contentMode?: string;
 }
 
 export interface EditorStory {
@@ -43,7 +51,15 @@ const defaultStory: EditorStory = {
     era: '',
     faction: '',
     role: '',
-    premise: ''
+    premise: '',
+    protagonistFirstName: '',
+    protagonistLastName: '',
+    protagonistAvatar: '🧑‍🚀',
+    writingStyle: 'cinematique',
+    writingTone: 'aventure',
+    writingPov: 'troisieme',
+    writingLength: 'moyen',
+    contentMode: 'cinematic'
   },
   tags: []
 };

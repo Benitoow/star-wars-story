@@ -19,71 +19,118 @@
 
   // ── Wizard navigation ─────────────────────
   const SCREENS = [
-    { id: 'profile',    label: 'Profil',       icon: '👤' },
-    { id: 'ai_text',   label: 'IA Texte',      icon: '🤖' },
-    { id: 'ai_image',  label: 'IA Images',     icon: '🎨' },
-    { id: 'style',     label: 'Style',         icon: '✍️' },
-    { id: 'content',   label: 'Contenu',       icon: '🔒' },
-    { id: 'profiles',  label: 'Profils',       icon: '🧩' },
-    { id: 'shortcuts', label: 'Raccourcis',    icon: '⌨️' },
-    { id: 'appearance',label: 'Apparence',     icon: '🌙' },
-    { id: 'data',      label: 'Données',       icon: '💾' },
+    { id: 'ai_text', label: 'IA Texte', icon: '🤖' },
+    { id: 'ai_image', label: 'IA Images', icon: '🎨' },
+    { id: 'appearance', label: 'Apparence', icon: '🌙' },
+    { id: 'data', label: 'Données', icon: '💾' }
   ];
 
-  let currentScreen = 'profile';
+  let currentScreen = 'ai_text';
   let slideDir = 1;
 
   function goTo(id: string) {
     const from = SCREENS.findIndex(s => s.id === currentScreen);
     const to   = SCREENS.findIndex(s => s.id === id);
-    slideDir = to >= from ? 1 : -1;
+    if (to === -1) return;
+    slideDir = to >= (from === -1 ? 0 : from) ? 1 : -1;
     currentScreen = id;
   }
 
+  type ProviderConfig = {
+    id: string;
+    name: string;
+    models: string[];
+    icon: string;
+  };
+
+  const PROVIDER_ICONS: Record<string, string> = {
+    openrouter: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M16.778 1.844v1.919q-.569-.026-1.138-.032-.708-.008-1.415.037c-1.93.126-4.023.728-6.149 2.237-2.911 2.066-2.731 1.95-4.14 2.75-.396.223-1.342.574-2.185.798-.841.225-1.753.333-1.751.333v4.229s.768.108 1.61.333c.842.224 1.789.575 2.185.799 1.41.798 1.228.683 4.14 2.75 2.126 1.509 4.22 2.11 6.148 2.236.88.058 1.716.041 2.555.005v1.918l7.222-4.168-7.222-4.17v2.176c-.86.038-1.611.065-2.278.021-1.364-.09-2.417-.357-3.979-1.465-2.244-1.593-2.866-2.027-3.68-2.508.889-.518 1.449-.906 3.822-2.59 1.56-1.109 2.614-1.377 3.978-1.466.667-.044 1.418-.017 2.278.02v2.176L24 6.014Z"/></svg>`,
+    openai: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 2.5a3.7 3.7 0 0 1 3.45 2.33 3.7 3.7 0 0 1 3.64 6.14 3.7 3.7 0 0 1-1.38 5.39 3.7 3.7 0 0 1-5.72 3.05 3.7 3.7 0 0 1-5.73-3.03 3.7 3.7 0 0 1-1.37-5.39 3.7 3.7 0 0 1 3.64-6.15A3.7 3.7 0 0 1 12 2.5Zm-.04 3.08-1.84 1.08v2.12l1.86 1.09 1.84-1.07V6.66l-1.86-1.08Zm-4.72 2.76-1.84 1.08v2.12l1.84 1.08 1.85-1.08V9.42L7.24 8.34Zm9.45 0-1.84 1.08v2.12l1.84 1.08 1.85-1.08V9.42l-1.85-1.08ZM12 11.1l-1.86 1.08v2.14L12 15.4l1.85-1.08v-2.14L12 11.1Zm-4.76 2.78-1.84 1.08v2.12l1.84 1.08 1.85-1.08v-2.12l-1.85-1.08Zm9.45 0-1.84 1.08v2.12l1.84 1.08 1.85-1.08v-2.12l-1.85-1.08Zm-4.72 2.75-1.84 1.07v2.13l1.86 1.07 1.84-1.08v-2.11l-1.86-1.08Z"/></svg>`,
+    anthropic: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M17.304 3.541h-3.672L20.328 20.46H24zm-10.608 0L0 20.46h3.744l1.37-3.553h7.005l1.37 3.553h3.744L10.536 3.541Zm-.371 10.223 2.291-5.946 2.292 5.946z"/></svg>`,
+    mistral: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M17.143 3.429v3.428h-3.429v3.429h-3.428V6.857H6.857V3.43H3.43v13.714H0v3.428h10.286v-3.428H6.857v-3.429h3.429v3.429h3.429v-3.429h3.428v3.429h-3.428v3.428H24v-3.428h-3.43V3.429z"/></svg>`,
+    groq: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 2a10 10 0 1 0 9.2 13.9h-3a7.2 7.2 0 1 1-1.3-7.92L14 11h8V3l-2.78 2.78A9.95 9.95 0 0 0 12 2Z"/></svg>`,
+    together: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="5" r="4" fill="currentColor"/><circle cx="5" cy="18" r="4" fill="currentColor" opacity="0.5"/><circle cx="19" cy="18" r="4" fill="currentColor" opacity="0.5"/></svg>`,
+    ollama: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="6" y="7" width="12" height="10" rx="3" fill="currentColor"/><circle cx="10" cy="12" r="1.5" fill="var(--color-bg-primary)"/><circle cx="14" cy="12" r="1.5" fill="var(--color-bg-primary)"/><path d="M9 4.5h2M13 4.5h2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+    fal_img: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" d="M5 4h9M5 4v16M5 12h7"/><path fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" d="M16 14l3 3-3 3M14 17h5"/></svg>`,
+    stability: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 2 2 20h20L12 2Zm0 4.5L19.5 20h-15L12 6.5Z"/><circle cx="12" cy="15" r="1.5" fill="currentColor"/></svg>`,
+    none: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="3" width="18" height="18" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/><line x1="3" y1="3" x2="21" y2="21" stroke="currentColor" stroke-width="1.5"/></svg>`,
+    default: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>`
+  };
+
+  function providerIconSvg(providerId: string): string {
+    return PROVIDER_ICONS[providerId] ?? PROVIDER_ICONS.default;
+  }
+
   // ── Config data ───────────────────────────
-  const TEXT_PROVIDERS = [
+  const TEXT_PROVIDERS: ProviderConfig[] = [
     {
       id: 'openrouter',
       name: 'OpenRouter',
       models: [
         'openai/gpt-5-mini',
+        'openai/gpt-5',
         'anthropic/claude-sonnet-4.5',
         'google/gemini-2.5-pro',
         'meta-llama/llama-3.3-70b-instruct'
-      ]
+      ],
+      icon: providerIconSvg('openrouter')
     },
-    { id: 'openai', name: 'OpenAI', models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'] },
-    { id: 'anthropic', name: 'Anthropic', models: ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001'] },
-    { id: 'mistral', name: 'Mistral AI', models: ['mistral-large-latest', 'mistral-medium-latest', 'mistral-small-latest', 'open-mixtral-8x7b'] },
-    { id: 'groq', name: 'Groq', models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768', 'gemma2-9b-it'] },
+    {
+      id: 'openai',
+      name: 'OpenAI',
+      models: ['gpt-4o', 'gpt-4o-mini', 'o4-mini', 'o3', 'gpt-4.1-mini'],
+      icon: providerIconSvg('openai')
+    },
+    {
+      id: 'anthropic',
+      name: 'Anthropic',
+      models: ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-3-5-sonnet-latest', 'claude-haiku-4-5-20251001'],
+      icon: providerIconSvg('anthropic')
+    },
+    {
+      id: 'mistral',
+      name: 'Mistral AI',
+      models: ['mistral-large-latest', 'mistral-medium-latest', 'mistral-small-latest', 'ministral-8b-latest', 'open-mixtral-8x7b'],
+      icon: providerIconSvg('mistral')
+    },
+    {
+      id: 'groq',
+      name: 'Groq',
+      models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768', 'qwen/qwen3-32b'],
+      icon: providerIconSvg('groq')
+    },
     {
       id: 'together',
       name: 'Together AI',
       models: [
         'meta-llama/Llama-3.3-70B-Instruct-Turbo',
         'meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo',
-        'mistralai/Mixtral-8x7B-Instruct-v0.1'
-      ]
+        'mistralai/Mixtral-8x7B-Instruct-v0.1',
+        'Qwen/Qwen2.5-72B-Instruct-Turbo'
+      ],
+      icon: providerIconSvg('together')
     },
-    { id: 'ollama', name: 'Ollama (local)', models: ['llama3.3', 'mistral', 'gemma3', 'qwen2.5'] },
-    { id: 'none', name: 'Aucun (texte manuel)', models: [] },
+    { id: 'ollama', name: 'Ollama (local)', models: ['llama3.3', 'mistral', 'gemma3', 'qwen2.5'], icon: providerIconSvg('ollama') },
+    { id: 'none', name: 'Aucun (texte manuel)', models: [], icon: providerIconSvg('none') }
   ];
 
-  const IMAGE_PROVIDERS = [
+  const IMAGE_PROVIDERS: ProviderConfig[] = [
     {
       id: 'openrouter_img',
       name: 'OpenRouter Images',
       models: [
         'google/gemini-2.5-flash-image',
-        'openai/gpt-5-image-mini',
-        'openai/gpt-5-image',
         'google/gemini-3.1-flash-image-preview',
         'google/gemini-3-pro-image-preview',
+        'openai/gpt-5-image-mini',
+        'openai/gpt-5-image',
+        'openai/gpt-image-1',
         'black-forest-labs/flux.2-max',
         'black-forest-labs/flux.2-pro',
         'black-forest-labs/flux.2-flex',
         'black-forest-labs/flux.2-klein-4b'
-      ]
+      ],
+      icon: providerIconSvg('openrouter')
     },
     {
       id: 'fal_img',
@@ -92,23 +139,34 @@
         'fal-ai/flux/schnell',
         'fal-ai/flux/dev',
         'fal-ai/flux-pro/v1.1',
+        'fal-ai/flux-pro/v1.1-ultra',
         'fal-ai/recraft-v3',
-        'fal-ai/ideogram/v2'
-      ]
+        'fal-ai/ideogram/v2',
+        'fal-ai/stable-diffusion-v3-medium'
+      ],
+      icon: providerIconSvg('fal_img')
     },
     {
       id: 'together_img',
       name: 'Together AI Images',
       models: [
         'black-forest-labs/FLUX.1-schnell',
+        'black-forest-labs/FLUX.1-schnell-Free',
         'black-forest-labs/FLUX.1-dev',
+        'black-forest-labs/FLUX.1.1-pro',
         'stabilityai/stable-diffusion-xl-base-1.0',
         'stabilityai/stable-diffusion-3-medium'
-      ]
+      ],
+      icon: providerIconSvg('together')
     },
-    { id: 'openai_img', name: 'DALL-E (OpenAI)', models: ['dall-e-3', 'dall-e-2'] },
-    { id: 'stability', name: 'Stability AI', models: ['ultra', 'core'] },
-    { id: 'none', name: 'Aucun (texte uniquement)', models: [] },
+    {
+      id: 'openai_img',
+      name: 'OpenAI Images',
+      models: ['gpt-image-1', 'gpt-image-1-mini'],
+      icon: providerIconSvg('openai')
+    },
+    { id: 'stability', name: 'Stability AI', models: ['ultra', 'core'], icon: providerIconSvg('stability') },
+    { id: 'none', name: 'Aucun (texte uniquement)', models: [], icon: providerIconSvg('none') }
   ];
 
   const WRITING_STYLES = [
@@ -135,10 +193,209 @@
   const AVATARS = ['🧑‍🚀', '👩‍🚀', '🧙', '🧙‍♀️', '⚔️', '🤖', '👾', '🦾', '🌌', '💫', '🔵', '🔴'];
 
   // ── Helpers ───────────────────────────────
+  const IMAGE_MODEL_PATTERN = /(image|flux|sdxl|stable[-_\s]?diffusion|sd3|gpt-image|ideogram|recraft|kandinsky|sana|lumina|dall)/i;
+
+  let dynamicTextModels: Record<string, string[]> = {};
+  let dynamicImageModels: Record<string, string[]> = {};
+  let syncingTextModels = false;
+  let syncingImageModels = false;
+  let syncTextMessage = '';
+  let syncImageMessage = '';
+
   $: activeTextProvider = TEXT_PROVIDERS.find(p => p.id === preferences?.textProvider);
   $: activeImageProvider = IMAGE_PROVIDERS.find(p => p.id === preferences?.imageProvider);
-  $: textProviderModels = activeTextProvider?.models ?? [];
-  $: imageProviderModels = activeImageProvider?.models ?? [];
+  $: textProviderModels = getTextProviderModels(preferences?.textProvider);
+  $: imageProviderModels = getImageProviderModels(preferences?.imageProvider);
+
+  function uniqueSorted(models: string[]): string[] {
+    return Array.from(new Set(models.map(m => m.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+  }
+
+  function normalizeOllamaUrl(url?: string): string {
+    const source = (url || '').trim() || 'http://localhost:11434';
+    return source.replace(/\/+$/, '');
+  }
+
+  function getTextProviderModels(providerId?: string): string[] {
+    if (!providerId) return [];
+    return dynamicTextModels[providerId] ?? TEXT_PROVIDERS.find(p => p.id === providerId)?.models ?? [];
+  }
+
+  function getImageProviderModels(providerId?: string): string[] {
+    if (!providerId) return [];
+    return dynamicImageModels[providerId] ?? IMAGE_PROVIDERS.find(p => p.id === providerId)?.models ?? [];
+  }
+
+  function requireApiKey(key: string | undefined, providerName: string): string | null {
+    const value = key?.trim() || '';
+    if (!value) {
+      showToast(`Ajoute une clé API pour ${providerName} avant la synchronisation.`, 'warning');
+      return null;
+    }
+    return value;
+  }
+
+  async function fetchModelsFromJsonEndpoint(url: string, headers: Record<string, string> = {}): Promise<string[]> {
+    const response = await fetch(url, { headers });
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => '');
+      throw new Error(errorText || `HTTP ${response.status}`);
+    }
+
+    const payload = await response.json() as { data?: Array<{ id?: string }> };
+    return uniqueSorted((payload.data || []).map(entry => String(entry?.id || '')).filter(Boolean));
+  }
+
+  async function refreshTextModels() {
+    if (!preferences) return;
+
+    const providerId = preferences.textProvider;
+    if (!providerId || providerId === 'none') {
+      showToast('Sélectionne un provider texte pour récupérer des modèles.', 'info');
+      return;
+    }
+
+    syncingTextModels = true;
+    syncTextMessage = '';
+
+    try {
+      let models: string[] = [];
+
+      if (providerId === 'ollama') {
+        const ollamaUrl = normalizeOllamaUrl(preferences.ollamaUrl);
+        const response = await fetch(`${ollamaUrl}/api/tags`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json() as { models?: Array<{ name?: string }> };
+        models = uniqueSorted((payload.models || []).map(model => String(model?.name || '')).filter(Boolean));
+      } else if (providerId === 'openrouter') {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        const optionalKey = preferences.textApiKey?.trim();
+        if (optionalKey) headers.Authorization = `Bearer ${optionalKey}`;
+        models = await fetchModelsFromJsonEndpoint('https://openrouter.ai/api/v1/models', headers);
+      } else if (providerId === 'openai') {
+        const key = requireApiKey(preferences.textApiKey, 'OpenAI');
+        if (!key) return;
+        models = await fetchModelsFromJsonEndpoint('https://api.openai.com/v1/models', {
+          Authorization: `Bearer ${key}`
+        });
+      } else if (providerId === 'anthropic') {
+        const key = requireApiKey(preferences.textApiKey, 'Anthropic');
+        if (!key) return;
+        models = await fetchModelsFromJsonEndpoint('https://api.anthropic.com/v1/models', {
+          'x-api-key': key,
+          'anthropic-version': '2023-06-01'
+        });
+      } else if (providerId === 'mistral') {
+        const key = requireApiKey(preferences.textApiKey, 'Mistral');
+        if (!key) return;
+        models = await fetchModelsFromJsonEndpoint('https://api.mistral.ai/v1/models', {
+          Authorization: `Bearer ${key}`
+        });
+      } else if (providerId === 'groq') {
+        const key = requireApiKey(preferences.textApiKey, 'Groq');
+        if (!key) return;
+        models = await fetchModelsFromJsonEndpoint('https://api.groq.com/openai/v1/models', {
+          Authorization: `Bearer ${key}`
+        });
+      } else if (providerId === 'together') {
+        const key = requireApiKey(preferences.textApiKey, 'Together AI');
+        if (!key) return;
+        models = await fetchModelsFromJsonEndpoint('https://api.together.xyz/v1/models', {
+          Authorization: `Bearer ${key}`
+        });
+      }
+
+      if (!models.length) {
+        throw new Error('Aucun modèle détecté');
+      }
+
+      dynamicTextModels = { ...dynamicTextModels, [providerId]: models };
+
+      if (!models.includes(preferences.textModel || '')) {
+        preferences.textModel = models[0] || '';
+      }
+
+      syncTextMessage = `${models.length} modèles synchronisés.`;
+      showToast(syncTextMessage, 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur inconnue';
+      syncTextMessage = `Échec de synchronisation (${message})`;
+      showToast(`Impossible de récupérer les modèles texte : ${message}`, 'error');
+    } finally {
+      syncingTextModels = false;
+    }
+  }
+
+  async function refreshImageModels() {
+    if (!preferences) return;
+
+    const providerId = preferences.imageProvider;
+    if (!providerId || providerId === 'none') {
+      showToast('Sélectionne un provider image pour récupérer des modèles.', 'info');
+      return;
+    }
+
+    syncingImageModels = true;
+    syncImageMessage = '';
+
+    try {
+      let models: string[] = [];
+
+      if (providerId === 'openrouter_img') {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        const key = (preferences.imageApiKey || preferences.textApiKey || '').trim();
+        if (key) headers.Authorization = `Bearer ${key}`;
+
+        const allModels = await fetchModelsFromJsonEndpoint('https://openrouter.ai/api/v1/models', headers);
+        models = allModels.filter(model => IMAGE_MODEL_PATTERN.test(model));
+      } else if (providerId === 'openai_img') {
+        const key = requireApiKey(preferences.imageApiKey || preferences.textApiKey, 'OpenAI Images');
+        if (!key) return;
+
+        const allModels = await fetchModelsFromJsonEndpoint('https://api.openai.com/v1/models', {
+          Authorization: `Bearer ${key}`
+        });
+        models = allModels.filter(model => /^gpt-image/i.test(model) || /image/i.test(model));
+
+        if (!models.length) {
+          models = ['gpt-image-1'];
+        }
+      } else if (providerId === 'together_img') {
+        const key = requireApiKey(preferences.imageApiKey, 'Together AI Images');
+        if (!key) return;
+
+        const allModels = await fetchModelsFromJsonEndpoint('https://api.together.xyz/v1/models', {
+          Authorization: `Bearer ${key}`
+        });
+        models = allModels.filter(model => IMAGE_MODEL_PATTERN.test(model));
+      } else {
+        models = IMAGE_PROVIDERS.find(provider => provider.id === providerId)?.models || [];
+      }
+
+      models = uniqueSorted(models);
+      if (!models.length) {
+        throw new Error('Aucun modèle image détecté');
+      }
+
+      dynamicImageModels = { ...dynamicImageModels, [providerId]: models };
+
+      if (!models.includes(preferences.imageModel || '')) {
+        preferences.imageModel = models[0] || '';
+      }
+
+      preferences.defaultImageProvider = preferences.imageProvider;
+      preferences.defaultImgModel = preferences.imageModel;
+
+      syncImageMessage = `${models.length} modèles synchronisés.`;
+      showToast(syncImageMessage, 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur inconnue';
+      syncImageMessage = `Échec de synchronisation (${message})`;
+      showToast(`Impossible de récupérer les modèles image : ${message}`, 'error');
+    } finally {
+      syncingImageModels = false;
+    }
+  }
 
   function applyPreferenceDefaults(input: UserPreferences): UserPreferences {
     const next = { ...input };
@@ -215,8 +472,10 @@
     const provider = TEXT_PROVIDERS.find(p => p.id === providerId);
     if (!provider) return;
 
-    if (!provider.models.includes(preferences.textModel || '')) {
-      preferences.textModel = provider.models[0] ?? '';
+    const availableModels = getTextProviderModels(providerId);
+
+    if (!availableModels.includes(preferences.textModel || '')) {
+      preferences.textModel = availableModels[0] ?? '';
     }
 
     if (providerId === 'none') {
@@ -236,8 +495,10 @@
     const provider = IMAGE_PROVIDERS.find(p => p.id === providerId);
     if (!provider) return;
 
-    if (!provider.models.includes(preferences.imageModel || '')) {
-      preferences.imageModel = provider.models[0] ?? '';
+    const availableModels = getImageProviderModels(providerId);
+
+    if (!availableModels.includes(preferences.imageModel || '')) {
+      preferences.imageModel = availableModels[0] ?? '';
     }
 
     if (providerId === 'none') {
@@ -512,7 +773,7 @@
             {:else if currentScreen === 'ai_text'}
               <div class="screen-header">
                 <h2>Modèle de texte</h2>
-                <p>Choisissez l'IA qui générera vos histoires</p>
+                <p>Choisissez l'IA qui générera vos histoires. Profil, style et contenu se règlent désormais pendant la création.</p>
               </div>
 
               <div class="provider-grid">
@@ -522,8 +783,11 @@
                     class:selected={preferences.textProvider === p.id}
                     on:click={() => selectTextProvider(p.id)}
                   >
-                    <span class="provider-name">{p.name}</span>
-                    {#if p.models.length}<span class="provider-models">{p.models.length} modèles</span>{/if}
+                    <span class="provider-head">
+                      <span class="provider-logo" aria-hidden="true">{@html p.icon}</span>
+                      <span class="provider-name">{p.name}</span>
+                    </span>
+                    <span class="provider-models">{getTextProviderModels(p.id).length} modèles</span>
                   </button>
                 {/each}
               </div>
@@ -563,11 +827,24 @@
                       />
                     </div>
                   {/if}
+
+                  <div class="field provider-tools">
+                    <button
+                      class="btn btn-secondary"
+                      on:click={refreshTextModels}
+                      disabled={syncingTextModels}
+                    >
+                      {syncingTextModels ? 'Synchronisation…' : 'Récupérer les modèles'}
+                    </button>
+                    {#if syncTextMessage}
+                      <span class="field-hint">{syncTextMessage}</span>
+                    {/if}
+                    <span class="field-hint">Astuce : OpenRouter permet de récupérer de longues listes de modèles en direct.</span>
+                  </div>
                 </div>
               {/if}
 
               <div class="screen-footer">
-                <button class="btn-back" on:click={() => goTo('profile')}>← Retour</button>
                 <button class="btn-next" on:click={() => goTo('ai_image')}>Suivant : IA Images →</button>
               </div>
 
@@ -585,8 +862,11 @@
                     class:selected={preferences.imageProvider === p.id}
                     on:click={() => selectImageProvider(p.id)}
                   >
-                    <span class="provider-name">{p.name}</span>
-                    {#if p.models.length}<span class="provider-models">{p.models.length} modèles</span>{/if}
+                    <span class="provider-head">
+                      <span class="provider-logo" aria-hidden="true">{@html p.icon}</span>
+                      <span class="provider-name">{p.name}</span>
+                    </span>
+                    <span class="provider-models">{getImageProviderModels(p.id).length} modèles</span>
                   </button>
                 {/each}
               </div>
@@ -613,12 +893,25 @@
                     />
                     <span class="field-hint">Stockée localement, jamais envoyée à nos serveurs</span>
                   </div>
+
+                  <div class="field provider-tools">
+                    <button
+                      class="btn btn-secondary"
+                      on:click={refreshImageModels}
+                      disabled={syncingImageModels}
+                    >
+                      {syncingImageModels ? 'Synchronisation…' : 'Récupérer les modèles'}
+                    </button>
+                    {#if syncImageMessage}
+                      <span class="field-hint">{syncImageMessage}</span>
+                    {/if}
+                  </div>
                 </div>
               {/if}
 
               <div class="screen-footer">
                 <button class="btn-back" on:click={() => goTo('ai_text')}>← Retour</button>
-                <button class="btn-next" on:click={() => goTo('style')}>Suivant : Style →</button>
+                <button class="btn-next" on:click={() => goTo('appearance')}>Suivant : Apparence →</button>
               </div>
 
             <!-- ── STYLE ──────────────────────────── -->
@@ -910,7 +1203,7 @@
               </div>
 
               <div class="screen-footer">
-                <button class="btn-back" on:click={() => goTo('shortcuts')}>← Retour</button>
+                <button class="btn-back" on:click={() => goTo('ai_image')}>← Retour</button>
                 <button class="btn-next" on:click={() => goTo('data')}>Suivant : Données →</button>
               </div>
 
@@ -1201,6 +1494,29 @@
     background: rgba(255, 232, 31, 0.08);
   }
 
+  .provider-head {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-sm);
+    width: 100%;
+  }
+
+  .provider-logo {
+    width: 20px;
+    height: 20px;
+    color: var(--color-text-primary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .provider-logo :global(svg) {
+    width: 20px;
+    height: 20px;
+    display: block;
+  }
+
   .provider-name {
     font-weight: 600;
     color: var(--color-text-primary);
@@ -1210,6 +1526,10 @@
   .provider-models {
     font-size: 0.75rem;
     color: var(--color-text-muted);
+  }
+
+  .provider-tools {
+    gap: var(--space-xs);
   }
 
   /* ── Option grid (style/tone) ────────────── */

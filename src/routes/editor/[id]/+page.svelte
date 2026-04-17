@@ -5,7 +5,7 @@
   import { get } from 'svelte/store';
   import { onDestroy } from 'svelte';
   import { story, saveStory, createStory, loadStory, currentSetup, updateSetupField, updateContent, startAutoSave, stopAutoSave } from '$lib/stores/editor';
-  import { showToast, toasts } from '$lib/stores/ui';
+  import { showToast } from '$lib/stores/ui';
   import { getPreferences } from '$lib/db';
   import SvgIcon from '$lib/components/SvgIcon.svelte';
   import PageHeader from '$lib/components/PageHeader.svelte';
@@ -68,7 +68,55 @@
     { id: 'custom', name: "Libre", icon: '✏️', premise: '' }
   ];
 
+  const AVATARS = ['🧑‍🚀', '👩‍🚀', '🧙', '🧙‍♀️', '⚔️', '🤖', '👾', '🦾', '🌌', '💫', '🔵', '🔴'];
+
+  const WRITING_STYLES = [
+    { id: 'cinematique', name: 'Cinématique', desc: 'Scènes courtes, rythme intense, style film' },
+    { id: 'litteraire', name: 'Littéraire', desc: 'Prose riche, descriptions profondes, introspection' },
+    { id: 'epique', name: 'Épique', desc: 'Grandeur, batailles, destins héroïques' },
+    { id: 'immersif', name: 'Immersif', desc: '2e personne, style jeu de rôle' }
+  ];
+
+  const WRITING_TONES = [
+    { id: 'heroique', name: 'Héroïque', desc: 'Courage, sacrifice, lumière' },
+    { id: 'sombre', name: 'Sombre', desc: 'Tension, danger, ambiguïté morale' },
+    { id: 'aventure', name: 'Aventure', desc: 'Action, humour, légèreté' },
+    { id: 'drame', name: 'Dramatique', desc: 'Émotions, relations, trahisons' }
+  ];
+
+  const WRITING_POVS = [
+    { id: 'premiere', name: '1ère personne — Je' },
+    { id: 'troisieme', name: '3ème personne — Il/Elle' }
+  ];
+
+  const WRITING_LENGTHS = [
+    { id: 'court', name: 'Court' },
+    { id: 'moyen', name: 'Moyen' },
+    { id: 'long', name: 'Long' }
+  ];
+
+  const CONTENT_MODES = [
+    { id: 'cinematic', icon: '🎬', name: 'Cinéma', desc: 'Intense mais équilibré.' },
+    { id: 'dark', icon: '🌒', name: 'Sombre', desc: 'Ambiance dure et tendue.' },
+    { id: 'adult', icon: '🔞', name: 'Adulte', desc: 'Mature, selon les limites du provider.' },
+    { id: 'raw', icon: '⚠️', name: 'Brut', desc: 'Très frontal (si le modèle le permet).' }
+  ];
+
   let selectedTrame: string | null = null;
+
+  function applySetupDefaultsFromPreferences(prefs: Awaited<ReturnType<typeof getPreferences>>) {
+    const setup = get(currentSetup);
+
+    if (!setup.protagonistFirstName && prefs.firstName) updateSetupField('protagonistFirstName', prefs.firstName);
+    if (!setup.protagonistLastName && prefs.lastName) updateSetupField('protagonistLastName', prefs.lastName);
+    if (!setup.protagonistAvatar && prefs.avatarEmoji) updateSetupField('protagonistAvatar', prefs.avatarEmoji);
+
+    if (!setup.writingStyle && prefs.writingStyle) updateSetupField('writingStyle', prefs.writingStyle);
+    if (!setup.writingTone && prefs.writingTone) updateSetupField('writingTone', prefs.writingTone);
+    if (!setup.writingPov && prefs.writingPov) updateSetupField('writingPov', prefs.writingPov);
+    if (!setup.writingLength && prefs.writingLength) updateSetupField('writingLength', prefs.writingLength);
+    if (!setup.contentMode && prefs.contentMode) updateSetupField('contentMode', prefs.contentMode);
+  }
 
   onMount(async () => {
     const id = $page.params.id;
@@ -80,6 +128,10 @@
     loading = false;
 
     const prefs = await getPreferences();
+    if (!storyId) {
+      applySetupDefaultsFromPreferences(prefs);
+    }
+
     if (prefs.autoSave) {
       startAutoSave(prefs.autoSaveInterval);
     }
@@ -101,6 +153,40 @@
     updateSetupField('role', roleId);
   }
 
+  function selectAvatar(avatar: string) {
+    updateSetupField('protagonistAvatar', avatar);
+  }
+
+  function handleFirstNameInput(e: Event) {
+    const target = e.target as HTMLInputElement;
+    updateSetupField('protagonistFirstName', target.value);
+  }
+
+  function handleLastNameInput(e: Event) {
+    const target = e.target as HTMLInputElement;
+    updateSetupField('protagonistLastName', target.value);
+  }
+
+  function selectWritingStyle(styleId: string) {
+    updateSetupField('writingStyle', styleId);
+  }
+
+  function selectWritingTone(toneId: string) {
+    updateSetupField('writingTone', toneId);
+  }
+
+  function selectWritingPov(povId: string) {
+    updateSetupField('writingPov', povId);
+  }
+
+  function selectWritingLength(lengthId: string) {
+    updateSetupField('writingLength', lengthId);
+  }
+
+  function selectContentMode(modeId: string) {
+    updateSetupField('contentMode', modeId);
+  }
+
   function handlePremiseInput(e: Event) {
     const target = e.target as HTMLTextAreaElement;
     updateSetupField('premise', target.value);
@@ -113,7 +199,15 @@
 
   function canProceedToEdit(): boolean {
     const setup = get(currentSetup);
-    return !!(setup.era && setup.faction && setup.role && selectedTrame);
+    return !!(
+      setup.era &&
+      setup.faction &&
+      setup.role &&
+      selectedTrame &&
+      setup.writingStyle &&
+      setup.writingTone &&
+      setup.contentMode
+    );
   }
 
   function proceedToEdit() {
@@ -160,6 +254,14 @@
 
   function getCurrentRole() {
     return ROLES.find(r => r.id === $currentSetup.role);
+  }
+
+  function getWritingStyleLabel() {
+    return WRITING_STYLES.find(item => item.id === $currentSetup.writingStyle)?.name || '—';
+  }
+
+  function getContentModeLabel() {
+    return CONTENT_MODES.find(item => item.id === $currentSetup.contentMode)?.name || '—';
   }
 
   function getFilteredRoles() {
@@ -324,6 +426,144 @@
             {/if}
           </section>
 
+          <section class="setup-section">
+            <h2>
+              <span class="step-number">5</span>
+              Profil du protagoniste
+            </h2>
+
+            <div class="story-profile-card">
+              <div class="avatar-row">
+                {#each AVATARS as avatar}
+                  <button
+                    class="avatar-btn"
+                    class:selected={$currentSetup.protagonistAvatar === avatar}
+                    on:click={() => selectAvatar(avatar)}
+                    aria-label={`Avatar ${avatar}`}
+                  >
+                    {avatar}
+                  </button>
+                {/each}
+              </div>
+
+              <div class="name-grid">
+                <label class="name-field">
+                  <span>Prénom</span>
+                  <input
+                    class="name-input"
+                    type="text"
+                    placeholder="Luke"
+                    value={$currentSetup.protagonistFirstName || ''}
+                    on:input={handleFirstNameInput}
+                  />
+                </label>
+                <label class="name-field">
+                  <span>Nom</span>
+                  <input
+                    class="name-input"
+                    type="text"
+                    placeholder="Skywalker"
+                    value={$currentSetup.protagonistLastName || ''}
+                    on:input={handleLastNameInput}
+                  />
+                </label>
+              </div>
+            </div>
+          </section>
+
+          <section class="setup-section">
+            <h2>
+              <span class="step-number">6</span>
+              Style narratif
+            </h2>
+
+            <div class="field-stack">
+              <div>
+                <h3 class="subheading">Style</h3>
+                <div class="style-grid">
+                  {#each WRITING_STYLES as style}
+                    <button
+                      class="style-card"
+                      class:selected={$currentSetup.writingStyle === style.id}
+                      on:click={() => selectWritingStyle(style.id)}
+                    >
+                      <span class="style-name">{style.name}</span>
+                      <span class="style-desc">{style.desc}</span>
+                    </button>
+                  {/each}
+                </div>
+              </div>
+
+              <div>
+                <h3 class="subheading">Ton</h3>
+                <div class="style-grid">
+                  {#each WRITING_TONES as tone}
+                    <button
+                      class="style-card"
+                      class:selected={$currentSetup.writingTone === tone.id}
+                      on:click={() => selectWritingTone(tone.id)}
+                    >
+                      <span class="style-name">{tone.name}</span>
+                      <span class="style-desc">{tone.desc}</span>
+                    </button>
+                  {/each}
+                </div>
+              </div>
+
+              <div class="dual-settings-row">
+                <div>
+                  <h3 class="subheading">Point de vue</h3>
+                  <div class="toggle-chip-group">
+                    {#each WRITING_POVS as pov}
+                      <button
+                        class="toggle-chip"
+                        class:active={$currentSetup.writingPov === pov.id}
+                        on:click={() => selectWritingPov(pov.id)}
+                      >
+                        {pov.name}
+                      </button>
+                    {/each}
+                  </div>
+                </div>
+
+                <div>
+                  <h3 class="subheading">Longueur</h3>
+                  <div class="toggle-chip-group">
+                    {#each WRITING_LENGTHS as length}
+                      <button
+                        class="toggle-chip"
+                        class:active={$currentSetup.writingLength === length.id}
+                        on:click={() => selectWritingLength(length.id)}
+                      >
+                        {length.name}
+                      </button>
+                    {/each}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="setup-section">
+            <h2>
+              <span class="step-number">7</span>
+              Intensité du contenu
+            </h2>
+            <div class="content-mode-grid">
+              {#each CONTENT_MODES as mode}
+                <button
+                  class="content-mode-card"
+                  class:selected={$currentSetup.contentMode === mode.id}
+                  on:click={() => selectContentMode(mode.id)}
+                >
+                  <span class="content-mode-icon">{mode.icon}</span>
+                  <span class="content-mode-name">{mode.name}</span>
+                  <span class="content-mode-desc">{mode.desc}</span>
+                </button>
+              {/each}
+            </div>
+          </section>
+
           <div class="setup-actions">
             <button
               class="btn btn-primary btn-large"
@@ -355,6 +595,22 @@
             <div class="context-item">
               <span class="context-label">Rôle</span>
               <span class="context-value">{getCurrentRole()?.name}</span>
+            </div>
+            {#if $currentSetup.protagonistFirstName || $currentSetup.protagonistLastName}
+              <div class="context-item">
+                <span class="context-label">Protagoniste</span>
+                <span class="context-value">
+                  {$currentSetup.protagonistAvatar || '🧑‍🚀'} {$currentSetup.protagonistFirstName || ''} {$currentSetup.protagonistLastName || ''}
+                </span>
+              </div>
+            {/if}
+            <div class="context-item">
+              <span class="context-label">Style</span>
+              <span class="context-value">{getWritingStyleLabel()}</span>
+            </div>
+            <div class="context-item">
+              <span class="context-label">Mode</span>
+              <span class="context-value">{getContentModeLabel()}</span>
             </div>
             <button class="btn btn-ghost btn-small" on:click={goBackToSetup}>
               Modifier
@@ -737,6 +993,205 @@ Utilisez les boutons ci-dessus pour ajouter des sections:
 
   .premise-input::placeholder {
     color: var(--color-text-muted);
+  }
+
+  .story-profile-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    padding: var(--space-lg);
+    background: var(--color-bg-secondary);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-lg);
+  }
+
+  .avatar-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+  }
+
+  .avatar-btn {
+    width: 44px;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    background: var(--color-bg-tertiary);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .avatar-btn:hover,
+  .avatar-btn.selected {
+    border-color: var(--color-gold);
+    background: rgba(255, 232, 31, 0.1);
+  }
+
+  .name-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--space-md);
+  }
+
+  .name-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    color: var(--color-text-muted);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+  }
+
+  .name-input {
+    padding: var(--space-sm) var(--space-md);
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text-primary);
+    font-size: 0.95rem;
+  }
+
+  .name-input:focus {
+    outline: none;
+    border-color: var(--color-gold);
+  }
+
+  .field-stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+  }
+
+  .subheading {
+    margin-bottom: var(--space-sm);
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+  }
+
+  .style-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--space-sm);
+  }
+
+  .style-card {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: var(--space-md);
+    background: var(--color-bg-secondary);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-md);
+    text-align: left;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .style-card:hover {
+    border-color: var(--color-gold);
+  }
+
+  .style-card.selected {
+    border-color: var(--color-gold);
+    background: rgba(255, 232, 31, 0.08);
+  }
+
+  .style-name {
+    color: var(--color-text-primary);
+    font-weight: 600;
+  }
+
+  .style-desc {
+    color: var(--color-text-muted);
+    font-size: 0.8rem;
+    line-height: 1.35;
+  }
+
+  .dual-settings-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: var(--space-md);
+  }
+
+  .toggle-chip-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+  }
+
+  .toggle-chip {
+    padding: var(--space-sm) var(--space-md);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-secondary);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .toggle-chip:hover {
+    border-color: var(--color-gold);
+    color: var(--color-text-primary);
+  }
+
+  .toggle-chip.active {
+    border-color: var(--color-gold);
+    background: rgba(255, 232, 31, 0.1);
+    color: var(--color-gold);
+    font-weight: 600;
+  }
+
+  .content-mode-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--space-sm);
+  }
+
+  .content-mode-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding: var(--space-md);
+    background: var(--color-bg-secondary);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    text-align: left;
+  }
+
+  .content-mode-card:hover {
+    border-color: var(--color-gold);
+  }
+
+  .content-mode-card.selected {
+    border-color: var(--color-gold);
+    background: rgba(255, 232, 31, 0.08);
+  }
+
+  .content-mode-icon {
+    font-size: 1.25rem;
+  }
+
+  .content-mode-name {
+    color: var(--color-text-primary);
+    font-weight: 600;
+  }
+
+  .content-mode-desc {
+    color: var(--color-text-muted);
+    font-size: 0.8rem;
+    line-height: 1.35;
   }
 
   .setup-actions {
