@@ -8,7 +8,7 @@ export interface LanguageOption {
 }
 
 export const UI_LANGUAGE_OPTIONS: LanguageOption[] = [
-  { code: 'auto', name: 'Auto-détection' },
+  { code: 'auto', name: 'Auto (navigateur)' },
   { code: 'fr', name: 'Français' },
   { code: 'en', name: 'English' },
   { code: 'es', name: 'Español' },
@@ -71,7 +71,7 @@ export function resolveUiLanguage(code?: string | null): Exclude<UiLanguageCode,
 }
 
 export function getLanguageLabel(code: UiLanguageCode | string | null | undefined): string {
-  if (!code) return 'Auto-détection';
+  if (!code) return 'Auto (navigateur)';
   const option = UI_LANGUAGE_OPTIONS.find(language => language.code === code);
-  return option?.name || 'Auto-détection';
+  return option?.name || 'Auto (navigateur)';
 }

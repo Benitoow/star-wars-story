@@ -132,11 +132,11 @@
   }
 
   function handlePlay() {
-    goto(`/story/${story.id}/play`);
+    goto(`/editor/${story.id}`);
   }
 
   function handleEdit() {
-    goto(`/story/${story.id}/edit`);
+    goto(`/editor/${story.id}`);
   }
 </script>
 

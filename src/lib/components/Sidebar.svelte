@@ -103,12 +103,13 @@
   {/if}
 
   <div class="sidebar-footer">
-    <a href="/settings" class="footer-link">
+    <a href="/settings" class="footer-link" aria-label={`Langue de l'interface: ${getLanguageLabel($uiLanguage)}`}>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="10"/>
         <line x1="2" y1="12" x2="22" y2="12"/>
         <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>
       </svg>
+      <span class="footer-link-label">Langue :</span>
       <span>{getLanguageLabel($uiLanguage)}</span>
     </a>
   </div>
@@ -328,6 +329,10 @@
   .footer-link svg {
     width: 16px;
     height: 16px;
+  }
+
+  .footer-link-label {
+    font-weight: 600;
   }
 
   .hide-desktop {

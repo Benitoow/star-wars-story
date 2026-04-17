@@ -1,7 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { toggleSidebar, searchOpen, searchQuery, uiLanguage, viewMode } from '$lib/stores/ui';
-  import { UI_LANGUAGE_OPTIONS, getLanguageLabel, type UiLanguageCode } from '$lib/config/languages';
+  import { UI_LANGUAGE_OPTIONS, type UiLanguageCode } from '$lib/config/languages';
 
   function handleNewStory() {
     goto('/editor/new');
@@ -50,8 +50,8 @@
 
   <div class="header-right">
     <label class="language-switcher" title="Langue de l'interface">
-      <span class="language-switcher-label">{getLanguageLabel($uiLanguage)}</span>
-      <select class="language-select" value={$uiLanguage} on:change={handleLanguageChange}>
+      <span class="language-switcher-label">Langue</span>
+      <select class="language-select" value={$uiLanguage} on:change={handleLanguageChange} aria-label="Langue de l'interface">
         {#each UI_LANGUAGE_OPTIONS as language}
           <option value={language.code}>{language.name}</option>
         {/each}

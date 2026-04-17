@@ -95,7 +95,6 @@
 
   function selectFaction(factionId: string) {
     updateSetupField('faction', factionId);
-    updateSetupField('role', '');
   }
 
   function selectRole(roleId: string) {
@@ -164,9 +163,20 @@
   }
 
   function getFilteredRoles() {
-    if (!$currentSetup.faction) return ROLES;
-    if ($currentSetup.faction === 'neutral') return ROLES.filter(r => r.faction === 'neutral');
-    return ROLES.filter(r => r.faction === $currentSetup.faction || r.faction === 'neutral');
+    const selectedFaction = $currentSetup.faction;
+    if (!selectedFaction) return ROLES;
+
+    const getPriority = (faction: string) => {
+      if (faction === selectedFaction) return 0;
+      if (faction === 'neutral') return 1;
+      return 2;
+    };
+
+    return [...ROLES].sort((a, b) => {
+      const priorityDiff = getPriority(a.faction) - getPriority(b.faction);
+      if (priorityDiff !== 0) return priorityDiff;
+      return a.name.localeCompare(b.name);
+    });
   }
 
   function selectTrame(trame: typeof TRAMES[0]) {
@@ -266,23 +276,23 @@
               Choisissez votre personnage
             </h2>
             {#if !$currentSetup.faction}
-              <p class="hint">Sélectionnez d'abord une faction</p>
-            {:else}
-              <div class="role-grid">
-                {#each getFilteredRoles() as role}
-                  <button
-                    class="role-card"
-                    class:selected={$currentSetup.role === role.id}
-                    on:click={() => selectRole(role.id)}
-                  >
-                    <span class="role-icon">
-                      <SvgIcon filename={role.icon} size={28} color="currentColor" alt={role.name} />
-                    </span>
-                    <span class="role-name">{role.name}</span>
-                  </button>
-                {/each}
-              </div>
+              <p class="hint">Astuce : choisissez d'abord une faction pour voir les rôles recommandés en haut de la liste.</p>
             {/if}
+            <div class="role-grid">
+              {#each getFilteredRoles() as role}
+                <button
+                  class="role-card"
+                  class:selected={$currentSetup.role === role.id}
+                  class:recommended={$currentSetup.faction && (role.faction === $currentSetup.faction || role.faction === 'neutral')}
+                  on:click={() => selectRole(role.id)}
+                >
+                  <span class="role-icon">
+                    <SvgIcon filename={role.icon} size={28} color="currentColor" alt={role.name} />
+                  </span>
+                  <span class="role-name">{role.name}</span>
+                </button>
+              {/each}
+            </div>
           </section>
 
           <!-- Trame + Premise -->
@@ -638,6 +648,10 @@ Utilisez les boutons ci-dessus pour ajouter des sections:
   .role-card.selected {
     border-color: var(--color-gold);
     background: rgba(255, 232, 31, 0.1);
+  }
+
+  .role-card.recommended {
+    border-color: color-mix(in srgb, var(--color-gold) 35%, var(--color-border));
   }
 
   .trame-grid {

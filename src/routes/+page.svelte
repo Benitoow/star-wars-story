@@ -1,38 +1,15 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { stories, filteredStories, recentStories, loadRecentStories } from '$lib/stores/stories';
-  import { viewMode, filters, sortBy, sortDirection, uiLanguage } from '$lib/stores/ui';
+  import { stories, filteredStories } from '$lib/stores/stories';
+  import { viewMode, uiLanguage, resetFilters } from '$lib/stores/ui';
   import { resolveUiLanguage } from '$lib/config/languages';
   import StoryCard from '$lib/components/StoryCard.svelte';
 
   let loading = true;
 
-  const ERAS = [
-    { id: 'old_republic', fr: 'Ancienne République', en: 'Old Republic' },
-    { id: 'clone_wars', fr: 'Guerres des Clones', en: 'Clone Wars' },
-    { id: 'imperial', fr: 'Ère Impériale', en: 'Imperial Era' },
-    { id: 'new_republic', fr: 'Nouvelle République', en: 'New Republic' },
-    { id: 'first_order', fr: 'Premier Ordre', en: 'First Order' }
-  ];
-
-  const FACTIONS = [
-    { id: 'jedi', fr: 'Ordre Jedi', en: 'Jedi Order' },
-    { id: 'sith', fr: 'Ordre Sith', en: 'Sith Order' },
-    { id: 'empire', fr: 'Empire', en: 'Empire' },
-    { id: 'rebels', fr: 'Alliance Rebelle', en: 'Rebel Alliance' },
-    { id: 'republic', fr: 'République', en: 'Republic' },
-    { id: 'mandalore', fr: 'Mandalorians', en: 'Mandalorians' },
-    { id: 'first_order', fr: 'Premier Ordre', en: 'First Order' },
-    { id: 'hutt', fr: 'Cartel Hutt', en: 'Hutt Cartel' },
-    { id: 'neutral', fr: 'Indépendant', en: 'Independent' }
-  ];
-
   const DASHBOARD_COPY = {
     fr: {
       title: 'Dashboard — Star Wars Story Manager',
-      era: 'Ère:',
-      faction: 'Faction:',
-      clear: 'Effacer les filtres',
       myStories: 'Mes Histoires',
       loading: 'Chargement de vos histoires...',
       noStories: 'Aucune histoire',
@@ -43,9 +20,6 @@
     },
     en: {
       title: 'Dashboard — Star Wars Story Manager',
-      era: 'Era:',
-      faction: 'Faction:',
-      clear: 'Clear filters',
       myStories: 'My Stories',
       loading: 'Loading your stories...',
       noStories: 'No stories yet',
@@ -56,35 +30,11 @@
     }
   } as const;
 
-  function pickText(entry: { fr?: string; en?: string }) {
-    return currentLang === 'fr' ? (entry.fr || entry.en || '') : (entry.en || entry.fr || '');
-  }
-
   onMount(async () => {
+    resetFilters();
     await stories.load();
-    await loadRecentStories();
     loading = false;
   });
-
-  function toggleEraFilter(eraId: string) {
-    filters.update(f => ({
-      ...f,
-      era: f.era === eraId ? undefined : eraId
-    }));
-  }
-
-  function toggleFactionFilter(factionId: string) {
-    filters.update(f => ({
-      ...f,
-      faction: f.faction === factionId ? undefined : factionId
-    }));
-  }
-
-  function clearFilters() {
-    filters.set({ tags: [] });
-  }
-
-  $: hasFilters = $filters.era || $filters.faction || $filters.tags.length > 0;
   $: currentLang = resolveUiLanguage($uiLanguage);
   $: copy = DASHBOARD_COPY[currentLang === 'fr' ? 'fr' : 'en'];
 </script>
@@ -94,49 +44,6 @@
 </svelte:head>
 
 <div class="dashboard">
-  <!-- Filters -->
-  <section class="filters-section">
-    <div class="filter-group">
-      <span class="filter-label">{copy.era}</span>
-      <div class="filter-chips">
-        {#each ERAS as era}
-          <button
-            class="chip"
-            class:active={$filters.era === era.id}
-            on:click={() => toggleEraFilter(era.id)}
-          >
-            {pickText(era)}
-          </button>
-        {/each}
-      </div>
-    </div>
-
-    <div class="filter-group">
-      <span class="filter-label">{copy.faction}</span>
-      <div class="filter-chips">
-        {#each FACTIONS as faction}
-          <button
-            class="chip"
-            class:active={$filters.faction === faction.id}
-            on:click={() => toggleFactionFilter(faction.id)}
-          >
-            {pickText(faction)}
-          </button>
-        {/each}
-      </div>
-    </div>
-
-    {#if hasFilters}
-      <button class="clear-filters" on:click={clearFilters}>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="6" x2="6" y2="18"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-        {copy.clear}
-      </button>
-    {/if}
-  </section>
-
   <!-- Stories Grid -->
   <section class="stories-section">
     <div class="section-header">
@@ -185,88 +92,6 @@
   .dashboard {
     max-width: 1200px;
     margin: 0 auto;
-  }
-
-  /* Filters Section */
-  .filters-section {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-lg);
-    padding: var(--space-lg);
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    margin-bottom: var(--space-xl);
-  }
-
-  .filter-group {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-sm);
-  }
-
-  .filter-label {
-    font-family: var(--font-display);
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    color: var(--color-text-muted);
-  }
-
-  .filter-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-xs);
-  }
-
-  .chip {
-    padding: var(--space-xs) var(--space-sm);
-    font-family: var(--font-display);
-    font-size: 0.75rem;
-    font-weight: 500;
-    letter-spacing: 0.5px;
-    background: var(--color-bg-tertiary);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-xl);
-    color: var(--color-text-secondary);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-  }
-
-  .chip:hover {
-    border-color: var(--color-gold);
-    color: var(--color-gold);
-  }
-
-  .chip.active {
-    background: rgba(255, 232, 31, 0.15);
-    border-color: var(--color-gold);
-    color: var(--color-gold);
-  }
-
-  .clear-filters {
-    display: flex;
-    align-items: center;
-    gap: var(--space-xs);
-    padding: var(--space-xs) var(--space-sm);
-    background: none;
-    border: none;
-    color: var(--color-text-muted);
-    font-size: 0.75rem;
-    cursor: pointer;
-    transition: color var(--transition-fast);
-    margin-left: auto;
-    align-self: flex-end;
-  }
-
-  .clear-filters:hover {
-    color: var(--color-red);
-  }
-
-  .clear-filters svg {
-    width: 14px;
-    height: 14px;
   }
 
   /* Stories Section */
@@ -360,14 +185,6 @@
   }
 
   @media (max-width: 768px) {
-    .filters-section {
-      flex-direction: column;
-    }
-
-    .clear-filters {
-      margin-left: 0;
-    }
-
     .stories-grid {
       grid-template-columns: 1fr;
     }
