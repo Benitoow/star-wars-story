@@ -11,15 +11,21 @@
   let initialized = false;
 
   onMount(async () => {
-    await initializeDB();
-    await theme.init();
-    await uiLanguage.init();
+    try {
+      await initializeDB();
+    } catch (e) {
+      console.error('DB init failed:', e);
+    }
+    try {
+      await theme.init();
+      await uiLanguage.init();
+    } catch (e) {
+      console.error('Store init failed:', e);
+    }
     initialized = true;
 
-    // Run trash cleanup in background — no await, non-blocking
     cleanupOldTrash(30).catch(() => {});
 
-    // Close sidebar on mobile by default
     if (window.innerWidth < 769) {
       sidebarOpen.set(false);
     }
