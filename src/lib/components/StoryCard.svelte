@@ -1,7 +1,8 @@
 <script lang="ts">
   import type { Story } from '$db';
   import { deleteStory, archiveStory } from '$lib/stores/stories';
-  import { toasts } from '$lib/stores/ui';
+  import { toasts, uiLanguage } from '$lib/stores/ui';
+  import { resolveUiLanguage } from '$lib/config/languages';
   import { goto } from '$app/navigation';
 
   export let story: Story;
@@ -9,29 +10,51 @@
   let showMenu = false;
   let isDeleting = false;
 
-  const ERA_NAMES: Record<string, string> = {
-    old_republic: 'Ancienne République',
-    clone_wars: 'Guerres des Clones',
-    imperial: 'Ère Impériale',
-    new_republic: 'Nouvelle République',
-    first_order: 'Premier Ordre'
-  };
+  const ERA_NAMES = {
+    fr: {
+      old_republic: 'Ancienne République',
+      clone_wars: 'Guerres des Clones',
+      imperial: 'Ère Impériale',
+      new_republic: 'Nouvelle République',
+      first_order: 'Premier Ordre'
+    },
+    en: {
+      old_republic: 'Old Republic',
+      clone_wars: 'Clone Wars',
+      imperial: 'Imperial Era',
+      new_republic: 'New Republic',
+      first_order: 'First Order'
+    }
+  } as const;
 
-  const FACTION_NAMES: Record<string, string> = {
-    jedi: 'Ordre Jedi',
-    sith: 'Ordre Sith',
-    empire: 'Empire',
-    rebels: 'Alliance Rebelle',
-    republic: 'République',
-    mandalore: 'Mandalorians',
-    first_order: 'Premier Ordre',
-    hutt: 'Cartel Hutt',
-    neutral: 'Indépendant'
-  };
+  const FACTION_NAMES = {
+    fr: {
+      jedi: 'Ordre Jedi',
+      sith: 'Ordre Sith',
+      empire: 'Empire',
+      rebels: 'Alliance Rebelle',
+      republic: 'République',
+      mandalore: 'Mandalorians',
+      first_order: 'Premier Ordre',
+      hutt: 'Cartel Hutt',
+      neutral: 'Indépendant'
+    },
+    en: {
+      jedi: 'Jedi Order',
+      sith: 'Sith Order',
+      empire: 'Empire',
+      rebels: 'Rebel Alliance',
+      republic: 'Republic',
+      mandalore: 'Mandalorians',
+      first_order: 'First Order',
+      hutt: 'Hutt Cartel',
+      neutral: 'Independent'
+    }
+  } as const;
 
   function formatDate(date: Date): string {
     const d = new Date(date);
-    return d.toLocaleDateString('fr-FR', {
+    return d.toLocaleDateString(currentLang === 'fr' ? 'fr-FR' : 'en-US', {
       day: 'numeric',
       month: 'short',
       year: 'numeric'
@@ -39,21 +62,57 @@
   }
 
   function getPreview(content: string, maxLength = 120): string {
-    if (!content) return 'Aucune contenu...';
+    if (!content) return copy.noContent;
     const stripped = content.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
     if (stripped.length <= maxLength) return stripped;
     return stripped.substring(0, maxLength) + '...';
   }
 
+  const COPY = {
+    fr: {
+      noContent: 'Aucun contenu...',
+      confirmDelete: 'Êtes-vous sûr de vouloir supprimer cette histoire ?',
+      deleted: 'Histoire supprimée',
+      deleteError: 'Erreur lors de la suppression',
+      archived: 'Histoire archivée',
+      archiveError: "Erreur lors de l'archivage",
+      edit: 'Modifier',
+      play: 'Jouer',
+      archive: 'Archiver',
+      deleting: 'Suppression...',
+      remove: 'Supprimer',
+      words: 'mots'
+    },
+    en: {
+      noContent: 'No content...',
+      confirmDelete: 'Are you sure you want to delete this story?',
+      deleted: 'Story deleted',
+      deleteError: 'Error while deleting story',
+      archived: 'Story archived',
+      archiveError: 'Error while archiving story',
+      edit: 'Edit',
+      play: 'Play',
+      archive: 'Archive',
+      deleting: 'Deleting...',
+      remove: 'Delete',
+      words: 'words'
+    }
+  } as const;
+
+  $: currentLang = resolveUiLanguage($uiLanguage);
+  $: copy = COPY[currentLang === 'fr' ? 'fr' : 'en'];
+  $: eraNames = ERA_NAMES[currentLang === 'fr' ? 'fr' : 'en'];
+  $: factionNames = FACTION_NAMES[currentLang === 'fr' ? 'fr' : 'en'];
+
   async function handleDelete() {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer cette histoire?')) return;
+    if (!confirm(copy.confirmDelete)) return;
     
     isDeleting = true;
     try {
       await deleteStory(story.id);
-      toasts.add({ type: 'success', message: 'Histoire supprimée' });
+      toasts.add({ type: 'success', message: copy.deleted });
     } catch (e) {
-      toasts.add({ type: 'error', message: 'Erreur lors de la suppression' });
+      toasts.add({ type: 'error', message: copy.deleteError });
     } finally {
       isDeleting = false;
       showMenu = false;
@@ -63,9 +122,9 @@
   async function handleArchive() {
     try {
       await archiveStory(story.id);
-      toasts.add({ type: 'success', message: 'Histoire archivée' });
+      toasts.add({ type: 'success', message: copy.archived });
     } catch (e) {
-      toasts.add({ type: 'error', message: 'Erreur lors de l\'archivage' });
+      toasts.add({ type: 'error', message: copy.archiveError });
     }
     showMenu = false;
   }
@@ -82,8 +141,8 @@
 <article class="story-card">
   <div class="card-header">
     <div class="badges">
-      <span class="badge">{ERA_NAMES[story.setup.era] || story.setup.era}</span>
-      <span class="badge badge-gold">{FACTION_NAMES[story.setup.faction] || story.setup.faction}</span>
+      <span class="badge">{eraNames[story.setup.era] || story.setup.era}</span>
+      <span class="badge badge-gold">{factionNames[story.setup.faction] || story.setup.faction}</span>
     </div>
     <div class="menu-wrapper">
       <button class="menu-btn" on:click|stopPropagation={() => showMenu = !showMenu}>
@@ -100,13 +159,13 @@
               <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
               <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
             </svg>
-            Modifier
+            {copy.edit}
           </button>
           <button class="menu-item" on:click={handlePlay}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polygon points="5,3 19,12 5,21"/>
             </svg>
-            Jouer
+            {copy.play}
           </button>
           <button class="menu-item" on:click={handleArchive}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -114,7 +173,7 @@
               <rect x="1" y="3" width="22" height="5"/>
               <line x1="10" y1="12" x2="14" y2="12"/>
             </svg>
-            Archiver
+            {copy.archive}
           </button>
           <hr />
           <button class="menu-item danger" on:click={handleDelete} disabled={isDeleting}>
@@ -122,7 +181,7 @@
               <polyline points="3,6 5,6 21,6"/>
               <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
             </svg>
-            {isDeleting ? 'Suppression...' : 'Supprimer'}
+            {isDeleting ? copy.deleting : copy.remove}
           </button>
         </div>
       {/if}
@@ -150,7 +209,7 @@
           <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/>
           <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
         </svg>
-        {story.metadata.wordCount} mots
+        {story.metadata.wordCount} {copy.words}
       </span>
     </div>
     <button class="play-btn" on:click={handlePlay}>

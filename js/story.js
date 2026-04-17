@@ -908,11 +908,32 @@ function formatNarrative(story) {
   const atmosphereClass = `atmosphere-${atmosphere}`;
 
   const sectionKey = String(story?.section_type || '').toLowerCase();
-  const availableKeys = Object.keys(narrative).filter(k => k !== 'atmosphere');
+  const availableKeys = Object.keys(narrative).filter(k => k !== 'atmosphere' && k !== 'blocks');
   const orderedKeys = [
     ...(availableKeys.includes(sectionKey) ? [sectionKey] : []),
     ...availableKeys
   ].filter((key, idx, arr) => arr.indexOf(key) === idx);
+
+  const normalizedBlocks = Array.isArray(narrative.blocks)
+    ? narrative.blocks
+        .map((block, index) => {
+          if (!block || typeof block !== 'object') return null;
+          const key = String(block.type || '').toLowerCase() || 'action';
+          const parsedOrder = Number(block.order);
+          const order = Number.isFinite(parsedOrder) ? parsedOrder : index;
+          return {
+            key,
+            value: block.text,
+            order
+          };
+        })
+        .filter(Boolean)
+        .sort((a, b) => a.order - b.order)
+    : [];
+
+  const sectionEntries = normalizedBlocks.length
+    ? normalizedBlocks
+    : orderedKeys.map((key, index) => ({ key, value: narrative[key], order: index }));
 
   const labelFor = (key) => {
     if (['context', 'action', 'dialogue', 'reflection'].includes(key)) return t(key);
@@ -921,8 +942,9 @@ function formatNarrative(story) {
 
   let html = `<div class="narrative-container ${atmosphereClass}">`;
 
-  for (const key of orderedKeys) {
-    const value = narrative[key];
+  for (const entry of sectionEntries) {
+    const key = entry.key;
+    const value = entry.value;
     if (value === null || value === undefined || value === '') continue;
 
     const sectionClass = ['context', 'action', 'dialogue', 'reflection'].includes(key)
@@ -939,7 +961,7 @@ function formatNarrative(story) {
       continue;
     }
 
-    const cleaned = cleanNarrativeText(typeof value === 'string' ? value : JSON.stringify(value));
+    const cleaned = cleanNarrativeText(extractNarrativeText(value));
     if (!cleaned) continue;
     const content = key === 'reflection' ? `<p><em>${escapeHtml(cleaned)}</em></p>` : `<p>${escapeHtml(cleaned)}</p>`;
 

@@ -1,30 +1,64 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { stories, filteredStories, recentStories, loadRecentStories } from '$lib/stores/stories';
-  import { viewMode, filters, sortBy, sortDirection } from '$lib/stores/ui';
+  import { viewMode, filters, sortBy, sortDirection, uiLanguage } from '$lib/stores/ui';
+  import { resolveUiLanguage } from '$lib/config/languages';
   import StoryCard from '$lib/components/StoryCard.svelte';
 
   let loading = true;
 
   const ERAS = [
-    { id: 'old_republic', name: 'Ancienne République' },
-    { id: 'clone_wars', name: 'Guerres des Clones' },
-    { id: 'imperial', name: 'Ère Impériale' },
-    { id: 'new_republic', name: 'Nouvelle République' },
-    { id: 'first_order', name: 'Premier Ordre' }
+    { id: 'old_republic', fr: 'Ancienne République', en: 'Old Republic' },
+    { id: 'clone_wars', fr: 'Guerres des Clones', en: 'Clone Wars' },
+    { id: 'imperial', fr: 'Ère Impériale', en: 'Imperial Era' },
+    { id: 'new_republic', fr: 'Nouvelle République', en: 'New Republic' },
+    { id: 'first_order', fr: 'Premier Ordre', en: 'First Order' }
   ];
 
   const FACTIONS = [
-    { id: 'jedi', name: 'Ordre Jedi' },
-    { id: 'sith', name: 'Ordre Sith' },
-    { id: 'empire', name: 'Empire' },
-    { id: 'rebels', name: 'Alliance Rebelle' },
-    { id: 'republic', name: 'République' },
-    { id: 'mandalore', name: 'Mandalorians' },
-    { id: 'first_order', name: 'Premier Ordre' },
-    { id: 'hutt', name: 'Cartel Hutt' },
-    { id: 'neutral', name: 'Indépendant' }
+    { id: 'jedi', fr: 'Ordre Jedi', en: 'Jedi Order' },
+    { id: 'sith', fr: 'Ordre Sith', en: 'Sith Order' },
+    { id: 'empire', fr: 'Empire', en: 'Empire' },
+    { id: 'rebels', fr: 'Alliance Rebelle', en: 'Rebel Alliance' },
+    { id: 'republic', fr: 'République', en: 'Republic' },
+    { id: 'mandalore', fr: 'Mandalorians', en: 'Mandalorians' },
+    { id: 'first_order', fr: 'Premier Ordre', en: 'First Order' },
+    { id: 'hutt', fr: 'Cartel Hutt', en: 'Hutt Cartel' },
+    { id: 'neutral', fr: 'Indépendant', en: 'Independent' }
   ];
+
+  const DASHBOARD_COPY = {
+    fr: {
+      title: 'Dashboard — Star Wars Story Manager',
+      era: 'Ère:',
+      faction: 'Faction:',
+      clear: 'Effacer les filtres',
+      myStories: 'Mes Histoires',
+      loading: 'Chargement de vos histoires...',
+      noStories: 'Aucune histoire',
+      emptyText: 'Commencez votre aventure en créant votre première histoire Star Wars!',
+      create: 'Créer une histoire',
+      countSingle: 'histoire',
+      countPlural: 'histoires'
+    },
+    en: {
+      title: 'Dashboard — Star Wars Story Manager',
+      era: 'Era:',
+      faction: 'Faction:',
+      clear: 'Clear filters',
+      myStories: 'My Stories',
+      loading: 'Loading your stories...',
+      noStories: 'No stories yet',
+      emptyText: 'Start your adventure by creating your first Star Wars story!',
+      create: 'Create a story',
+      countSingle: 'story',
+      countPlural: 'stories'
+    }
+  } as const;
+
+  function pickText(entry: { fr?: string; en?: string }) {
+    return currentLang === 'fr' ? (entry.fr || entry.en || '') : (entry.en || entry.fr || '');
+  }
 
   onMount(async () => {
     await stories.load();
@@ -51,17 +85,19 @@
   }
 
   $: hasFilters = $filters.era || $filters.faction || $filters.tags.length > 0;
+  $: currentLang = resolveUiLanguage($uiLanguage);
+  $: copy = DASHBOARD_COPY[currentLang === 'fr' ? 'fr' : 'en'];
 </script>
 
 <svelte:head>
-  <title>Dashboard — Star Wars Story Manager</title>
+  <title>{copy.title}</title>
 </svelte:head>
 
 <div class="dashboard">
   <!-- Filters -->
   <section class="filters-section">
     <div class="filter-group">
-      <span class="filter-label">Ère:</span>
+      <span class="filter-label">{copy.era}</span>
       <div class="filter-chips">
         {#each ERAS as era}
           <button
@@ -69,14 +105,14 @@
             class:active={$filters.era === era.id}
             on:click={() => toggleEraFilter(era.id)}
           >
-            {era.name}
+            {pickText(era)}
           </button>
         {/each}
       </div>
     </div>
 
     <div class="filter-group">
-      <span class="filter-label">Faction:</span>
+      <span class="filter-label">{copy.faction}</span>
       <div class="filter-chips">
         {#each FACTIONS as faction}
           <button
@@ -84,7 +120,7 @@
             class:active={$filters.faction === faction.id}
             on:click={() => toggleFactionFilter(faction.id)}
           >
-            {faction.name}
+            {pickText(faction)}
           </button>
         {/each}
       </div>
@@ -96,7 +132,7 @@
           <line x1="18" y1="6" x2="6" y2="18"/>
           <line x1="6" y1="6" x2="18" y2="18"/>
         </svg>
-        Effacer les filtres
+        {copy.clear}
       </button>
     {/if}
   </section>
@@ -104,14 +140,16 @@
   <!-- Stories Grid -->
   <section class="stories-section">
     <div class="section-header">
-      <h2>Mes Histoires</h2>
-      <span class="story-count">{$filteredStories.length} histoire{$filteredStories.length !== 1 ? 's' : ''}</span>
+      <h2>{copy.myStories}</h2>
+      <span class="story-count">
+        {$filteredStories.length} {$filteredStories.length !== 1 ? copy.countPlural : copy.countSingle}
+      </span>
     </div>
 
     {#if loading}
       <div class="loading-state">
         <div class="loading-spinner"></div>
-        <p>Chargement de vos histoires...</p>
+        <p>{copy.loading}</p>
       </div>
     {:else if $filteredStories.length === 0}
       <div class="empty-state">
@@ -123,14 +161,14 @@
             <line x1="9" y1="11" x2="15" y2="11"/>
           </svg>
         </div>
-        <h3>Aucune histoire</h3>
-        <p>Commencez votre aventure en créant votre première histoire Star Wars!</p>
+        <h3>{copy.noStories}</h3>
+        <p>{copy.emptyText}</p>
         <a href="/stories/new" class="btn btn-primary">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="12" y1="5" x2="12" y2="19"/>
             <line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
-          Créer une histoire
+          {copy.create}
         </a>
       </div>
     {:else}
