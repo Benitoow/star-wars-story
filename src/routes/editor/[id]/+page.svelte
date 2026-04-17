@@ -1,19 +1,92 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
+  import { fly } from 'svelte/transition';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { get } from 'svelte/store';
-  import { onDestroy } from 'svelte';
-  import { story, saveStory, createStory, loadStory, currentSetup, updateSetupField, updateContent, startAutoSave, stopAutoSave } from '$lib/stores/editor';
+  import {
+    story,
+    saveStory,
+    createStory,
+    loadStory,
+    currentSetup,
+    updateSetupField,
+    updateContent,
+    updateTitle,
+    startAutoSave,
+    stopAutoSave,
+    resetEditor,
+    type StorySetup
+  } from '$lib/stores/editor';
   import { showToast } from '$lib/stores/ui';
-  import { getPreferences } from '$lib/db';
+  import { getPreferences, type UserPreferences } from '$lib/db';
   import SvgIcon from '$lib/components/SvgIcon.svelte';
   import PageHeader from '$lib/components/PageHeader.svelte';
+  import {
+    buildContinuePrompt,
+    buildStartPrompt,
+    buildSystemPrompt,
+    callTextModel,
+    normalizeProviderId,
+    parseStoryResponse,
+    summarizeChapterForPrompt,
+    type ChatMessage,
+    type StoryChapter,
+    type StoryChoice,
+    type StoryProviderConfig
+  } from '$lib/ai/storyEngine';
 
   let loading = true;
   let saving = false;
-  let step: 'setup' | 'edit' = 'setup';
+  let mode: 'setup' | 'play' = 'setup';
   let storyId: string | null = null;
+
+  type SetupScreenId = 'era' | 'faction_role' | 'premise' | 'style' | 'profile' | 'review';
+  type SetupScreen = {
+    id: SetupScreenId;
+    label: string;
+    subtitle: string;
+  };
+
+  const SETUP_SCREENS: SetupScreen[] = [
+    { id: 'era', label: 'Ère', subtitle: 'Quand commence votre histoire ?' },
+    { id: 'faction_role', label: 'Faction & rôle', subtitle: 'Qui êtes-vous dans cette galaxie ?' },
+    { id: 'premise', label: 'Trame', subtitle: 'Quel est le point de départ ?' },
+    { id: 'style', label: 'Style IA', subtitle: 'Comment doit écrire l’IA ?' },
+    { id: 'profile', label: 'Protagoniste', subtitle: 'Nom facultatif, avatar rapide' },
+    { id: 'review', label: 'Lancement', subtitle: 'On démarre l’aventure immédiatement' }
+  ];
+
+  const INTERACTIVE_SESSION_PREFIX = 'sw_svelte_interactive_story_';
+
+  interface InteractiveSessionPayload {
+    version: 1;
+    turnNumber: number;
+    selectedTrame: string | null;
+    currentChapter: StoryChapter | null;
+    chapterHistory: StoryChapter[];
+    actionHistory: string[];
+    aiMessages: ChatMessage[];
+    memoryLog: string[];
+    setupSnapshot: StorySetup;
+  }
+
+  let setupScreenIndex = 0;
+  let setupSlideDir = 1;
+  let selectedTrame: string | null = null;
+
+  let generating = false;
+  let generationError = '';
+  let turnNumber = 0;
+  let currentChapter: StoryChapter | null = null;
+  let chapterHistory: StoryChapter[] = [];
+  let actionHistory: string[] = [];
+  let aiMessages: ChatMessage[] = [];
+  let memoryLog: string[] = [];
+  let customAction = '';
+
+  let providerConfig: StoryProviderConfig | null = null;
+  let providerStatus = 'Aucun provider texte configuré.';
 
   const ERAS = [
     { id: 'old_republic', name: 'Ancienne République', years: '25 000 - 1000 AVBY', icon: 'AncientRepublic.svg' },
@@ -29,7 +102,7 @@
     { id: 'empire', name: 'Empire Galactique', color: '#c41e3a', icon: 'Emblem_of_the_First_Galactic_Empire.svg' },
     { id: 'rebels', name: 'Alliance Rebelle', color: '#f39c12', icon: 'millennium-falcon-svgrepo-com.svg' },
     { id: 'republic', name: 'République Galactique', color: '#3498db', icon: 'brand-galactic-republic-svgrepo-com.svg' },
-    { id: 'mandalore', name: 'Mandalorians', color: '#9b59b6', icon: 'mandalorian-svgrepo-com.svg' },
+    { id: 'mandalore', name: 'Mandaloriens', color: '#9b59b6', icon: 'mandalorian-svgrepo-com.svg' },
     { id: 'first_order', name: 'Premier Ordre', color: '#1a1a2e', icon: 'Emblem_of_the_First_Order.svg' },
     { id: 'hutt', name: 'Cartel Hutt', color: '#27ae60', icon: 'Desilijic_clan_vector.svg' },
     { id: 'neutral', name: 'Indépendant', color: '#95a5a6', icon: 'alone-characterized-embodied-svgrepo-com.svg' }
@@ -59,29 +132,29 @@
   ];
 
   const TRAMES = [
-    { id: 'solo', name: "Le Solitaire", icon: '🚀', premise: "Contrebandier solitaire naviguant dans les zones grises de la galaxie, vous acceptez un contrat qui semble simple. Mais il va vous entraîner dans un conflit qui vous dépasse..." },
-    { id: 'chosen', name: "L'Élu", icon: '✨', premise: "La Force vous a choisi pour accomplir quelque chose de grand. Mais le chemin vers votre destinée est semé d'embûches, de trahisons et de doutes sur votre propre nature..." },
-    { id: 'exile', name: "Le Banni", icon: '🌑', premise: "Exilé après un incident que vous seul connaissez vraiment, vous survivez dans l'ombre. Mais une menace qui grandit dans la galaxie va vous obliger à reprendre les armes..." },
-    { id: 'rebel', name: "Le Résistant", icon: '⚡', premise: "Vous avez tout perdu à cause de l'oppresseur. Vous avez rejoint la Rébellion non par idéologie, mais par vengeance. En combattant, vous découvrez quelque chose de plus grand que vous..." },
-    { id: 'redeemed', name: "La Rédemption", icon: '🔥', premise: "Vous avez servi l'Obscur pendant des années. Un événement a tout changé. Vous cherchez à racheter vos crimes, mais vos anciens maîtres ne vous laisseront pas partir facilement..." },
-    { id: 'spy', name: "L'Infiltrateur", icon: '🕵', premise: "Votre mission : infiltrer les hautes sphères de l'ennemi. Plus vous avancez, plus la ligne entre vos deux identités s'efface. De quel côté êtes-vous vraiment ?" },
-    { id: 'custom', name: "Libre", icon: '✏️', premise: '' }
+    { id: 'solo', name: 'Le Solitaire', icon: '🚀', premise: 'Vous acceptez un contrat en apparence simple, mais il vous entraîne dans un conflit galactique majeur.' },
+    { id: 'chosen', name: 'L’Élu', icon: '✨', premise: 'Une intuition de la Force vous pousse sur une piste que personne ne comprend encore.' },
+    { id: 'exile', name: 'Le Banni', icon: '🌑', premise: 'Exilé après un incident obscur, vous survivez dans l’ombre jusqu’au jour où tout bascule.' },
+    { id: 'rebel', name: 'Le Résistant', icon: '⚡', premise: 'Vous combattez l’oppresseur et découvrez un enjeu plus grand que votre vengeance.' },
+    { id: 'redeemed', name: 'La Rédemption', icon: '🔥', premise: 'Ancien serviteur de l’Obscur, vous tentez de réparer ce qui peut encore l’être.' },
+    { id: 'spy', name: 'L’Infiltrateur', icon: '🕵️', premise: 'Votre mission d’infiltration brouille progressivement la frontière entre vos deux identités.' },
+    { id: 'custom', name: 'Libre', icon: '✏️', premise: '' }
   ];
 
   const AVATARS = ['🧑‍🚀', '👩‍🚀', '🧙', '🧙‍♀️', '⚔️', '🤖', '👾', '🦾', '🌌', '💫', '🔵', '🔴'];
 
   const WRITING_STYLES = [
-    { id: 'cinematique', name: 'Cinématique', desc: 'Scènes courtes, rythme intense, style film' },
-    { id: 'litteraire', name: 'Littéraire', desc: 'Prose riche, descriptions profondes, introspection' },
-    { id: 'epique', name: 'Épique', desc: 'Grandeur, batailles, destins héroïques' },
-    { id: 'immersif', name: 'Immersif', desc: '2e personne, style jeu de rôle' }
+    { id: 'cinematique', name: 'Cinématique', desc: 'Scènes courtes, rythme intense' },
+    { id: 'litteraire', name: 'Littéraire', desc: 'Descriptions riches et profondes' },
+    { id: 'epique', name: 'Épique', desc: 'Grandeur et destin héroïque' },
+    { id: 'immersif', name: 'Immersif', desc: 'Mode jeu de rôle très direct' }
   ];
 
   const WRITING_TONES = [
-    { id: 'heroique', name: 'Héroïque', desc: 'Courage, sacrifice, lumière' },
-    { id: 'sombre', name: 'Sombre', desc: 'Tension, danger, ambiguïté morale' },
-    { id: 'aventure', name: 'Aventure', desc: 'Action, humour, légèreté' },
-    { id: 'drame', name: 'Dramatique', desc: 'Émotions, relations, trahisons' }
+    { id: 'heroique', name: 'Héroïque' },
+    { id: 'sombre', name: 'Sombre' },
+    { id: 'aventure', name: 'Aventure' },
+    { id: 'drame', name: 'Dramatique' }
   ];
 
   const WRITING_POVS = [
@@ -96,220 +169,621 @@
   ];
 
   const CONTENT_MODES = [
-    { id: 'cinematic', icon: '🎬', name: 'Cinéma', desc: 'Intense mais équilibré.' },
-    { id: 'dark', icon: '🌒', name: 'Sombre', desc: 'Ambiance dure et tendue.' },
-    { id: 'adult', icon: '🔞', name: 'Adulte', desc: 'Mature, selon les limites du provider.' },
-    { id: 'raw', icon: '⚠️', name: 'Brut', desc: 'Très frontal (si le modèle le permet).' }
+    { id: 'cinematic', icon: '🎬', name: 'Cinéma', desc: 'Intense mais équilibré' },
+    { id: 'dark', icon: '🌒', name: 'Sombre', desc: 'Ambiance dure et tendue' },
+    { id: 'adult', icon: '🔞', name: 'Adulte', desc: 'Mature et frontal' },
+    { id: 'raw', icon: '⚠️', name: 'Brut', desc: 'Très frontal quand le modèle le permet' }
   ];
 
-  let selectedTrame: string | null = null;
+  $: activeSetupStep = SETUP_SCREENS[setupScreenIndex];
+  $: isLastSetupStep = setupScreenIndex === SETUP_SCREENS.length - 1;
+  $: providerMissing = !providerConfig;
 
-  function applySetupDefaultsFromPreferences(prefs: Awaited<ReturnType<typeof getPreferences>>) {
+  function textToParagraphs(text: string): string[] {
+    return String(text || '')
+      .split(/\n+/)
+      .map(line => line.trim())
+      .filter(Boolean);
+  }
+
+  function storySessionKey(id: string): string {
+    return `${INTERACTIVE_SESSION_PREFIX}${id}`;
+  }
+
+  function saveInteractiveSession(): void {
+    if (!storyId || typeof localStorage === 'undefined') return;
+
+    const payload: InteractiveSessionPayload = {
+      version: 1,
+      turnNumber,
+      selectedTrame,
+      currentChapter,
+      chapterHistory,
+      actionHistory,
+      aiMessages,
+      memoryLog,
+      setupSnapshot: get(currentSetup)
+    };
+
+    localStorage.setItem(storySessionKey(storyId), JSON.stringify(payload));
+  }
+
+  function loadInteractiveSession(id: string): InteractiveSessionPayload | null {
+    if (typeof localStorage === 'undefined') return null;
+
+    const raw = localStorage.getItem(storySessionKey(id));
+    if (!raw) return null;
+
+    try {
+      const parsed = JSON.parse(raw) as Partial<InteractiveSessionPayload>;
+      if (!Array.isArray(parsed.chapterHistory) || !parsed.chapterHistory.length) return null;
+
+      return {
+        version: 1,
+        turnNumber: Number(parsed.turnNumber || parsed.chapterHistory.length || 0),
+        selectedTrame: typeof parsed.selectedTrame === 'string' ? parsed.selectedTrame : null,
+        currentChapter: parsed.currentChapter ?? parsed.chapterHistory[parsed.chapterHistory.length - 1] ?? null,
+        chapterHistory: parsed.chapterHistory,
+        actionHistory: Array.isArray(parsed.actionHistory) ? parsed.actionHistory : [],
+        aiMessages: Array.isArray(parsed.aiMessages) ? parsed.aiMessages : [],
+        memoryLog: Array.isArray(parsed.memoryLog) ? parsed.memoryLog : [],
+        setupSnapshot: (parsed.setupSnapshot as StorySetup) || get(currentSetup)
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  function clearInteractiveSession(id: string): void {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.removeItem(storySessionKey(id));
+  }
+
+  function setSetupField<K extends keyof StorySetup>(field: K, value: StorySetup[K]): void {
+    const current = get(currentSetup)[field];
+    if (current !== value) {
+      updateSetupField(field, value);
+    }
+  }
+
+  function defaultRoleForFaction(factionId: string): string {
+    return ROLES.find(role => role.faction === factionId)?.id || ROLES[0].id;
+  }
+
+  function ensureSetupDefaults(): StorySetup {
+    const setup = get(currentSetup);
+    const next: StorySetup = { ...setup };
+
+    if (!next.era) next.era = ERAS[0].id;
+    if (!next.faction) next.faction = FACTIONS[0].id;
+    if (!next.role) next.role = defaultRoleForFaction(next.faction);
+    if (!next.writingStyle) next.writingStyle = WRITING_STYLES[0].id;
+    if (!next.writingTone) next.writingTone = WRITING_TONES[2].id;
+    if (!next.writingPov) next.writingPov = WRITING_POVS[1].id;
+    if (!next.writingLength) next.writingLength = WRITING_LENGTHS[1].id;
+    if (!next.contentMode) next.contentMode = CONTENT_MODES[0].id;
+    if (!next.protagonistAvatar) next.protagonistAvatar = AVATARS[0];
+
+    if (!next.premise) {
+      const trame = TRAMES.find(item => item.id === selectedTrame);
+      next.premise = trame?.premise || 'Un appel de détresse inattendu force votre protagoniste à agir immédiatement.';
+    }
+
+    setSetupField('era', next.era);
+    setSetupField('faction', next.faction);
+    setSetupField('role', next.role);
+    setSetupField('premise', next.premise);
+    setSetupField('writingStyle', next.writingStyle);
+    setSetupField('writingTone', next.writingTone);
+    setSetupField('writingPov', next.writingPov);
+    setSetupField('writingLength', next.writingLength);
+    setSetupField('contentMode', next.contentMode);
+    setSetupField('protagonistAvatar', next.protagonistAvatar);
+
+    return next;
+  }
+
+  function applySetupDefaultsFromPreferences(preferences: UserPreferences): void {
     const setup = get(currentSetup);
 
-    if (!setup.protagonistFirstName && prefs.firstName) updateSetupField('protagonistFirstName', prefs.firstName);
-    if (!setup.protagonistLastName && prefs.lastName) updateSetupField('protagonistLastName', prefs.lastName);
-    if (!setup.protagonistAvatar && prefs.avatarEmoji) updateSetupField('protagonistAvatar', prefs.avatarEmoji);
+    if (!setup.protagonistFirstName && preferences.firstName) updateSetupField('protagonistFirstName', preferences.firstName);
+    if (!setup.protagonistLastName && preferences.lastName) updateSetupField('protagonistLastName', preferences.lastName);
+    if (!setup.protagonistAvatar && preferences.avatarEmoji) updateSetupField('protagonistAvatar', preferences.avatarEmoji);
 
-    if (!setup.writingStyle && prefs.writingStyle) updateSetupField('writingStyle', prefs.writingStyle);
-    if (!setup.writingTone && prefs.writingTone) updateSetupField('writingTone', prefs.writingTone);
-    if (!setup.writingPov && prefs.writingPov) updateSetupField('writingPov', prefs.writingPov);
-    if (!setup.writingLength && prefs.writingLength) updateSetupField('writingLength', prefs.writingLength);
-    if (!setup.contentMode && prefs.contentMode) updateSetupField('contentMode', prefs.contentMode);
+    if (!setup.writingStyle && preferences.writingStyle) updateSetupField('writingStyle', preferences.writingStyle);
+    if (!setup.writingTone && preferences.writingTone) updateSetupField('writingTone', preferences.writingTone);
+    if (!setup.writingPov && preferences.writingPov) updateSetupField('writingPov', preferences.writingPov);
+    if (!setup.writingLength && preferences.writingLength) updateSetupField('writingLength', preferences.writingLength);
+    if (!setup.contentMode && preferences.contentMode) updateSetupField('contentMode', preferences.contentMode);
+  }
+
+  function buildProviderConfigFromPreferences(preferences: UserPreferences): StoryProviderConfig | null {
+    const providerId = normalizeProviderId(preferences.textProvider);
+    if (!providerId || providerId === 'none') return null;
+
+    const model = (preferences.textModel || '').trim();
+
+    return {
+      providerId,
+      model,
+      apiKey: (preferences.textApiKey || '').trim(),
+      ollamaUrl: (preferences.ollamaUrl || '').trim()
+    };
+  }
+
+  function providerSummary(config: StoryProviderConfig | null): string {
+    if (!config) return 'Aucun provider texte configuré.';
+    const modelLabel = config.model || 'modèle auto';
+    return `${config.providerId} · ${modelLabel}`;
+  }
+
+  function trimMessages(messages: ChatMessage[], maxWithoutSystem = 18): ChatMessage[] {
+    const systemMessage = messages.find(message => message.role === 'system');
+    const others = messages.filter(message => message.role !== 'system').slice(-maxWithoutSystem);
+    return systemMessage ? [systemMessage, ...others] : others;
+  }
+
+  function appendMemoryFromChapter(chapter: StoryChapter): void {
+    const explicitFacts = [
+      ...chapter.memory_updates.relations.map(item => `Relation: ${item}`),
+      ...chapter.memory_updates.places.map(item => `Lieu: ${item}`),
+      ...chapter.memory_updates.injuries.map(item => `Blessure: ${item}`),
+      ...chapter.memory_updates.resources.map(item => `Ressource: ${item}`),
+      ...chapter.memory_updates.notes.map(item => `Note: ${item}`)
+    ];
+
+    const corpus = [
+      chapter.narrative.context,
+      chapter.narrative.action,
+      chapter.narrative.dialogue,
+      chapter.narrative.reflection
+    ].join(' ');
+
+    const implicitFacts: string[] = [];
+    if (/(bless|hémorrag|fracture|wound|injur|brûlure)/i.test(corpus)) {
+      implicitFacts.push(`Tour ${chapter.chapter_number}: état physique du protagoniste potentiellement dégradé.`);
+    }
+    if (/(crédit|credits|prime|dette|ressource|équipement|blaster|sabrelaser|vaisseau)/i.test(corpus)) {
+      implicitFacts.push(`Tour ${chapter.chapter_number}: ressources matérielles ou financières modifiées.`);
+    }
+    if (/(coruscant|tatouine|mustafar|hoth|dagobah|temple|cantina|station|base|croiseur)/i.test(corpus)) {
+      implicitFacts.push(`Tour ${chapter.chapter_number}: nouveaux lieux importants visités.`);
+    }
+
+    const merged = Array.from(new Set([...memoryLog, ...explicitFacts, ...implicitFacts].filter(Boolean)));
+    memoryLog = merged.slice(-120);
+  }
+
+  function chapterToJournalMarkdown(chapter: StoryChapter, index: number): string {
+    const lines: string[] = [];
+    lines.push(`## Chapitre ${chapter.chapter_number || index + 1} — ${chapter.chapter_title}`);
+
+    if (chapter.narrative.context) lines.push(`**Contexte**\n${chapter.narrative.context}`);
+    if (chapter.narrative.action) lines.push(`**Action**\n${chapter.narrative.action}`);
+    if (chapter.narrative.dialogue) lines.push(`**Dialogue**\n${chapter.narrative.dialogue}`);
+    if (chapter.narrative.reflection) lines.push(`**Réflexion**\n${chapter.narrative.reflection}`);
+
+    if (chapter.choices.length) {
+      lines.push('**Choix proposés**');
+      chapter.choices.forEach((choice, choiceIndex) => {
+        lines.push(`${choiceIndex + 1}. ${choice.text} [${choice.attribute} · diff ${choice.difficulty}]`);
+      });
+    }
+
+    if (chapter.memory_updates.notes.length) {
+      lines.push(`**Mémoire (notes)**\n- ${chapter.memory_updates.notes.join('\n- ')}`);
+    }
+
+    return lines.join('\n\n');
+  }
+
+  function buildJournalContent(): string {
+    if (!chapterHistory.length) return '';
+    return chapterHistory.map((chapter, index) => chapterToJournalMarkdown(chapter, index)).join('\n\n---\n\n');
+  }
+
+  function buildStoryTitle(setup: StorySetup): string {
+    const eraLabel = ERAS.find(era => era.id === setup.era)?.name || 'Star Wars';
+    const firstName = (setup.protagonistFirstName || '').trim();
+    const lastName = (setup.protagonistLastName || '').trim();
+    const fullName = [firstName, lastName].filter(Boolean).join(' ').trim();
+    return fullName ? `${fullName} — ${eraLabel}` : `Chroniques ${eraLabel}`;
+  }
+
+  async function persistInteractiveState(setup: StorySetup): Promise<void> {
+    updateTitle(buildStoryTitle(setup));
+    updateContent(buildJournalContent());
+
+    if (storyId) {
+      await saveStory();
+    }
+
+    saveInteractiveSession();
+  }
+
+  async function ensureStoryExists(setup: StorySetup): Promise<string> {
+    if (storyId) return storyId;
+
+    const createdStory = await createStory(setup);
+    storyId = createdStory.id;
+    await goto(`/editor/${createdStory.id}`, { replaceState: true, noScroll: true, keepFocus: true });
+    return createdStory.id;
+  }
+
+  async function requestStoryChapter(prompt: string, setup: StorySetup, turn: number): Promise<StoryChapter> {
+    if (!providerConfig) {
+      throw new Error('Aucun provider IA configuré. Ouvre les paramètres IA texte.');
+    }
+
+    const systemPrompt = buildSystemPrompt(setup, memoryLog.slice(-25));
+    aiMessages = [{ role: 'system', content: systemPrompt }, ...aiMessages.filter(message => message.role !== 'system')];
+
+    const requestMessages = trimMessages([
+      ...aiMessages,
+      { role: 'user', content: prompt }
+    ]);
+
+    const rawResponse = await callTextModel(requestMessages, providerConfig);
+    const chapter = parseStoryResponse(rawResponse, turn);
+
+    aiMessages = trimMessages([
+      ...requestMessages,
+      { role: 'assistant', content: JSON.stringify(chapter) }
+    ]);
+
+    return chapter;
+  }
+
+  async function launchAdventure(): Promise<void> {
+    if (generating) return;
+
+    generationError = '';
+    const setup = ensureSetupDefaults();
+
+    if (!providerConfig) {
+      generationError = 'Aucun provider IA texte configuré. Ouvre les paramètres pour en choisir un.';
+      showToast('Configurez votre IA texte dans Paramètres.', 'warning');
+      return;
+    }
+
+    generating = true;
+
+    try {
+      await ensureStoryExists(setup);
+
+      turnNumber = 1;
+      currentChapter = null;
+      chapterHistory = [];
+      actionHistory = [];
+      aiMessages = [];
+      memoryLog = [];
+      customAction = '';
+
+      const trameLabel = TRAMES.find(item => item.id === selectedTrame)?.name || null;
+      const prompt = buildStartPrompt(setup, trameLabel);
+      const chapter = await requestStoryChapter(prompt, setup, 1);
+
+      currentChapter = chapter;
+      chapterHistory = [chapter];
+      actionHistory = ['Prologue IA'];
+
+      appendMemoryFromChapter(chapter);
+      await persistInteractiveState(setup);
+
+      mode = 'play';
+      showToast('Aventure IA lancée.', 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur inconnue';
+      generationError = message;
+      showToast(`Impossible de lancer l’aventure: ${message}`, 'error');
+    } finally {
+      generating = false;
+    }
+  }
+
+  async function continueAdventure(actionText: string): Promise<void> {
+    const action = actionText.trim();
+    if (!action || generating) return;
+
+    const setup = ensureSetupDefaults();
+    generationError = '';
+    generating = true;
+
+    try {
+      await ensureStoryExists(setup);
+
+      const nextTurn = turnNumber + 1;
+      const recentSummary = chapterHistory.slice(-3).map(chapter => summarizeChapterForPrompt(chapter));
+      const prompt = buildContinuePrompt(action, nextTurn, recentSummary);
+
+      const chapter = await requestStoryChapter(prompt, setup, nextTurn);
+
+      turnNumber = nextTurn;
+      currentChapter = chapter;
+      chapterHistory = [...chapterHistory, chapter].slice(-60);
+      actionHistory = [...actionHistory, action].slice(-60);
+
+      appendMemoryFromChapter(chapter);
+      await persistInteractiveState(setup);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur inconnue';
+      generationError = message;
+      showToast(`Échec du tour: ${message}`, 'error');
+    } finally {
+      generating = false;
+    }
+  }
+
+  function handleChoice(choice: StoryChoice): void {
+    void continueAdventure(choice.text);
+  }
+
+  function handleCustomActionSubmit(): void {
+    const action = customAction.trim();
+    if (!action) return;
+    customAction = '';
+    void continueAdventure(action);
+  }
+
+  async function handleSave(): Promise<void> {
+    if (saving) return;
+    saving = true;
+
+    try {
+      const setup = ensureSetupDefaults();
+      await ensureStoryExists(setup);
+      await persistInteractiveState(setup);
+      showToast('Histoire sauvegardée', 'success');
+    } catch (error) {
+      showToast('Erreur lors de la sauvegarde', 'error');
+      console.error(error);
+    } finally {
+      saving = false;
+    }
+  }
+
+  function goToSetupStep(index: number): void {
+    const boundedIndex = Math.max(0, Math.min(SETUP_SCREENS.length - 1, index));
+    if (boundedIndex === setupScreenIndex) return;
+    setupSlideDir = boundedIndex > setupScreenIndex ? 1 : -1;
+    setupScreenIndex = boundedIndex;
+  }
+
+  function nextSetupStep(): void {
+    if (isLastSetupStep) {
+      void launchAdventure();
+      return;
+    }
+    goToSetupStep(setupScreenIndex + 1);
+  }
+
+  function previousSetupStep(): void {
+    goToSetupStep(setupScreenIndex - 1);
+  }
+
+  function selectEra(eraId: string): void {
+    updateSetupField('era', eraId);
+  }
+
+  function selectFaction(factionId: string): void {
+    updateSetupField('faction', factionId);
+    const setup = get(currentSetup);
+    if (!setup.role) {
+      updateSetupField('role', defaultRoleForFaction(factionId));
+    }
+  }
+
+  function selectRole(roleId: string): void {
+    updateSetupField('role', roleId);
+  }
+
+  function selectTrame(trame: (typeof TRAMES)[number]): void {
+    selectedTrame = trame.id;
+    if (trame.premise) {
+      updateSetupField('premise', trame.premise);
+    }
+  }
+
+  function selectWritingStyle(styleId: string): void {
+    updateSetupField('writingStyle', styleId);
+  }
+
+  function selectWritingTone(toneId: string): void {
+    updateSetupField('writingTone', toneId);
+  }
+
+  function selectWritingPov(povId: string): void {
+    updateSetupField('writingPov', povId);
+  }
+
+  function selectWritingLength(lengthId: string): void {
+    updateSetupField('writingLength', lengthId);
+  }
+
+  function selectContentMode(modeId: string): void {
+    updateSetupField('contentMode', modeId);
+  }
+
+  function selectAvatar(avatar: string): void {
+    updateSetupField('protagonistAvatar', avatar);
+  }
+
+  function handleFirstNameInput(event: Event): void {
+    const target = event.currentTarget as HTMLInputElement;
+    updateSetupField('protagonistFirstName', target.value);
+  }
+
+  function handleLastNameInput(event: Event): void {
+    const target = event.currentTarget as HTMLInputElement;
+    updateSetupField('protagonistLastName', target.value);
+  }
+
+  function handlePremiseInput(event: Event): void {
+    const target = event.currentTarget as HTMLTextAreaElement;
+    updateSetupField('premise', target.value);
+  }
+
+  function getFilteredRoles() {
+    const selectedFaction = get(currentSetup).faction;
+    if (!selectedFaction) return ROLES;
+
+    const byPriority = (faction: string): number => {
+      if (faction === selectedFaction) return 0;
+      if (faction === 'neutral') return 1;
+      return 2;
+    };
+
+    return [...ROLES].sort((left, right) => {
+      const diff = byPriority(left.faction) - byPriority(right.faction);
+      if (diff !== 0) return diff;
+      return left.name.localeCompare(right.name);
+    });
+  }
+
+  function getCurrentEraLabel(): string {
+    return ERAS.find(era => era.id === get(currentSetup).era)?.name || '—';
+  }
+
+  function getCurrentFactionLabel(): string {
+    return FACTIONS.find(faction => faction.id === get(currentSetup).faction)?.name || '—';
+  }
+
+  function getCurrentRoleLabel(): string {
+    return ROLES.find(role => role.id === get(currentSetup).role)?.name || '—';
+  }
+
+  function getCurrentStyleLabel(): string {
+    return WRITING_STYLES.find(style => style.id === get(currentSetup).writingStyle)?.name || '—';
+  }
+
+  function getCurrentToneLabel(): string {
+    return WRITING_TONES.find(tone => tone.id === get(currentSetup).writingTone)?.name || '—';
+  }
+
+  function getCurrentContentModeLabel(): string {
+    return CONTENT_MODES.find(modeItem => modeItem.id === get(currentSetup).contentMode)?.name || '—';
+  }
+
+  function goToSettings(): void {
+    void goto('/settings');
+  }
+
+  function goBackToSetupFromPlay(): void {
+    mode = 'setup';
+    goToSetupStep(SETUP_SCREENS.length - 1);
+  }
+
+  function startNewStory(): void {
+    if (storyId) {
+      clearInteractiveSession(storyId);
+    }
+
+    resetEditor();
+    mode = 'setup';
+    storyId = null;
+    setupScreenIndex = 0;
+    setupSlideDir = 1;
+    selectedTrame = null;
+    generating = false;
+    generationError = '';
+    turnNumber = 0;
+    currentChapter = null;
+    chapterHistory = [];
+    actionHistory = [];
+    aiMessages = [];
+    memoryLog = [];
+    customAction = '';
+
+    void goto('/editor/new');
   }
 
   onMount(async () => {
-    const id = $page.params.id;
+    const params = get(page).params;
+    const id = params.id;
+
     if (id && id !== 'new') {
       storyId = id;
       await loadStory(id);
-      step = 'edit';
+    } else {
+      resetEditor();
+      storyId = null;
     }
+
+    const preferences = await getPreferences();
+    applySetupDefaultsFromPreferences(preferences);
+
+    providerConfig = buildProviderConfigFromPreferences(preferences);
+    providerStatus = providerSummary(providerConfig);
+
+    if (storyId) {
+      const session = loadInteractiveSession(storyId);
+      if (session) {
+        turnNumber = session.turnNumber;
+        selectedTrame = session.selectedTrame;
+        currentChapter = session.currentChapter;
+        chapterHistory = session.chapterHistory;
+        actionHistory = session.actionHistory;
+        aiMessages = session.aiMessages;
+        memoryLog = session.memoryLog;
+
+        const snapshot = session.setupSnapshot;
+        setSetupField('era', snapshot.era || get(currentSetup).era);
+        setSetupField('faction', snapshot.faction || get(currentSetup).faction);
+        setSetupField('role', snapshot.role || get(currentSetup).role);
+        setSetupField('premise', snapshot.premise || get(currentSetup).premise);
+        setSetupField('protagonistFirstName', snapshot.protagonistFirstName);
+        setSetupField('protagonistLastName', snapshot.protagonistLastName);
+        setSetupField('protagonistAvatar', snapshot.protagonistAvatar || get(currentSetup).protagonistAvatar);
+        setSetupField('writingStyle', snapshot.writingStyle || get(currentSetup).writingStyle);
+        setSetupField('writingTone', snapshot.writingTone || get(currentSetup).writingTone);
+        setSetupField('writingPov', snapshot.writingPov || get(currentSetup).writingPov);
+        setSetupField('writingLength', snapshot.writingLength || get(currentSetup).writingLength);
+        setSetupField('contentMode', snapshot.contentMode || get(currentSetup).contentMode);
+
+        mode = session.currentChapter ? 'play' : 'setup';
+      }
+    }
+
     loading = false;
 
-    const prefs = await getPreferences();
-    if (!storyId) {
-      applySetupDefaultsFromPreferences(prefs);
-    }
-
-    if (prefs.autoSave) {
-      startAutoSave(prefs.autoSaveInterval);
+    if (preferences.autoSave) {
+      startAutoSave(preferences.autoSaveInterval);
     }
   });
 
   onDestroy(() => {
     stopAutoSave();
   });
-
-  function selectEra(eraId: string) {
-    updateSetupField('era', eraId);
-  }
-
-  function selectFaction(factionId: string) {
-    updateSetupField('faction', factionId);
-  }
-
-  function selectRole(roleId: string) {
-    updateSetupField('role', roleId);
-  }
-
-  function selectAvatar(avatar: string) {
-    updateSetupField('protagonistAvatar', avatar);
-  }
-
-  function handleFirstNameInput(e: Event) {
-    const target = e.target as HTMLInputElement;
-    updateSetupField('protagonistFirstName', target.value);
-  }
-
-  function handleLastNameInput(e: Event) {
-    const target = e.target as HTMLInputElement;
-    updateSetupField('protagonistLastName', target.value);
-  }
-
-  function selectWritingStyle(styleId: string) {
-    updateSetupField('writingStyle', styleId);
-  }
-
-  function selectWritingTone(toneId: string) {
-    updateSetupField('writingTone', toneId);
-  }
-
-  function selectWritingPov(povId: string) {
-    updateSetupField('writingPov', povId);
-  }
-
-  function selectWritingLength(lengthId: string) {
-    updateSetupField('writingLength', lengthId);
-  }
-
-  function selectContentMode(modeId: string) {
-    updateSetupField('contentMode', modeId);
-  }
-
-  function handlePremiseInput(e: Event) {
-    const target = e.target as HTMLTextAreaElement;
-    updateSetupField('premise', target.value);
-  }
-
-  function handleContentInput(e: Event) {
-    const target = e.target as HTMLTextAreaElement;
-    updateContent(target.value);
-  }
-
-  function canProceedToEdit(): boolean {
-    const setup = get(currentSetup);
-    return !!(
-      setup.era &&
-      setup.faction &&
-      setup.role &&
-      selectedTrame &&
-      setup.writingStyle &&
-      setup.writingTone &&
-      setup.contentMode
-    );
-  }
-
-  function proceedToEdit() {
-    if (canProceedToEdit()) {
-      step = 'edit';
-    }
-  }
-
-  function goBackToSetup() {
-    step = 'setup';
-  }
-
-  async function handleSave() {
-    saving = true;
-    try {
-      if (storyId) {
-        await saveStory();
-        showToast('Histoire sauvegardée', 'success');
-      } else {
-        const newStory = await createStory(get(currentSetup));
-        storyId = newStory.id;
-        goto(`/editor/${newStory.id}`, { replaceState: true });
-        showToast('Histoire créée', 'success');
-      }
-    } catch (error) {
-      showToast('Erreur lors de la sauvegarde', 'error');
-      console.error(error);
-    }
-    saving = false;
-  }
-
-  function addSection(type: 'narration' | 'dialogue' | 'action' | 'reflection') {
-    const appended = get(story).content + `\n[${type.toUpperCase()}]\n\n[/${type.toUpperCase()}]\n`;
-    updateContent(appended);
-  }
-
-  function getCurrentEra() {
-    return ERAS.find(e => e.id === $currentSetup.era);
-  }
-
-  function getCurrentFaction() {
-    return FACTIONS.find(f => f.id === $currentSetup.faction);
-  }
-
-  function getCurrentRole() {
-    return ROLES.find(r => r.id === $currentSetup.role);
-  }
-
-  function getWritingStyleLabel() {
-    return WRITING_STYLES.find(item => item.id === $currentSetup.writingStyle)?.name || '—';
-  }
-
-  function getContentModeLabel() {
-    return CONTENT_MODES.find(item => item.id === $currentSetup.contentMode)?.name || '—';
-  }
-
-  function getFilteredRoles() {
-    const selectedFaction = $currentSetup.faction;
-    if (!selectedFaction) return ROLES;
-
-    const getPriority = (faction: string) => {
-      if (faction === selectedFaction) return 0;
-      if (faction === 'neutral') return 1;
-      return 2;
-    };
-
-    return [...ROLES].sort((a, b) => {
-      const priorityDiff = getPriority(a.faction) - getPriority(b.faction);
-      if (priorityDiff !== 0) return priorityDiff;
-      return a.name.localeCompare(b.name);
-    });
-  }
-
-  function selectTrame(trame: typeof TRAMES[0]) {
-    selectedTrame = trame.id;
-    if (trame.premise) updateSetupField('premise', trame.premise);
-  }
 </script>
 
 <svelte:head>
-  <title>{storyId ? 'Modifier l\'histoire' : 'Nouvelle histoire'} — Star Wars Story Manager</title>
+  <title>{storyId ? 'Aventure interactive' : 'Nouvelle aventure IA'} — Star Wars Story Manager</title>
 </svelte:head>
 
 <div class="editor-layout">
   <main class="editor-main">
     <PageHeader
-      title={storyId ? 'Modifier l\'histoire' : 'Nouvelle histoire'}
+      title={mode === 'setup' ? 'Création d’histoire IA' : 'Aventure interactive'}
       showBack={true}
       on:back={() => goto('/')}
     >
-      <button class="btn btn-secondary" on:click={handleSave} disabled={saving}>
-        {#if saving}
-          <span class="spinner"></span>
-        {:else}
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
-            <polyline points="17,21 17,13 7,13 7,21"/>
-            <polyline points="7,3 7,8 15,8"/>
-          </svg>
-        {/if}
-        Sauvegarder
-      </button>
+      <div class="header-actions">
+        <button class="btn btn-ghost" on:click={startNewStory} disabled={generating || saving}>
+          Nouvelle
+        </button>
+        <button class="btn btn-secondary" on:click={handleSave} disabled={saving || generating}>
+          {#if saving}
+            <span class="spinner"></span>
+          {:else}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+              <polyline points="17,21 17,13 7,13 7,21"/>
+              <polyline points="7,3 7,8 15,8"/>
+            </svg>
+          {/if}
+          Sauvegarder
+        </button>
+      </div>
     </PageHeader>
 
     <div class="editor-content">
@@ -318,356 +792,403 @@
           <div class="loading-spinner"></div>
           <p>Chargement...</p>
         </div>
-      {:else if step === 'setup'}
-        <div class="setup-container">
-          <div class="setup-header">
-            <h1>Configurez votre histoire</h1>
-            <p>Choisissez le contexte de votre aventure dans l'univers Star Wars</p>
+      {:else if mode === 'setup'}
+        <div class="setup-shell">
+          <div class="setup-progress" role="tablist" aria-label="Étapes de configuration">
+            {#each SETUP_SCREENS as screen, index}
+              <button
+                type="button"
+                class="progress-pill"
+                class:active={index === setupScreenIndex}
+                class:done={index < setupScreenIndex}
+                on:click={() => goToSetupStep(index)}
+              >
+                <span class="pill-index">{index + 1}</span>
+                <span class="pill-label">{screen.label}</span>
+              </button>
+            {/each}
           </div>
 
-          <!-- Era Selection -->
-          <section class="setup-section">
-            <h2>
-              <span class="step-number">1</span>
-              Choisissez l'ère
-            </h2>
-            <div class="era-grid">
-              {#each ERAS as era}
-                <button
-                  class="era-card"
-                  class:selected={$currentSetup.era === era.id}
-                  on:click={() => selectEra(era.id)}
-                >
-                  <span class="era-icon">
-                    <SvgIcon filename={era.icon} size={40} color="currentColor" alt={era.name} />
-                  </span>
-                  <span class="era-name">{era.name}</span>
-                  <span class="era-years">{era.years}</span>
-                </button>
-              {/each}
+          <div class="setup-stage">
+            {#key activeSetupStep.id}
+              <section
+                class="setup-screen"
+                in:fly={{ x: setupSlideDir * 80, duration: 220, opacity: 0 }}
+                out:fly={{ x: -setupSlideDir * 80, duration: 180, opacity: 0 }}
+              >
+                <header class="setup-screen-header">
+                  <h1>{activeSetupStep.label}</h1>
+                  <p>{activeSetupStep.subtitle}</p>
+                </header>
+
+                {#if activeSetupStep.id === 'era'}
+                  <div class="era-grid">
+                    {#each ERAS as era}
+                      <button
+                        class="era-card"
+                        class:selected={$currentSetup.era === era.id}
+                        on:click={() => selectEra(era.id)}
+                      >
+                        <span class="era-icon">
+                          <SvgIcon filename={era.icon} size={40} color="currentColor" alt={era.name} />
+                        </span>
+                        <span class="era-name">{era.name}</span>
+                        <span class="era-years">{era.years}</span>
+                      </button>
+                    {/each}
+                  </div>
+                {:else if activeSetupStep.id === 'faction_role'}
+                  <div class="split-grid">
+                    <section>
+                      <h2 class="subheading">Faction</h2>
+                      <div class="faction-grid">
+                        {#each FACTIONS as faction}
+                          <button
+                            class="faction-card"
+                            class:selected={$currentSetup.faction === faction.id}
+                            style="--faction-color: {faction.color}"
+                            on:click={() => selectFaction(faction.id)}
+                          >
+                            <span class="faction-icon">
+                              <SvgIcon filename={faction.icon} size={34} color="currentColor" alt={faction.name} />
+                            </span>
+                            <span class="faction-name">{faction.name}</span>
+                          </button>
+                        {/each}
+                      </div>
+                    </section>
+
+                    <section>
+                      <h2 class="subheading">Rôle</h2>
+                      <div class="role-grid">
+                        {#each getFilteredRoles() as role}
+                          <button
+                            class="role-card"
+                            class:selected={$currentSetup.role === role.id}
+                            class:recommended={$currentSetup.faction && (role.faction === $currentSetup.faction || role.faction === 'neutral')}
+                            on:click={() => selectRole(role.id)}
+                          >
+                            <span class="role-icon">
+                              <SvgIcon filename={role.icon} size={26} color="currentColor" alt={role.name} />
+                            </span>
+                            <span class="role-name">{role.name}</span>
+                          </button>
+                        {/each}
+                      </div>
+                    </section>
+                  </div>
+                {:else if activeSetupStep.id === 'premise'}
+                  <div class="trame-grid">
+                    {#each TRAMES as trame}
+                      <button
+                        class="trame-card"
+                        class:selected={selectedTrame === trame.id}
+                        on:click={() => selectTrame(trame)}
+                      >
+                        <span class="trame-icon">{trame.icon}</span>
+                        <span class="trame-name">{trame.name}</span>
+                      </button>
+                    {/each}
+                  </div>
+
+                  <label class="premise-label" for="premise-input">Prémisse (modifiable, facultative)</label>
+                  <textarea
+                    id="premise-input"
+                    class="premise-input"
+                    placeholder="Laissez vide pour une ouverture générée automatiquement..."
+                    value={$currentSetup.premise}
+                    on:input={handlePremiseInput}
+                    rows="5"
+                  ></textarea>
+                {:else if activeSetupStep.id === 'style'}
+                  <div class="style-stack">
+                    <section>
+                      <h2 class="subheading">Style</h2>
+                      <div class="style-grid">
+                        {#each WRITING_STYLES as style}
+                          <button
+                            class="style-card"
+                            class:selected={$currentSetup.writingStyle === style.id}
+                            on:click={() => selectWritingStyle(style.id)}
+                          >
+                            <span class="style-name">{style.name}</span>
+                            <span class="style-desc">{style.desc}</span>
+                          </button>
+                        {/each}
+                      </div>
+                    </section>
+
+                    <section>
+                      <h2 class="subheading">Ton</h2>
+                      <div class="tone-grid">
+                        {#each WRITING_TONES as tone}
+                          <button
+                            class="tone-chip"
+                            class:selected={$currentSetup.writingTone === tone.id}
+                            on:click={() => selectWritingTone(tone.id)}
+                          >
+                            {tone.name}
+                          </button>
+                        {/each}
+                      </div>
+                    </section>
+
+                    <section class="double-stack">
+                      <div>
+                        <h2 class="subheading">Point de vue</h2>
+                        <div class="toggle-chip-group">
+                          {#each WRITING_POVS as pov}
+                            <button
+                              class="toggle-chip"
+                              class:active={$currentSetup.writingPov === pov.id}
+                              on:click={() => selectWritingPov(pov.id)}
+                            >
+                              {pov.name}
+                            </button>
+                          {/each}
+                        </div>
+                      </div>
+                      <div>
+                        <h2 class="subheading">Longueur</h2>
+                        <div class="toggle-chip-group">
+                          {#each WRITING_LENGTHS as length}
+                            <button
+                              class="toggle-chip"
+                              class:active={$currentSetup.writingLength === length.id}
+                              on:click={() => selectWritingLength(length.id)}
+                            >
+                              {length.name}
+                            </button>
+                          {/each}
+                        </div>
+                      </div>
+                    </section>
+
+                    <section>
+                      <h2 class="subheading">Intensité</h2>
+                      <div class="content-mode-grid">
+                        {#each CONTENT_MODES as modeOption}
+                          <button
+                            class="content-mode-card"
+                            class:selected={$currentSetup.contentMode === modeOption.id}
+                            on:click={() => selectContentMode(modeOption.id)}
+                          >
+                            <span class="content-mode-icon">{modeOption.icon}</span>
+                            <span class="content-mode-name">{modeOption.name}</span>
+                            <span class="content-mode-desc">{modeOption.desc}</span>
+                          </button>
+                        {/each}
+                      </div>
+                    </section>
+                  </div>
+                {:else if activeSetupStep.id === 'profile'}
+                  <div class="profile-card">
+                    <p class="helper-text">Le nom est facultatif. Vous pouvez lancer l’aventure sans le renseigner.</p>
+
+                    <div class="avatar-row">
+                      {#each AVATARS as avatar}
+                        <button
+                          class="avatar-btn"
+                          class:selected={$currentSetup.protagonistAvatar === avatar}
+                          on:click={() => selectAvatar(avatar)}
+                          aria-label={`Avatar ${avatar}`}
+                        >
+                          {avatar}
+                        </button>
+                      {/each}
+                    </div>
+
+                    <div class="name-grid">
+                      <label class="name-field">
+                        <span>Prénom (facultatif)</span>
+                        <input
+                          class="name-input"
+                          type="text"
+                          placeholder="Ex: Luke"
+                          value={$currentSetup.protagonistFirstName || ''}
+                          on:input={handleFirstNameInput}
+                        />
+                      </label>
+                      <label class="name-field">
+                        <span>Nom (facultatif)</span>
+                        <input
+                          class="name-input"
+                          type="text"
+                          placeholder="Ex: Skywalker"
+                          value={$currentSetup.protagonistLastName || ''}
+                          on:input={handleLastNameInput}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                {:else}
+                  <div class="review-grid">
+                    <div class="review-card">
+                      <h2>Résumé</h2>
+                      <ul>
+                        <li><strong>Ère:</strong> {getCurrentEraLabel()}</li>
+                        <li><strong>Faction:</strong> {getCurrentFactionLabel()}</li>
+                        <li><strong>Rôle:</strong> {getCurrentRoleLabel()}</li>
+                        <li><strong>Style:</strong> {getCurrentStyleLabel()} / {getCurrentToneLabel()}</li>
+                        <li><strong>Intensité:</strong> {getCurrentContentModeLabel()}</li>
+                        <li><strong>Provider:</strong> {providerStatus}</li>
+                      </ul>
+                    </div>
+
+                    <div class="review-card">
+                      <h2>Ce qui change maintenant</h2>
+                      <ul class="feature-list">
+                        <li>✅ L’histoire démarre immédiatement (pas besoin d’écrire à la main).</li>
+                        <li>✅ Les noms sont facultatifs.</li>
+                        <li>✅ Vous jouez avec des choix + réponse personnalisée.</li>
+                        <li>✅ Une mémoire de session est conservée pour la cohérence.</li>
+                      </ul>
+
+                      {#if providerMissing}
+                        <div class="provider-warning">
+                          <p>Aucun provider texte actif. Configurez l’IA texte avant de lancer.</p>
+                          <button class="btn btn-secondary" on:click={goToSettings}>Ouvrir les paramètres IA</button>
+                        </div>
+                      {/if}
+                    </div>
+                  </div>
+                {/if}
+              </section>
+            {/key}
+          </div>
+
+          <div class="setup-nav">
+            <button class="btn btn-secondary" on:click={previousSetupStep} disabled={setupScreenIndex === 0 || generating}>
+              ← Retour
+            </button>
+
+            <button class="btn btn-primary" on:click={nextSetupStep} disabled={generating}>
+              {#if isLastSetupStep}
+                {#if generating}
+                  Lancement de l’aventure…
+                {:else}
+                  Lancer l’aventure IA
+                {/if}
+              {:else}
+                Suivant →
+              {/if}
+            </button>
+          </div>
+
+          {#if generationError}
+            <div class="error-banner">{generationError}</div>
+          {/if}
+        </div>
+      {:else}
+        <div class="play-shell">
+          <div class="play-topbar">
+            <div class="status-badge">Tour {turnNumber || 1}</div>
+            <div class="status-badge muted">Mémoire active: {memoryLog.length}</div>
+            <button class="btn btn-ghost" on:click={goBackToSetupFromPlay} disabled={generating}>Modifier la config</button>
+          </div>
+
+          {#if generationError}
+            <div class="error-banner">{generationError}</div>
+          {/if}
+
+          {#if generating}
+            <div class="play-loading">
+              <div class="loading-spinner"></div>
+              <p>L’IA écrit la suite de votre histoire…</p>
             </div>
-          </section>
+          {/if}
 
-          <!-- Faction Selection -->
-          <section class="setup-section">
-            <h2>
-              <span class="step-number">2</span>
-              Choisissez votre faction
-            </h2>
-            <div class="faction-grid">
-              {#each FACTIONS as faction}
-                <button
-                  class="faction-card"
-                  class:selected={$currentSetup.faction === faction.id}
-                  style="--faction-color: {faction.color}"
-                  on:click={() => selectFaction(faction.id)}
-                >
-                  <span class="faction-icon">
-                    <SvgIcon filename={faction.icon} size={36} color="currentColor" alt={faction.name} />
-                  </span>
-                  <span class="faction-name">{faction.name}</span>
-                </button>
-              {/each}
-            </div>
-          </section>
+          {#if currentChapter}
+            <article class="chapter-card">
+              <header class="chapter-header">
+                <h2>{currentChapter.chapter_title}</h2>
+                <span>{currentChapter.section_type}</span>
+              </header>
 
-          <!-- Role Selection -->
-          <section class="setup-section">
-            <h2>
-              <span class="step-number">3</span>
-              Choisissez votre personnage
-            </h2>
-            {#if !$currentSetup.faction}
-              <p class="hint">Astuce : choisissez d'abord une faction pour voir les rôles recommandés en haut de la liste.</p>
-            {/if}
-            <div class="role-grid">
-              {#each getFilteredRoles() as role}
-                <button
-                  class="role-card"
-                  class:selected={$currentSetup.role === role.id}
-                  class:recommended={$currentSetup.faction && (role.faction === $currentSetup.faction || role.faction === 'neutral')}
-                  on:click={() => selectRole(role.id)}
-                >
-                  <span class="role-icon">
-                    <SvgIcon filename={role.icon} size={28} color="currentColor" alt={role.name} />
-                  </span>
-                  <span class="role-name">{role.name}</span>
-                </button>
-              {/each}
-            </div>
-          </section>
+              <div class="narrative-grid">
+                {#if currentChapter.narrative.context}
+                  <section class="narrative-block context">
+                    <h3>Contexte</h3>
+                    {#each textToParagraphs(currentChapter.narrative.context) as paragraph}
+                      <p>{paragraph}</p>
+                    {/each}
+                  </section>
+                {/if}
 
-          <!-- Trame + Premise -->
-          <section class="setup-section">
-            <h2>
-              <span class="step-number">4</span>
-              Choisissez une trame
-            </h2>
-            <div class="trame-grid">
-              {#each TRAMES as trame}
-                <button
-                  class="trame-card"
-                  class:selected={selectedTrame === trame.id}
-                  on:click={() => selectTrame(trame)}
-                >
-                  <span class="trame-icon">{trame.icon}</span>
-                  <span class="trame-name">{trame.name}</span>
-                </button>
-              {/each}
-            </div>
-            {#if selectedTrame === 'custom' || selectedTrame}
-              <textarea
-                class="premise-input"
-                placeholder="Décrivez le contexte de départ de votre histoire..."
-                value={$currentSetup.premise}
-                on:input={handlePremiseInput}
-                rows="4"
-              ></textarea>
-            {/if}
-          </section>
+                {#if currentChapter.narrative.action}
+                  <section class="narrative-block action">
+                    <h3>Action</h3>
+                    {#each textToParagraphs(currentChapter.narrative.action) as paragraph}
+                      <p>{paragraph}</p>
+                    {/each}
+                  </section>
+                {/if}
 
-          <section class="setup-section">
-            <h2>
-              <span class="step-number">5</span>
-              Profil du protagoniste
-            </h2>
+                {#if currentChapter.narrative.dialogue}
+                  <section class="narrative-block dialogue">
+                    <h3>Dialogue</h3>
+                    {#each textToParagraphs(currentChapter.narrative.dialogue) as paragraph}
+                      <p>{paragraph}</p>
+                    {/each}
+                  </section>
+                {/if}
 
-            <div class="story-profile-card">
-              <div class="avatar-row">
-                {#each AVATARS as avatar}
-                  <button
-                    class="avatar-btn"
-                    class:selected={$currentSetup.protagonistAvatar === avatar}
-                    on:click={() => selectAvatar(avatar)}
-                    aria-label={`Avatar ${avatar}`}
-                  >
-                    {avatar}
+                {#if currentChapter.narrative.reflection}
+                  <section class="narrative-block reflection">
+                    <h3>Réflexion</h3>
+                    {#each textToParagraphs(currentChapter.narrative.reflection) as paragraph}
+                      <p><em>{paragraph}</em></p>
+                    {/each}
+                  </section>
+                {/if}
+              </div>
+            </article>
+
+            <section class="choices-section">
+              <h3>Que faites-vous ?</h3>
+              <div class="choice-list">
+                {#each currentChapter.choices as choice}
+                  <button class="choice-button" on:click={() => handleChoice(choice)} disabled={generating}>
+                    <span class="choice-text">{choice.text}</span>
+                    <span class="choice-meta">{choice.attribute} · difficulté {choice.difficulty}</span>
                   </button>
                 {/each}
               </div>
+            </section>
 
-              <div class="name-grid">
-                <label class="name-field">
-                  <span>Prénom</span>
-                  <input
-                    class="name-input"
-                    type="text"
-                    placeholder="Luke"
-                    value={$currentSetup.protagonistFirstName || ''}
-                    on:input={handleFirstNameInput}
-                  />
-                </label>
-                <label class="name-field">
-                  <span>Nom</span>
-                  <input
-                    class="name-input"
-                    type="text"
-                    placeholder="Skywalker"
-                    value={$currentSetup.protagonistLastName || ''}
-                    on:input={handleLastNameInput}
-                  />
-                </label>
-              </div>
-            </div>
-          </section>
+            <form class="custom-action-form" on:submit|preventDefault={handleCustomActionSubmit}>
+              <label for="custom-action">Ou écrivez votre propre action</label>
+              <textarea
+                id="custom-action"
+                class="custom-action-input"
+                bind:value={customAction}
+                placeholder="Ex: Je tente de négocier un passage sûr en promettant une faveur à la contrepartie."
+                rows="3"
+                disabled={generating}
+              ></textarea>
+              <button class="btn btn-primary" type="submit" disabled={generating || !customAction.trim()}>
+                Envoyer ma réponse personnalisée
+              </button>
+            </form>
 
-          <section class="setup-section">
-            <h2>
-              <span class="step-number">6</span>
-              Style narratif
-            </h2>
-
-            <div class="field-stack">
-              <div>
-                <h3 class="subheading">Style</h3>
-                <div class="style-grid">
-                  {#each WRITING_STYLES as style}
-                    <button
-                      class="style-card"
-                      class:selected={$currentSetup.writingStyle === style.id}
-                      on:click={() => selectWritingStyle(style.id)}
-                    >
-                      <span class="style-name">{style.name}</span>
-                      <span class="style-desc">{style.desc}</span>
-                    </button>
+            <details class="memory-panel">
+              <summary>Mémoire IA ({memoryLog.length})</summary>
+              {#if memoryLog.length}
+                <ul>
+                  {#each [...memoryLog].reverse().slice(0, 25) as item}
+                    <li>{item}</li>
                   {/each}
-                </div>
-              </div>
-
-              <div>
-                <h3 class="subheading">Ton</h3>
-                <div class="style-grid">
-                  {#each WRITING_TONES as tone}
-                    <button
-                      class="style-card"
-                      class:selected={$currentSetup.writingTone === tone.id}
-                      on:click={() => selectWritingTone(tone.id)}
-                    >
-                      <span class="style-name">{tone.name}</span>
-                      <span class="style-desc">{tone.desc}</span>
-                    </button>
-                  {/each}
-                </div>
-              </div>
-
-              <div class="dual-settings-row">
-                <div>
-                  <h3 class="subheading">Point de vue</h3>
-                  <div class="toggle-chip-group">
-                    {#each WRITING_POVS as pov}
-                      <button
-                        class="toggle-chip"
-                        class:active={$currentSetup.writingPov === pov.id}
-                        on:click={() => selectWritingPov(pov.id)}
-                      >
-                        {pov.name}
-                      </button>
-                    {/each}
-                  </div>
-                </div>
-
-                <div>
-                  <h3 class="subheading">Longueur</h3>
-                  <div class="toggle-chip-group">
-                    {#each WRITING_LENGTHS as length}
-                      <button
-                        class="toggle-chip"
-                        class:active={$currentSetup.writingLength === length.id}
-                        on:click={() => selectWritingLength(length.id)}
-                      >
-                        {length.name}
-                      </button>
-                    {/each}
-                  </div>
-                </div>
-              </div>
+                </ul>
+              {:else}
+                <p class="memory-empty">La mémoire va se remplir au fil des tours.</p>
+              {/if}
+            </details>
+          {:else}
+            <div class="play-empty">
+              <p>Aucun chapitre actif. Retournez à la configuration pour lancer l’aventure.</p>
+              <button class="btn btn-primary" on:click={goBackToSetupFromPlay}>Retour à la configuration</button>
             </div>
-          </section>
-
-          <section class="setup-section">
-            <h2>
-              <span class="step-number">7</span>
-              Intensité du contenu
-            </h2>
-            <div class="content-mode-grid">
-              {#each CONTENT_MODES as mode}
-                <button
-                  class="content-mode-card"
-                  class:selected={$currentSetup.contentMode === mode.id}
-                  on:click={() => selectContentMode(mode.id)}
-                >
-                  <span class="content-mode-icon">{mode.icon}</span>
-                  <span class="content-mode-name">{mode.name}</span>
-                  <span class="content-mode-desc">{mode.desc}</span>
-                </button>
-              {/each}
-            </div>
-          </section>
-
-          <div class="setup-actions">
-            <button
-              class="btn btn-primary btn-large"
-              disabled={!canProceedToEdit()}
-              on:click={proceedToEdit}
-            >
-              Commencer à écrire
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="5" y1="12" x2="19" y2="12"/>
-                <polyline points="12,5 19,12 12,19"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-      {:else}
-        <div class="edit-container">
-          <!-- Story Context Bar -->
-          <div class="context-bar">
-            <div class="context-item">
-              <span class="context-label">Ère</span>
-              <span class="context-value">{getCurrentEra()?.name}</span>
-            </div>
-            <div class="context-item">
-              <span class="context-label">Faction</span>
-              <span class="context-value" style="color: {getCurrentFaction()?.color}">
-                {getCurrentFaction()?.name}
-              </span>
-            </div>
-            <div class="context-item">
-              <span class="context-label">Rôle</span>
-              <span class="context-value">{getCurrentRole()?.name}</span>
-            </div>
-            {#if $currentSetup.protagonistFirstName || $currentSetup.protagonistLastName}
-              <div class="context-item">
-                <span class="context-label">Protagoniste</span>
-                <span class="context-value">
-                  {$currentSetup.protagonistAvatar || '🧑‍🚀'} {$currentSetup.protagonistFirstName || ''} {$currentSetup.protagonistLastName || ''}
-                </span>
-              </div>
-            {/if}
-            <div class="context-item">
-              <span class="context-label">Style</span>
-              <span class="context-value">{getWritingStyleLabel()}</span>
-            </div>
-            <div class="context-item">
-              <span class="context-label">Mode</span>
-              <span class="context-value">{getContentModeLabel()}</span>
-            </div>
-            <button class="btn btn-ghost btn-small" on:click={goBackToSetup}>
-              Modifier
-            </button>
-          </div>
-
-          <!-- Editor Toolbar -->
-          <div class="editor-toolbar">
-            <div class="toolbar-group">
-              <button class="toolbar-btn" title="Narration" on:click={() => addSection('narration')}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/>
-                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
-                </svg>
-              </button>
-              <button class="toolbar-btn" title="Dialogue" on:click={() => addSection('dialogue')}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
-                </svg>
-              </button>
-              <button class="toolbar-btn" title="Action" on:click={() => addSection('action')}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polygon points="13,2 3,14 12,14 11,22 21,10 12,10"/>
-                </svg>
-              </button>
-              <button class="toolbar-btn" title="Réflexion" on:click={() => addSection('reflection')}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="10"/>
-                  <line x1="12" y1="8" x2="12" y2="12"/>
-                  <line x1="12" y1="16" x2="12.01" y2="16"/>
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          <!-- Story Content Editor -->
-          <div class="story-editor">
-            <textarea
-              class="content-editor"
-              placeholder="Commencez à écrire votre histoire ici...
-
-Utilisez les boutons ci-dessus pour ajouter des sections:
-- [NARRATION] pour la narration
-- [DIALOGUE] pour les dialogues
-- [ACTION] pour les scènes d'action
-- [REFLECTION] pour les moments de réflexion"
-              value={$story.content}
-              on:input={handleContentInput}
-            ></textarea>
-          </div>
-
-          <!-- Word Count -->
-          <div class="editor-footer">
-            <span class="word-count">
-              {$story.content.split(/\s+/).filter(w => w.length > 0).length} mots
-            </span>
-          </div>
+          {/if}
         </div>
       {/if}
     </div>
@@ -687,6 +1208,12 @@ Utilisez les boutons ci-dessus pour ajouter des sections:
     flex-direction: column;
   }
 
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+  }
+
   .spinner {
     width: 18px;
     height: 18px;
@@ -698,17 +1225,21 @@ Utilisez les boutons ci-dessus pour ajouter des sections:
 
   .editor-content {
     flex: 1;
-    padding: var(--space-xl);
+    padding: var(--space-lg) var(--space-xl);
     overflow-y: auto;
   }
 
-  .loading-state {
+  .loading-state,
+  .play-loading,
+  .play-empty {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    height: 400px;
+    gap: var(--space-md);
+    min-height: 320px;
     color: var(--color-text-muted);
+    text-align: center;
   }
 
   .loading-spinner {
@@ -718,79 +1249,209 @@ Utilisez les boutons ci-dessus pour ajouter des sections:
     border-top-color: var(--color-gold);
     border-radius: 50%;
     animation: spin 1s linear infinite;
-    margin-bottom: var(--space-md);
   }
 
   @keyframes spin {
     to { transform: rotate(360deg); }
   }
 
-  /* Setup Styles */
-  .setup-container {
-    max-width: 900px;
-    margin: 0 auto;
-  }
-
-  .setup-header {
-    text-align: center;
-    margin-bottom: var(--space-2xl);
-  }
-
-  .setup-header h1 {
-    font-size: 2rem;
-    color: var(--color-text-primary);
-    margin-bottom: var(--space-sm);
-  }
-
-  .setup-header p {
-    color: var(--color-text-muted);
-    font-size: 1.125rem;
-  }
-
-  .setup-section {
-    margin-bottom: var(--space-2xl);
-  }
-
-  .setup-section h2 {
+  .setup-shell {
     display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+    min-height: calc(100vh - 180px);
+  }
+
+  .setup-progress {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+  }
+
+  .progress-pill {
+    display: inline-flex;
     align-items: center;
-    gap: var(--space-md);
-    font-size: 1.25rem;
-    color: var(--color-text-primary);
-    margin-bottom: var(--space-lg);
+    gap: var(--space-xs);
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    padding: 6px 12px;
+    background: var(--color-bg-secondary);
+    color: var(--color-text-muted);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    font-size: 0.75rem;
   }
 
-  .step-number {
-    display: flex;
+  .progress-pill.active {
+    border-color: var(--color-gold);
+    color: var(--color-gold);
+    background: rgba(255, 232, 31, 0.1);
+  }
+
+  .progress-pill.done {
+    border-color: color-mix(in srgb, var(--color-gold) 55%, var(--color-border));
+    color: var(--color-text-secondary);
+  }
+
+  .pill-index {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
-    background: var(--color-gold);
-    color: var(--color-bg-primary);
-    border-radius: 50%;
+    background: var(--color-bg-tertiary);
+    font-size: 0.65rem;
     font-weight: 700;
-    font-size: 0.875rem;
+  }
+
+  .setup-stage {
+    position: relative;
+    flex: 1;
+    min-height: 560px;
+    overflow: hidden;
+  }
+
+  .setup-screen {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+    padding: var(--space-lg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    background: var(--color-bg-secondary);
+    overflow-y: auto;
+  }
+
+  .setup-screen-header h1 {
+    margin: 0;
+    font-size: 1.6rem;
+    color: var(--color-text-primary);
+  }
+
+  .setup-screen-header p {
+    margin: var(--space-xs) 0 0;
+    color: var(--color-text-muted);
+  }
+
+  .setup-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-md);
+  }
+
+  .subheading {
+    margin: 0 0 var(--space-sm);
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+  }
+
+  .era-grid,
+  .faction-grid,
+  .role-grid,
+  .trame-grid,
+  .style-grid,
+  .content-mode-grid {
+    display: grid;
+    gap: var(--space-sm);
   }
 
   .era-grid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+
+  .faction-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+
+  .role-grid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    max-height: 360px;
+    overflow-y: auto;
+    padding-right: 2px;
+  }
+
+  .trame-grid {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  }
+
+  .style-grid {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  }
+
+  .content-mode-grid {
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  }
+
+  .split-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: var(--space-md);
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-lg);
+  }
+
+  .era-card,
+  .faction-card,
+  .role-card,
+  .trame-card,
+  .style-card,
+  .content-mode-card,
+  .tone-chip,
+  .toggle-chip,
+  .avatar-btn {
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-tertiary);
+    color: var(--color-text-primary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .era-card,
+  .faction-card,
+  .trame-card,
+  .style-card,
+  .content-mode-card {
+    text-align: left;
+    padding: var(--space-md);
+  }
+
+  .era-card:hover,
+  .faction-card:hover,
+  .role-card:hover,
+  .trame-card:hover,
+  .style-card:hover,
+  .content-mode-card:hover,
+  .tone-chip:hover,
+  .toggle-chip:hover,
+  .avatar-btn:hover {
+    border-color: var(--color-gold);
+  }
+
+  .era-card.selected,
+  .faction-card.selected,
+  .role-card.selected,
+  .trame-card.selected,
+  .style-card.selected,
+  .content-mode-card.selected,
+  .tone-chip.selected,
+  .toggle-chip.active,
+  .avatar-btn.selected {
+    border-color: var(--color-gold);
+    background: rgba(255, 232, 31, 0.1);
   }
 
   .era-card {
     display: flex;
     flex-direction: column;
+    gap: var(--space-xs);
     align-items: center;
-    gap: var(--space-sm);
-    padding: var(--space-lg);
-    background: var(--color-bg-secondary);
-    border: 2px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    text-align: left;
+    text-align: center;
   }
 
   .era-icon,
@@ -800,235 +1461,150 @@ Utilisez les boutons ci-dessus pour ajouter des sections:
     align-items: center;
     justify-content: center;
     color: var(--color-gold);
-    flex-shrink: 0;
-  }
-
-  .era-icon {
-    width: 48px;
-    height: 48px;
-  }
-
-  .faction-icon {
-    width: 40px;
-    height: 40px;
-    margin-bottom: var(--space-xs);
-  }
-
-  .role-icon {
-    width: 30px;
-    height: 30px;
-  }
-
-  .era-card:hover {
-    border-color: var(--color-gold);
-    transform: translateY(-2px);
-  }
-
-  .era-card.selected {
-    border-color: var(--color-gold);
-    background: rgba(255, 232, 31, 0.1);
-  }
-
-  .era-name {
-    font-family: var(--font-display);
-    font-weight: 600;
-    color: var(--color-text-primary);
-    margin-bottom: var(--space-xs);
   }
 
   .era-years {
     font-size: 0.75rem;
     color: var(--color-text-muted);
-    font-family: var(--font-mono);
-  }
-
-  .faction-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: var(--space-md);
   }
 
   .faction-card {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: var(--space-md) var(--space-lg);
-    background: var(--color-bg-secondary);
-    border: 2px solid var(--color-border);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    text-align: center;
-    border-left: 4px solid var(--faction-color);
-  }
-
-  .faction-card:hover {
-    border-color: var(--faction-color);
-    transform: translateY(-2px);
+    border-left-color: var(--faction-color);
   }
 
   .faction-card.selected {
     border-color: var(--faction-color);
-    background: color-mix(in srgb, var(--faction-color) 15%, transparent);
-  }
-
-  .faction-name {
-    font-family: var(--font-display);
-    font-weight: 500;
-    color: var(--color-text-primary);
-  }
-
-  .role-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: var(--space-sm);
+    background: color-mix(in srgb, var(--faction-color) 14%, transparent);
   }
 
   .role-card {
     display: flex;
     align-items: center;
     gap: var(--space-sm);
-    padding: var(--space-md);
-    background: var(--color-bg-secondary);
-    border: 2px solid var(--color-border);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-  }
-
-  .role-card:hover {
-    border-color: var(--color-gold);
-    transform: translateY(-2px);
-  }
-
-  .role-card.selected {
-    border-color: var(--color-gold);
-    background: rgba(255, 232, 31, 0.1);
+    padding: var(--space-sm) var(--space-md);
+    text-align: left;
   }
 
   .role-card.recommended {
-    border-color: color-mix(in srgb, var(--color-gold) 35%, var(--color-border));
-  }
-
-  .trame-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    gap: var(--space-sm);
-    margin-bottom: var(--space-md);
+    border-color: color-mix(in srgb, var(--color-gold) 40%, var(--color-border));
   }
 
   .trame-card {
     display: flex;
     flex-direction: column;
     align-items: center;
+    text-align: center;
     gap: var(--space-xs);
     padding: var(--space-md) var(--space-sm);
-    background: var(--color-bg-secondary);
-    border: 2px solid var(--color-border);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    text-align: center;
-  }
-
-  .trame-card:hover {
-    border-color: var(--color-gold);
-    transform: translateY(-2px);
-  }
-
-  .trame-card.selected {
-    border-color: var(--color-gold);
-    background: rgba(255, 232, 31, 0.1);
   }
 
   .trame-icon {
-    font-size: 1.5rem;
-    line-height: 1;
+    font-size: 1.35rem;
   }
 
   .trame-name {
-    font-size: 0.75rem;
+    font-size: 0.8rem;
     font-weight: 600;
-    color: var(--color-text-primary);
-    font-family: var(--font-display);
   }
 
-  .role-icon {
-    line-height: 0;
-  }
-
-  .role-name {
-    font-size: 0.875rem;
-    color: var(--color-text-primary);
-    font-weight: 500;
-  }
-
-  .hint {
+  .premise-label {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
     color: var(--color-text-muted);
-    font-style: italic;
-    padding: var(--space-lg);
-    text-align: center;
-    background: var(--color-bg-secondary);
-    border-radius: var(--radius-md);
+    font-weight: 600;
   }
 
-  .premise-input {
+  .premise-input,
+  .custom-action-input,
+  .name-input {
     width: 100%;
-    padding: var(--space-lg);
-    background: var(--color-bg-secondary);
-    border: 2px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-primary);
     color: var(--color-text-primary);
-    font-family: var(--font-body);
-    font-size: 1rem;
-    line-height: 1.6;
+    border-radius: var(--radius-md);
+    padding: var(--space-sm) var(--space-md);
     resize: vertical;
+    font: inherit;
     transition: border-color var(--transition-fast);
   }
 
-  .premise-input:focus {
+  .premise-input:focus,
+  .custom-action-input:focus,
+  .name-input:focus {
     outline: none;
     border-color: var(--color-gold);
   }
 
-  .premise-input::placeholder {
-    color: var(--color-text-muted);
-  }
-
-  .story-profile-card {
+  .style-stack {
     display: flex;
     flex-direction: column;
     gap: var(--space-md);
-    padding: var(--space-lg);
-    background: var(--color-bg-secondary);
-    border: 2px solid var(--color-border);
-    border-radius: var(--radius-lg);
+  }
+
+  .style-name {
+    font-weight: 600;
+  }
+
+  .style-desc,
+  .content-mode-desc {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+  }
+
+  .tone-grid,
+  .toggle-chip-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+  }
+
+  .tone-chip,
+  .toggle-chip {
+    padding: var(--space-xs) var(--space-sm);
+    font-size: 0.85rem;
+  }
+
+  .double-stack {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: var(--space-md);
+  }
+
+  .content-mode-card {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .content-mode-icon {
+    font-size: 1.25rem;
+  }
+
+  .profile-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+
+  .helper-text {
+    margin: 0;
+    color: var(--color-text-muted);
   }
 
   .avatar-row {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-sm);
+    gap: var(--space-xs);
   }
 
   .avatar-btn {
-    width: 44px;
-    height: 44px;
+    width: 42px;
+    height: 42px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     font-size: 1.2rem;
-    background: var(--color-bg-tertiary);
-    border: 2px solid var(--color-border);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-  }
-
-  .avatar-btn:hover,
-  .avatar-btn.selected {
-    border-color: var(--color-gold);
-    background: rgba(255, 232, 31, 0.1);
   }
 
   .name-grid {
@@ -1041,311 +1617,274 @@ Utilisez les boutons ci-dessus pour ajouter des sections:
     display: flex;
     flex-direction: column;
     gap: var(--space-xs);
+  }
+
+  .name-field span {
     color: var(--color-text-muted);
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    font-weight: 600;
   }
 
-  .name-input {
-    padding: var(--space-sm) var(--space-md);
-    background: var(--color-bg-primary);
+  .review-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: var(--space-md);
+  }
+
+  .review-card {
+    background: var(--color-bg-tertiary);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
-    color: var(--color-text-primary);
-    font-size: 0.95rem;
+    padding: var(--space-md);
   }
 
-  .name-input:focus {
-    outline: none;
-    border-color: var(--color-gold);
+  .review-card h2 {
+    margin: 0 0 var(--space-sm);
+    font-size: 1rem;
   }
 
-  .field-stack {
+  .review-card ul {
+    margin: 0;
+    padding-left: 1rem;
     display: flex;
     flex-direction: column;
-    gap: var(--space-lg);
+    gap: var(--space-xs);
   }
 
-  .subheading {
-    margin-bottom: var(--space-sm);
-    font-size: 0.8rem;
-    font-weight: 700;
-    letter-spacing: 0.4px;
-    text-transform: uppercase;
+  .feature-list {
+    list-style: none;
+    padding-left: 0;
+  }
+
+  .provider-warning {
+    margin-top: var(--space-md);
+    padding: var(--space-sm);
+    border: 1px solid rgba(255, 23, 68, 0.45);
+    border-radius: var(--radius-sm);
+    background: rgba(255, 23, 68, 0.08);
+  }
+
+  .provider-warning p {
+    margin: 0 0 var(--space-sm);
+    color: var(--color-red);
+  }
+
+  .error-banner {
+    border: 1px solid rgba(255, 23, 68, 0.5);
+    background: rgba(255, 23, 68, 0.1);
+    color: #ff8fa3;
+    border-radius: var(--radius-md);
+    padding: var(--space-sm) var(--space-md);
+    font-size: 0.9rem;
+  }
+
+  .play-shell {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    max-width: 980px;
+    margin: 0 auto;
+    padding-bottom: var(--space-xl);
+  }
+
+  .play-topbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-xs);
+  }
+
+  .status-badge {
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-gold);
+    background: rgba(255, 232, 31, 0.1);
+  }
+
+  .status-badge.muted {
     color: var(--color-text-muted);
+    background: var(--color-bg-secondary);
   }
 
-  .style-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  .chapter-card {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg-secondary);
+    padding: var(--space-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+
+  .chapter-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
     gap: var(--space-sm);
   }
 
-  .style-card {
+  .chapter-header h2 {
+    margin: 0;
+    color: var(--color-text-primary);
+  }
+
+  .chapter-header span {
+    color: var(--color-text-muted);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+  }
+
+  .narrative-grid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .narrative-block {
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-tertiary);
+    border-radius: var(--radius-md);
+    padding: var(--space-sm) var(--space-md);
+  }
+
+  .narrative-block h3 {
+    margin: 0 0 var(--space-xs);
+    color: var(--color-gold);
+    font-size: 0.8rem;
+    letter-spacing: 0.45px;
+    text-transform: uppercase;
+  }
+
+  .narrative-block p {
+    margin: 0;
+    line-height: 1.65;
+    color: var(--color-text-secondary);
+  }
+
+  .narrative-block p + p {
+    margin-top: var(--space-sm);
+  }
+
+  .choices-section h3 {
+    margin: 0 0 var(--space-sm);
+    color: var(--color-text-primary);
+  }
+
+  .choice-list {
+    display: grid;
+    gap: var(--space-xs);
+  }
+
+  .choice-button {
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-secondary);
+    border-radius: var(--radius-md);
+    padding: var(--space-sm) var(--space-md);
+    text-align: left;
+    cursor: pointer;
+    transition: all var(--transition-fast);
     display: flex;
     flex-direction: column;
     gap: 4px;
-    padding: var(--space-md);
-    background: var(--color-bg-secondary);
-    border: 2px solid var(--color-border);
-    border-radius: var(--radius-md);
-    text-align: left;
-    cursor: pointer;
-    transition: all var(--transition-fast);
   }
 
-  .style-card:hover {
-    border-color: var(--color-gold);
-  }
-
-  .style-card.selected {
+  .choice-button:hover:not(:disabled) {
     border-color: var(--color-gold);
     background: rgba(255, 232, 31, 0.08);
   }
 
-  .style-name {
-    color: var(--color-text-primary);
-    font-weight: 600;
+  .choice-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 
-  .style-desc {
+  .choice-text {
+    color: var(--color-text-primary);
+    line-height: 1.45;
+  }
+
+  .choice-meta {
     color: var(--color-text-muted);
-    font-size: 0.8rem;
-    line-height: 1.35;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.45px;
   }
 
-  .dual-settings-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: var(--space-md);
-  }
-
-  .toggle-chip-group {
+  .custom-action-form {
     display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-xs);
-  }
-
-  .toggle-chip {
-    padding: var(--space-sm) var(--space-md);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--color-border);
-    background: var(--color-bg-secondary);
-    color: var(--color-text-secondary);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-  }
-
-  .toggle-chip:hover {
-    border-color: var(--color-gold);
-    color: var(--color-text-primary);
-  }
-
-  .toggle-chip.active {
-    border-color: var(--color-gold);
-    background: rgba(255, 232, 31, 0.1);
-    color: var(--color-gold);
-    font-weight: 600;
-  }
-
-  .content-mode-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    flex-direction: column;
     gap: var(--space-sm);
   }
 
-  .content-mode-card {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 6px;
-    padding: var(--space-md);
-    background: var(--color-bg-secondary);
-    border: 2px solid var(--color-border);
+  .custom-action-form label {
+    color: var(--color-text-primary);
+    font-weight: 600;
+  }
+
+  .memory-panel {
+    border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
+    background: var(--color-bg-secondary);
+    padding: var(--space-sm) var(--space-md);
+  }
+
+  .memory-panel summary {
     cursor: pointer;
-    transition: all var(--transition-fast);
-    text-align: left;
-  }
-
-  .content-mode-card:hover {
-    border-color: var(--color-gold);
-  }
-
-  .content-mode-card.selected {
-    border-color: var(--color-gold);
-    background: rgba(255, 232, 31, 0.08);
-  }
-
-  .content-mode-icon {
-    font-size: 1.25rem;
-  }
-
-  .content-mode-name {
-    color: var(--color-text-primary);
-    font-weight: 600;
-  }
-
-  .content-mode-desc {
-    color: var(--color-text-muted);
-    font-size: 0.8rem;
-    line-height: 1.35;
-  }
-
-  .setup-actions {
-    display: flex;
-    justify-content: center;
-    padding: var(--space-xl) 0;
-  }
-
-  .btn-large {
-    padding: var(--space-md) var(--space-xl);
-    font-size: 1.125rem;
-  }
-
-  .btn-large svg {
-    width: 20px;
-    height: 20px;
-  }
-
-  /* Edit Mode Styles */
-  .edit-container {
-    display: flex;
-    flex-direction: column;
-    height: calc(100vh - 120px);
-  }
-
-  .context-bar {
-    display: flex;
-    align-items: center;
-    gap: var(--space-xl);
-    padding: var(--space-md) var(--space-lg);
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    margin-bottom: var(--space-lg);
-  }
-
-  .context-item {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-xs);
-  }
-
-  .context-label {
-    font-size: 0.625rem;
-    font-weight: 600;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    color: var(--color-text-muted);
-  }
-
-  .context-value {
-    font-family: var(--font-display);
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: var(--color-text-primary);
-  }
-
-  .context-bar .btn {
-    margin-left: auto;
-  }
-
-  .editor-toolbar {
-    display: flex;
-    gap: var(--space-md);
-    padding: var(--space-md);
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md) var(--radius-md) 0 0;
-    border-bottom: none;
-  }
-
-  .toolbar-group {
-    display: flex;
-    gap: var(--space-xs);
-  }
-
-  .toolbar-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 40px;
-    height: 40px;
-    background: var(--color-bg-tertiary);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
     color: var(--color-text-secondary);
-    cursor: pointer;
-    transition: all var(--transition-fast);
+    font-weight: 600;
   }
 
-  .toolbar-btn:hover {
-    background: var(--color-bg-primary);
-    color: var(--color-gold);
-    border-color: var(--color-gold);
-  }
-
-  .toolbar-btn svg {
-    width: 20px;
-    height: 20px;
-  }
-
-  .story-editor {
-    flex: 1;
-    border: 1px solid var(--color-border);
-    border-top: none;
-    background: var(--color-bg-secondary);
-  }
-
-  .content-editor {
-    width: 100%;
-    height: 100%;
-    padding: var(--space-xl);
-    background: transparent;
-    border: none;
-    color: var(--color-text-primary);
-    font-family: var(--font-body);
-    font-size: 1rem;
-    line-height: 1.8;
-    resize: none;
-  }
-
-  .content-editor:focus {
-    outline: none;
-  }
-
-  .content-editor::placeholder {
-    color: var(--color-text-muted);
-  }
-
-  .editor-footer {
+  .memory-panel ul {
+    margin: var(--space-sm) 0 0;
+    padding-left: 1.1rem;
     display: flex;
-    justify-content: flex-end;
-    padding: var(--space-md);
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border);
-    border-top: none;
-    border-radius: 0 0 var(--radius-md) var(--radius-md);
-  }
-
-  .word-count {
-    font-size: 0.75rem;
+    flex-direction: column;
+    gap: 4px;
     color: var(--color-text-muted);
-    font-family: var(--font-mono);
   }
 
-  @media (max-width: 768px) {
-    .era-grid,
-    .faction-grid,
-    .role-grid {
+  .memory-empty {
+    margin: var(--space-sm) 0 0;
+    color: var(--color-text-muted);
+    font-size: 0.85rem;
+  }
+
+  @media (max-width: 920px) {
+    .split-grid {
       grid-template-columns: 1fr;
     }
 
-    .context-bar {
-      flex-wrap: wrap;
+    .setup-screen {
+      padding: var(--space-md);
+    }
+  }
+
+  @media (max-width: 720px) {
+    .editor-content {
+      padding: var(--space-md);
+    }
+
+    .setup-shell {
+      min-height: calc(100vh - 150px);
+    }
+
+    .setup-stage {
+      min-height: 520px;
+    }
+
+    .progress-pill {
+      font-size: 0.7rem;
+      padding: 6px 10px;
+    }
+
+    .header-actions {
+      width: 100%;
+      justify-content: flex-end;
     }
   }
 </style>
