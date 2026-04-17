@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { getPreferences, savePreferences, type UserPreferences } from '$lib/db';
+  import { getPreferences, savePreferences, exportAllData, importAllData, emptyTrash, type UserPreferences } from '$lib/db';
   import { showToast, theme, uiLanguage } from '$lib/stores/ui';
   import { UI_LANGUAGE_OPTIONS, type UiLanguageCode } from '$lib/config/languages';
   import Header from '$lib/components/Header.svelte';
@@ -10,6 +10,7 @@
   let preferences: UserPreferences | null = null;
   let loading = true;
   let saving = false;
+  let importInput: HTMLInputElement | null = null;
 
   const IMAGE_PROVIDERS = [
     { id: 'openai', name: 'DALL-E (OpenAI)' },
@@ -35,6 +36,61 @@
       showToast('Erreur lors de la sauvegarde', 'error');
     }
     saving = false;
+  }
+
+  async function handleExportData() {
+    try {
+      const payload = await exportAllData();
+      const blob = new Blob([payload], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `star-wars-story-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      showToast('Sauvegarde exportée', 'success');
+    } catch (error) {
+      showToast('Impossible d’exporter les données', 'error');
+    }
+  }
+
+  function triggerImport() {
+    importInput?.click();
+  }
+
+  async function handleImportData(event: Event) {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    const confirmed = window.confirm('Importer ce fichier remplacera les données locales. Continuer ?');
+    if (!confirmed) {
+      input.value = '';
+      return;
+    }
+
+    try {
+      const payload = await file.text();
+      const counts = await importAllData(payload);
+      showToast(`Import terminé (${counts.stories} histoires, ${counts.folders} dossiers)`, 'success');
+      window.location.reload();
+    } catch (error) {
+      showToast('Impossible d’importer ce fichier', 'error');
+    } finally {
+      input.value = '';
+    }
+  }
+
+  async function handleEmptyTrash() {
+    const confirmed = window.confirm('Supprimer définitivement toutes les histoires de la corbeille ?');
+    if (!confirmed) return;
+
+    try {
+      await emptyTrash();
+      showToast('Corbeille vidée', 'success');
+    } catch (error) {
+      showToast('Impossible de vider la corbeille', 'error');
+    }
   }
 
   function handleThemeChange(newTheme: 'light' | 'dark' | 'auto') {
@@ -459,7 +515,7 @@
                 <label>Exporter toutes les données</label>
                 <span class="setting-description">Téléchargez une sauvegarde complète de vos histoires</span>
               </div>
-              <button class="btn btn-secondary">
+              <button class="btn btn-secondary" on:click={handleExportData}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
                   <polyline points="7,10 12,15 17,10"/>
@@ -474,7 +530,14 @@
                 <label>Importer des données</label>
                 <span class="setting-description"> Restaurez des histoires depuis un fichier de sauvegarde</span>
               </div>
-              <button class="btn btn-secondary">
+              <input
+                bind:this={importInput}
+                type="file"
+                accept="application/json"
+                class="hidden-file-input"
+                on:change={handleImportData}
+              />
+              <button class="btn btn-secondary" on:click={triggerImport}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
                   <polyline points="17,8 12,3 7,8"/>
@@ -489,7 +552,7 @@
                 <label class="danger-label">Vider la corbeille</label>
                 <span class="setting-description">Supprimer définitivement toutes les histoires supprimées</span>
               </div>
-              <button class="btn btn-danger">
+              <button class="btn btn-danger" on:click={handleEmptyTrash}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <polyline points="3,6 5,6 21,6"/>
                   <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
@@ -530,6 +593,10 @@
     border-top-color: var(--color-gold);
     border-radius: 50%;
     animation: spin 1s linear infinite;
+  }
+
+  .hidden-file-input {
+    display: none;
   }
 
   .settings-content {

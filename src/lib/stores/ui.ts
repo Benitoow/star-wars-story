@@ -128,31 +128,33 @@ export interface Toast {
 function createToastStore() {
   const { subscribe, update } = writable<Toast[]>([]);
 
+  function pushToast(toast: Omit<Toast, 'id'>) {
+    const id = crypto.randomUUID();
+    const newToast = { ...toast, id };
+
+    update(toasts => [...toasts, newToast]);
+
+    const duration = toast.duration || 4000;
+    if (duration > 0) {
+      setTimeout(() => {
+        update(toasts => toasts.filter(t => t.id !== id));
+      }, duration);
+    }
+
+    return id;
+  }
+
   return {
     subscribe,
-    add: (toast: Omit<Toast, 'id'>) => {
-      const id = crypto.randomUUID();
-      const newToast = { ...toast, id };
-      
-      update(toasts => [...toasts, newToast]);
-
-      const duration = toast.duration || 4000;
-      if (duration > 0) {
-        setTimeout(() => {
-          update(toasts => toasts.filter(t => t.id !== id));
-        }, duration);
-      }
-
-      return id;
-    },
+    add: pushToast,
     remove: (id: string) => {
       update(toasts => toasts.filter(t => t.id !== id));
     },
     success: (message: string) => {
-      return createToastStore().add({ type: 'success', message });
+      return pushToast({ type: 'success', message });
     },
     error: (message: string) => {
-      return createToastStore().add({ type: 'error', message, duration: 6000 });
+      return pushToast({ type: 'error', message, duration: 6000 });
     }
   };
 }

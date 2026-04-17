@@ -3,6 +3,16 @@
 ══════════════════════════════════════════════ */
 import Dexie, { type Table } from 'dexie';
 import type { UiLanguageCode } from '$lib/config/languages';
+import {
+  createAllDataExportEnvelope,
+  createStoryExportEnvelope,
+  normalizeAppStateForStorage,
+  normalizeFolderForStorage,
+  normalizePreferencesForStorage,
+  normalizeStoryForStorage,
+  parseAllDataImportEnvelope,
+  parseStoryImportEnvelope
+} from '$lib/persistence';
 
 export interface Story {
   id: string;
@@ -171,37 +181,57 @@ export const DEFAULT_APP_STATE: AppState = {
   }
 };
 
+function createDefaultPreferences(): UserPreferences {
+  return {
+    ...DEFAULT_PREFERENCES,
+    shortcuts: { ...DEFAULT_PREFERENCES.shortcuts },
+    profiles: []
+  };
+}
+
+function createDefaultAppState(): AppState {
+  return {
+    ...DEFAULT_APP_STATE,
+    recentStories: [],
+    firstVisitDate: new Date(DEFAULT_APP_STATE.firstVisitDate),
+    analytics: {
+      ...DEFAULT_APP_STATE.analytics,
+      weeklyStats: []
+    }
+  };
+}
+
 // ─── Database Helpers ─────────────────────────
 export async function initializeDB(): Promise<void> {
   const prefs = await db.preferences.get('preferences');
   if (!prefs) {
-    await db.preferences.put(DEFAULT_PREFERENCES);
+    await db.preferences.put(createDefaultPreferences());
   }
 
   const appState = await db.appState.get('appState');
   if (!appState) {
-    await db.appState.put(DEFAULT_APP_STATE);
+    await db.appState.put(createDefaultAppState());
   }
 }
 
 export async function getPreferences(): Promise<UserPreferences> {
   const prefs = await db.preferences.get('preferences');
-  return prefs || DEFAULT_PREFERENCES;
+  return normalizePreferencesForStorage(prefs || createDefaultPreferences());
 }
 
 export async function savePreferences(prefs: Partial<UserPreferences>): Promise<void> {
   const current = await getPreferences();
-  await db.preferences.put({ ...current, ...prefs });
+  await db.preferences.put(normalizePreferencesForStorage({ ...current, ...prefs }));
 }
 
 export async function getAppState(): Promise<AppState> {
   const state = await db.appState.get('appState');
-  return state || DEFAULT_APP_STATE;
+  return normalizeAppStateForStorage(state || createDefaultAppState());
 }
 
 export async function updateAppState(state: Partial<AppState>): Promise<void> {
   const current = await getAppState();
-  await db.appState.put({ ...current, ...state });
+  await db.appState.put(normalizeAppStateForStorage({ ...current, ...state }));
 }
 
 // ─── Story CRUD ────────────────────────────────
@@ -209,7 +239,7 @@ export async function createStory(data: Omit<Story, 'id' | 'metadata' | 'version
   const id = crypto.randomUUID();
   const now = new Date();
 
-  const story: Story = {
+  const story = normalizeStoryForStorage({
     id,
     ...data,
     metadata: {
@@ -221,7 +251,7 @@ export async function createStory(data: Omit<Story, 'id' | 'metadata' | 'version
     version: 1,
     isArchived: false,
     isDeleted: false
-  };
+  });
 
   await db.stories.put(story);
   await addToRecentStories(id);
@@ -231,21 +261,26 @@ export async function createStory(data: Omit<Story, 'id' | 'metadata' | 'version
 }
 
 export async function getStory(id: string): Promise<Story | undefined> {
-  return db.stories.get(id);
+  const story = await db.stories.get(id);
+  return story ? normalizeStoryForStorage(story) : undefined;
 }
 
 export async function updateStory(id: string, data: Partial<Story>): Promise<void> {
   const story = await db.stories.get(id);
   if (!story) throw new Error('Story not found');
 
-  const updated: Partial<Story> = {
+  const updated = normalizeStoryForStorage({
+    ...story,
     ...data,
+    setup: data.setup ? { ...story.setup, ...data.setup } : story.setup,
+    tags: data.tags || story.tags,
     metadata: {
       ...story.metadata,
+      ...(data.metadata || {}),
       updatedAt: new Date(),
       wordCount: data.content?.split(/\s+/).length || story.metadata.wordCount
     }
-  };
+  });
 
   if (data.content !== undefined) {
     await createVersion(story);
@@ -289,7 +324,7 @@ export async function getAllStories(options?: {
 }): Promise<Story[]> {
   let collection = db.stories.toCollection();
 
-  const stories = await collection.toArray();
+  const stories = (await collection.toArray()).map(story => normalizeStoryForStorage(story));
 
   return stories.filter(s => {
     if (options?.includeDeleted !== true && s.isDeleted) return false;
@@ -307,7 +342,7 @@ export async function getAllStories(options?: {
 
 export async function searchStories(query: string): Promise<Story[]> {
   const lowerQuery = query.toLowerCase();
-  const stories = await db.stories.toArray();
+  const stories = (await db.stories.toArray()).map(story => normalizeStoryForStorage(story));
 
   return stories.filter(s => {
     if (s.isDeleted) return false;
@@ -330,7 +365,7 @@ export async function createVersion(story: Story): Promise<void> {
     id: crypto.randomUUID(),
     storyId: story.id,
     content: story.content,
-    setup: story.setup,
+    setup: { ...story.setup },
     savedAt: new Date(),
     version: versions.length + 1
   };
@@ -346,11 +381,14 @@ export async function createVersion(story: Story): Promise<void> {
 }
 
 export async function getVersions(storyId: string): Promise<StoryVersion[]> {
-  return db.storyVersions
+  return (await db.storyVersions
     .where('storyId')
     .equals(storyId)
     .reverse()
-    .sortBy('savedAt');
+    .sortBy('savedAt')).map(version => ({
+      ...version,
+      savedAt: new Date(version.savedAt)
+    }));
 }
 
 export async function restoreVersion(versionId: string): Promise<void> {
@@ -365,18 +403,18 @@ export async function restoreVersion(versionId: string): Promise<void> {
 
 // ─── Folders ────────────────────────────────
 export async function createFolder(data: Omit<Folder, 'id' | 'createdAt' | 'storyCount'>): Promise<Folder> {
-  const folder: Folder = {
+  const folder = normalizeFolderForStorage({
     id: crypto.randomUUID(),
     ...data,
     createdAt: new Date()
-  };
+  });
 
   await db.folders.put(folder);
   return folder;
 }
 
 export async function getFolders(): Promise<Folder[]> {
-  const folders = await db.folders.toArray();
+  const folders = (await db.folders.toArray()).map(folder => normalizeFolderForStorage(folder));
   
   for (const folder of folders) {
     const count = await db.stories.where('folderId').equals(folder.id).count();
@@ -422,7 +460,7 @@ export async function getRecentStories(limit = 5): Promise<Story[]> {
   for (const id of state.recentStories.slice(0, limit)) {
     const story = await db.stories.get(id);
     if (story && !story.isDeleted) {
-      stories.push(story);
+      stories.push(normalizeStoryForStorage(story));
     }
   }
   
@@ -456,62 +494,71 @@ export async function exportStory(id: string): Promise<string> {
   const story = await db.stories.get(id);
   if (!story) throw new Error('Story not found');
 
-  return JSON.stringify({
-    version: 1,
-    exportedAt: new Date().toISOString(),
-    story: {
-      ...story,
-      metadata: {
-        ...story.metadata,
-        createdAt: story.metadata.createdAt.toISOString(),
-        updatedAt: story.metadata.updatedAt.toISOString(),
-        lastPlayedAt: story.metadata.lastPlayedAt?.toISOString()
-      }
-    }
-  }, null, 2);
+  return JSON.stringify(createStoryExportEnvelope(story), null, 2);
 }
 
 export async function importStory(jsonString: string): Promise<Story> {
-  const data = JSON.parse(jsonString);
-  
-  if (!data.story) {
-    throw new Error('Invalid export format');
-  }
+  const imported = parseStoryImportEnvelope(jsonString);
+  const story = normalizeStoryForStorage({
+    ...imported,
+    id: crypto.randomUUID(),
+    version: (imported.version || 1) + 1,
+    metadata: {
+      ...imported.metadata,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }
+  });
 
-  const imported = data.story;
-  imported.id = crypto.randomUUID();
-  imported.metadata.createdAt = new Date(imported.metadata.createdAt);
-  imported.metadata.updatedAt = new Date(imported.metadata.updatedAt);
-  if (imported.metadata.lastPlayedAt) {
-    imported.metadata.lastPlayedAt = new Date(imported.metadata.lastPlayedAt);
-  }
-
-  await db.stories.put(imported);
-  return imported;
+  await db.stories.put(story);
+  return story;
 }
 
 export async function exportAllData(): Promise<string> {
   const stories = await db.stories.toArray();
   const folders = await db.folders.toArray();
-  const preferences = await db.preferences.get('preferences');
-  const appState = await db.appState.get('appState');
+  const storyVersions = await db.storyVersions.toArray();
+  const preferences = await getPreferences();
+  const appState = await getAppState();
 
-  return JSON.stringify({
-    version: 1,
-    exportedAt: new Date().toISOString(),
-    data: {
-      stories: stories.map(s => ({
-        ...s,
-        metadata: {
-          ...s.metadata,
-          createdAt: s.metadata.createdAt.toISOString(),
-          updatedAt: s.metadata.updatedAt.toISOString(),
-          lastPlayedAt: s.metadata.lastPlayedAt?.toISOString()
-        }
-      })),
-      folders,
-      preferences,
-      appState
+  return JSON.stringify(createAllDataExportEnvelope({
+    stories,
+    folders,
+    storyVersions,
+    preferences,
+    appState
+  }), null, 2);
+}
+
+export async function importAllData(jsonString: string): Promise<{
+  stories: number;
+  folders: number;
+}> {
+  const payload = parseAllDataImportEnvelope(jsonString);
+
+  await db.transaction('rw', db.stories, db.folders, db.storyVersions, db.preferences, db.appState, async () => {
+    await db.stories.clear();
+    await db.folders.clear();
+    await db.storyVersions.clear();
+    await db.preferences.clear();
+    await db.appState.clear();
+
+    if (payload.stories.length) {
+      await db.stories.bulkPut(payload.stories);
     }
-  }, null, 2);
+    if (payload.folders.length) {
+      await db.folders.bulkPut(payload.folders);
+    }
+    if (payload.storyVersions.length) {
+      await db.storyVersions.bulkPut(payload.storyVersions);
+    }
+
+    await db.preferences.put(payload.preferences || createDefaultPreferences());
+    await db.appState.put(payload.appState || createDefaultAppState());
+  });
+
+  return {
+    stories: payload.stories.length,
+    folders: payload.folders.length
+  };
 }
