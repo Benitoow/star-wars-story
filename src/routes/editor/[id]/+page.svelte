@@ -95,6 +95,11 @@
     updateSetupField('premise', target.value);
   }
 
+  function handleContentInput(e: Event) {
+    const target = e.target as HTMLTextAreaElement;
+    updateContent(target.value);
+  }
+
   function canProceedToEdit(): boolean {
     const setup = get(currentSetup);
     return !!(setup.era && setup.faction && setup.role && setup.premise);
@@ -355,7 +360,7 @@ Utilisez les boutons ci-dessus pour ajouter des sections:
 - [ACTION] pour les scènes d'action
 - [REFLECTION] pour les moments de réflexion"
               value={$story.content}
-              on:input={(e) => updateContent((e.currentTarget as HTMLTextAreaElement).value)}
+              on:input={handleContentInput}
             ></textarea>
           </div>
 

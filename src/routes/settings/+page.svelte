@@ -66,7 +66,7 @@
       URL.revokeObjectURL(url);
       showToast('Sauvegarde exportée', 'success');
     } catch (error) {
-      showToast('Impossible d’exporter les données', 'error');
+      showToast("Impossible d'exporter les données", 'error');
     }
   }
 
@@ -81,18 +81,18 @@
     pendingFile = file;
 
     requestConfirm(
-      ‘Importer ce fichier remplacera les données locales. Continuer ?’,
+      'Importer ce fichier remplacera les données locales. Continuer ?',
       async () => {
         try {
           const payload = await pendingFile!.text();
           const counts = await importAllData(payload);
-          showToast(`Import terminé (${counts.stories} histoires, ${counts.folders} dossiers)`, ‘success’);
+          showToast(`Import terminé (${counts.stories} histoires, ${counts.folders} dossiers)`, 'success');
           window.location.reload();
         } catch {
-          showToast(‘Impossible d’importer ce fichier’, ‘error’);
+          showToast("Impossible d'importer ce fichier", 'error');
         } finally {
           pendingFile = null;
-          if (importInput) importInput.value = ‘’;
+          if (importInput) importInput.value = '';
         }
       },
       false
@@ -101,13 +101,13 @@
 
   async function handleEmptyTrash() {
     requestConfirm(
-      ‘Supprimer définitivement toutes les histoires de la corbeille ?’,
+      'Supprimer définitivement toutes les histoires de la corbeille ?',
       async () => {
         try {
           await emptyTrash();
-          showToast(‘Corbeille vidée’, ‘success’);
+          showToast('Corbeille vidée', 'success');
         } catch {
-          showToast(‘Impossible de vider la corbeille’, ‘error’);
+          showToast('Impossible de vider la corbeille', 'error');
         }
       },
       true

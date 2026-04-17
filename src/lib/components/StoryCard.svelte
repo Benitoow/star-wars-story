@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Story } from '$db';
-  import { deleteStory, archiveStory } from '$lib/stores/stories';
+  import { deleteStory, archiveStory } from '$lib/db';
   import { toasts, uiLanguage } from '$lib/stores/ui';
   import { resolveUiLanguage } from '$lib/config/languages';
   import { goto } from '$app/navigation';
