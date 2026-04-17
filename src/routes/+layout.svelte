@@ -26,8 +26,8 @@
 
     cleanupOldTrash(30).catch(() => {});
 
-    if (window.innerWidth < 769) {
-      sidebarOpen.set(false);
+    if (window.innerWidth >= 769) {
+      sidebarOpen.set(true);
     }
   });
 
@@ -90,19 +90,27 @@
     display: flex;
     flex-direction: column;
     min-width: 0;
+    margin-left: 0;
     transition: margin-left var(--transition-normal);
   }
 
-  @media (max-width: 768px) {
+  /* push content when sidebar is open on desktop */
+  @media (min-width: 769px) {
     .main-content {
-      margin-left: 0;
+      margin-left: var(--sidebar-width);
     }
   }
 
   .page-content {
     flex: 1;
-    padding: var(--space-lg);
+    padding: var(--space-xl) var(--space-xl);
     overflow-y: auto;
+  }
+
+  @media (max-width: 768px) {
+    .page-content {
+      padding: var(--space-md);
+    }
   }
 
   .loading-screen {

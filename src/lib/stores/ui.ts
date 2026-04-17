@@ -80,7 +80,7 @@ function createUiLanguageStore() {
 export const uiLanguage = createUiLanguageStore();
 
 // ─── Sidebar ────────────────────────────────
-export const sidebarOpen = writable(true);
+export const sidebarOpen = writable(false);
 export const sidebarCollapsed = writable(false);
 
 export function toggleSidebar() {
