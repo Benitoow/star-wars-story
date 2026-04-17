@@ -1901,59 +1901,55 @@
 
   /* ── Narrative flow ─────────────────────── */
   .narrative {
-    padding: 0 var(--space-xl);
+    padding: 0 var(--space-xl) var(--space-md);
   }
 
-  /* Each block: label floats as a small chip, then prose below */
   .n-block {
-    padding: var(--space-lg) 0;
+    padding: var(--space-md) 0;
     position: relative;
   }
 
   .n-block + .n-block {
-    border-top: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent);
+    border-top: 1px solid color-mix(in srgb, var(--color-border) 40%, transparent);
   }
 
   .n-tag {
-    display: inline-flex;
-    align-items: center;
-    font-size: 0.6rem;
+    display: block;
+    font-size: 0.58rem;
     font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 1.5px;
+    letter-spacing: 1.8px;
     color: var(--color-gold);
-    margin-bottom: var(--space-sm);
-    opacity: 0.75;
+    margin-bottom: 6px;
+    opacity: 0.65;
   }
 
-  .n-tag--action     { color: #d4a017; }
-  .n-tag--dialogue   { color: #6ab4d8; }
-  .n-tag--reflection { color: #9b8ec4; }
+  .n-tag--action     { color: #c8960f; }
+  .n-tag--dialogue   { color: #5aaed4; }
+  .n-tag--reflection { color: #8e7ab8; }
 
-  /* Prose text shared */
+  /* Prose shared */
   .n-block p {
     margin: 0;
-    line-height: 1.8;
+    line-height: 1.72;
+    font-size: 0.975rem;
+  }
+
+  .n-block p + p { margin-top: 0.75em; }
+
+  /* Context */
+  .n-context p { color: var(--color-text-secondary); }
+
+  /* Action — slightly more weight */
+  .n-action p {
+    color: var(--color-text-primary);
     font-size: 1rem;
   }
 
-  .n-block p + p { margin-top: 0.9em; }
-
-  /* Context: standard prose */
-  .n-context p { color: var(--color-text-secondary); }
-
-  /* Action: bolder, slightly larger */
-  .n-action p {
-    color: var(--color-text-primary);
-    font-size: 1.025rem;
-    font-weight: 450;
-  }
-
-  /* Dialogue: indented, italic, subtle left bar */
+  /* Dialogue — screenplay style */
   .n-dialogue {
-    padding-left: var(--space-lg);
-    border-left: 2px solid color-mix(in srgb, #6ab4d8 35%, transparent);
-    margin-left: var(--space-xs);
+    padding-left: 14px;
+    border-left: 2px solid color-mix(in srgb, #5aaed4 30%, transparent);
   }
 
   .n-dialogue p {
@@ -1961,19 +1957,19 @@
     font-style: italic;
   }
 
-  /* Reflection: dimmed italic, subtle background */
+  /* Reflection — tinted box */
   .n-reflection {
-    background: color-mix(in srgb, var(--color-bg-tertiary) 45%, transparent);
+    background: color-mix(in srgb, var(--color-bg-tertiary) 55%, transparent);
     border-radius: var(--radius-md);
-    padding: var(--space-md) var(--space-lg);
-    margin-bottom: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
     border-top: none !important;
+    margin-top: 2px;
   }
 
   .n-reflection p {
     color: var(--color-text-muted);
     font-style: italic;
-    font-size: 0.95rem;
+    font-size: 0.93rem;
   }
 
   /* ═══════════════════════════════════════════
