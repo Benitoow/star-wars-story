@@ -48,7 +48,7 @@
     openai: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 2.5a3.7 3.7 0 0 1 3.45 2.33 3.7 3.7 0 0 1 3.64 6.14 3.7 3.7 0 0 1-1.38 5.39 3.7 3.7 0 0 1-5.72 3.05 3.7 3.7 0 0 1-5.73-3.03 3.7 3.7 0 0 1-1.37-5.39 3.7 3.7 0 0 1 3.64-6.15A3.7 3.7 0 0 1 12 2.5Zm-.04 3.08-1.84 1.08v2.12l1.86 1.09 1.84-1.07V6.66l-1.86-1.08Zm-4.72 2.76-1.84 1.08v2.12l1.84 1.08 1.85-1.08V9.42L7.24 8.34Zm9.45 0-1.84 1.08v2.12l1.84 1.08 1.85-1.08V9.42l-1.85-1.08ZM12 11.1l-1.86 1.08v2.14L12 15.4l1.85-1.08v-2.14L12 11.1Zm-4.76 2.78-1.84 1.08v2.12l1.84 1.08 1.85-1.08v-2.12l-1.85-1.08Zm9.45 0-1.84 1.08v2.12l1.84 1.08 1.85-1.08v-2.12l-1.85-1.08Zm-4.72 2.75-1.84 1.07v2.13l1.86 1.07 1.84-1.08v-2.11l-1.86-1.08Z"/></svg>`,
     anthropic: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M17.304 3.541h-3.672L20.328 20.46H24zm-10.608 0L0 20.46h3.744l1.37-3.553h7.005l1.37 3.553h3.744L10.536 3.541Zm-.371 10.223 2.291-5.946 2.292 5.946z"/></svg>`,
     mistral: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M17.143 3.429v3.428h-3.429v3.429h-3.428V6.857H6.857V3.43H3.43v13.714H0v3.428h10.286v-3.428H6.857v-3.429h3.429v3.429h3.429v-3.429h3.428v3.429h-3.428v3.428H24v-3.428h-3.43V3.429z"/></svg>`,
-    groq: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 2a10 10 0 1 0 9.2 13.9h-3a7.2 7.2 0 1 1-1.3-7.92L14 11h8V3l-2.78 2.78A9.95 9.95 0 0 0 12 2Z"/></svg>`,
+    grok: `<img src="/svg/grok-ai-icon.svg" alt="" loading="lazy" decoding="async" />`,
     together: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="5" r="4" fill="currentColor"/><circle cx="5" cy="18" r="4" fill="currentColor" opacity="0.5"/><circle cx="19" cy="18" r="4" fill="currentColor" opacity="0.5"/></svg>`,
     ollama: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="6" y="7" width="12" height="10" rx="3" fill="currentColor"/><circle cx="10" cy="12" r="1.5" fill="var(--color-bg-primary)"/><circle cx="14" cy="12" r="1.5" fill="var(--color-bg-primary)"/><path d="M9 4.5h2M13 4.5h2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
     fal_img: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" d="M5 4h9M5 4v16M5 12h7"/><path fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" d="M16 14l3 3-3 3M14 17h5"/></svg>`,
@@ -78,35 +78,35 @@
     {
       id: 'openai',
       name: 'OpenAI',
-      models: ['gpt-4o', 'gpt-4o-mini', 'o4-mini', 'o3', 'gpt-4.1-mini'],
+      models: ['gpt-5', 'gpt-5-mini', 'gpt-5-nano', 'o4-mini', 'o3', 'gpt-4.1'],
       icon: providerIconSvg('openai')
     },
     {
       id: 'anthropic',
       name: 'Anthropic',
-      models: ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-3-5-sonnet-latest', 'claude-haiku-4-5-20251001'],
+      models: ['claude-opus-4-1', 'claude-sonnet-4-5', 'claude-3-7-sonnet-latest', 'claude-3-5-haiku-latest'],
       icon: providerIconSvg('anthropic')
     },
     {
       id: 'mistral',
       name: 'Mistral AI',
-      models: ['mistral-large-latest', 'mistral-medium-latest', 'mistral-small-latest', 'ministral-8b-latest', 'open-mixtral-8x7b'],
+      models: ['magistral-medium-latest', 'magistral-small-latest', 'mistral-large-latest', 'ministral-8b-latest', 'codestral-latest'],
       icon: providerIconSvg('mistral')
     },
     {
-      id: 'groq',
-      name: 'Groq',
-      models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768', 'qwen/qwen3-32b'],
-      icon: providerIconSvg('groq')
+      id: 'grok',
+      name: 'Grok',
+      models: ['grok-4', 'grok-3-beta', 'grok-3-mini-beta', 'grok-2-vision-1212'],
+      icon: providerIconSvg('grok')
     },
     {
       id: 'together',
       name: 'Together AI',
       models: [
         'meta-llama/Llama-3.3-70B-Instruct-Turbo',
-        'meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo',
-        'mistralai/Mixtral-8x7B-Instruct-v0.1',
-        'Qwen/Qwen2.5-72B-Instruct-Turbo'
+        'deepseek-ai/DeepSeek-R1',
+        'Qwen/Qwen3-72B-Instruct-Turbo',
+        'mistralai/Mixtral-8x7B-Instruct-v0.1'
       ],
       icon: providerIconSvg('together')
     },
@@ -194,6 +194,22 @@
 
   // ── Helpers ───────────────────────────────
   const IMAGE_MODEL_PATTERN = /(image|flux|sdxl|stable[-_\s]?diffusion|sd3|gpt-image|ideogram|recraft|kandinsky|sana|lumina|dall)/i;
+  const TEXT_MODEL_PRIORITIES: Record<string, RegExp[]> = {
+    openrouter: [
+      /openai\/gpt-5/i,
+      /anthropic\/claude-(opus|sonnet)-4/i,
+      /x-ai\/grok-4/i,
+      /google\/gemini-2\.5-pro/i,
+      /deepseek\/deepseek-r1/i,
+      /meta-llama\/llama-3\.3-70b/i,
+      /qwen\/qwen3/i
+    ],
+    openai: [/^gpt-5/i, /^o4/i, /^o3/i, /^gpt-4\.1/i, /^gpt-4o/i],
+    anthropic: [/claude-(opus|sonnet)-4/i, /claude-3\.5-sonnet/i, /haiku/i],
+    mistral: [/magistral/i, /mistral-large/i, /mistral-medium/i, /ministral/i, /mistral-small/i],
+    grok: [/grok-4/i, /grok-3/i, /grok-2/i],
+    together: [/Llama-3\.3-70B/i, /Qwen.*72B/i, /Mixtral-8x7B/i]
+  };
 
   let dynamicTextModels: Record<string, string[]> = {};
   let dynamicImageModels: Record<string, string[]> = {};
@@ -201,14 +217,61 @@
   let syncingImageModels = false;
   let syncTextMessage = '';
   let syncImageMessage = '';
+  let textModelSearch = '';
+  let imageModelSearch = '';
 
-  $: activeTextProvider = TEXT_PROVIDERS.find(p => p.id === preferences?.textProvider);
-  $: activeImageProvider = IMAGE_PROVIDERS.find(p => p.id === preferences?.imageProvider);
-  $: textProviderModels = getTextProviderModels(preferences?.textProvider);
-  $: imageProviderModels = getImageProviderModels(preferences?.imageProvider);
+  let activeTextProviderId = '';
+  let activeImageProviderId = '';
+  let textProviderModels: string[] = [];
+  let imageProviderModels: string[] = [];
+  let normalizedTextSearch = '';
+  let normalizedImageSearch = '';
+  let filteredTextModels: string[] = [];
+  let filteredImageModels: string[] = [];
+
+  let textSyncTimer: ReturnType<typeof setTimeout> | null = null;
+  let imageSyncTimer: ReturnType<typeof setTimeout> | null = null;
+  let lastTextSyncSignature = '';
+  let lastImageSyncSignature = '';
+
+  $: activeTextProviderId = preferences?.textProvider ?? '';
+  $: activeImageProviderId = preferences?.imageProvider ?? '';
+  $: textProviderModels = activeTextProviderId
+    ? (dynamicTextModels[activeTextProviderId] ?? TEXT_PROVIDERS.find(p => p.id === activeTextProviderId)?.models ?? [])
+    : [];
+  $: imageProviderModels = activeImageProviderId
+    ? (dynamicImageModels[activeImageProviderId] ?? IMAGE_PROVIDERS.find(p => p.id === activeImageProviderId)?.models ?? [])
+    : [];
+
+  $: normalizedTextSearch = textModelSearch.trim().toLowerCase();
+  $: normalizedImageSearch = imageModelSearch.trim().toLowerCase();
+
+  $: filteredTextModels = normalizedTextSearch
+    ? textProviderModels.filter(model => model.toLowerCase().includes(normalizedTextSearch))
+    : textProviderModels;
+
+  $: filteredImageModels = normalizedImageSearch
+    ? imageProviderModels.filter(model => model.toLowerCase().includes(normalizedImageSearch))
+    : imageProviderModels;
 
   function uniqueSorted(models: string[]): string[] {
     return Array.from(new Set(models.map(m => m.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+  }
+
+  function getPriorityRank(model: string, patterns: RegExp[]): number {
+    const index = patterns.findIndex(pattern => pattern.test(model));
+    return index === -1 ? patterns.length + 1 : index;
+  }
+
+  function sortModelsForProvider(models: string[], providerId: string): string[] {
+    const uniqueModels = Array.from(new Set(models.map(model => model.trim()).filter(Boolean)));
+    const priorities = TEXT_MODEL_PRIORITIES[providerId] || [];
+
+    return uniqueModels.sort((left, right) => {
+      const rankDiff = getPriorityRank(left, priorities) - getPriorityRank(right, priorities);
+      if (rankDiff !== 0) return rankDiff;
+      return left.localeCompare(right);
+    });
   }
 
   function normalizeOllamaUrl(url?: string): string {
@@ -226,12 +289,23 @@
     return dynamicImageModels[providerId] ?? IMAGE_PROVIDERS.find(p => p.id === providerId)?.models ?? [];
   }
 
-  function requireApiKey(key: string | undefined, providerName: string): string | null {
+  function scheduleAutoTextSync() {
+    if (textSyncTimer) clearTimeout(textSyncTimer);
+    textSyncTimer = setTimeout(() => {
+      void refreshTextModels({ automatic: true });
+    }, 300);
+  }
+
+  function scheduleAutoImageSync() {
+    if (imageSyncTimer) clearTimeout(imageSyncTimer);
+    imageSyncTimer = setTimeout(() => {
+      void refreshImageModels({ automatic: true });
+    }, 300);
+  }
+
+  function requireApiKey(key: string | undefined): string | null {
     const value = key?.trim() || '';
-    if (!value) {
-      showToast(`Ajoute une clé API pour ${providerName} avant la synchronisation.`, 'warning');
-      return null;
-    }
+    if (!value) return null;
     return value;
   }
 
@@ -246,17 +320,18 @@
     return uniqueSorted((payload.data || []).map(entry => String(entry?.id || '')).filter(Boolean));
   }
 
-  async function refreshTextModels() {
+  async function refreshTextModels(options: { automatic?: boolean } = {}) {
     if (!preferences) return;
+    const isAutomatic = options.automatic === true;
 
     const providerId = preferences.textProvider;
     if (!providerId || providerId === 'none') {
-      showToast('Sélectionne un provider texte pour récupérer des modèles.', 'info');
+      syncTextMessage = '';
       return;
     }
 
     syncingTextModels = true;
-    syncTextMessage = '';
+    syncTextMessage = isAutomatic ? 'Synchronisation automatique des modèles…' : '';
 
     try {
       let models: string[] = [];
@@ -271,72 +346,90 @@
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         const optionalKey = preferences.textApiKey?.trim();
         if (optionalKey) headers.Authorization = `Bearer ${optionalKey}`;
-        models = await fetchModelsFromJsonEndpoint('https://openrouter.ai/api/v1/models', headers);
+        models = (await fetchModelsFromJsonEndpoint('https://openrouter.ai/api/v1/models', headers))
+          .filter(model => !IMAGE_MODEL_PATTERN.test(model));
       } else if (providerId === 'openai') {
-        const key = requireApiKey(preferences.textApiKey, 'OpenAI');
-        if (!key) return;
-        models = await fetchModelsFromJsonEndpoint('https://api.openai.com/v1/models', {
+        const key = requireApiKey(preferences.textApiKey);
+        if (!key) {
+          syncTextMessage = 'Ajoute une clé API OpenAI pour charger les modèles en direct.';
+          return;
+        }
+        models = (await fetchModelsFromJsonEndpoint('https://api.openai.com/v1/models', {
           Authorization: `Bearer ${key}`
-        });
+        })).filter(model => /^(gpt|o\d)/i.test(model));
       } else if (providerId === 'anthropic') {
-        const key = requireApiKey(preferences.textApiKey, 'Anthropic');
-        if (!key) return;
-        models = await fetchModelsFromJsonEndpoint('https://api.anthropic.com/v1/models', {
+        const key = requireApiKey(preferences.textApiKey);
+        if (!key) {
+          syncTextMessage = 'Ajoute une clé API Anthropic pour charger les modèles en direct.';
+          return;
+        }
+        models = (await fetchModelsFromJsonEndpoint('https://api.anthropic.com/v1/models', {
           'x-api-key': key,
           'anthropic-version': '2023-06-01'
-        });
+        })).filter(model => /^claude/i.test(model));
       } else if (providerId === 'mistral') {
-        const key = requireApiKey(preferences.textApiKey, 'Mistral');
-        if (!key) return;
-        models = await fetchModelsFromJsonEndpoint('https://api.mistral.ai/v1/models', {
+        const key = requireApiKey(preferences.textApiKey);
+        if (!key) {
+          syncTextMessage = 'Ajoute une clé API Mistral pour charger les modèles en direct.';
+          return;
+        }
+        models = (await fetchModelsFromJsonEndpoint('https://api.mistral.ai/v1/models', {
           Authorization: `Bearer ${key}`
-        });
-      } else if (providerId === 'groq') {
-        const key = requireApiKey(preferences.textApiKey, 'Groq');
-        if (!key) return;
-        models = await fetchModelsFromJsonEndpoint('https://api.groq.com/openai/v1/models', {
+        })).filter(model => /(mistral|ministral|magistral|mixtral)/i.test(model));
+      } else if (providerId === 'grok') {
+        const key = requireApiKey(preferences.textApiKey);
+        if (!key) {
+          syncTextMessage = 'Ajoute une clé API Grok pour charger les modèles en direct.';
+          return;
+        }
+        models = (await fetchModelsFromJsonEndpoint('https://api.x.ai/v1/models', {
           Authorization: `Bearer ${key}`
-        });
+        })).filter(model => /grok/i.test(model));
       } else if (providerId === 'together') {
-        const key = requireApiKey(preferences.textApiKey, 'Together AI');
-        if (!key) return;
-        models = await fetchModelsFromJsonEndpoint('https://api.together.xyz/v1/models', {
+        const key = requireApiKey(preferences.textApiKey);
+        if (!key) {
+          syncTextMessage = 'Ajoute une clé API Together pour charger les modèles en direct.';
+          return;
+        }
+        models = (await fetchModelsFromJsonEndpoint('https://api.together.xyz/v1/models', {
           Authorization: `Bearer ${key}`
-        });
+        })).filter(model => !IMAGE_MODEL_PATTERN.test(model));
       }
 
       if (!models.length) {
         throw new Error('Aucun modèle détecté');
       }
 
+      models = sortModelsForProvider(models, providerId);
+
       dynamicTextModels = { ...dynamicTextModels, [providerId]: models };
 
       if (!models.includes(preferences.textModel || '')) {
         preferences.textModel = models[0] || '';
+        preferences = { ...preferences };
       }
 
-      syncTextMessage = `${models.length} modèles synchronisés.`;
-      showToast(syncTextMessage, 'success');
+      syncTextMessage = `${models.length} modèles chargés automatiquement.`;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erreur inconnue';
-      syncTextMessage = `Échec de synchronisation (${message})`;
-      showToast(`Impossible de récupérer les modèles texte : ${message}`, 'error');
+      syncTextMessage = `Impossible de charger les modèles (${message}).`;
     } finally {
       syncingTextModels = false;
     }
   }
 
-  async function refreshImageModels() {
+  async function refreshImageModels(options: { automatic?: boolean } = {}) {
     if (!preferences) return;
+    const isAutomatic = options.automatic === true;
 
     const providerId = preferences.imageProvider;
     if (!providerId || providerId === 'none') {
-      showToast('Sélectionne un provider image pour récupérer des modèles.', 'info');
+      syncImageMessage = '';
       return;
     }
 
     syncingImageModels = true;
-    syncImageMessage = '';
+    syncImageMessage = isAutomatic ? 'Synchronisation automatique des modèles image…' : '';
 
     try {
       let models: string[] = [];
@@ -349,8 +442,11 @@
         const allModels = await fetchModelsFromJsonEndpoint('https://openrouter.ai/api/v1/models', headers);
         models = allModels.filter(model => IMAGE_MODEL_PATTERN.test(model));
       } else if (providerId === 'openai_img') {
-        const key = requireApiKey(preferences.imageApiKey || preferences.textApiKey, 'OpenAI Images');
-        if (!key) return;
+        const key = requireApiKey(preferences.imageApiKey || preferences.textApiKey);
+        if (!key) {
+          syncImageMessage = 'Ajoute une clé API OpenAI pour charger les modèles image en direct.';
+          return;
+        }
 
         const allModels = await fetchModelsFromJsonEndpoint('https://api.openai.com/v1/models', {
           Authorization: `Bearer ${key}`
@@ -361,8 +457,11 @@
           models = ['gpt-image-1'];
         }
       } else if (providerId === 'together_img') {
-        const key = requireApiKey(preferences.imageApiKey, 'Together AI Images');
-        if (!key) return;
+        const key = requireApiKey(preferences.imageApiKey);
+        if (!key) {
+          syncImageMessage = 'Ajoute une clé API Together pour charger les modèles image en direct.';
+          return;
+        }
 
         const allModels = await fetchModelsFromJsonEndpoint('https://api.together.xyz/v1/models', {
           Authorization: `Bearer ${key}`
@@ -381,19 +480,44 @@
 
       if (!models.includes(preferences.imageModel || '')) {
         preferences.imageModel = models[0] || '';
+        preferences = { ...preferences };
       }
 
       preferences.defaultImageProvider = preferences.imageProvider;
       preferences.defaultImgModel = preferences.imageModel;
 
-      syncImageMessage = `${models.length} modèles synchronisés.`;
-      showToast(syncImageMessage, 'success');
+      syncImageMessage = `${models.length} modèles image chargés automatiquement.`;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erreur inconnue';
-      syncImageMessage = `Échec de synchronisation (${message})`;
-      showToast(`Impossible de récupérer les modèles image : ${message}`, 'error');
+      syncImageMessage = `Impossible de charger les modèles image (${message}).`;
     } finally {
       syncingImageModels = false;
+    }
+  }
+
+  $: if (preferences) {
+    const signature = [
+      preferences.textProvider || '',
+      preferences.textApiKey || '',
+      preferences.ollamaUrl || ''
+    ].join('|');
+
+    if (signature !== lastTextSyncSignature) {
+      lastTextSyncSignature = signature;
+      scheduleAutoTextSync();
+    }
+  }
+
+  $: if (preferences) {
+    const signature = [
+      preferences.imageProvider || '',
+      preferences.imageApiKey || '',
+      preferences.textApiKey || ''
+    ].join('|');
+
+    if (signature !== lastImageSyncSignature) {
+      lastImageSyncSignature = signature;
+      scheduleAutoImageSync();
     }
   }
 
@@ -404,7 +528,8 @@
     if (!next.avatarEmoji) next.avatarEmoji = AVATARS[0];
 
     const textProviderAlias: Record<string, string> = {
-      gemini: 'openrouter'
+      gemini: 'openrouter',
+      groq: 'grok'
     };
     const imageProviderAlias: Record<string, string> = {
       openai: 'openai_img',
@@ -426,7 +551,7 @@
     if (!next.textProvider) next.textProvider = 'openrouter';
 
     const textProvider = TEXT_PROVIDERS.find(p => p.id === next.textProvider);
-    if (!next.textModel || (textProvider?.models.length && !textProvider.models.includes(next.textModel))) {
+    if (!next.textModel) {
       next.textModel = textProvider?.models[0] ?? '';
     }
 
@@ -456,7 +581,7 @@
     }
 
     const imageProvider = IMAGE_PROVIDERS.find(p => p.id === next.imageProvider);
-    if (!next.imageModel || (imageProvider?.models.length && !imageProvider.models.includes(next.imageModel))) {
+    if (!next.imageModel) {
       next.imageModel = next.defaultImgModel || imageProvider?.models[0] || '';
     }
 
@@ -468,6 +593,7 @@
   function selectTextProvider(providerId: string) {
     if (!preferences) return;
     preferences.textProvider = providerId;
+    textModelSearch = '';
 
     const provider = TEXT_PROVIDERS.find(p => p.id === providerId);
     if (!provider) return;
@@ -481,16 +607,21 @@
     if (providerId === 'none') {
       preferences.textModel = '';
       preferences.textApiKey = '';
+      syncTextMessage = '';
     }
 
     if (providerId === 'ollama' && !preferences.ollamaUrl) {
       preferences.ollamaUrl = 'http://localhost:11434';
     }
+
+    preferences = { ...preferences };
+    scheduleAutoTextSync();
   }
 
   function selectImageProvider(providerId: string) {
     if (!preferences) return;
     preferences.imageProvider = providerId;
+    imageModelSearch = '';
 
     const provider = IMAGE_PROVIDERS.find(p => p.id === providerId);
     if (!provider) return;
@@ -504,10 +635,14 @@
     if (providerId === 'none') {
       preferences.imageModel = '';
       preferences.imageApiKey = '';
+      syncImageMessage = '';
     }
 
     preferences.defaultImageProvider = preferences.imageProvider;
     preferences.defaultImgModel = preferences.imageModel;
+
+    preferences = { ...preferences };
+    scheduleAutoImageSync();
   }
 
   function addProfile() {
@@ -795,13 +930,37 @@
               {#if preferences.textProvider && preferences.textProvider !== 'none'}
                 <div class="field-group">
                   {#if textProviderModels.length}
-                    <div class="field">
-                      <label>Modèle</label>
-                      <select class="select" bind:value={preferences.textModel}>
-                        {#each textProviderModels as m}
-                          <option value={m}>{m}</option>
-                        {/each}
-                      </select>
+                    <div class="field model-picker-field">
+                      <div class="model-picker-head">
+                        <label>Modèle</label>
+                        <span class="model-count">{textProviderModels.length} disponibles</span>
+                      </div>
+                      <input
+                        type="search"
+                        class="input model-search"
+                        placeholder="Rechercher un modèle…"
+                        bind:value={textModelSearch}
+                      />
+                      <div class="model-list" role="listbox" aria-label="Modèles IA texte disponibles">
+                        {#if filteredTextModels.length}
+                          {#each filteredTextModels as m}
+                            <button
+                              type="button"
+                              class="model-option"
+                              class:selected={preferences.textModel === m}
+                              on:click={() => {
+                                if (!preferences) return;
+                                preferences.textModel = m;
+                                preferences = { ...preferences };
+                              }}
+                            >
+                              <span class="model-option-name">{m}</span>
+                            </button>
+                          {/each}
+                        {:else}
+                          <div class="model-empty">Aucun modèle ne correspond à « {textModelSearch} ».</div>
+                        {/if}
+                      </div>
                     </div>
                   {/if}
 
@@ -829,17 +988,11 @@
                   {/if}
 
                   <div class="field provider-tools">
-                    <button
-                      class="btn btn-secondary"
-                      on:click={refreshTextModels}
-                      disabled={syncingTextModels}
-                    >
-                      {syncingTextModels ? 'Synchronisation…' : 'Récupérer les modèles'}
-                    </button>
-                    {#if syncTextMessage}
+                    {#if syncingTextModels}
+                      <span class="field-hint">Synchronisation automatique des modèles…</span>
+                    {:else if syncTextMessage}
                       <span class="field-hint">{syncTextMessage}</span>
                     {/if}
-                    <span class="field-hint">Astuce : OpenRouter permet de récupérer de longues listes de modèles en direct.</span>
                   </div>
                 </div>
               {/if}
@@ -874,13 +1027,38 @@
               {#if preferences.imageProvider && preferences.imageProvider !== 'none'}
                 <div class="field-group">
                   {#if imageProviderModels.length}
-                    <div class="field">
-                      <label>Modèle</label>
-                      <select class="select" bind:value={preferences.imageModel}>
-                        {#each imageProviderModels as m}
-                          <option value={m}>{m}</option>
-                        {/each}
-                      </select>
+                    <div class="field model-picker-field">
+                      <div class="model-picker-head">
+                        <label>Modèle</label>
+                        <span class="model-count">{imageProviderModels.length} disponibles</span>
+                      </div>
+                      <input
+                        type="search"
+                        class="input model-search"
+                        placeholder="Rechercher un modèle image…"
+                        bind:value={imageModelSearch}
+                      />
+                      <div class="model-list" role="listbox" aria-label="Modèles IA image disponibles">
+                        {#if filteredImageModels.length}
+                          {#each filteredImageModels as m}
+                            <button
+                              type="button"
+                              class="model-option"
+                              class:selected={preferences.imageModel === m}
+                              on:click={() => {
+                                if (!preferences) return;
+                                preferences.imageModel = m;
+                                preferences.defaultImgModel = m;
+                                preferences = { ...preferences };
+                              }}
+                            >
+                              <span class="model-option-name">{m}</span>
+                            </button>
+                          {/each}
+                        {:else}
+                          <div class="model-empty">Aucun modèle ne correspond à « {imageModelSearch} ».</div>
+                        {/if}
+                      </div>
                     </div>
                   {/if}
                   <div class="field">
@@ -895,14 +1073,9 @@
                   </div>
 
                   <div class="field provider-tools">
-                    <button
-                      class="btn btn-secondary"
-                      on:click={refreshImageModels}
-                      disabled={syncingImageModels}
-                    >
-                      {syncingImageModels ? 'Synchronisation…' : 'Récupérer les modèles'}
-                    </button>
-                    {#if syncImageMessage}
+                    {#if syncingImageModels}
+                      <span class="field-hint">Synchronisation automatique des modèles image…</span>
+                    {:else if syncImageMessage}
                       <span class="field-hint">{syncImageMessage}</span>
                     {/if}
                   </div>
@@ -1517,6 +1690,13 @@
     display: block;
   }
 
+  .provider-logo :global(img) {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+    display: block;
+  }
+
   .provider-name {
     font-weight: 600;
     color: var(--color-text-primary);
@@ -1530,6 +1710,74 @@
 
   .provider-tools {
     gap: var(--space-xs);
+  }
+
+  .model-picker-field {
+    gap: var(--space-sm);
+  }
+
+  .model-picker-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-sm);
+  }
+
+  .model-count {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+  }
+
+  .model-search {
+    font-size: 0.875rem;
+  }
+
+  .model-list {
+    max-height: 320px;
+    overflow-y: auto;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-tertiary);
+    padding: var(--space-xs);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .model-option {
+    width: 100%;
+    text-align: left;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    padding: var(--space-xs) var(--space-sm);
+    transition: all var(--transition-fast);
+  }
+
+  .model-option:hover {
+    border-color: var(--color-border-hover);
+    background: var(--color-bg-hover);
+    color: var(--color-text-primary);
+  }
+
+  .model-option.selected {
+    border-color: var(--color-gold);
+    background: rgba(255, 232, 31, 0.1);
+    color: var(--color-gold);
+  }
+
+  .model-option-name {
+    font-size: 0.8rem;
+    font-family: var(--font-mono);
+    word-break: break-word;
+  }
+
+  .model-empty {
+    padding: var(--space-sm);
+    color: var(--color-text-muted);
+    font-size: 0.8rem;
   }
 
   /* ── Option grid (style/tone) ────────────── */
