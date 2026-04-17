@@ -1,4 +1,4 @@
-# Star Wars Story — v1.1.0
+# Star Wars Story — v1.1.1
 
 An open-source Star Wars story project whose playable deployment lives on the project's Cloudflare-hosted site. This repository now focuses on source, release notes, and archived legacy material.
 
@@ -10,7 +10,7 @@ An open-source Star Wars story project whose playable deployment lives on the pr
 
 ### Status
 
-- ✅ **Official release:** v1.1.0
+- ✅ **Official release:** v1.1.1
 - 🗓️ **Release date:** 2026-04-17
 - 🌍 **Open source:** the repository is public, so the project is fully open for inspection and contribution.
 
@@ -52,7 +52,7 @@ The repository source remains useful for inspection and maintenance, but it is n
 
 ### Statut
 
-- ✅ **Version officielle :** v1.1.0
+- ✅ **Version officielle :** v1.1.1
 - 🗓️ **Date de release :** 2026-04-17
 - 🌍 **Open source :** le dépôt est public, donc le projet est librement consultable et partageable.
 

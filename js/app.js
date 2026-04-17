@@ -113,6 +113,49 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
+function extractNarrativeText(value) {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
+
+  if (Array.isArray(value)) {
+    return value.map(extractNarrativeText).filter(Boolean).join('\n');
+  }
+
+  if (typeof value === 'object') {
+    const preferredKeys = ['text', 'line', 'dialogue', 'say', 'content', 'message', 'utterance', 'quote', 'speaker', 'name', 'character', 'who'];
+    for (const key of preferredKeys) {
+      if (value[key] !== undefined && value[key] !== null && value[key] !== '') {
+        const extracted = extractNarrativeText(value[key]);
+        if (extracted) return extracted;
+      }
+    }
+
+    return Object.values(value).map(extractNarrativeText).filter(Boolean).join(' ');
+  }
+
+  return String(value);
+}
+
+function stringifyNarrativeValue(value, key = '') {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
+
+  if (Array.isArray(value)) {
+    return value.map(entry => stringifyNarrativeValue(entry, key)).filter(Boolean).join('\n');
+  }
+
+  if (typeof value === 'object') {
+    const speaker = extractNarrativeText(value.speaker || value.name || value.character || value.who || '');
+    const line = extractNarrativeText(value.text || value.line || value.dialogue || value.say || value.content || value.message || value.utterance || value.quote || '');
+    if (key === 'dialogue' && (speaker || line)) {
+      return speaker ? `${speaker}: ${line}` : String(line);
+    }
+    return Object.values(value).map(v => stringifyNarrativeValue(v, key)).filter(Boolean).join(' ');
+  }
+
+  return String(value);
+}
+
 function normalizeSkillKey(rawKey) {
   const key = String(rawKey || '').trim().toLowerCase();
   return HIDDEN_SKILL_KEYS.includes(key) ? key : 'survival';
