@@ -27,10 +27,12 @@
     buildContinuePrompt,
     buildStartPrompt,
     buildSystemPrompt,
+    generateBackgroundWorldEvent,
     generateStoryTurn,
     normalizeProviderId,
     summarizeChapterForPrompt,
     supportsAgenticToolCalling,
+    type BackgroundWorldEvent,
     type ChatMessage,
     type StoryChapter,
     type StoryChoice,
@@ -62,6 +64,15 @@
 
   const INTERACTIVE_SESSION_PREFIX = 'sw_svelte_interactive_story_';
 
+  interface LoggedBackgroundEvent {
+    id: string;
+    turn: number;
+    title: string;
+    summary: string;
+    promptHook?: string;
+    privateSummary?: string;
+  }
+
   interface InteractiveSessionPayload {
     version: 1;
     turnNumber: number;
@@ -72,6 +83,7 @@
     aiMessages: ChatMessage[];
     memoryLog: string[];
     setupSnapshot: StorySetup;
+    backgroundEvents?: LoggedBackgroundEvent[];
     worldState?: WorldState;
   }
 
@@ -87,6 +99,7 @@
   let actionHistory: string[] = [];
   let aiMessages: ChatMessage[] = [];
   let memoryLog: string[] = [];
+  let backgroundEvents: LoggedBackgroundEvent[] = [];
   let customAction = '';
   let hudCollapsed = false;
 
@@ -361,6 +374,7 @@
       actionHistory,
       aiMessages,
       memoryLog,
+      backgroundEvents,
       setupSnapshot: get(currentSetup),
       worldState
     };
@@ -387,6 +401,7 @@
         actionHistory: Array.isArray(parsed.actionHistory) ? parsed.actionHistory : [],
         aiMessages: Array.isArray(parsed.aiMessages) ? parsed.aiMessages : [],
         memoryLog: Array.isArray(parsed.memoryLog) ? parsed.memoryLog : [],
+        backgroundEvents: Array.isArray(parsed.backgroundEvents) ? parsed.backgroundEvents : [],
         setupSnapshot: (parsed.setupSnapshot as StorySetup) || get(currentSetup),
         worldState: parsed.worldState as WorldState | undefined
       };
@@ -491,6 +506,11 @@
     return systemMessage ? [systemMessage, ...others] : others;
   }
 
+  function mergeMemoryFacts(nextFacts: string[]): void {
+    const merged = Array.from(new Set([...memoryLog, ...nextFacts].filter(Boolean)));
+    memoryLog = merged.slice(-120);
+  }
+
   function appendMemoryFromChapter(chapter: StoryChapter): void {
     const explicitFacts = [
       ...chapter.memory_updates.relations.map(item => `Relation: ${item}`),
@@ -518,8 +538,100 @@
       implicitFacts.push(`Tour ${chapter.chapter_number}: nouveaux lieux importants visités.`);
     }
 
-    const merged = Array.from(new Set([...memoryLog, ...explicitFacts, ...implicitFacts].filter(Boolean)));
-    memoryLog = merged.slice(-120);
+    mergeMemoryFacts([...explicitFacts, ...implicitFacts]);
+  }
+
+  function backgroundEventToSyntheticChapter(event: BackgroundWorldEvent, turn: number): StoryChapter {
+    return {
+      chapter_title: event.title || 'Mouvement de la galaxie',
+      chapter_number: turn,
+      section_type: 'background',
+      narrative: {
+        context: '',
+        action: event.summary_public || '',
+        dialogue: '',
+        reflection: '',
+        atmosphere: 'tense'
+      },
+      choices: [],
+      memory_updates: event.memory_updates,
+      scene_description: 'Off-screen galactic world event',
+      user_edits_applied: null,
+      state_update: event.state_update
+    };
+  }
+
+  function appendMemoryFromBackgroundEvent(event: BackgroundWorldEvent, turn: number): void {
+    const explicitFacts = [
+      ...event.memory_updates.relations.map(item => `Relation (off-screen): ${item}`),
+      ...event.memory_updates.places.map(item => `Lieu (off-screen): ${item}`),
+      ...event.memory_updates.injuries.map(item => `Blessure (off-screen): ${item}`),
+      ...event.memory_updates.resources.map(item => `Ressource (off-screen): ${item}`),
+      ...event.memory_updates.notes.map(item => `Note (off-screen): ${item}`)
+    ];
+
+    const summary = event.summary_private || event.summary_public;
+    const syntheticFacts = [
+      summary ? `Tour ${turn} (galaxie): ${summary}` : '',
+      event.prompt_hook ? `Hook MJ: ${event.prompt_hook}` : ''
+    ];
+
+    mergeMemoryFacts([...explicitFacts, ...syntheticFacts]);
+  }
+
+  function createBackgroundEventId(): string {
+    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+      return crypto.randomUUID();
+    }
+    return `bg-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+
+  async function runBackgroundWorldTick(setup: StorySetup, turn: number): Promise<void> {
+    if (!providerConfig) return;
+    if (!supportsAgenticToolCalling(providerConfig.providerId)) return;
+
+    const recentSummary = chapterHistory.slice(-4).map(chapter => summarizeChapterForPrompt(chapter));
+
+    try {
+      const generation = await generateBackgroundWorldEvent(
+        {
+          setup,
+          worldState,
+          memoryFacts: memoryLog.slice(-25),
+          recentSummary,
+          turnNumber: turn
+        },
+        providerConfig
+      );
+
+      const event = generation.event;
+      if (!event || !event.inject_now) return;
+
+      if (event.state_update) {
+        applyStateUpdate(backgroundEventToSyntheticChapter(event, turn));
+      }
+
+      appendMemoryFromBackgroundEvent(event, turn);
+
+      const summary = event.summary_public || event.prompt_hook || event.title;
+      backgroundEvents = [
+        {
+          id: createBackgroundEventId(),
+          turn,
+          title: event.title || 'Mouvement de la galaxie',
+          summary,
+          promptHook: event.prompt_hook,
+          privateSummary: event.summary_private
+        },
+        ...backgroundEvents
+      ].slice(0, 24);
+
+      if (summary) {
+        showToast(`Événement galactique: ${summary}`, 'warning');
+      }
+    } catch (error) {
+      console.warn('[editor] Tick hors-écran ignoré:', error);
+    }
   }
 
   function chapterToJournalMarkdown(chapter: StoryChapter, index: number): string {
@@ -627,6 +739,7 @@
       actionHistory = [];
       aiMessages = [];
       memoryLog = [];
+      backgroundEvents = [];
       customAction = '';
       worldState = initWorldState(setup);
 
@@ -677,6 +790,8 @@
 
       applyStateUpdate(chapter);
       appendMemoryFromChapter(chapter);
+
+      await runBackgroundWorldTick(setup, nextTurn);
       await persistInteractiveState(setup);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erreur inconnue';
@@ -865,6 +980,7 @@
     actionHistory = [];
     aiMessages = [];
     memoryLog = [];
+    backgroundEvents = [];
     customAction = '';
 
     void goto('/editor/new');
@@ -898,6 +1014,7 @@
         actionHistory = session.actionHistory;
         aiMessages = session.aiMessages;
         memoryLog = session.memoryLog;
+        backgroundEvents = session.backgroundEvents || [];
 
         const snapshot = session.setupSnapshot;
         setSetupField('era', snapshot.era || get(currentSetup).era);
@@ -1275,6 +1392,26 @@
 
           {#if generationError}
             <div class="error-banner">{generationError}</div>
+          {/if}
+
+          {#if backgroundEvents.length > 0}
+            <section class="world-events-panel" aria-label="Événements galactiques hors écran">
+              <header class="world-events-header">
+                <h3>Mouvements de la galaxie</h3>
+                <span>{backgroundEvents.length}</span>
+              </header>
+              <div class="world-events-list">
+                {#each backgroundEvents.slice(0, 3) as event}
+                  <article class="world-event-item">
+                    <div class="world-event-meta">
+                      <span>Tour {event.turn}</span>
+                    </div>
+                    <strong>{event.title}</strong>
+                    <p>{event.summary}</p>
+                  </article>
+                {/each}
+              </div>
+            </section>
           {/if}
 
           <!-- ── Living World HUD ───────────────────────── -->
@@ -1934,6 +2071,80 @@
     margin: 0 auto;
     width: 100%;
     padding-bottom: calc(var(--space-xl) * 2);
+  }
+
+  .world-events-panel {
+    border: 1px solid color-mix(in srgb, var(--color-gold) 25%, var(--color-border));
+    background: color-mix(in srgb, var(--color-gold) 4%, var(--color-bg-secondary));
+    border-radius: var(--radius-lg);
+    padding: var(--space-sm) var(--space-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .world-events-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-sm);
+  }
+
+  .world-events-header h3 {
+    margin: 0;
+    font-size: 0.82rem;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+  }
+
+  .world-events-header span {
+    font-size: 0.7rem;
+    color: var(--color-text-muted);
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    padding: 1px 7px;
+  }
+
+  .world-events-list {
+    display: grid;
+    gap: var(--space-xs);
+  }
+
+  .world-event-item {
+    border: 1px solid color-mix(in srgb, var(--color-border) 75%, transparent);
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--color-bg-tertiary) 65%, transparent);
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .world-event-item strong {
+    font-size: 0.88rem;
+    color: var(--color-text-secondary);
+  }
+
+  .world-event-item p {
+    margin: 0;
+    font-size: 0.78rem;
+    color: var(--color-text-muted);
+    line-height: 1.4;
+  }
+
+  .world-event-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+  }
+
+  .world-event-meta span {
+    font-size: 0.62rem;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: var(--color-gold);
+    opacity: 0.85;
   }
 
   /* ── Topbar ─────────────────────────────── */

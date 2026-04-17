@@ -106,6 +106,32 @@ export interface StoryTurnGenerationResult {
   toolCalls: number;
 }
 
+export interface BackgroundWorldEvent {
+  title: string;
+  summary_public: string;
+  summary_private?: string;
+  inject_now: boolean;
+  memory_updates: StoryMemoryUpdates;
+  state_update?: StateUpdate;
+  prompt_hook?: string;
+}
+
+export interface BackgroundWorldInput {
+  setup: StorySetupSnapshot;
+  worldState?: WorldState;
+  memoryFacts: string[];
+  recentSummary: string[];
+  turnNumber: number;
+}
+
+export interface BackgroundWorldGenerationResult {
+  event: BackgroundWorldEvent | null;
+  rawResponse: string;
+  mode: 'structured-json' | 'agentic-tools';
+  steps: number;
+  toolCalls: number;
+}
+
 export interface StorySetupSnapshot {
   era: string;
   faction: string;
@@ -975,6 +1001,52 @@ const AGENTIC_GM_TOOLS: OpenAiToolDefinition[] = [
   }
 ];
 
+const AGENTIC_BACKGROUND_TOOLS: OpenAiToolDefinition[] = [
+  {
+    type: 'function',
+    function: {
+      name: 'queue_world_event',
+      description: 'Crée ou met à jour un événement hors-écran du monde (injection potentielle au joueur).',
+      parameters: {
+        type: 'object',
+        properties: {
+          title: { type: 'string' },
+          summary_public: { type: 'string' },
+          summary_private: { type: 'string' },
+          inject_now: { type: 'boolean' },
+          prompt_hook: { type: 'string' },
+          memory_updates: { type: 'object' },
+          state_update: { type: 'object' },
+          hp: { type: 'number' },
+          credits: { type: 'number' },
+          location: { type: 'string' },
+          date_advance: { type: 'string' },
+          npcs: { type: 'array' },
+          factions: { type: 'object' },
+          injuries_new: { type: 'array' },
+          injuries_resolved: { type: 'array' },
+          inventory_gained: { type: 'array' },
+          inventory_lost: { type: 'array' }
+        }
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'finalize_background_tick',
+      description: 'Termine le tick de monde hors-écran.',
+      parameters: {
+        type: 'object',
+        properties: {
+          done: { type: 'boolean' },
+          reason: { type: 'string' }
+        }
+      }
+    }
+  }
+];
+
 type AgenticDraft = {
   chapter_title: string;
   section_type: string;
@@ -986,6 +1058,107 @@ type AgenticDraft = {
   user_edits_applied: string | null;
   done: boolean;
 };
+
+type BackgroundEventDraft = {
+  event: BackgroundWorldEvent;
+  done: boolean;
+};
+
+function coerceBackgroundWorldEvent(source: unknown): BackgroundWorldEvent | null {
+  if (!isObjectRecord(source)) return null;
+
+  const title = cleanText(source.title ?? source.event_title, 90);
+  const summaryPublic = cleanText(source.summary_public ?? source.summary ?? source.event_summary_public, 260);
+  const summaryPrivate = cleanText(source.summary_private ?? source.event_summary_private, 420);
+  const promptHook = cleanText(source.prompt_hook, 220);
+
+  let injectNow = false;
+  if (typeof source.inject_now === 'boolean') {
+    injectNow = source.inject_now;
+  } else if (typeof source.inject_now === 'string') {
+    injectNow = /^(true|yes|1)$/i.test(source.inject_now.trim());
+  }
+
+  const memoryUpdates = coerceMemoryUpdates(source.memory_updates ?? source);
+  const stateUpdate = coerceStateUpdate(source.state_update ?? source);
+
+  const hasSignal = Boolean(
+    title ||
+    summaryPublic ||
+    summaryPrivate ||
+    promptHook ||
+    stateUpdate ||
+    memoryUpdates.notes.length ||
+    memoryUpdates.relations.length ||
+    memoryUpdates.places.length ||
+    memoryUpdates.injuries.length ||
+    memoryUpdates.resources.length
+  );
+
+  if (!hasSignal) return null;
+
+  return {
+    title: title || 'Mouvement de la galaxie',
+    summary_public: summaryPublic,
+    summary_private: summaryPrivate || undefined,
+    inject_now: injectNow,
+    memory_updates: memoryUpdates,
+    state_update: stateUpdate,
+    prompt_hook: promptHook || undefined
+  };
+}
+
+function createBackgroundEventDraft(): BackgroundEventDraft {
+  return {
+    event: {
+      title: 'Mouvement de la galaxie',
+      summary_public: '',
+      summary_private: undefined,
+      inject_now: false,
+      memory_updates: defaultMemoryUpdates(),
+      state_update: undefined,
+      prompt_hook: undefined
+    },
+    done: false
+  };
+}
+
+function hasBackgroundEventImpact(event: BackgroundWorldEvent | null): boolean {
+  if (!event) return false;
+  return Boolean(
+    event.inject_now ||
+    event.summary_public ||
+    event.summary_private ||
+    event.prompt_hook ||
+    event.state_update ||
+    event.memory_updates.notes.length ||
+    event.memory_updates.relations.length ||
+    event.memory_updates.places.length ||
+    event.memory_updates.injuries.length ||
+    event.memory_updates.resources.length
+  );
+}
+
+function mergeBackgroundEvent(
+  base: BackgroundWorldEvent,
+  patch: BackgroundWorldEvent
+): BackgroundWorldEvent {
+  return {
+    title: patch.title || base.title,
+    summary_public: patch.summary_public || base.summary_public,
+    summary_private: patch.summary_private || base.summary_private,
+    inject_now: patch.inject_now || base.inject_now,
+    prompt_hook: patch.prompt_hook || base.prompt_hook,
+    memory_updates: {
+      relations: mergeStringLists(base.memory_updates.relations, patch.memory_updates.relations),
+      places: mergeStringLists(base.memory_updates.places, patch.memory_updates.places),
+      injuries: mergeStringLists(base.memory_updates.injuries, patch.memory_updates.injuries),
+      resources: mergeStringLists(base.memory_updates.resources, patch.memory_updates.resources),
+      notes: mergeStringLists(base.memory_updates.notes, patch.memory_updates.notes)
+    },
+    state_update: mergeStateUpdates(base.state_update, patch.state_update)
+  };
+}
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -1361,6 +1534,196 @@ export async function generateStoryTurn(
     steps: 1,
     toolCalls: 0
   };
+}
+
+function buildBackgroundWorldSystemPrompt(
+  input: BackgroundWorldInput,
+  promptMode: StoryPromptMode = 'json'
+): string {
+  const setup = input.setup;
+  const protagonist = [setup.protagonistFirstName || '', setup.protagonistLastName || ''].join(' ').trim() || 'Le protagoniste';
+
+  const recentBlock = input.recentSummary.length
+    ? `\nRÉSUMÉ RÉCENT:\n${input.recentSummary.map(item => `- ${cleanText(item, 220)}`).join('\n')}`
+    : '';
+
+  const memoryBlock = input.memoryFacts.length
+    ? `\nMÉMOIRE LONG TERME:\n${input.memoryFacts.slice(-20).map(item => `- ${cleanText(item, 200)}`).join('\n')}`
+    : '';
+
+  let worldBlock = '\nÉTAT MONDE: indisponible';
+  if (input.worldState) {
+    const p = input.worldState.player;
+    const topFactions = Object.entries(input.worldState.factions)
+      .sort(([, left], [, right]) => right - left)
+      .slice(0, 5)
+      .map(([id, score]) => `${id}=${score > 0 ? '+' : ''}${score}`)
+      .join(', ');
+    const npcs = input.worldState.npcs
+      .filter(npc => npc.alive !== false)
+      .slice(0, 8)
+      .map(npc => `${npc.name}(${npc.status}, aff=${npc.affinity})`)
+      .join(', ');
+
+    worldBlock = `\nÉTAT MONDE:\n- HP=${p.hp}/100 | Crédits=${p.credits}\n- Lieu=${p.location} | Date=${p.date}\n- PNJs=${npcs || 'aucun'}\n- Factions=${topFactions || 'neutre'}`;
+  }
+
+  const base = `Tu es le Simulateur Galactique hors-écran d'une campagne Star Wars.\nTu résous uniquement les dynamiques de fond entre les tours du joueur.\n\nRÈGLES:\n- La plupart du temps, reste discret (pas d'événement majeur à chaque tour).\n- Déclenche un événement visible seulement s'il apporte une tension utile.\n- Respecte la continuité du monde et des factions.\n- N'écris pas une scène complète du joueur.\n- Si aucun événement utile: inject_now=false, impacts minimes ou nuls.\n- Si événement: reste concis, concret, exploitable (state_update + mémoire).\n\nSETUP:\n- Protagoniste: ${protagonist}\n- Ère: ${setup.era} | Faction: ${setup.faction} | Rôle: ${setup.role}\n- Prémisse: ${setup.premise || 'Libre'}${worldBlock}${recentBlock}${memoryBlock}`;
+
+  const jsonContract = `Réponds UNIQUEMENT en JSON valide:\n{\n  "title": "Titre court",\n  "summary_public": "Message bref affichable au joueur",\n  "summary_private": "Contexte MJ optionnel",\n  "inject_now": false,\n  "prompt_hook": "Consigne courte pour influencer le prochain tour",\n  "memory_updates": {\n    "relations": [],\n    "places": [],\n    "injuries": [],\n    "resources": [],\n    "notes": []\n  },\n  "state_update": {\n    "hp": 0,\n    "credits": 0,\n    "location": "",\n    "date_advance": "",\n    "npcs": [],\n    "factions": {},\n    "injuries_new": [],\n    "injuries_resolved": [],\n    "inventory_gained": [],\n    "inventory_lost": [],\n    "gm_note": ""\n  }\n}`;
+
+  const toolsContract = `MODE AGENTIQUE (tool-calling):\n- Utilise queue_world_event pour construire l'événement de fond.\n- inject_now=true uniquement si l'événement mérite d'être annoncé immédiatement.\n- Termine avec finalize_background_tick.`;
+
+  return `${base}\n\n${promptMode === 'tool-calls' ? toolsContract : jsonContract}`;
+}
+
+function buildBackgroundWorldTickPrompt(turnNumber: number): string {
+  return `Résous le tick hors-écran après le tour ${turnNumber}.\nDécide s'il y a un mouvement galactique pertinent à injecter maintenant.`;
+}
+
+function applyBackgroundToolCall(
+  draft: BackgroundEventDraft,
+  toolName: string,
+  args: Record<string, unknown>
+): { ok: boolean; note: string } {
+  if (toolName === 'queue_world_event') {
+    const patch = coerceBackgroundWorldEvent(args);
+    if (!patch) return { ok: false, note: 'no background event payload' };
+    draft.event = mergeBackgroundEvent(draft.event, patch);
+    return { ok: true, note: 'background event updated' };
+  }
+
+  if (toolName === 'finalize_background_tick') {
+    draft.done = true;
+    return { ok: true, note: 'background tick finalized' };
+  }
+
+  return { ok: false, note: `unknown tool: ${toolName}` };
+}
+
+async function generateBackgroundWorldEventWithTools(
+  input: BackgroundWorldInput,
+  config: StoryProviderConfig
+): Promise<BackgroundWorldGenerationResult> {
+  const conversation: OpenAiMessage[] = [
+    {
+      role: 'system',
+      content: buildBackgroundWorldSystemPrompt(input, 'tool-calls')
+    },
+    {
+      role: 'user',
+      content: buildBackgroundWorldTickPrompt(input.turnNumber)
+    }
+  ];
+
+  const draft = createBackgroundEventDraft();
+  const rawChunks: string[] = [];
+  let totalToolCalls = 0;
+  let steps = 0;
+
+  for (let step = 1; step <= 5; step += 1) {
+    steps = step;
+
+    const assistantMessage = await callOpenAiCompatibleRaw(conversation, config, {
+      tools: AGENTIC_BACKGROUND_TOOLS,
+      toolChoice: 'auto',
+      maxTokens: 900,
+      temperature: step === 1 ? 0.8 : 0.65
+    });
+
+    const assistantContent = cleanText(assistantMessage.content, 8000);
+    if (assistantContent) rawChunks.push(assistantContent);
+
+    const toolCalls = Array.isArray(assistantMessage.tool_calls) ? assistantMessage.tool_calls : [];
+    if (!toolCalls.length) {
+      if (assistantContent) {
+        const parsed = parseJsonSafely(assistantContent);
+        const patch = coerceBackgroundWorldEvent(parsed);
+        if (patch) {
+          draft.event = mergeBackgroundEvent(draft.event, patch);
+        }
+      }
+      break;
+    }
+
+    conversation.push({
+      role: 'assistant',
+      content: assistantMessage.content ?? '',
+      tool_calls: toolCalls
+    });
+
+    for (const toolCall of toolCalls) {
+      totalToolCalls += 1;
+      const args = parseToolArguments(toolCall.function.arguments);
+      const result = applyBackgroundToolCall(draft, toolCall.function.name, args);
+
+      conversation.push({
+        role: 'tool',
+        tool_call_id: toolCall.id,
+        name: toolCall.function.name,
+        content: JSON.stringify(result)
+      });
+    }
+
+    if (draft.done) break;
+  }
+
+  const rawResponse = rawChunks.join('\n\n').trim();
+  return {
+    event: hasBackgroundEventImpact(draft.event) ? draft.event : null,
+    rawResponse: rawResponse || JSON.stringify(draft.event),
+    mode: 'agentic-tools',
+    steps: Math.max(1, steps),
+    toolCalls: totalToolCalls
+  };
+}
+
+async function generateBackgroundWorldEventStructured(
+  input: BackgroundWorldInput,
+  config: StoryProviderConfig
+): Promise<BackgroundWorldGenerationResult> {
+  const messages: ChatMessage[] = [
+    {
+      role: 'system',
+      content: buildBackgroundWorldSystemPrompt(input, 'json')
+    },
+    {
+      role: 'user',
+      content: buildBackgroundWorldTickPrompt(input.turnNumber)
+    }
+  ];
+
+  const rawResponse = await callTextModel(messages, config);
+  const parsed = parseJsonSafely(rawResponse);
+  const event = coerceBackgroundWorldEvent(parsed);
+
+  return {
+    event: hasBackgroundEventImpact(event) ? event : null,
+    rawResponse,
+    mode: 'structured-json',
+    steps: 1,
+    toolCalls: 0
+  };
+}
+
+export async function generateBackgroundWorldEvent(
+  input: BackgroundWorldInput,
+  config: StoryProviderConfig
+): Promise<BackgroundWorldGenerationResult> {
+  const normalizedProviderId = normalizeProviderId(config.providerId);
+  const normalizedConfig = normalizedProviderId === config.providerId
+    ? config
+    : { ...config, providerId: normalizedProviderId };
+
+  if (supportsAgenticToolCalling(normalizedProviderId)) {
+    try {
+      return await generateBackgroundWorldEventWithTools(input, normalizedConfig);
+    } catch (error) {
+      console.warn('[storyEngine] Background tool-calling indisponible, fallback JSON.', error);
+    }
+  }
+
+  return generateBackgroundWorldEventStructured(input, normalizedConfig);
 }
 
 async function callAnthropic(messages: ChatMessage[], config: StoryProviderConfig): Promise<string> {
