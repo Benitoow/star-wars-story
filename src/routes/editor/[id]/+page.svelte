@@ -48,15 +48,27 @@
     { id: 'senator', name: 'Sénateur', faction: 'republic', icon: 'brand-galactic-republic-svgrepo-com.svg' },
     { id: 'clone_trooper', name: 'Clone Trooper', faction: 'republic', icon: 'noun-storm-trooper-49992.svg' },
     { id: 'mandalorian_warrior', name: 'Guerrier Mandalorien', faction: 'mandalore', icon: 'mandalorian-svgrepo-com.svg' },
-    { id: 'bounty_hunter', name: 'Chasseur de Primes', faction: 'neutral', icon: 'scifi-starwars-boba-fett-svgrepo-com.svg' },
-    { id: 'smuggler', name: 'Contrebandier', faction: 'neutral', icon: 'millennium-falcon-svgrepo-com.svg' },
-    { id: 'scavenger', name: 'Éclaireur', faction: 'neutral', icon: 'alone-characterized-embodied-svgrepo-com.svg' },
-    { id: 'force_sensitive', name: 'Sensible à la Force', faction: 'neutral', icon: 'luke-skywalker-lightsaber-svgrepo-com.svg' },
     { id: 'first_order_trooper', name: 'Soldat du Premier Ordre', faction: 'first_order', icon: 'Emblem_of_the_First_Order.svg' },
     { id: 'resistance_member', name: 'Membre de la Résistance', faction: 'rebels', icon: 'millennium-falcon-svgrepo-com.svg' },
     { id: 'hutt_enforcer', name: 'Main du Hutt', faction: 'hutt', icon: 'Desilijic_clan_vector.svg' },
-    { id: 'jedi_exile', name: ' Jedi Banni', faction: 'neutral', icon: 'alone-characterized-embodied-svgrepo-com.svg' }
+    { id: 'bounty_hunter', name: 'Chasseur de Primes', faction: 'neutral', icon: 'scifi-starwars-boba-fett-svgrepo-com.svg' },
+    { id: 'smuggler', name: 'Contrebandier', faction: 'neutral', icon: 'millennium-falcon-svgrepo-com.svg' },
+    { id: 'scavenger', name: 'Éclaireur', faction: 'neutral', icon: 'alone-characterized-embodied-svgrepo-com.svg' },
+    { id: 'force_sensitive', name: 'Sensible à la Force', faction: 'neutral', icon: 'lightsaber-svgrepo-com.svg' },
+    { id: 'jedi_exile', name: 'Jedi Banni', faction: 'neutral', icon: 'alone-characterized-embodied-svgrepo-com.svg' }
   ];
+
+  const TRAMES = [
+    { id: 'solo', name: "Le Solitaire", icon: '🚀', premise: "Contrebandier solitaire naviguant dans les zones grises de la galaxie, vous acceptez un contrat qui semble simple. Mais il va vous entraîner dans un conflit qui vous dépasse..." },
+    { id: 'chosen', name: "L'Élu", icon: '✨', premise: "La Force vous a choisi pour accomplir quelque chose de grand. Mais le chemin vers votre destinée est semé d'embûches, de trahisons et de doutes sur votre propre nature..." },
+    { id: 'exile', name: "Le Banni", icon: '🌑', premise: "Exilé après un incident que vous seul connaissez vraiment, vous survivez dans l'ombre. Mais une menace qui grandit dans la galaxie va vous obliger à reprendre les armes..." },
+    { id: 'rebel', name: "Le Résistant", icon: '⚡', premise: "Vous avez tout perdu à cause de l'oppresseur. Vous avez rejoint la Rébellion non par idéologie, mais par vengeance. En combattant, vous découvrez quelque chose de plus grand que vous..." },
+    { id: 'redeemed', name: "La Rédemption", icon: '🔥', premise: "Vous avez servi l'Obscur pendant des années. Un événement a tout changé. Vous cherchez à racheter vos crimes, mais vos anciens maîtres ne vous laisseront pas partir facilement..." },
+    { id: 'spy', name: "L'Infiltrateur", icon: '🕵', premise: "Votre mission : infiltrer les hautes sphères de l'ennemi. Plus vous avancez, plus la ligne entre vos deux identités s'efface. De quel côté êtes-vous vraiment ?" },
+    { id: 'custom', name: "Libre", icon: '✏️', premise: '' }
+  ];
+
+  let selectedTrame: string | null = null;
 
   onMount(async () => {
     const id = $page.params.id;
@@ -102,7 +114,7 @@
 
   function canProceedToEdit(): boolean {
     const setup = get(currentSetup);
-    return !!(setup.era && setup.faction && setup.role && setup.premise);
+    return !!(setup.era && setup.faction && setup.role && selectedTrame);
   }
 
   function proceedToEdit() {
@@ -153,7 +165,13 @@
 
   function getFilteredRoles() {
     if (!$currentSetup.faction) return ROLES;
-    return ROLES.filter(r => r.faction === $currentSetup.faction);
+    if ($currentSetup.faction === 'neutral') return ROLES.filter(r => r.faction === 'neutral');
+    return ROLES.filter(r => r.faction === $currentSetup.faction || r.faction === 'neutral');
+  }
+
+  function selectTrame(trame: typeof TRAMES[0]) {
+    selectedTrame = trame.id;
+    if (trame.premise) updateSetupField('premise', trame.premise);
   }
 </script>
 
@@ -267,19 +285,33 @@
             {/if}
           </section>
 
-          <!-- Premise -->
+          <!-- Trame + Premise -->
           <section class="setup-section">
             <h2>
               <span class="step-number">4</span>
-              Décrivez votre histoire
+              Choisissez une trame
             </h2>
-            <textarea
-              class="premise-input"
-              placeholder="Ex: Vous êtes un Jedi exilé qui découvre une menace cachée au cœur de la galaxie..."
-              value={$currentSetup.premise}
-              on:input={handlePremiseInput}
-              rows="4"
-            ></textarea>
+            <div class="trame-grid">
+              {#each TRAMES as trame}
+                <button
+                  class="trame-card"
+                  class:selected={selectedTrame === trame.id}
+                  on:click={() => selectTrame(trame)}
+                >
+                  <span class="trame-icon">{trame.icon}</span>
+                  <span class="trame-name">{trame.name}</span>
+                </button>
+              {/each}
+            </div>
+            {#if selectedTrame === 'custom' || selectedTrame}
+              <textarea
+                class="premise-input"
+                placeholder="Décrivez le contexte de départ de votre histoire..."
+                value={$currentSetup.premise}
+                on:input={handlePremiseInput}
+                rows="4"
+              ></textarea>
+            {/if}
           </section>
 
           <div class="setup-actions">
@@ -599,13 +631,56 @@ Utilisez les boutons ci-dessus pour ajouter des sections:
   }
 
   .role-card:hover {
-    border-color: var(--color-blue);
+    border-color: var(--color-gold);
     transform: translateY(-2px);
   }
 
   .role-card.selected {
-    border-color: var(--color-blue);
-    background: rgba(79, 195, 247, 0.1);
+    border-color: var(--color-gold);
+    background: rgba(255, 232, 31, 0.1);
+  }
+
+  .trame-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: var(--space-sm);
+    margin-bottom: var(--space-md);
+  }
+
+  .trame-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-md) var(--space-sm);
+    background: var(--color-bg-secondary);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    text-align: center;
+  }
+
+  .trame-card:hover {
+    border-color: var(--color-gold);
+    transform: translateY(-2px);
+  }
+
+  .trame-card.selected {
+    border-color: var(--color-gold);
+    background: rgba(255, 232, 31, 0.1);
+  }
+
+  .trame-icon {
+    font-size: 1.5rem;
+    line-height: 1;
+  }
+
+  .trame-name {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    font-family: var(--font-display);
   }
 
   .role-icon {

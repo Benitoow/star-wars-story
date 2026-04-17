@@ -36,7 +36,11 @@
   }
 
   onMount(async () => {
-    preferences = await getPreferences();
+    try {
+      preferences = await getPreferences();
+    } catch (e) {
+      console.error('Failed to load preferences:', e);
+    }
     loading = false;
   });
 

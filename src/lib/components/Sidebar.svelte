@@ -14,6 +14,10 @@
 
   $: currentPath = $page.url.pathname;
 
+  function closeMobile() {
+    if (window.innerWidth < 769) toggleSidebar();
+  }
+
   async function loadFolders() {
     await folders.load();
   }
@@ -43,6 +47,7 @@
         href={item.href}
         class="nav-item"
         class:active={currentPath === item.href || (item.href !== '/' && currentPath.startsWith(item.href))}
+        on:click={closeMobile}
       >
         <span class="nav-icon">
           {#if item.icon === 'home'}
