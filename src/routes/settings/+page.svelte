@@ -5,11 +5,35 @@
   import { showToast, theme, uiLanguage } from '$lib/stores/ui';
   import { UI_LANGUAGE_OPTIONS, type UiLanguageCode } from '$lib/config/languages';
   import PageHeader from '$lib/components/PageHeader.svelte';
+  import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 
   let preferences: UserPreferences | null = null;
   let loading = true;
   let saving = false;
   let importInput: HTMLInputElement | null = null;
+
+  let confirmMessage = '';
+  let confirmDanger = false;
+  let pendingAction: (() => Promise<void>) | null = null;
+  let pendingFile: File | null = null;
+
+  function requestConfirm(message: string, action: () => Promise<void>, danger = false) {
+    confirmMessage = message;
+    confirmDanger = danger;
+    pendingAction = action;
+  }
+
+  async function handleConfirm() {
+    const action = pendingAction;
+    pendingAction = null;
+    if (action) await action();
+  }
+
+  function handleCancel() {
+    pendingAction = null;
+    pendingFile = null;
+    if (importInput) importInput.value = '';
+  }
 
   onMount(async () => {
     preferences = await getPreferences();
@@ -54,35 +78,40 @@
     const input = event.currentTarget as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
+    pendingFile = file;
 
-    const confirmed = window.confirm('Importer ce fichier remplacera les données locales. Continuer ?');
-    if (!confirmed) {
-      input.value = '';
-      return;
-    }
-
-    try {
-      const payload = await file.text();
-      const counts = await importAllData(payload);
-      showToast(`Import terminé (${counts.stories} histoires, ${counts.folders} dossiers)`, 'success');
-      window.location.reload();
-    } catch (error) {
-      showToast('Impossible d’importer ce fichier', 'error');
-    } finally {
-      input.value = '';
-    }
+    requestConfirm(
+      ‘Importer ce fichier remplacera les données locales. Continuer ?’,
+      async () => {
+        try {
+          const payload = await pendingFile!.text();
+          const counts = await importAllData(payload);
+          showToast(`Import terminé (${counts.stories} histoires, ${counts.folders} dossiers)`, ‘success’);
+          window.location.reload();
+        } catch {
+          showToast(‘Impossible d’importer ce fichier’, ‘error’);
+        } finally {
+          pendingFile = null;
+          if (importInput) importInput.value = ‘’;
+        }
+      },
+      false
+    );
   }
 
   async function handleEmptyTrash() {
-    const confirmed = window.confirm('Supprimer définitivement toutes les histoires de la corbeille ?');
-    if (!confirmed) return;
-
-    try {
-      await emptyTrash();
-      showToast('Corbeille vidée', 'success');
-    } catch (error) {
-      showToast('Impossible de vider la corbeille', 'error');
-    }
+    requestConfirm(
+      ‘Supprimer définitivement toutes les histoires de la corbeille ?’,
+      async () => {
+        try {
+          await emptyTrash();
+          showToast(‘Corbeille vidée’, ‘success’);
+        } catch {
+          showToast(‘Impossible de vider la corbeille’, ‘error’);
+        }
+      },
+      true
+    );
   }
 
   function handleThemeChange(newTheme: 'light' | 'dark' | 'auto') {
@@ -147,6 +176,16 @@
 <svelte:head>
   <title>Paramètres — Star Wars Story Manager</title>
 </svelte:head>
+
+{#if pendingAction}
+  <ConfirmDialog
+    message={confirmMessage}
+    danger={confirmDanger}
+    confirmLabel={confirmDanger ? 'Supprimer' : 'Confirmer'}
+    on:confirm={handleConfirm}
+    on:cancel={handleCancel}
+  />
+{/if}
 
 <div class="settings-layout">
   <PageHeader

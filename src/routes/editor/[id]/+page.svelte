@@ -3,8 +3,10 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { get } from 'svelte/store';
-  import { story, saveStory, createStory, loadStory, currentSetup, updateSetupField, updateContent } from '$lib/stores/editor';
-  import { showToast } from '$lib/stores/ui';
+  import { onDestroy } from 'svelte';
+  import { story, saveStory, createStory, loadStory, currentSetup, updateSetupField, updateContent, startAutoSave, stopAutoSave } from '$lib/stores/editor';
+  import { showToast, toasts } from '$lib/stores/ui';
+  import { getPreferences } from '$lib/db';
   import SvgIcon from '$lib/components/SvgIcon.svelte';
   import PageHeader from '$lib/components/PageHeader.svelte';
 
@@ -64,6 +66,15 @@
       step = 'edit';
     }
     loading = false;
+
+    const prefs = await getPreferences();
+    if (prefs.autoSave) {
+      startAutoSave(prefs.autoSaveInterval);
+    }
+  });
+
+  onDestroy(() => {
+    stopAutoSave();
   });
 
   function selectEra(eraId: string) {

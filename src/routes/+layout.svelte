@@ -3,7 +3,7 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { theme, uiLanguage, sidebarOpen, searchOpen, toggleSidebar, toasts } from '$lib/stores/ui';
-  import { initializeDB } from '$lib/db';
+  import { initializeDB, cleanupOldTrash } from '$lib/db';
   import Toast from '$lib/components/Toast.svelte';
   import Sidebar from '$lib/components/Sidebar.svelte';
   import Header from '$lib/components/Header.svelte';
@@ -15,6 +15,14 @@
     await theme.init();
     await uiLanguage.init();
     initialized = true;
+
+    // Run trash cleanup in background — no await, non-blocking
+    cleanupOldTrash(30).catch(() => {});
+
+    // Close sidebar on mobile by default
+    if (window.innerWidth < 769) {
+      sidebarOpen.set(false);
+    }
   });
 
   function handleKeydown(e: KeyboardEvent) {

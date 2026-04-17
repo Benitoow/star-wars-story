@@ -59,22 +59,13 @@
     await loadTrash();
   }
 
-  async function handleDelete(id: string, permanent = false) {
-    if (!permanent) {
-      try {
-        await deleteStory(id, true);
-        showToast('Histoire supprimée définitivement', 'success');
-        await loadTrash();
-      } catch (e) {
-        showToast('Erreur lors de la suppression', 'error');
-      }
-    } else {
-      try {
-        await deleteStory(id, true);
-        await loadTrash();
-      } catch (e) {
-        showToast('Erreur lors de la suppression', 'error');
-      }
+  async function handleDelete(id: string) {
+    try {
+      await deleteStory(id, true);
+      showToast('Histoire supprimée définitivement', 'success');
+      await loadTrash();
+    } catch (e) {
+      showToast('Erreur lors de la suppression', 'error');
     }
   }
 
@@ -249,7 +240,7 @@
                   <button 
                     class="action-btn delete" 
                     title="Supprimer définitivement"
-                    on:click={() => handleDelete(story.id, true)}
+                    on:click={() => handleDelete(story.id)}
                   >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <polyline points="3,6 5,6 21,6"/>

@@ -295,7 +295,7 @@ export async function createStory(data: Omit<Story, 'id' | 'metadata' | 'version
       createdAt: now,
       updatedAt: now,
       playCount: 0,
-      wordCount: data.content.split(/\s+/).length
+      wordCount: data.content.split(/\s+/).filter(Boolean).length
     },
     version: 1,
     isArchived: false,
@@ -327,7 +327,7 @@ export async function updateStory(id: string, data: Partial<Story>): Promise<voi
       ...story.metadata,
       ...(data.metadata || {}),
       updatedAt: new Date(),
-      wordCount: data.content?.split(/\s+/).length || story.metadata.wordCount
+      wordCount: data.content !== undefined ? data.content.split(/\s+/).filter(Boolean).length : story.metadata.wordCount
     }
   });
 

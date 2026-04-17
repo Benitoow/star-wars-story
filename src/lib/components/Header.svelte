@@ -1,33 +1,10 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { toggleSidebar, searchOpen, searchQuery, uiLanguage, viewMode, toasts } from '$lib/stores/ui';
-  import { stories } from '$lib/stores/stories';
+  import { toggleSidebar, searchOpen, searchQuery, uiLanguage, viewMode } from '$lib/stores/ui';
   import { UI_LANGUAGE_OPTIONS, getLanguageLabel, type UiLanguageCode } from '$lib/config/languages';
 
-  let showNewStoryModal = false;
-  let newStoryTitle = '';
-
-  async function handleCreateStory() {
-    if (!newStoryTitle.trim()) return;
-
-    try {
-      const story = await stories.create({
-        title: newStoryTitle,
-        content: '',
-        setup: {
-          era: 'imperial',
-          faction: 'neutral',
-          role: 'pilot',
-          premise: 'chosen'
-        }
-      });
-      toasts.add({ type: 'success', message: 'Histoire créée avec succès' });
-      showNewStoryModal = false;
-      newStoryTitle = '';
-      goto(`/editor/${story.id}`);
-    } catch (e) {
-      toasts.add({ type: 'error', message: 'Erreur lors de la création' });
-    }
+  function handleNewStory() {
+    goto('/editor/new');
   }
 
   function handleLanguageChange(event: Event) {
@@ -112,7 +89,7 @@
       </button>
     </div>
 
-    <button class="btn btn-primary new-story-btn" on:click={() => showNewStoryModal = true}>
+    <button class="btn btn-primary new-story-btn" on:click={handleNewStory}>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <line x1="12" y1="5" x2="12" y2="19"/>
         <line x1="5" y1="12" x2="19" y2="12"/>
@@ -122,43 +99,6 @@
   </div>
 </header>
 
-<!-- New Story Modal -->
-{#if showNewStoryModal}
-  <div class="modal-overlay" on:click={() => showNewStoryModal = false}>
-    <div class="modal" on:click|stopPropagation>
-      <div class="modal-header">
-        <h2>Créer une nouvelle histoire</h2>
-        <button class="modal-close" on:click={() => showNewStoryModal = false}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"/>
-            <line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
-      </div>
-      <form class="modal-body" on:submit|preventDefault={handleCreateStory}>
-        <div class="form-group">
-          <label class="label" for="story-title">Titre de l'histoire</label>
-          <input
-            id="story-title"
-            type="text"
-            class="input"
-            placeholder="Mon aventure Star Wars..."
-            bind:value={newStoryTitle}
-            required
-          />
-        </div>
-        <div class="modal-actions">
-          <button type="button" class="btn btn-secondary" on:click={() => showNewStoryModal = false}>
-            Annuler
-          </button>
-          <button type="submit" class="btn btn-primary">
-            Créer
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-{/if}
 
 <style>
   .header {
@@ -344,94 +284,6 @@
   .new-story-btn svg {
     width: 18px;
     height: 18px;
-  }
-
-  /* Modal */
-  .modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(4px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 200;
-    padding: var(--space-lg);
-    animation: fadeIn 0.2s ease;
-  }
-
-  .modal {
-    background: var(--color-bg-elevated);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-xl);
-    width: 100%;
-    max-width: 480px;
-    animation: slideUp 0.3s ease;
-  }
-
-  .modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--space-lg);
-    border-bottom: 1px solid var(--color-border);
-  }
-
-  .modal-header h2 {
-    font-size: 1.125rem;
-    color: var(--color-gold);
-  }
-
-  .modal-close {
-    width: 32px;
-    height: 32px;
-    padding: 0;
-    background: none;
-    border: none;
-    color: var(--color-text-muted);
-    cursor: pointer;
-    border-radius: var(--radius-sm);
-    transition: all var(--transition-fast);
-  }
-
-  .modal-close:hover {
-    background: var(--color-bg-hover);
-    color: var(--color-text-primary);
-  }
-
-  .modal-close svg {
-    width: 20px;
-    height: 20px;
-  }
-
-  .modal-body {
-    padding: var(--space-lg);
-  }
-
-  .form-group {
-    margin-bottom: var(--space-lg);
-  }
-
-  .modal-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: var(--space-sm);
-  }
-
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-
-  @keyframes slideUp {
-    from {
-      opacity: 0;
-      transform: translateY(20px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
   }
 
   .hide-mobile {
