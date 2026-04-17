@@ -1,4 +1,4 @@
-# Star Wars Story — v1.1.1
+# Star Wars Story — v1.1.2
 
 An open-source Star Wars story project whose playable deployment lives on the project's Cloudflare-hosted site. This repository now focuses on source, release notes, and archived legacy material.
 
@@ -10,7 +10,7 @@ An open-source Star Wars story project whose playable deployment lives on the pr
 
 ### Status
 
-- ✅ **Official release:** v1.1.1
+- ✅ **Official release:** v1.1.2
 - 🗓️ **Release date:** 2026-04-17
 - 🌍 **Open source:** the repository is public, so the project is fully open for inspection and contribution.
 
@@ -40,7 +40,8 @@ The playable version is no longer served from GitHub Pages.
 - API secrets stay in the browser and are not committed.
 - User data is stored locally in the browser.
 
-The classic vanilla JS prototype has been archived under `archives/legacy-js/` for reference.
+The classic vanilla JS prototype has been physically moved under `archives/legacy-js/` for reference.
+The root `index.html` is now a transition stub and no longer boots the legacy runtime.
 
 ### Development
 
@@ -52,7 +53,7 @@ The repository source remains useful for inspection and maintenance, but it is n
 
 ### Statut
 
-- ✅ **Version officielle :** v1.1.1
+- ✅ **Version officielle :** v1.1.2
 - 🗓️ **Date de release :** 2026-04-17
 - 🌍 **Open source :** le dépôt est public, donc le projet est librement consultable et partageable.
 
@@ -82,7 +83,8 @@ La version jouable n’est plus servie via GitHub Pages.
 - Les secrets API restent côté navigateur et ne sont pas commis.
 - Les données utilisateur sont stockées localement dans le navigateur.
 
-Le prototype JavaScript classique a été archivé dans `archives/legacy-js/` pour référence.
+Le prototype JavaScript classique a été déplacé physiquement dans `archives/legacy-js/` pour référence.
+Le `index.html` racine est désormais une page de transition et ne lance plus le runtime legacy.
 
 ### Développement
 

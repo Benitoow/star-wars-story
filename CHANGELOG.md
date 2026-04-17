@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.1.2 — 2026-04-17
+
+### 🧱 Technical reset (legacy retirement)
+- Physically moved the legacy vanilla JS runtime from repository root into `archives/legacy-js/`:
+	- `index.html`
+	- `css/style.css`
+	- `js/api.js`
+	- `js/app.js`
+	- `js/config.js`
+	- `js/story.js`
+- Added a new root `index.html` transition stub so the root no longer boots the legacy runtime.
+- Updated repository documentation to reflect a Svelte-first codebase with legacy kept as historical archive only.
+
 ## Unreleased (V1.2 technical)
 
 ### 🧩 Narrative Contract Hardening
