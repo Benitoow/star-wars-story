@@ -1336,6 +1336,24 @@ function draftHasMeaningfulData(draft: AgenticDraft): boolean {
   );
 }
 
+const UNUSABLE_STORY_OUTPUT_PATTERN = /n'a pas renvoyé de sortie exploitable/i;
+
+function hasPlayableChapterContent(chapter: StoryChapter): boolean {
+  const action = cleanText(chapter.narrative.action, 280);
+  if (!action) return false;
+  return !UNUSABLE_STORY_OUTPUT_PATTERN.test(action);
+}
+
+function hasUsableStoryTurnOutput(rawResponse: string, chapter: StoryChapter): boolean {
+  const raw = cleanText(rawResponse, 12000);
+
+  if (hasPlayableChapterContent(chapter)) return true;
+  if (!raw) return false;
+  if (UNUSABLE_STORY_OUTPUT_PATTERN.test(raw)) return false;
+
+  return chapter.choices.length > 0;
+}
+
 function draftToChapter(draft: AgenticDraft, turnNumber: number, rawFallback = ''): StoryChapter {
   const payload = {
     chapter_title: draft.chapter_title,
@@ -1557,15 +1575,26 @@ export async function generateStoryTurn(
 
   if (supportsAgenticToolCalling(normalizedProviderId)) {
     try {
-      return await generateStoryTurnWithTools(messages, normalizedConfig, turnNumber);
+      const agenticResult = await generateStoryTurnWithTools(messages, normalizedConfig, turnNumber);
+      if (hasUsableStoryTurnOutput(agenticResult.rawResponse, agenticResult.chapter)) {
+        return agenticResult;
+      }
+
+      console.warn('[storyEngine] Tool-calling a renvoyé une sortie vide/inexploitable, fallback JSON.');
     } catch (error) {
       console.warn('[storyEngine] Tool-calling indisponible, fallback JSON.', error);
     }
   }
 
   const rawResponse = await callTextModel(messages, normalizedConfig);
+  const chapter = parseStoryResponse(rawResponse, turnNumber);
+
+  if (!hasUsableStoryTurnOutput(rawResponse, chapter)) {
+    throw new Error('Réponse vide ou inexploitable du modèle IA. Vérifie le modèle sélectionné et la clé API, puis réessaie.');
+  }
+
   return {
-    chapter: parseStoryResponse(rawResponse, turnNumber),
+    chapter,
     rawResponse,
     mode: 'structured-json',
     steps: 1,

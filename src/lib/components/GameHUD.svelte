@@ -125,23 +125,25 @@
 <style>
   .hud {
     position: fixed;
-    top: 72px;
-    right: 12px;
-    width: 200px;
+    top: 84px;
+    right: clamp(10px, 1.3vw, 24px);
+    width: var(--hud-width, 228px);
+    max-height: calc(100vh - 108px);
     background: rgba(12, 12, 16, 0.88);
     border: 1px solid rgba(255, 232, 31, 0.18);
-    border-radius: 10px;
+    border-radius: 12px;
     backdrop-filter: blur(10px);
     z-index: 150;
     font-size: 0.75rem;
     color: var(--color-text-secondary);
     box-shadow: 0 4px 24px rgba(0,0,0,0.5);
-    transition: width 0.2s ease;
+    transition: width 0.2s ease, transform 0.2s ease;
     overflow: hidden;
   }
 
   .hud.collapsed {
     width: auto;
+    max-height: none;
   }
 
   .hud-toggle {
@@ -163,11 +165,18 @@
   .hud-toggle:hover { background: rgba(255,232,31,0.05); }
   .hud-toggle-label { font-weight: 600; }
 
+  .hud.collapsed .hud-toggle {
+    border-bottom: none;
+  }
+
   .hud-body {
     padding: 8px 10px 10px;
     display: flex;
     flex-direction: column;
     gap: 4px;
+    max-height: calc(100vh - 158px);
+    overflow-y: auto;
+    scrollbar-width: thin;
   }
 
   .hud-section-label {
@@ -280,12 +289,25 @@
     color: #fca5a5;
   }
 
+  @media (max-width: 1159px) {
+    .hud {
+      width: 208px;
+      top: 76px;
+      right: 10px;
+    }
+  }
+
   @media (max-width: 768px) {
     .hud {
       top: auto;
       bottom: 80px;
       right: 8px;
-      width: 180px;
+      width: min(190px, calc(100vw - 16px));
+      max-height: calc(100vh - 130px);
+    }
+
+    .hud-body {
+      max-height: calc(100vh - 180px);
     }
   }
 </style>

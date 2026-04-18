@@ -1523,7 +1523,7 @@
           {/if}
         </div>
       {:else}
-        <div class="play-shell">
+        <div class="play-shell" class:hud-open={!hudCollapsed}>
 
           <!-- ── Topbar ──────────────────────────────────── -->
           <div class="play-topbar">
@@ -2234,6 +2234,8 @@
      PLAY SHELL
   ═══════════════════════════════════════════ */
   .play-shell {
+    --hud-width: 228px;
+    --hud-gap: 18px;
     display: flex;
     flex-direction: column;
     gap: var(--space-xl);
@@ -2241,6 +2243,13 @@
     margin: 0 auto;
     width: 100%;
     padding-bottom: calc(var(--space-xl) * 2);
+  }
+
+  @media (min-width: 1160px) {
+    .play-shell.hud-open {
+      max-width: calc(740px + var(--hud-width) + var(--hud-gap));
+      padding-right: calc(var(--hud-width) + var(--hud-gap));
+    }
   }
 
   .world-events-panel {
