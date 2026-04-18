@@ -47,7 +47,7 @@
 
   const PROVIDER_ICONS: Record<string, string> = {
     openrouter: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M16.778 1.844v1.919q-.569-.026-1.138-.032-.708-.008-1.415.037c-1.93.126-4.023.728-6.149 2.237-2.911 2.066-2.731 1.95-4.14 2.75-.396.223-1.342.574-2.185.798-.841.225-1.753.333-1.751.333v4.229s.768.108 1.61.333c.842.224 1.789.575 2.185.799 1.41.798 1.228.683 4.14 2.75 2.126 1.509 4.22 2.11 6.148 2.236.88.058 1.716.041 2.555.005v1.918l7.222-4.168-7.222-4.17v2.176c-.86.038-1.611.065-2.278.021-1.364-.09-2.417-.357-3.979-1.465-2.244-1.593-2.866-2.027-3.68-2.508.889-.518 1.449-.906 3.822-2.59 1.56-1.109 2.614-1.377 3.978-1.466.667-.044 1.418-.017 2.278.02v2.176L24 6.014Z"/></svg>`,
-    openai: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 2.5a3.7 3.7 0 0 1 3.45 2.33 3.7 3.7 0 0 1 3.64 6.14 3.7 3.7 0 0 1-1.38 5.39 3.7 3.7 0 0 1-5.72 3.05 3.7 3.7 0 0 1-5.73-3.03 3.7 3.7 0 0 1-1.37-5.39 3.7 3.7 0 0 1 3.64-6.15A3.7 3.7 0 0 1 12 2.5Zm-.04 3.08-1.84 1.08v2.12l1.86 1.09 1.84-1.07V6.66l-1.86-1.08Zm-4.72 2.76-1.84 1.08v2.12l1.84 1.08 1.85-1.08V9.42L7.24 8.34Zm9.45 0-1.84 1.08v2.12l1.84 1.08 1.85-1.08V9.42l-1.85-1.08ZM12 11.1l-1.86 1.08v2.14L12 15.4l1.85-1.08v-2.14L12 11.1Zm-4.76 2.78-1.84 1.08v2.12l1.84 1.08 1.85-1.08v-2.12l-1.85-1.08Zm9.45 0-1.84 1.08v2.12l1.84 1.08 1.85-1.08v-2.12l-1.85-1.08Zm-4.72 2.75-1.84 1.07v2.13l1.86 1.07 1.84-1.08v-2.11l-1.86-1.08Z"/></svg>`,
+    openai: `<img src="/svg/openai-icon.svg" alt="" loading="lazy" decoding="async" />`,
     anthropic: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M17.304 3.541h-3.672L20.328 20.46H24zm-10.608 0L0 20.46h3.744l1.37-3.553h7.005l1.37 3.553h3.744L10.536 3.541Zm-.371 10.223 2.291-5.946 2.292 5.946z"/></svg>`,
     mistral: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M17.143 3.429v3.428h-3.429v3.429h-3.428V6.857H6.857V3.43H3.43v13.714H0v3.428h10.286v-3.428H6.857v-3.429h3.429v3.429h3.429v-3.429h3.428v3.429h-3.428v3.428H24v-3.428h-3.43V3.429z"/></svg>`,
     grok: `<img src="/svg/grok-ai-icon.svg" alt="" loading="lazy" decoding="async" />`,
@@ -280,6 +280,14 @@
   $: filteredImageModels = normalizedImageSearch
     ? imageProviderModels.filter(model => model.toLowerCase().includes(normalizedImageSearch))
     : imageProviderModels;
+
+  function shortModelName(model: string): string {
+    // "google/gemma-3-27b-it:free" → "gemma-3-27b-it"
+    // "anthropic/claude-sonnet-4.5" → "claude-sonnet-4.5"
+    // "gpt-5-mini" → "gpt-5-mini"
+    const afterSlash = model.includes('/') ? model.split('/').pop()! : model;
+    return afterSlash.split(':')[0];
+  }
 
   function uniqueSorted(models: string[]): string[] {
     return Array.from(new Set(models.map(m => m.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b));
@@ -950,6 +958,12 @@
                       <span class="provider-name">{p.name}</span>
                     </span>
                     <span class="provider-models">{providerModelCounts[p.id] ?? p.models.length} modèles</span>
+                    {#if preferences.textProvider === p.id && preferences.textModel}
+                      <span class="provider-active-model" title={preferences.textModel}>
+                        <svg viewBox="0 0 8 8" width="6" height="6"><circle cx="4" cy="4" r="4" fill="currentColor"/></svg>
+                        {shortModelName(preferences.textModel)}
+                      </span>
+                    {/if}
                     {#if p.recommended || (p.badges && p.badges.length)}
                       <span class="provider-badges">
                         {#if p.recommended}
@@ -1059,6 +1073,12 @@
                       <span class="provider-name">{p.name}</span>
                     </span>
                     <span class="provider-models">{imageProviderModelCounts[p.id] ?? p.models.length} modèles</span>
+                    {#if preferences.imageProvider === p.id && preferences.imageModel}
+                      <span class="provider-active-model" title={preferences.imageModel}>
+                        <svg viewBox="0 0 8 8" width="6" height="6"><circle cx="4" cy="4" r="4" fill="currentColor"/></svg>
+                        {shortModelName(preferences.imageModel)}
+                      </span>
+                    {/if}
                   </button>
                 {/each}
               </div>
@@ -1770,6 +1790,24 @@
     border-color: rgba(255, 232, 31, 0.5);
     color: var(--color-gold);
     background: rgba(255, 232, 31, 0.12);
+  }
+
+  .provider-active-model {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.7rem;
+    color: #4ade80;
+    font-family: var(--font-mono, monospace);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .provider-active-model svg {
+    flex-shrink: 0;
+    color: #4ade80;
   }
 
   .provider-tools {
