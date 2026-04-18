@@ -571,7 +571,13 @@ export function parseStoryResponse(rawText: string, turnNumber: number): StoryCh
 
   const narrative = coerceNarrative(parsed.narrative);
   if (!narrative.action) {
-    narrative.action = cleanText(parsed.action, 2200) || cleanText(rawText, 2200);
+    const candidate = cleanText(parsed.action, 2200);
+    const rawFallback = cleanText(rawText, 2200);
+    const isJson = (t: string) => /^\s*[{[]/.test(t);
+    // Never inject raw JSON as narrative text
+    narrative.action = (candidate && !isJson(candidate))
+      ? candidate
+      : (!isJson(rawFallback) ? rawFallback : '');
   }
 
   const choices = extractChoices(parsed.choices);
