@@ -2508,7 +2508,7 @@
 
   .chapter-title {
     margin: 0;
-    font-size: 1.75rem;
+    font-size: clamp(1.72rem, 1.56rem + 0.45vw, 1.95rem);
     font-weight: 800;
     color: var(--color-text-primary);
     line-height: 1.2;
@@ -2518,10 +2518,12 @@
   /* ── Narrative flow ─────────────────────── */
   .narrative {
     padding: 0 var(--space-xl) var(--space-md);
+    max-width: 74ch;
+    margin: 0 auto;
   }
 
   .n-block {
-    padding: var(--space-md) 0;
+    padding: calc(var(--space-md) + 2px) 0;
     position: relative;
   }
 
@@ -2531,13 +2533,13 @@
 
   .n-tag {
     display: block;
-    font-size: 0.58rem;
+    font-size: 0.62rem;
     font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 1.8px;
+    letter-spacing: 1.65px;
     color: var(--color-gold);
-    margin-bottom: 6px;
-    opacity: 0.65;
+    margin-bottom: 8px;
+    opacity: 0.85;
   }
 
   .n-tag--action     { color: #c8960f; }
@@ -2547,45 +2549,50 @@
   /* Prose shared */
   .n-block p {
     margin: 0;
-    line-height: 1.72;
-    font-size: 0.975rem;
+    line-height: 1.84;
+    font-size: clamp(1rem, 0.97rem + 0.2vw, 1.07rem);
+    text-wrap: pretty;
   }
 
   .n-block p + p { margin-top: 0.75em; }
 
   /* Context */
-  .n-context p { color: var(--color-text-secondary); }
+  .n-context p { color: color-mix(in srgb, var(--color-text-primary) 90%, white 10%); }
 
   /* Action — slightly more weight */
   .n-action p {
     color: var(--color-text-primary);
-    font-size: 1rem;
+    font-size: clamp(1.02rem, 1rem + 0.2vw, 1.1rem);
+    font-weight: 500;
   }
 
   /* Dialogue — screenplay style */
   .n-dialogue {
-    padding-left: 14px;
-    border-left: 2px solid color-mix(in srgb, #5aaed4 30%, transparent);
+    padding: var(--space-sm) var(--space-md);
+    border-left: 3px solid color-mix(in srgb, #5aaed4 45%, transparent);
+    background: color-mix(in srgb, #5aaed4 8%, transparent);
+    border-radius: var(--radius-md);
   }
 
   .n-dialogue p {
-    color: var(--color-text-primary);
-    font-style: italic;
+    color: color-mix(in srgb, var(--color-text-primary) 95%, white 5%);
+    font-style: normal;
   }
 
   /* Reflection — tinted box */
   .n-reflection {
-    background: color-mix(in srgb, var(--color-bg-tertiary) 55%, transparent);
+    background: color-mix(in srgb, #8e7ab8 10%, var(--color-bg-tertiary));
     border-radius: var(--radius-md);
     padding: var(--space-sm) var(--space-md);
     border-top: none !important;
     margin-top: var(--space-lg);
+    border: 1px solid color-mix(in srgb, #8e7ab8 25%, var(--color-border));
   }
 
   .n-reflection p {
-    color: var(--color-text-muted);
-    font-style: italic;
-    font-size: 0.93rem;
+    color: color-mix(in srgb, var(--color-text-secondary) 88%, white 12%);
+    font-style: normal;
+    font-size: clamp(0.98rem, 0.95rem + 0.15vw, 1.02rem);
   }
 
   /* ═══════════════════════════════════════════
@@ -2870,6 +2877,24 @@
     .header-actions {
       width: 100%;
       justify-content: flex-end;
+    }
+
+    .chapter-header {
+      padding: var(--space-lg) var(--space-md) var(--space-md);
+    }
+
+    .narrative {
+      padding: 0 var(--space-md) var(--space-sm);
+      max-width: none;
+    }
+
+    .n-block p {
+      line-height: 1.72;
+      font-size: 0.99rem;
+    }
+
+    .n-dialogue {
+      padding: var(--space-xs) var(--space-sm);
     }
   }
 </style>
