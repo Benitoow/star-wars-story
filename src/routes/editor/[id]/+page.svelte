@@ -198,15 +198,65 @@
     });
   }
 
+  function buildEconomySignalText(chapter: StoryChapter): string {
+    return [
+      chapter.chapter_title,
+      chapter.narrative.context,
+      chapter.narrative.action,
+      chapter.narrative.dialogue,
+      chapter.narrative.reflection,
+      ...(chapter.memory_updates.resources || []),
+      ...(chapter.memory_updates.notes || [])
+    ].join(' ');
+  }
+
+  function hasEconomyGainCue(text: string): boolean {
+    return /(récompense|recompense|prime|bonus|paiement|payé|payee|payée|gagne|gagné|gagn[eé]s?|encaisse|butin|loot|récupère|recupere|trouv[ée])/i.test(text);
+  }
+
+  function hasHealOrDamageCue(text: string): boolean {
+    return /(soin|médikit|medikit|guéri|gueri|récup|recup|stabilis|pansement|bless|tir|impact|explosion|hémorrag|hemorrag|fracture|attaque|coup)/i.test(text);
+  }
+
+  function normalizeHpDelta(rawHp: number, currentHp: number, signalText: string): number {
+    const looksLikeAbsoluteSnapshot = rawHp >= 0 && rawHp <= 100 && Math.abs(rawHp - currentHp) <= 25;
+    if (looksLikeAbsoluteSnapshot && !hasHealOrDamageCue(signalText)) {
+      return rawHp - currentHp;
+    }
+    return rawHp;
+  }
+
+  function normalizeCreditsDelta(rawCredits: number, currentCredits: number, hpLooksAbsoluteSnapshot: boolean, signalText: string): number {
+    const nearCurrent = Math.abs(rawCredits - currentCredits) <= Math.max(250, currentCredits * 0.35);
+    const mediumOrLargeValue = Math.abs(rawCredits) >= 250;
+    const looksLikeAbsoluteSnapshot = rawCredits >= 0 && nearCurrent && mediumOrLargeValue;
+
+    if (looksLikeAbsoluteSnapshot && (hpLooksAbsoluteSnapshot || !hasEconomyGainCue(signalText))) {
+      return rawCredits - currentCredits;
+    }
+
+    return rawCredits;
+  }
+
   function applyStateUpdate(chapter: StoryChapter): void {
     const upd = chapter.state_update;
     if (!upd) return;
 
     const p = worldState.player;
+    const signalText = buildEconomySignalText(chapter);
+
+    const hpDelta = upd.hp !== undefined ? normalizeHpDelta(upd.hp, p.hp, signalText) : undefined;
+    const hpLooksAbsoluteSnapshot = upd.hp !== undefined
+      ? upd.hp >= 0 && upd.hp <= 100 && Math.abs(upd.hp - p.hp) <= 25 && hpDelta !== upd.hp
+      : false;
+
+    const creditsDelta = upd.credits !== undefined
+      ? normalizeCreditsDelta(upd.credits, p.credits, hpLooksAbsoluteSnapshot, signalText)
+      : undefined;
 
     // Player vitals
-    const newHp = upd.hp !== undefined ? Math.max(0, Math.min(100, p.hp + upd.hp)) : p.hp;
-    const newCredits = upd.credits !== undefined ? p.credits + upd.credits : p.credits;
+    const newHp = hpDelta !== undefined ? Math.max(0, Math.min(100, p.hp + hpDelta)) : p.hp;
+    const newCredits = creditsDelta !== undefined ? Math.max(0, p.credits + creditsDelta) : p.credits;
     const newLocation = upd.location || p.location;
     const newDate = upd.date_advance ? `${p.date.replace(/ \+.*$/, '')} +${upd.date_advance}` : p.date;
 

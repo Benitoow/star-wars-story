@@ -1320,6 +1320,104 @@ function parseToolArguments(rawArgs: string): Record<string, unknown> {
   return parsed ?? {};
 }
 
+type ParsedPseudoToolCall = {
+  name: string;
+  args: Record<string, unknown>;
+};
+
+function parseLooseJsonObject(rawObject: string): Record<string, unknown> | null {
+  const direct = parseJsonSafely(rawObject);
+  if (direct) return direct;
+
+  const normalized = String(rawObject || '')
+    .replace(/([{,]\s*)([A-Za-z_][A-Za-z0-9_]*)(\s*:)/g, '$1"$2"$3')
+    .replace(/,\s*([}\]])/g, '$1');
+
+  return parseJsonSafely(normalized);
+}
+
+function extractPseudoToolCalls(rawText: string): ParsedPseudoToolCall[] {
+  const text = String(rawText || '');
+  const calls: ParsedPseudoToolCall[] = [];
+
+  let cursor = 0;
+  while (cursor < text.length) {
+    const callIndex = text.indexOf('call:', cursor);
+    if (callIndex === -1) break;
+
+    let nameStart = callIndex + 5;
+    while (nameStart < text.length && /\s/.test(text[nameStart])) nameStart += 1;
+
+    let nameEnd = nameStart;
+    while (nameEnd < text.length && /[A-Za-z0-9_]/.test(text[nameEnd])) nameEnd += 1;
+
+    const name = text.slice(nameStart, nameEnd).trim().toLowerCase();
+    if (!name) {
+      cursor = callIndex + 5;
+      continue;
+    }
+
+    while (nameEnd < text.length && /\s/.test(text[nameEnd])) nameEnd += 1;
+    if (text[nameEnd] !== '{') {
+      cursor = nameEnd;
+      continue;
+    }
+
+    const braceStart = nameEnd;
+    let depth = 0;
+    let inString = false;
+    let escaping = false;
+    let braceEnd = -1;
+
+    for (let i = braceStart; i < text.length; i += 1) {
+      const char = text[i];
+
+      if (inString) {
+        if (escaping) {
+          escaping = false;
+          continue;
+        }
+        if (char === '\\') {
+          escaping = true;
+          continue;
+        }
+        if (char === '"') {
+          inString = false;
+        }
+        continue;
+      }
+
+      if (char === '"') {
+        inString = true;
+        continue;
+      }
+
+      if (char === '{') {
+        depth += 1;
+        continue;
+      }
+
+      if (char === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          braceEnd = i;
+          break;
+        }
+      }
+    }
+
+    if (braceEnd === -1) break;
+
+    const rawArgs = text.slice(braceStart, braceEnd + 1);
+    const parsedArgs = parseLooseJsonObject(rawArgs) ?? {};
+    calls.push({ name, args: parsedArgs });
+
+    cursor = braceEnd + 1;
+  }
+
+  return calls;
+}
+
 function draftHasMeaningfulData(draft: AgenticDraft): boolean {
   return Boolean(
     draft.narrative.context ||
@@ -1337,11 +1435,12 @@ function draftHasMeaningfulData(draft: AgenticDraft): boolean {
 }
 
 const UNUSABLE_STORY_OUTPUT_PATTERN = /n'a pas renvoyé de sortie exploitable/i;
+const TOOL_CALL_LEAK_PATTERN = /<tool_call>|(?:^|\s)call:(?:thought_process|set_scene|update_world|update_npc|update_faction|add_memory|offer_choices|finalize_turn)\s*\{/i;
 
 function hasPlayableChapterContent(chapter: StoryChapter): boolean {
   const action = cleanText(chapter.narrative.action, 280);
   if (!action) return false;
-  return !UNUSABLE_STORY_OUTPUT_PATTERN.test(action);
+  return !UNUSABLE_STORY_OUTPUT_PATTERN.test(action) && !TOOL_CALL_LEAK_PATTERN.test(action);
 }
 
 function hasUsableStoryTurnOutput(rawResponse: string, chapter: StoryChapter): boolean {
@@ -1350,6 +1449,7 @@ function hasUsableStoryTurnOutput(rawResponse: string, chapter: StoryChapter): b
   if (hasPlayableChapterContent(chapter)) return true;
   if (!raw) return false;
   if (UNUSABLE_STORY_OUTPUT_PATTERN.test(raw)) return false;
+  if (TOOL_CALL_LEAK_PATTERN.test(raw)) return false;
 
   return chapter.choices.length > 0;
 }
@@ -1510,6 +1610,27 @@ async function generateStoryTurnWithTools(
 
     const toolCalls = Array.isArray(assistantMessage.tool_calls) ? assistantMessage.tool_calls : [];
     if (!toolCalls.length) {
+      const pseudoToolCalls = extractPseudoToolCalls(assistantContent);
+      if (pseudoToolCalls.length) {
+        conversation.push({
+          role: 'assistant',
+          content: assistantMessage.content ?? ''
+        });
+
+        for (const pseudoToolCall of pseudoToolCalls) {
+          totalToolCalls += 1;
+          applyAgenticToolCall(draft, pseudoToolCall.name, pseudoToolCall.args);
+        }
+
+        if (draft.done && draft.choices.length > 0) {
+          break;
+        }
+
+        if (draftHasMeaningfulData(draft)) {
+          continue;
+        }
+      }
+
       if (assistantContent && !draftHasMeaningfulData(draft)) {
         const parsedFromText = parseJsonSafely(assistantContent);
         if (parsedFromText) {
