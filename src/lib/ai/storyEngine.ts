@@ -121,6 +121,7 @@ export interface BackgroundWorldInput {
   worldState?: WorldState;
   memoryFacts: string[];
   recentSummary: string[];
+  recentBackgroundEvents?: Array<{ title: string; summary: string }>;
   turnNumber: number;
 }
 
@@ -170,6 +171,13 @@ function cleanText(value: unknown, maxLength = 2200): string {
     .replace(/[ \t]{2,}/g, ' ')
     .trim();
   return text.slice(0, maxLength);
+}
+
+function normalizeTextForPrompt(value: unknown): string {
+  return cleanText(value, 2000)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
 }
 
 function uniqueStrings(values: unknown, max = 10): string[] {
@@ -230,27 +238,94 @@ function normalizeChoice(choice: unknown): StoryChoice | null {
   };
 }
 
-function defaultChoices(): StoryChoice[] {
-  return [
-    {
-      text: 'Observer la scène discrètement avant de bouger.',
-      attribute: 'stealth',
-      difficulty: 2,
-      faction_impact: {}
-    },
-    {
-      text: `Prendre l'initiative et agir immédiatement.`,
-      attribute: 'combat',
-      difficulty: 3,
-      faction_impact: {}
-    },
-    {
-      text: 'Tenter une approche diplomatique avec les personnes présentes.',
-      attribute: 'diplomacy',
-      difficulty: 2,
-      faction_impact: {}
-    }
+function stableHash(value: string): number {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = ((hash << 5) - hash) + value.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+const FALLBACK_CHOICE_TEMPLATES: Record<StoryAttribute, string[]> = {
+  stealth: [
+    'Contourner les patrouilles discrètement {hint} pour trouver un angle mort.',
+    'Observer les routines ennemies {hint} avant de s\'engager.',
+    'Se fondre dans l\'environnement {hint} pour repérer une ouverture.'
+  ],
+  diplomacy: [
+    'Engager calmement le dialogue {hint} pour obtenir des informations.',
+    'Tenter une négociation mesurée {hint} afin d\'éviter l\'escalade.',
+    'Questionner les personnes présentes {hint} pour clarifier les enjeux.'
+  ],
+  combat: [
+    'Prendre l\'initiative avec une manœuvre offensive contrôlée {hint}.',
+    'Lancer une action rapide pour briser l\'avantage adverse {hint}.',
+    'Forcer le passage par une percée tactique {hint}.'
+  ],
+  tech: [
+    'Exploiter la technologie locale {hint} pour obtenir un avantage tactique.',
+    'Pirater les systèmes disponibles {hint} pour brouiller la surveillance.',
+    'Analyser les signaux et verrouillages {hint} pour créer une faille.'
+  ],
+  force: [
+    'S\'ancrer dans la Force {hint} pour anticiper le danger immédiat.',
+    'Utiliser la perception de la Force {hint} pour choisir la meilleure fenêtre.',
+    'Canaliser la Force {hint} afin de renverser le rapport de force.'
+  ],
+  survival: [
+    'Se repositionner prudemment {hint} pour préserver santé et ressources.',
+    'Sécuriser une route de repli {hint} avant toute prise de risque.',
+    'Stabiliser la situation {hint} puis préparer une action plus sûre.'
+  ]
+};
+
+function inferFallbackChoiceHint(seedText: string): string {
+  const text = normalizeTextForPrompt(seedText);
+  if (/(hangar|dock|quai|spatioport|vaisseau|croiseur)/.test(text)) return 'dans les zones d\'arrimage';
+  if (/(cantina|bar|taverne|club|salle commune)/.test(text)) return 'au milieu de la foule';
+  if (/(base|poste|avant-poste|bunker|forteresse)/.test(text)) return 'dans le périmètre sécurisé';
+  if (/(desert|dune|tempete|jungle|foret|marais|glace|neige)/.test(text)) return 'sur ce terrain hostile';
+  if (/(secteur|blocus|verrouillage|patrouille|checkpoint)/.test(text)) return 'dans ce secteur sous tension';
+  return 'dans la zone actuelle';
+}
+
+function chooseFallbackThirdAttribute(seedText: string, sectionType: string): StoryAttribute {
+  const text = normalizeTextForPrompt(`${seedText} ${sectionType}`);
+  if (/(force|jedi|sith|kyber|holocron)/.test(text)) return 'force';
+  if (/(terminal|console|droid|pirat|reseau|système|systeme|chiffre|code)/.test(text)) return 'tech';
+  if (/(action|confrontation|tension|combat|assaut|embuscade|blaster|duel|tir)/.test(text)) return 'combat';
+  return 'survival';
+}
+
+function fallbackDifficulty(seed: number, offset: number): number {
+  return Math.max(1, Math.min(5, 2 + ((seed + offset) % 3)));
+}
+
+function defaultChoices(seedText = '', turnNumber = 1, sectionType = ''): StoryChoice[] {
+  const normalizedSeed = cleanText(`${seedText}|${sectionType}|${turnNumber}`, 1200);
+  const seed = stableHash(normalizedSeed || String(turnNumber));
+  const hint = inferFallbackChoiceHint(seedText);
+
+  const attributes: StoryAttribute[] = [
+    'stealth',
+    'diplomacy',
+    chooseFallbackThirdAttribute(seedText, sectionType)
   ];
+
+  const generated = attributes.map((attribute, index) => {
+    const templates = FALLBACK_CHOICE_TEMPLATES[attribute];
+    const template = templates[(seed + turnNumber + index) % templates.length];
+
+    return {
+      text: cleanText(template.replace('{hint}', hint), 220),
+      attribute,
+      difficulty: fallbackDifficulty(seed, index),
+      faction_impact: {}
+    } satisfies StoryChoice;
+  });
+
+  return dedupeChoices(generated);
 }
 
 function defaultMemoryUpdates(): StoryMemoryUpdates {
@@ -478,7 +553,7 @@ function fallbackChapter(rawText: string, turnNumber: number): StoryChapter {
     chapter_number: turnNumber,
     section_type: 'action',
     narrative: defaultNarrativeFromRaw(rawText || `Le modèle n'a pas renvoyé de JSON exploitable.`),
-    choices: defaultChoices(),
+    choices: defaultChoices(rawText, turnNumber, 'action'),
     memory_updates: defaultMemoryUpdates(),
     scene_description: 'Cinematic Star Wars scene with dramatic lighting and dynamic action',
     user_edits_applied: null
@@ -492,6 +567,7 @@ export function parseStoryResponse(rawText: string, turnNumber: number): StoryCh
   const chapterNumberRaw = Number(parsed.chapter_number);
   const chapterNumber = Number.isFinite(chapterNumberRaw) ? chapterNumberRaw : turnNumber;
   const chapterTitle = cleanText(parsed.chapter_title, 80) || (chapterNumber <= 1 ? 'Prologue' : `Tour ${chapterNumber}`);
+  const sectionType = cleanText(parsed.section_type, 40) || 'action';
 
   const narrative = coerceNarrative(parsed.narrative);
   if (!narrative.action) {
@@ -499,12 +575,19 @@ export function parseStoryResponse(rawText: string, turnNumber: number): StoryCh
   }
 
   const choices = extractChoices(parsed.choices);
-  const safeChoices = choices.length ? choices : defaultChoices();
+  const fallbackChoiceSeed = [
+    chapterTitle,
+    narrative.context,
+    narrative.action,
+    narrative.dialogue,
+    narrative.reflection
+  ].join('\n');
+  const safeChoices = choices.length ? choices : defaultChoices(fallbackChoiceSeed, chapterNumber, sectionType);
 
   return {
     chapter_title: chapterTitle,
     chapter_number: chapterNumber,
-    section_type: cleanText(parsed.section_type, 40) || 'action',
+    section_type: sectionType,
     narrative,
     choices: safeChoices,
     memory_updates: coerceMemoryUpdates(parsed.memory_updates),
@@ -691,10 +774,21 @@ export function buildContinuePrompt(
   turnNumber: number,
   recentSummary: string[],
   promptMode: StoryPromptMode = 'json',
-  recentSectionTypes: string[] = []
+  recentSectionTypes: string[] = [],
+  recentChoiceTexts: string[] = []
 ): string {
   const history = recentSummary.length
     ? `\nRésumé récent:\n${recentSummary.map(item => `- ${item}`).join('\n')}`
+    : '';
+
+  const recentChoices = Array.from(new Set(
+    recentChoiceTexts
+      .map(item => cleanText(item, 180))
+      .filter(Boolean)
+  )).slice(-8);
+
+  const recentChoicesBlock = recentChoices.length
+    ? `\nChoix récemment proposés (évite les reformulations identiques):\n${recentChoices.map(choice => `- ${choice}`).join('\n')}`
     : '';
 
   // Count consecutive action-heavy chapters from the end
@@ -722,11 +816,12 @@ export function buildContinuePrompt(
     ? `\nMode agentique actif: enchaîne les outils nécessaires avant de finaliser le tour.`
     : '';
 
-  return `Tour ${turnNumber}. Le joueur agit: "${cleanText(actionText, 320)}".${history}${pacingDirective}
+  return `Tour ${turnNumber}. Le joueur agit: "${cleanText(actionText, 320)}".${history}${recentChoicesBlock}${pacingDirective}
 
 En tant que MJ, décide de ce qui se passe vraiment — pas forcément ce que le joueur espère.
 Mets à jour state_update avec toutes les conséquences réelles.
-Propose 3 à 4 choix distincts — au moins un doit ouvrir sur de l'interaction sociale, de la récupération ou de l'exploration si la situation le permet.${modeHint}`;
+Propose 3 à 4 choix distincts — au moins un doit ouvrir sur de l'interaction sociale, de la récupération ou de l'exploration si la situation le permet.
+N'utilise pas mot pour mot les mêmes choix que les deux derniers tours.${modeHint}`;
 }
 
 function getProviderDisplayName(providerId: string): string {
@@ -1325,6 +1420,20 @@ type ParsedPseudoToolCall = {
   args: Record<string, unknown>;
 };
 
+const SUPPORTED_AGENTIC_TOOL_NAMES = new Set<string>([
+  'set_scene',
+  'update_world',
+  'update_npc',
+  'update_faction',
+  'add_memory',
+  'offer_choices',
+  'finalize_turn'
+]);
+
+function isSupportedAgenticToolName(name: string | undefined): boolean {
+  return SUPPORTED_AGENTIC_TOOL_NAMES.has(String(name || '').trim().toLowerCase());
+}
+
 function parseLooseJsonObject(rawObject: string): Record<string, unknown> | null {
   const direct = parseJsonSafely(rawObject);
   if (direct) return direct;
@@ -1435,7 +1544,7 @@ function draftHasMeaningfulData(draft: AgenticDraft): boolean {
 }
 
 const UNUSABLE_STORY_OUTPUT_PATTERN = /n'a pas renvoyé de sortie exploitable/i;
-const TOOL_CALL_LEAK_PATTERN = /<tool_call>|(?:^|\s)call:(?:thought_process|set_scene|update_world|update_npc|update_faction|add_memory|offer_choices|finalize_turn)\s*\{/i;
+const TOOL_CALL_LEAK_PATTERN = /<\|?tool_call\|?>|tool_call|(?:^|\s)call:[a-z_]+\s*\{/i;
 
 function hasPlayableChapterContent(chapter: StoryChapter): boolean {
   const action = cleanText(chapter.narrative.action, 280);
@@ -1609,8 +1718,11 @@ async function generateStoryTurnWithTools(
     }
 
     const toolCalls = Array.isArray(assistantMessage.tool_calls) ? assistantMessage.tool_calls : [];
-    if (!toolCalls.length) {
-      const pseudoToolCalls = extractPseudoToolCalls(assistantContent);
+    const hasSupportedStructuredToolCall = toolCalls.some(toolCall => isSupportedAgenticToolName(toolCall.function?.name));
+
+    if (!toolCalls.length || !hasSupportedStructuredToolCall) {
+      const pseudoToolCalls = extractPseudoToolCalls(assistantContent)
+        .filter(pseudoToolCall => isSupportedAgenticToolName(pseudoToolCall.name));
       if (pseudoToolCalls.length) {
         conversation.push({
           role: 'assistant',
@@ -1630,6 +1742,13 @@ async function generateStoryTurnWithTools(
           continue;
         }
       }
+
+      if (toolCalls.length && !hasSupportedStructuredToolCall) {
+        continue;
+      }
+    }
+
+    if (!toolCalls.length) {
 
       if (assistantContent && !draftHasMeaningfulData(draft)) {
         const parsedFromText = parseJsonSafely(assistantContent);
@@ -1738,6 +1857,13 @@ function buildBackgroundWorldSystemPrompt(
     ? `\nMÉMOIRE LONG TERME:\n${input.memoryFacts.slice(-20).map(item => `- ${cleanText(item, 200)}`).join('\n')}`
     : '';
 
+  const recentBackgroundEventsBlock = input.recentBackgroundEvents?.length
+    ? `\nDERNIERS ÉVÉNEMENTS HORS-ÉCRAN (ne pas répéter à l'identique):\n${input.recentBackgroundEvents
+      .slice(0, 6)
+      .map(event => `- ${cleanText(event.title, 90)} :: ${cleanText(event.summary, 220)}`)
+      .join('\n')}`
+    : '';
+
   let worldBlock = '\nÉTAT MONDE: indisponible';
   if (input.worldState) {
     const p = input.worldState.player;
@@ -1755,7 +1881,7 @@ function buildBackgroundWorldSystemPrompt(
     worldBlock = `\nÉTAT MONDE:\n- HP=${p.hp}/100 | Crédits=${p.credits}\n- Lieu=${p.location} | Date=${p.date}\n- PNJs=${npcs || 'aucun'}\n- Factions=${topFactions || 'neutre'}`;
   }
 
-  const base = `Tu es le Simulateur Galactique hors-écran d'une campagne Star Wars.\nTu résous uniquement les dynamiques de fond entre les tours du joueur.\n\nRÈGLES:\n- La plupart du temps, reste discret (pas d'événement majeur à chaque tour).\n- Déclenche un événement visible seulement s'il apporte une tension utile.\n- Respecte la continuité du monde et des factions.\n- N'écris pas une scène complète du joueur.\n- Si aucun événement utile: inject_now=false, impacts minimes ou nuls.\n- Si événement: reste concis, concret, exploitable (state_update + mémoire).\n\nSETUP:\n- Protagoniste: ${protagonist}\n- Ère: ${setup.era} | Faction: ${setup.faction} | Rôle: ${setup.role}\n- Prémisse: ${setup.premise || 'Libre'}${worldBlock}${recentBlock}${memoryBlock}`;
+  const base = `Tu es le Simulateur Galactique hors-écran d'une campagne Star Wars.\nTu résous uniquement les dynamiques de fond entre les tours du joueur.\n\nRÈGLES:\n- La plupart du temps, reste discret (pas d'événement majeur à chaque tour).\n- Déclenche un événement visible seulement s'il apporte une tension utile.\n- Respecte la continuité du monde et des factions.\n- N'écris pas une scène complète du joueur.\n- Si aucun événement utile: inject_now=false, impacts minimes ou nuls.\n- Si événement: reste concis, concret, exploitable (state_update + mémoire).\n- Interdiction de recycler quasiment à l'identique un événement hors-écran récent (même idée, même titre, même résumé).\n\nSETUP:\n- Protagoniste: ${protagonist}\n- Ère: ${setup.era} | Faction: ${setup.faction} | Rôle: ${setup.role}\n- Prémisse: ${setup.premise || 'Libre'}${worldBlock}${recentBlock}${memoryBlock}${recentBackgroundEventsBlock}`;
 
   const jsonContract = `Réponds UNIQUEMENT en JSON valide:\n{\n  "title": "Titre court",\n  "summary_public": "Message bref affichable au joueur",\n  "summary_private": "Contexte MJ optionnel",\n  "inject_now": false,\n  "prompt_hook": "Consigne courte pour influencer le prochain tour",\n  "memory_updates": {\n    "relations": [],\n    "places": [],\n    "injuries": [],\n    "resources": [],\n    "notes": []\n  },\n  "state_update": {\n    "hp": 0,\n    "credits": 0,\n    "location": "",\n    "date_advance": "",\n    "npcs": [],\n    "factions": {},\n    "injuries_new": [],\n    "injuries_resolved": [],\n    "inventory_gained": [],\n    "inventory_lost": [],\n    "gm_note": ""\n  }\n}`;
 

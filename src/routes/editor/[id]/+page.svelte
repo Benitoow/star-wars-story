@@ -156,6 +156,89 @@
   const DIALOGUE_CHOICE_REGEX = /(parler|discuter|dialogue|dialoguer|interroger|questionner|négocier|convaincre|échanger|demander|écouter|sonder)/i;
   const TIME_PASS_CHOICE_REGEX = /(attendre|patienter|passer le temps|se reposer|méditer|observer|planifier|faire le point|préparer|laisser avancer|laisser filer|récupérer)/i;
   const ACTION_HEAVY_CHOICE_REGEX = /(attaquer|assaut|fusillade|duel|foncer|abattre|détruire|exploser|charge|combat|sabre|blaster|éliminer)/i;
+  const TOOL_CALL_LEAK_TEXT_REGEX = /<\|?tool_call\|?>|tool_call|(?:^|\s)call:[a-z_]+\s*\{/i;
+
+  function sanitizeNarrativeLeak(text: string): string {
+    if (!TOOL_CALL_LEAK_TEXT_REGEX.test(text || '')) return text;
+    return `Le système IA a renvoyé une sortie technique non lisible pour ce passage. L'histoire continue normalement via les choix ci-dessous.`;
+  }
+
+  function sanitizeChapterForDisplay(chapter: StoryChapter | null): StoryChapter | null {
+    if (!chapter) return null;
+
+    return {
+      ...chapter,
+      narrative: {
+        ...chapter.narrative,
+        action: sanitizeNarrativeLeak(chapter.narrative.action),
+        context: sanitizeNarrativeLeak(chapter.narrative.context),
+        dialogue: sanitizeNarrativeLeak(chapter.narrative.dialogue),
+        reflection: sanitizeNarrativeLeak(chapter.narrative.reflection)
+      }
+    };
+  }
+
+  function sanitizeChapterList(chapters: StoryChapter[]): StoryChapter[] {
+    return chapters.map(chapter => sanitizeChapterForDisplay(chapter) as StoryChapter);
+  }
+
+  function normalizeEventText(value: string): string {
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function eventTokenSet(value: string): Set<string> {
+    return new Set(
+      normalizeEventText(value)
+        .split(' ')
+        .map(token => token.trim())
+        .filter(token => token.length >= 4)
+    );
+  }
+
+  function tokenOverlapRatio(left: string, right: string): number {
+    const a = eventTokenSet(left);
+    const b = eventTokenSet(right);
+    if (!a.size || !b.size) return 0;
+
+    let common = 0;
+    for (const token of a) {
+      if (b.has(token)) common += 1;
+    }
+
+    return common / Math.max(a.size, b.size);
+  }
+
+  function isNearDuplicateBackgroundEvent(event: BackgroundWorldEvent): boolean {
+    const incomingTitle = normalizeEventText(event.title);
+    const incomingSummary = normalizeEventText(event.summary_public || event.prompt_hook || '');
+    if (!incomingTitle && !incomingSummary) return false;
+
+    return backgroundEvents.slice(0, 6).some(previous => {
+      const previousTitle = normalizeEventText(previous.title);
+      const previousSummary = normalizeEventText(previous.summary);
+
+      const titleMatch = Boolean(
+        incomingTitle &&
+        previousTitle &&
+        (incomingTitle === previousTitle || incomingTitle.includes(previousTitle) || previousTitle.includes(incomingTitle))
+      );
+
+      const summaryMatch = Boolean(
+        incomingSummary &&
+        previousSummary &&
+        (incomingSummary === previousSummary || incomingSummary.includes(previousSummary) || previousSummary.includes(incomingSummary))
+      );
+
+      const overlap = tokenOverlapRatio(incomingSummary || incomingTitle, previousSummary || previousTitle);
+      return (titleMatch && (summaryMatch || overlap >= 0.72)) || (summaryMatch && overlap >= 0.72) || overlap >= 0.85;
+    });
+  }
 
   function normalizeSearchText(value: string): string {
     return String(value || '')
@@ -792,6 +875,9 @@
     if (!supportsAgenticToolCalling(providerConfig.providerId)) return;
 
     const recentSummary = chapterHistory.slice(-4).map(chapter => summarizeChapterForPrompt(chapter));
+    const recentBackgroundEvents = backgroundEvents
+      .slice(0, 6)
+      .map(event => ({ title: event.title, summary: event.summary }));
 
     try {
       const generation = await generateBackgroundWorldEvent(
@@ -800,6 +886,7 @@
           worldState,
           memoryFacts: memoryLog.slice(-25),
           recentSummary,
+          recentBackgroundEvents,
           turnNumber: turn
         },
         providerConfig
@@ -807,6 +894,7 @@
 
       const event = generation.event;
       if (!event || !event.inject_now) return;
+      if (isNearDuplicateBackgroundEvent(event)) return;
 
       if (event.state_update) {
         applyStateUpdate(backgroundEventToSyntheticChapter(event, turn));
@@ -906,7 +994,7 @@
     ]);
 
     const generation = await generateStoryTurn(requestMessages, providerConfig, turn);
-    const chapter = enforceTransitionChoiceQuality(generation.chapter);
+    const chapter = sanitizeChapterForDisplay(enforceTransitionChoiceQuality(generation.chapter)) as StoryChapter;
     const assistantContent = generation.rawResponse || JSON.stringify(chapter);
 
     aiMessages = trimMessages([
@@ -981,7 +1069,18 @@
       const nextTurn = turnNumber + 1;
       const recentSummary = chapterHistory.slice(-3).map(chapter => summarizeChapterForPrompt(chapter));
       const recentSectionTypes = chapterHistory.slice(-5).map(c => c.section_type).filter(Boolean);
-      const prompt = buildContinuePrompt(action, nextTurn, recentSummary, resolvePromptMode(), recentSectionTypes);
+      const recentChoiceTexts = chapterHistory
+        .slice(-2)
+        .flatMap(chapter => chapter.choices.map(choice => choice.text));
+
+      const prompt = buildContinuePrompt(
+        action,
+        nextTurn,
+        recentSummary,
+        resolvePromptMode(),
+        recentSectionTypes,
+        recentChoiceTexts
+      );
 
       const chapter = await requestStoryChapter(prompt, setup, nextTurn);
 
@@ -1211,8 +1310,8 @@
       if (session) {
         turnNumber = session.turnNumber;
         selectedTrame = session.selectedTrame;
-        currentChapter = session.currentChapter;
-        chapterHistory = session.chapterHistory;
+        currentChapter = sanitizeChapterForDisplay(session.currentChapter);
+        chapterHistory = sanitizeChapterList(session.chapterHistory);
         actionHistory = session.actionHistory;
         aiMessages = session.aiMessages;
         memoryLog = session.memoryLog;
