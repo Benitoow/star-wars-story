@@ -1,5 +1,81 @@
 # Changelog
 
+## v2.0.0 — 2026-04-18
+
+### Moteur narratif agentique (refonte majeure)
+
+- **Tool calling natif OpenRouter** — l'IA appelle des fonctions réelles au lieu de générer un JSON monolithique : `set_scene`, `update_world`, `update_npc`, `update_faction`, `add_memory`, `offer_choices`, `finalize_turn`
+- **Boucle agentique multi-étapes** (jusqu'à 8 steps/tour) — l'IA raisonne puis agit, les outils s'enchaînent dynamiquement
+- **Agent de simulation galactique** — second agent de fond qui simule les événements du monde (batailles, élections, crises) pendant que le joueur joue
+- **Fallback JSON structuré** automatique pour les providers sans tool calling
+
+### Living World State
+
+- **`PlayerState`** — HP (0–100), crédits, lieu, date narrative, blessures actives (`active`/`healing`/`critical`), inventaire avec quantités
+- **`NpcRelation`** — affinité −100..100, statut (allié/neutre/hostile/mort/inconnu), faction, note, `last_seen`
+- **`FactionStandings`** — réputation −100..100 pour Empire, Alliance, Jedi, Sith, Hutt Cartel, Mandalorien, Neutre
+- **`ChronologyEntry`** — journal horodaté des événements avec tag de type (combat, dialogue, découverte…)
+- **`StateUpdate` delta-based** — deltas HP/crédits, upsert NPCs par nom, clamp factions, résolution/ajout de blessures, fusion inventaire, appends chronologie
+
+### GameHUD — interface monde vivant
+
+- Nouveau composant `GameHUD.svelte` — panneau flottant collapsible en jeu (coin supérieur droit)
+- Barre HP colorée (vert → jaune → rouge), crédits, lieu, date narrative
+- Liste des blessures actives avec icônes de sévérité
+- NPCs trackés avec dot d'affinité coloré + score
+- Barres mini factions avec label et valeur
+- Design dark theme, bordure dorée, backdrop blur
+
+### Conséquences mécaniques sur les choix
+
+- HP < 20 → choix `combat` / `force` marqués ⚠ + `diffBonus` +2
+- Blessure grave active → choix `combat` / `stealth` marqués ⚠ + `diffBonus` +1
+- Crédits ≤ 0 + mots-clés paiement → choix désactivés (bouton grisé)
+
+### Rythme narratif intelligent
+
+- Enum `section_type` (8 types) : `action`, `dialogue`, `exploration`, `tension`, `revelation`, `repos`, `interlude`, `confrontation`
+- Suivi des 5 derniers `section_type` dans `chapterHistory`
+- 2+ scènes intenses consécutives → directive GM : "ce tour DOIT être repos/dialogue/interlude"
+- 3+ scènes intenses consécutives → directive renforcée avec interdiction explicite d'action/combat
+
+### OpenRouter — provider n°1
+
+- OpenRouter promu **provider par défaut et recommandé**
+- Modèle par défaut : `google/gemma-3-27b-it:free` (gratuit, aucun crédit requis)
+- Liste modèles étendue : free tier d'abord (Gemma, Llama, Mistral, Qwen), puis payants
+- Badges mis à jour : `⚡ Agentique`, `Tool calling natif`, `400+ modèles`
+- Détection `supportsAgenticToolCalling()` pour activer/désactiver la boucle agentique
+
+### Model chip dans la topbar de jeu
+
+- Chip discret affichant le modèle actif pendant le jeu (nom court sans préfixe provider)
+- Dot vert pulsant si mode agentique actif (`⚡`)
+- Tooltip avec statut complet du provider
+
+### Favicons & PWA icons
+
+- Nouvelle source `fav.jpg` → génération de toutes les tailles PWA via Sharp
+- `favicon.ico` multi-size (16 / 32 / 48 px) assemblé manuellement
+- `favicon-16.png`, `favicon-32.png`, `favicon-48.png`
+- `icon-192.png`, `icon-512.png`, `icon-512-maskable.png` (PWA installable)
+- `apple-touch-icon.png` 180×180 (iOS)
+- `manifest.json` mis à jour avec l'array d'icônes complet + version 2.0.0
+
+### Corrections de bugs
+
+- **Réactivité du nombre de modèles** dans Settings — `getTextProviderModels()` n'était pas réactif dans Svelte ; remplacé par des déclarations `$:` dérivées
+- **Guillemets typographiques** (U+2018/U+2019) introduits par les éditions IA cassaient le parsing TypeScript/Svelte — corrigés, chaînes françaises converties en template literals
+- **Corbeille** — `loadTrash()` renvoyait toutes les histoires ; filtre `isDeleted === true` ajouté
+- **Modèle par défaut DB** — `textModel` mis à jour vers `google/gemma-3-27b-it:free` dans le schéma Dexie
+
+### Documentation
+
+- `README.md` entièrement réécrit pour v2.0 — sections FR + EN, tableau modèles OpenRouter, arbre architecture, stack technique
+- `CHANGELOG.md` mis à jour
+
+---
+
 ## v1.2.0 — 2026-04-17
 
 ### Bugfixes & cleanup (SvelteKit app)

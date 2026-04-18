@@ -189,7 +189,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   uiLanguage: 'auto',
   theme: 'dark',
   textProvider: 'openrouter',
-  textModel: 'google/gemma-4-26b-a4b-it',
+  textModel: 'google/gemma-3-27b-it:free',
   textApiKey: '',
   ollamaUrl: 'http://localhost:11434',
   imageProvider: 'none',

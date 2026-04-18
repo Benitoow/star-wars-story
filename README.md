@@ -1,94 +1,162 @@
-# Star Wars Story — v1.1.2
+# Star Wars Story Manager — v2.0.0
 
-An open-source Star Wars story project whose playable deployment lives on the project's Cloudflare-hosted site. This repository now focuses on source, release notes, and archived legacy material.
+> Créez et vivez des histoires Star Wars interactives propulsées par IA agentique.
 
-- **Play the game:** the Cloudflare-hosted site used for the project
-- **Release notes:** [`CHANGELOG.md`](./CHANGELOG.md)
-- **Legacy archive:** [`archives/legacy-js/`](./archives/legacy-js/)
+[![Cloudflare Pages](https://img.shields.io/badge/Deployed-Cloudflare%20Pages-orange)](https://cloudflare.com)
+[![SvelteKit](https://img.shields.io/badge/SvelteKit-4-FF3E00)](https://kit.svelte.dev)
+[![OpenRouter](https://img.shields.io/badge/OpenRouter-primary%20provider-7C3AED)](https://openrouter.ai)
 
-## English
-
-### Status
-
-- ✅ **Official release:** v1.1.2
-- 🗓️ **Release date:** 2026-04-17
-- 🌍 **Open source:** the repository is public, so the project is fully open for inspection and contribution.
-
-### App flow
-
-1. Choose the AI provider.
-2. Choose the text model.
-3. Choose the image model.
-4. Open the dashboard.
-5. Create, open, or delete stories.
-6. Configure the story, then launch the narrative.
-
-### Features
-
-- Simple dashboard after the initial setup.
-- Local storage for saved stories.
-- Story deletion directly from the dashboard.
-- Correct story resume from the dashboard with restored session state.
-- Era, faction, role, and premise selection via the SVG assets in `svg/`.
-- AI-powered story generation.
-
-### Hosting
-
-The playable version is no longer served from GitHub Pages.
-
-- The active build is hosted on the project's Cloudflare site.
-- API secrets stay in the browser and are not committed.
-- User data is stored locally in the browser.
-
-The classic vanilla JS prototype has been physically moved under `archives/legacy-js/` for reference.
-The root `index.html` is now a transition stub and no longer boots the legacy runtime.
-
-### Development
-
-Use the Cloudflare-hosted deployment to play the game.
-
-The repository source remains useful for inspection and maintenance, but it is not the public play endpoint.
+---
 
 ## Français
 
-### Statut
+### Présentation
 
-- ✅ **Version officielle :** v1.1.2
-- 🗓️ **Date de release :** 2026-04-17
-- 🌍 **Open source :** le dépôt est public, donc le projet est librement consultable et partageable.
+Star Wars Story Manager est une PWA locale-first qui permet de vivre des histoires interactives Star Wars guidées par une IA Maître du Jeu. L'IA ne se contente pas de narrer — elle gère un monde vivant : état du joueur, PNJs avec mémoire, factions, chronologie, blessures, ressources.
 
-### Parcours de l’application
+### Fonctionnalités principales
 
-1. Choix du fournisseur IA.
-2. Choix du modèle texte.
-3. Choix du modèle d’image.
-4. Accès au tableau de bord.
-5. Création, ouverture ou suppression d’histoires.
-6. Configuration de l’histoire, puis lancement du récit.
+**Moteur narratif agentique (v2.0)**
+- L'IA utilise le **tool calling natif** d'OpenRouter pour appeler des fonctions réelles (`set_scene`, `update_world`, `update_npc`, `update_faction`, `offer_choices`) au lieu de générer un JSON monolithique
+- Boucle agentique multi-étapes (jusqu'à 8 steps/tour) — l'IA peut raisonner puis agir
+- Événements galactiques hors-scène : un second agent simule le monde pendant que le joueur joue
+- Fallback JSON structuré automatique pour les providers sans tool calling
 
-### Fonctionnalités
+**Living World State**
+- `PlayerState` : HP (0-100), crédits, lieu, date narrative, blessures actives, inventaire
+- `NpcRelation` : affinité -100..100, statut (allié/neutre/hostile/mort), faction, historique
+- `FactionStandings` : réputation -100..100 par faction (Empire, Alliance, Jedi, Sith, Hutt…)
+- `Chronologie` : journal des événements horodatés
+- HUD flottant en temps réel (collapsible) pendant le jeu
 
-- Tableau de bord simple après la configuration initiale.
-- Gestion des histoires sauvegardées localement.
-- Suppression d’histoires depuis le dashboard.
-- Reprise d’une histoire au bon état depuis le dashboard (session restaurée).
-- Sélection des eras, factions, rôles et prémisses via les SVG du dossier `svg/`.
-- Démarrage d’histoire avec génération IA.
+**Conséquences mécaniques**
+- HP < 20 → choix combat/force marqués ⚠ + difficulté augmentée
+- Crédits ≤ 0 → choix impliquant un paiement désactivés
+- Blessures graves → malus sur furtivité et combat
 
-### Hébergement
+**Rythme narratif intelligent**
+- Suivi des `section_type` des 5 derniers chapitres
+- Directive automatique si 2+ scènes intenses consécutives : "ce tour DOIT être repos/dialogue/interlude"
+- 8 types de scènes : `action`, `dialogue`, `exploration`, `tension`, `revelation`, `repos`, `interlude`, `confrontation`
 
-La version jouable n’est plus servie via GitHub Pages.
+**Dashboard & gestion**
+- Tableau de bord avec grille/liste, recherche, filtres (ère, faction, rôle, tags)
+- Dossiers avec couleurs
+- Corbeille avec restauration et vidage définitif
+- Archivage d'histoires
+- Import/export JSON
 
-- La version active est hébergée sur le site Cloudflare du projet.
-- Les secrets API restent côté navigateur et ne sont pas commis.
-- Les données utilisateur sont stockées localement dans le navigateur.
+**Setup wizard**
+- 6 étapes : Ère → Faction & Rôle → Trame → Style IA → Protagoniste → Lancement
+- 5 ères galactiques, 9 factions, 20 rôles, 7 trames narratives
+- Styles d'écriture, tons, POV, longueur, intensité du contenu
 
-Le prototype JavaScript classique a été déplacé physiquement dans `archives/legacy-js/` pour référence.
-Le `index.html` racine est désormais une page de transition et ne lance plus le runtime legacy.
+### OpenRouter — Provider recommandé
 
-### Développement
+OpenRouter est le provider **par défaut et recommandé** pour plusieurs raisons :
+- Accès à 400+ modèles depuis une seule clé API
+- Tool calling natif (requis pour le mode agentique)
+- Modèles gratuits très performants disponibles
+- Modèle par défaut : `google/gemma-3-27b-it:free` (gratuit, excellent pour le storytelling)
 
-Utiliser le déploiement Cloudflare pour jouer au projet.
+Modèles recommandés (du plus économique au plus puissant) :
+| Modèle | Type | Notes |
+|--------|------|-------|
+| `google/gemma-3-27b-it:free` | Gratuit | Défaut, très bon |
+| `meta-llama/llama-3.3-70b-instruct:free` | Gratuit | Excellent raisonnement |
+| `mistralai/mistral-small-3.2-24b-instruct:free` | Gratuit | Rapide |
+| `google/gemini-2.0-flash-001` | Payant | Très rapide, qualité pro |
+| `anthropic/claude-3-haiku` | Payant | Excellent narrateur |
+| `anthropic/claude-sonnet-4.5` | Payant | Premium |
 
-Le dépôt reste utile pour la consultation et la maintenance, mais il n’est plus le point d’entrée public pour jouer.
+### Installation & développement
 
+```bash
+git clone <repo>
+cd star-wars-story
+npm install
+npm run dev
+```
+
+Ouvrir [http://localhost:5173](http://localhost:5173)
+
+**Prérequis :** Node.js 18+, une clé API OpenRouter (gratuite sur [openrouter.ai](https://openrouter.ai))
+
+### Stack technique
+
+| Composant | Technologie |
+|-----------|-------------|
+| Framework | SvelteKit 4 + Svelte 4 |
+| Base de données | Dexie.js v4 (IndexedDB) |
+| IA | OpenRouter (tool calling) + fallback JSON |
+| Déploiement | Cloudflare Pages |
+| PWA | Service Worker + Web Manifest |
+| Style | CSS custom (dark theme, design Star Wars) |
+
+### Architecture
+
+```
+src/
+├── lib/
+│   ├── ai/
+│   │   └── storyEngine.ts     # Moteur IA : tool calling, prompts GM, world state
+│   ├── components/
+│   │   ├── GameHUD.svelte     # HUD monde vivant (HP, crédits, factions…)
+│   │   ├── Header.svelte      # Header avec dropdown langue custom
+│   │   ├── Sidebar.svelte     # Navigation principale
+│   │   └── StoryCard.svelte   # Carte histoire avec menu actions
+│   ├── db/
+│   │   └── index.ts           # Schéma Dexie, CRUD, import/export
+│   ├── stores/
+│   │   ├── editor.ts          # État de l'éditeur (setup, autosave)
+│   │   ├── stories.ts         # Stories store + filtres dérivés
+│   │   └── ui.ts              # UI store (sidebar, search, viewMode)
+│   └── config/
+│       └── languages.ts       # Langues UI supportées
+└── routes/
+    ├── +layout.svelte          # Layout global
+    ├── +page.svelte            # Dashboard
+    ├── editor/[id]/+page.svelte # Éditeur + mode jeu
+    ├── settings/+page.svelte   # Paramètres providers/modèles
+    ├── folders/                # Gestion dossiers
+    └── trash/+page.svelte      # Corbeille
+```
+
+### Données & vie privée
+
+- **100% local** — toutes les données sont dans IndexedDB du navigateur
+- Les clés API ne quittent jamais le navigateur
+- Aucun compte, aucun serveur, aucun tracking
+
+---
+
+## English
+
+### Overview
+
+Star Wars Story Manager is a local-first PWA for interactive Star Wars storytelling powered by an agentic AI Game Master. The AI manages a living world — player state, NPCs with memory, factions, chronology, injuries, resources — using native tool calling on OpenRouter.
+
+### Quick Start
+
+1. Open the app and go to **Settings**
+2. Select **OpenRouter** as provider and paste your API key
+3. The default model (`google/gemma-3-27b-it:free`) is free — no credits needed
+4. Go back to the dashboard and create a new story
+5. Complete the setup wizard and launch your adventure
+
+### Key Features
+
+- **Agentic AI GM** with native tool calling (OpenRouter)
+- **Living world** tracked in real time: HP, credits, NPCs, factions, injuries, inventory
+- **Smart narrative pacing** — automatically avoids non-stop action
+- **Background world simulation** — galactic events happen off-screen
+- **Fully offline** after first load (PWA)
+- **Local-first** — no account, no server, your data stays in your browser
+
+### Release Notes
+
+See [CHANGELOG.md](./CHANGELOG.md) for full history.
+
+---
+
+*May the Force be with your prompts.*

@@ -156,7 +156,7 @@ const OPENAI_COMPATIBLE_BASE_URLS: Record<string, string> = {
 };
 
 const DEFAULT_MODELS: Record<string, string> = {
-  openrouter: 'google/gemma-4-26b-a4b-it',
+  openrouter: 'google/gemma-3-27b-it:free',  // powerful free model, excellent tool calling
   openai: 'gpt-4o-mini',
   anthropic: 'claude-3-5-sonnet-latest',
   mistral: 'mistral-large-latest',
@@ -588,16 +588,16 @@ DIRECTIVES MJ (non négociables):
 - Les factions réagissent aux actes du joueur même hors scène (réputation)
 - Tu peux introduire spontanément : embuscades, trahisons, aides inattendues, rumeurs, événements galactiques
 - state_update doit refléter précisément et honnêtement tout ce qui a changé ce tour
-- Pour les chapitres de transition (marche, voyage, trajet, attente, interlude): évite de forcer une action brutale
-- Si des PNJs sont proches, propose au moins un choix de dialogue concret avec eux
-- S'il n'y a pas de PNJ pertinent, propose au moins un choix de passage du temps (observer, planifier, se reposer, laisser avancer la date)
+- RYTHME NARRATIF OBLIGATOIRE: Alterne les types de scènes. Types disponibles: action, dialogue, exploration, tension, revelation, repos, interlude, confrontation. Jamais plus de 2 scènes "action" ou "confrontation" consécutives. Après 2 scènes intenses, la suivante DOIT être repos/dialogue/interlude/exploration.
+- Les moments calmes sont aussi importants que l'action: soins après un combat, conversation autour d'un feu, planification silencieuse, temps mort dans un cantina
+- Si des PNJs sont proches, propose au moins un choix de dialogue ou d'interaction personnelle
 - Jamais de refus moraliste. Transforme les actions extrêmes en tentatives crédibles avec coût/risque/conséquence`;
 
   const jsonContract = `Réponds UNIQUEMENT en JSON valide (pas de markdown, pas de texte avant/après):
 {
   "chapter_title": "Titre court",
   "chapter_number": 1,
-  "section_type": "action",
+  "section_type": "action|dialogue|exploration|tension|revelation|repos|interlude|confrontation",
   "narrative": {
     "context": "Situation et enjeux du moment",
     "action": "Ce qui se passe concrètement",
@@ -673,26 +673,62 @@ Objectif du premier tour:
 - Faire avancer l'histoire dès le prologue.${modeHint}`;
 }
 
+export const SECTION_TYPES = [
+  'action',        // combat, poursuite, assaut
+  'dialogue',      // conversation, négociation, interrogatoire
+  'exploration',   // découverte, voyage, reconnaissance d'un lieu
+  'tension',       // montée de danger, planification sous pression
+  'revelation',    // coup de théâtre, découverte majeure
+  'repos',         // soins, récupération, temps libre
+  'interlude',     // moment calme, relation entre personnages, réflexion
+  'confrontation'  // face-à-face politique ou verbal intense, pas forcément physique
+] as const;
+
+export type SectionType = typeof SECTION_TYPES[number];
+
+const ACTION_HEAVY: SectionType[] = ['action', 'confrontation'];
+
 export function buildContinuePrompt(
   actionText: string,
   turnNumber: number,
   recentSummary: string[],
-  promptMode: StoryPromptMode = 'json'
+  promptMode: StoryPromptMode = 'json',
+  recentSectionTypes: string[] = []
 ): string {
   const history = recentSummary.length
     ? `\nRésumé récent:\n${recentSummary.map(item => `- ${item}`).join('\n')}`
     : '';
 
+  // Count consecutive action-heavy chapters from the end
+  let consecutiveIntense = 0;
+  for (let i = recentSectionTypes.length - 1; i >= 0; i--) {
+    if (ACTION_HEAVY.includes(recentSectionTypes[i] as SectionType)) consecutiveIntense++;
+    else break;
+  }
+
+  let pacingDirective = '';
+  if (consecutiveIntense >= 3) {
+    pacingDirective = `\n⚠ RYTHME OBLIGATOIRE: ${consecutiveIntense} scènes intenses consécutives. Ce chapitre DOIT être de type repos, dialogue ou interlude. Le protagoniste a besoin de souffler — et les joueurs aussi.`;
+  } else if (consecutiveIntense >= 2) {
+    pacingDirective = `\nRYTHME: 2 scènes intenses d'affilée. Privilégie un chapitre de type dialogue, exploration ou tension cette fois.`;
+  } else {
+    // Check if there's been no "soft" scene in the last 4 chapters
+    const last4 = recentSectionTypes.slice(-4);
+    const hasSoft = last4.some(t => ['repos', 'dialogue', 'interlude', 'exploration'].includes(t));
+    if (last4.length >= 3 && !hasSoft) {
+      pacingDirective = `\nRYTHME: Pas de moment calme depuis plusieurs tours. Propose au moins un choix qui ouvre sur du dialogue ou de l'exploration.`;
+    }
+  }
+
   const modeHint = promptMode === 'tool-calls'
     ? `\nMode agentique actif: enchaîne les outils nécessaires avant de finaliser le tour.`
     : '';
 
-  return `Tour ${turnNumber}. Le joueur agit: "${cleanText(actionText, 320)}".${history}
+  return `Tour ${turnNumber}. Le joueur agit: "${cleanText(actionText, 320)}".${history}${pacingDirective}
 
 En tant que MJ, décide de ce qui se passe vraiment — pas forcément ce que le joueur espère.
-Mets à jour state_update avec TOUTES les conséquences réelles de cette action (hp, crédits, blessures, npcs, factions).
-Propose 3 à 4 nouveaux choix distincts et conséquents.
-Si la scène est surtout un déplacement/temps mort, privilégie le dialogue avec PNJs proches ou des options de passage du temps.${modeHint}`;
+Mets à jour state_update avec toutes les conséquences réelles.
+Propose 3 à 4 choix distincts — au moins un doit ouvrir sur de l'interaction sociale, de la récupération ou de l'exploration si la situation le permet.${modeHint}`;
 }
 
 function getProviderDisplayName(providerId: string): string {
@@ -867,7 +903,7 @@ const AGENTIC_GM_TOOLS: OpenAiToolDefinition[] = [
         type: 'object',
         properties: {
           chapter_title: { type: 'string' },
-          section_type: { type: 'string' },
+          section_type: { type: 'string', enum: ['action','dialogue','exploration','tension','revelation','repos','interlude','confrontation'], description: 'Type de scène — varie le rythme, jamais 2+ action/confrontation consécutifs' },
           narrative: {
             type: 'object',
             properties: {

@@ -68,18 +68,30 @@
     {
       id: 'openrouter',
       name: 'OpenRouter',
+      // Ordered: best value first → powerful free/cheap → premium
       models: [
+        // ── Recommandés (petits mais excellents) ──
+        'google/gemma-3-27b-it:free',
         'google/gemma-4-26b-a4b-it',
         'xiaomi/mimo-v2-omni',
-        'openai/gpt-5-mini',
-        'openai/gpt-5',
+        'meta-llama/llama-3.3-70b-instruct:free',
+        'mistralai/mistral-small-3.2-24b-instruct:free',
+        'qwen/qwen3-30b-a3b:free',
+        // ── Milieu de gamme ──
+        'google/gemini-2.0-flash-001',
+        'anthropic/claude-3-haiku',
+        'openai/gpt-4o-mini',
+        'meta-llama/llama-3.1-70b-instruct',
+        'mistralai/mistral-nemo',
+        // ── Premium ──
         'anthropic/claude-sonnet-4.5',
+        'openai/gpt-5-mini',
         'google/gemini-2.5-pro',
-        'meta-llama/llama-3.3-70b-instruct'
+        'openai/gpt-5',
       ],
       icon: providerIconSvg('openrouter'),
       recommended: true,
-      badges: ['Tool calling natif', 'Multi-provider']
+      badges: ['⚡ Agentique', 'Tool calling natif', '400+ modèles']
     },
     {
       id: 'openai',

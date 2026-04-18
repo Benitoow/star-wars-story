@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
   import { onDestroy, onMount } from 'svelte';
   import { fly } from 'svelte/transition';
   import { goto } from '$app/navigation';
@@ -57,9 +57,9 @@
     { id: 'era', label: 'Ère', subtitle: 'Quand commence votre histoire ?' },
     { id: 'faction_role', label: 'Faction & rôle', subtitle: 'Qui êtes-vous dans cette galaxie ?' },
     { id: 'premise', label: 'Trame', subtitle: 'Quel est le point de départ ?' },
-    { id: 'style', label: 'Style IA', subtitle: 'Comment doit écrire l’IA ?' },
+    { id: 'style', label: 'Style IA', subtitle: `Comment doit écrire l'IA ?` },
     { id: 'profile', label: 'Protagoniste', subtitle: 'Nom facultatif, avatar rapide' },
-    { id: 'review', label: 'Lancement', subtitle: 'On démarre l’aventure immédiatement' }
+    { id: 'review', label: 'Lancement', subtitle: `On démarre l'aventure immédiatement` }
   ];
 
   const INTERACTIVE_SESSION_PREFIX = 'sw_svelte_interactive_story_';
@@ -455,13 +455,13 @@
   ];
 
   const TRAMES = [
-    { id: 'solo', name: 'Le Solitaire', icon: '🚀', premise: 'Vous acceptez un contrat en apparence simple, mais il vous entraîne dans un conflit galactique majeur.' },
-    { id: 'chosen', name: 'L’Élu', icon: '✨', premise: 'Une intuition de la Force vous pousse sur une piste que personne ne comprend encore.' },
-    { id: 'exile', name: 'Le Banni', icon: '🌑', premise: 'Exilé après un incident obscur, vous survivez dans l’ombre jusqu’au jour où tout bascule.' },
-    { id: 'rebel', name: 'Le Résistant', icon: '⚡', premise: 'Vous combattez l’oppresseur et découvrez un enjeu plus grand que votre vengeance.' },
-    { id: 'redeemed', name: 'La Rédemption', icon: '🔥', premise: 'Ancien serviteur de l’Obscur, vous tentez de réparer ce qui peut encore l’être.' },
-    { id: 'spy', name: 'L’Infiltrateur', icon: '🕵️', premise: 'Votre mission d’infiltration brouille progressivement la frontière entre vos deux identités.' },
-    { id: 'custom', name: 'Libre', icon: '✏️', premise: '' }
+    { id: 'solo',     name: 'Le Solitaire',   icon: '🚀', premise: `Vous acceptez un contrat en apparence simple, mais il vous entraîne dans un conflit galactique majeur.` },
+    { id: 'chosen',   name: "L'Élu",          icon: '✨', premise: `Une intuition de la Force vous pousse sur une piste que personne ne comprend encore.` },
+    { id: 'exile',    name: 'Le Banni',        icon: '🌑', premise: `Exilé après un incident obscur, vous survivez dans l'ombre jusqu'au jour où tout bascule.` },
+    { id: 'rebel',    name: 'Le Résistant',    icon: '⚡', premise: `Vous combattez l'oppresseur et découvrez un enjeu plus grand que votre vengeance.` },
+    { id: 'redeemed', name: 'La Rédemption',   icon: '🔥', premise: `Ancien serviteur de l'Obscur, vous tentez de réparer ce qui peut encore l'être.` },
+    { id: 'spy',      name: "L'Infiltrateur",  icon: '🕵️', premise: `Votre mission d'infiltration brouille progressivement la frontière entre vos deux identités.` },
+    { id: 'custom',   name: 'Libre',           icon: '✏️', premise: '' }
   ];
 
   const AVATARS = ['🧑‍🚀', '👩‍🚀', '🧙', '🧙‍♀️', '⚔️', '🤖', '👾', '🦾', '🌌', '💫', '🔵', '🔴'];
@@ -911,7 +911,7 @@
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erreur inconnue';
       generationError = message;
-      showToast(`Impossible de lancer l’aventure: ${message}`, 'error');
+      showToast(`Impossible de lancer l'aventure: ${message}`, 'error');
     } finally {
       generating = false;
     }
@@ -930,7 +930,8 @@
 
       const nextTurn = turnNumber + 1;
       const recentSummary = chapterHistory.slice(-3).map(chapter => summarizeChapterForPrompt(chapter));
-      const prompt = buildContinuePrompt(action, nextTurn, recentSummary, resolvePromptMode());
+      const recentSectionTypes = chapterHistory.slice(-5).map(c => c.section_type).filter(Boolean);
+      const prompt = buildContinuePrompt(action, nextTurn, recentSummary, resolvePromptMode(), recentSectionTypes);
 
       const chapter = await requestStoryChapter(prompt, setup, nextTurn);
 
@@ -1205,7 +1206,7 @@
 <div class="editor-layout">
   <main class="editor-main">
     <PageHeader
-      title={mode === 'setup' ? 'Création d’histoire IA' : 'Aventure interactive'}
+      title={mode === 'setup' ? "Création d'histoire IA" : 'Aventure interactive'}
       showBack={true}
       on:back={() => goto('/')}
     >
@@ -1425,7 +1426,7 @@
                   </div>
                 {:else if activeSetupStep.id === 'profile'}
                   <div class="profile-card">
-                    <p class="helper-text">Le nom est facultatif. Vous pouvez lancer l’aventure sans le renseigner.</p>
+                    <p class="helper-text">Le nom est facultatif. Vous pouvez lancer l'aventure sans le renseigner.</p>
 
                     <div class="avatar-row">
                       {#each AVATARS as avatar}
@@ -1480,7 +1481,7 @@
                     <div class="review-card">
                       <h2>Ce qui change maintenant</h2>
                       <ul class="feature-list">
-                        <li>✅ L’histoire démarre immédiatement (pas besoin d’écrire à la main).</li>
+                        <li>✅ L'histoire démarre immédiatement (pas besoin d'écrire à la main).</li>
                         <li>✅ Les noms sont facultatifs.</li>
                         <li>✅ Vous jouez avec des choix + réponse personnalisée.</li>
                         <li>✅ Une mémoire de session est conservée pour la cohérence.</li>
@@ -1488,7 +1489,7 @@
 
                       {#if providerMissing}
                         <div class="provider-warning">
-                          <p>Aucun provider texte actif. Configurez l’IA texte avant de lancer.</p>
+                          <p>Aucun provider texte actif. Configurez l'IA texte avant de lancer.</p>
                           <button class="btn btn-secondary" on:click={goToSettings}>Ouvrir les paramètres IA</button>
                         </div>
                       {/if}
@@ -1507,9 +1508,9 @@
             <button class="btn btn-primary" on:click={nextSetupStep} disabled={generating}>
               {#if isLastSetupStep}
                 {#if generating}
-                  Lancement de l’aventure…
+                  Lancement de l'aventure…
                 {:else}
-                  Lancer l’aventure IA
+                  Lancer l'aventure IA
                 {/if}
               {:else}
                 Suivant →
@@ -1530,14 +1531,32 @@
               <span class="turn-dot"></span>
               Tour&nbsp;<strong>{turnNumber || 1}</strong>
             </div>
+
+            <!-- Model chip -->
+            {#if providerConfig}
+              <div class="model-chip" title={providerStatus}>
+                {#if supportsAgenticToolCalling(providerConfig.providerId)}
+                  <span class="model-chip-dot agentic"></span>
+                {:else}
+                  <span class="model-chip-dot"></span>
+                {/if}
+                <span class="model-chip-name">
+                  {(providerConfig.model || 'auto').split('/').pop()?.split(':')[0] ?? 'auto'}
+                </span>
+                {#if supportsAgenticToolCalling(providerConfig.providerId)}
+                  <span class="model-chip-tag">⚡</span>
+                {/if}
+              </div>
+            {/if}
+
             {#if memoryLog.length > 0}
-              <div class="mem-badge" title="Faits mémorisés par l’IA">
+              <div class="mem-badge" title="Faits mémorisés par l'IA">
                 <svg viewBox="0 0 16 16" fill="currentColor" width="12" height="12"><path d="M8 1a7 7 0 100 14A7 7 0 008 1zm.75 10.5h-1.5v-5h1.5v5zm0-6.5h-1.5V3.5h1.5V5z"/></svg>
                 {memoryLog.length}
               </div>
             {/if}
             <button class="topbar-link" on:click={goBackToSetupFromPlay} disabled={generating}>
-              Modifier la config
+              Config
             </button>
           </div>
 
@@ -1574,7 +1593,7 @@
               <div class="gen-dot-row">
                 <span></span><span></span><span></span>
               </div>
-              <p>L’IA compose la suite…</p>
+              <p>L'IA compose la suite…</p>
             </div>
           {/if}
 
@@ -1717,7 +1736,7 @@
 
           {:else}
             <div class="play-empty">
-              <p>Aucun chapitre actif. Retournez à la configuration pour lancer l’aventure.</p>
+              <p>Aucun chapitre actif. Retournez à la configuration pour lancer l'aventure.</p>
               <button class="btn btn-primary" on:click={goBackToSetupFromPlay}>Retour à la configuration</button>
             </div>
           {/if}
@@ -2358,6 +2377,48 @@
   .topbar-link:hover:not(:disabled) {
     color: var(--color-text-secondary);
     text-decoration-color: currentColor;
+  }
+
+  /* ── Model chip ─────────────────────────── */
+  .model-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px 2px 5px;
+    background: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border);
+    border-radius: 20px;
+    font-size: 0.68rem;
+    color: var(--color-text-muted);
+    max-width: 160px;
+    overflow: hidden;
+  }
+
+  .model-chip-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--color-text-muted);
+  }
+
+  .model-chip-dot.agentic {
+    background: #4ade80;
+    box-shadow: 0 0 5px rgba(74,222,128,0.6);
+  }
+
+  .model-chip-name {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: monospace;
+    font-size: 0.65rem;
+  }
+
+  .model-chip-tag {
+    flex-shrink: 0;
+    font-size: 0.6rem;
   }
 
   /* ── Generating ─────────────────────────── */
