@@ -2279,13 +2279,23 @@
       flex-direction: row;
       overflow-x: auto;
       padding: var(--space-sm);
+      gap: 4px;
       border-right: none;
       border-bottom: 1px solid var(--color-border);
     }
-    .nav-btn { flex-direction: column; gap: 2px; padding: var(--space-xs) var(--space-sm); font-size: 0.75rem; }
+    .nav-btn {
+      flex-direction: column;
+      min-width: 64px;
+      gap: 2px;
+      padding: var(--space-xs) var(--space-sm);
+      font-size: 0.65rem;
+      text-align: center;
+    }
+    .nav-label { font-size: 0.6rem; flex: none; }
     .nav-dot { display: none; }
-    .screen { padding: var(--space-lg); }
-    .option-grid, .provider-grid { grid-template-columns: 1fr 1fr; }
+    .wizard-content { overflow-y: auto; }
+    .screen { padding: var(--space-lg) var(--space-md); }
+    .option-grid, .provider-grid { grid-template-columns: 1fr 1fr !important; }
     .profiles-grid { grid-template-columns: 1fr; }
     .shortcut-item { flex-direction: column; align-items: flex-start; }
   }

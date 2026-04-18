@@ -28,6 +28,16 @@
   function severityIcon(sev: string): string {
     return sev === 'severe' ? '🔴' : sev === 'moderate' ? '🟡' : '⚪';
   }
+
+  function affinityLabel(aff: number): string {
+    if (aff >= 70) return 'Loyal';
+    if (aff >= 30) return 'Ami';
+    if (aff > 0)   return 'Favorable';
+    if (aff === 0) return 'Neutre';
+    if (aff > -30) return 'Méfiant';
+    if (aff > -70) return 'Hostile';
+    return 'Ennemi';
+  }
 </script>
 
 <aside class="hud" class:collapsed>
@@ -98,7 +108,7 @@
           <div class="hud-row hud-npc">
             <span class="npc-dot" style="background:{aff > 30 ? '#4ade80' : aff < -30 ? '#f87171' : '#94a3b8'}"></span>
             <span class="hud-text" title={npc.note ?? ''}>{npc.name}</span>
-            <span class="npc-score" style="color:{aff > 30 ? '#4ade80' : aff < -30 ? '#f87171' : '#94a3b8'}">{aff > 0 ? '+' : ''}{aff}</span>
+            <span class="npc-score" style="color:{aff > 30 ? '#4ade80' : aff < -30 ? '#f87171' : '#94a3b8'}">{affinityLabel(aff)}</span>
           </div>
         {/each}
       {/if}
@@ -363,15 +373,15 @@
 
   @media (max-width: 768px) {
     .hud {
+      bottom: 12px;
+      right: 12px;
       top: auto;
-      bottom: 80px;
-      right: 8px;
-      width: min(190px, calc(100vw - 16px));
-      max-height: calc(100vh - 130px);
+      width: min(200px, calc(100vw - 24px));
+      max-height: 55vh;
     }
 
     .hud-body {
-      max-height: calc(100vh - 180px);
+      max-height: calc(55vh - 40px);
     }
   }
 </style>

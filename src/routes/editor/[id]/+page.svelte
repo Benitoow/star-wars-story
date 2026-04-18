@@ -3018,4 +3018,67 @@
       padding: var(--space-xs) var(--space-sm);
     }
   }
+
+  /* ── Mobile (≤ 768px) ────────────────────── */
+  @media (max-width: 768px) {
+
+    /* Topbar play */
+    .play-topbar {
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 8px 12px;
+    }
+    .model-chip { font-size: 0.65rem; }
+
+    /* Chapter header & narrative */
+    .chapter-header { padding: 16px 16px 10px; }
+    .narrative { padding: 0 16px 16px; max-width: none; }
+    .chapter-title { font-size: 1.4rem; }
+
+    /* Choice buttons — touch-friendly */
+    .choice-btn {
+      min-height: 56px;
+      font-size: 0.9rem;
+    }
+    .choice-content {
+      padding: 14px var(--space-md);
+    }
+
+    /* Custom action form */
+    .custom-row {
+      flex-direction: column;
+      gap: 8px;
+    }
+    .custom-input {
+      width: 100%;
+      font-size: 16px; /* évite zoom iOS */
+    }
+    .custom-send {
+      width: 100%;
+      height: 44px;
+    }
+
+    /* Setup — grids 2 colonnes */
+    .era-grid,
+    .faction-grid,
+    .role-grid,
+    .trame-grid,
+    .style-grid,
+    .content-mode-grid {
+      grid-template-columns: repeat(2, 1fr) !important;
+    }
+
+    /* Setup stage — pas de position absolute sur petit écran */
+    .setup-stage {
+      min-height: auto;
+    }
+    .setup-screen {
+      position: static;
+    }
+
+    /* Split grid → colonne */
+    .split-grid {
+      grid-template-columns: 1fr;
+    }
+  }
 </style>

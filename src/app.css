@@ -450,6 +450,10 @@ a:hover {
 
 /* ─── Responsive Utilities ───────────────────── */
 @media (max-width: 768px) {
+  :root {
+    --space-xl: 1rem;
+    --space-2xl: 1.25rem;
+  }
   .hide-mobile { display: none !important; }
   .grid-cols-2, .grid-cols-3, .grid-cols-4 {
     grid-template-columns: 1fr;
