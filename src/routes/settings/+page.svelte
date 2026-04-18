@@ -68,25 +68,33 @@
     {
       id: 'openrouter',
       name: 'OpenRouter',
-      // Ordered: best value first → powerful free/cheap → premium
       models: [
-        // ── Recommandés (petits mais excellents) ──
+        // ── Free tier ──
         'google/gemma-3-27b-it:free',
         'google/gemma-4-26b-a4b-it',
-        'xiaomi/mimo-v2-omni',
+        'google/gemma-4-31b-it',
+        'meta-llama/llama-4-scout:free',
         'meta-llama/llama-3.3-70b-instruct:free',
         'mistralai/mistral-small-3.2-24b-instruct:free',
         'qwen/qwen3-30b-a3b:free',
+        'qwen/qwen3-235b-a22b:free',
+        'xiaomi/mimo-v2-omni',
         // ── Milieu de gamme ──
+        'x-ai/grok-4.1-fast',
+        'deepseek/deepseek-v3.2',
+        'mistralai/mistral-small-2603',
+        'meta-llama/llama-4-maverick',
         'google/gemini-2.0-flash-001',
-        'anthropic/claude-3-haiku',
-        'openai/gpt-4o-mini',
-        'meta-llama/llama-3.1-70b-instruct',
-        'mistralai/mistral-nemo',
+        'google/gemini-2.5-flash-preview',
+        'openai/gpt-4.1-mini',
+        'anthropic/claude-3-5-haiku',
         // ── Premium ──
-        'anthropic/claude-sonnet-4.5',
-        'openai/gpt-5-mini',
+        'anthropic/claude-sonnet-4-5',
+        'openai/gpt-4.1',
+        'x-ai/grok-4',
         'google/gemini-2.5-pro',
+        'anthropic/claude-opus-4-5',
+        'openai/gpt-5-mini',
         'openai/gpt-5',
       ],
       icon: providerIconSvg('openrouter'),
@@ -96,39 +104,90 @@
     {
       id: 'openai',
       name: 'OpenAI',
-      models: ['gpt-5', 'gpt-5-mini', 'gpt-5-nano', 'o4-mini', 'o3', 'gpt-4.1'],
-      icon: providerIconSvg('openai')
+      models: [
+        'gpt-4.1',
+        'gpt-4.1-mini',
+        'gpt-4.1-nano',
+        'o4-mini',
+        'o3',
+        'gpt-4o',
+        'gpt-4o-mini',
+        'gpt-5-mini',
+        'gpt-5',
+      ],
+      icon: providerIconSvg('openai'),
+      badges: ['GPT-4.1 · o3', 'Vision', 'Fonctions']
     },
     {
       id: 'anthropic',
       name: 'Anthropic',
-      models: ['claude-opus-4-1', 'claude-sonnet-4-5', 'claude-3-7-sonnet-latest', 'claude-3-5-haiku-latest'],
-      icon: providerIconSvg('anthropic')
+      models: [
+        'claude-opus-4-5',
+        'claude-sonnet-4-5',
+        'claude-haiku-4-5',
+        'claude-3-7-sonnet-latest',
+        'claude-3-5-haiku-latest',
+      ],
+      icon: providerIconSvg('anthropic'),
+      badges: ['Claude 4', '200K tokens', 'Vision']
     },
     {
       id: 'mistral',
       name: 'Mistral AI',
-      models: ['magistral-medium-latest', 'magistral-small-latest', 'mistral-large-latest', 'ministral-8b-latest', 'codestral-latest'],
-      icon: providerIconSvg('mistral')
+      models: [
+        'magistral-medium-2506',
+        'magistral-small-2506',
+        'mistral-medium-3',
+        'mistral-small-2603',
+        'mistral-large-latest',
+        'pixtral-large-latest',
+        'ministral-8b-latest',
+        'codestral-latest',
+      ],
+      icon: providerIconSvg('mistral'),
+      badges: ['EU hébergé', 'Magistral', 'Codestral']
     },
     {
       id: 'grok',
-      name: 'Grok',
-      models: ['grok-4', 'grok-3-beta', 'grok-3-mini-beta', 'grok-2-vision-1212'],
-      icon: providerIconSvg('grok')
+      name: 'Grok / xAI',
+      models: [
+        'grok-4.1-fast',
+        'grok-4',
+        'grok-3-beta',
+        'grok-3-mini-beta',
+        'grok-2-vision-1212',
+      ],
+      icon: providerIconSvg('grok'),
+      badges: ['Grok 4', '2M tokens', '⚡ Tool calling']
     },
     {
       id: 'together',
       name: 'Together AI',
       models: [
+        'meta-llama/Llama-4-Scout-17B-16E-Instruct',
+        'meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8',
         'meta-llama/Llama-3.3-70B-Instruct-Turbo',
+        'deepseek-ai/DeepSeek-V3',
         'deepseek-ai/DeepSeek-R1',
+        'Qwen/Qwen3-235B-A22B-fp8-tput',
         'Qwen/Qwen3-72B-Instruct-Turbo',
-        'mistralai/Mixtral-8x7B-Instruct-v0.1'
+        'mistralai/Mixtral-8x22B-Instruct-v0.1',
+        'mistralai/Mixtral-8x7B-Instruct-v0.1',
       ],
-      icon: providerIconSvg('together')
+      icon: providerIconSvg('together'),
+      badges: ['Open source', 'Llama 4', 'Inférence rapide']
     },
-    { id: 'ollama', name: 'Ollama (local)', models: ['llama3.3', 'mistral', 'gemma3', 'qwen2.5'], icon: providerIconSvg('ollama') },
+    {
+      id: 'ollama',
+      name: 'Ollama (local)',
+      models: [
+        'llama4', 'llama3.3', 'gemma3', 'gemma3:12b',
+        'qwen3', 'qwen2.5', 'phi4', 'phi4-mini',
+        'mistral', 'deepseek-r1', 'codestral',
+      ],
+      icon: providerIconSvg('ollama'),
+      badges: ['100% local', 'Sans clé API', '🔒 Vie privée']
+    },
     { id: 'none', name: 'Aucun (texte manuel)', models: [], icon: providerIconSvg('none') }
   ];
 
@@ -137,53 +196,65 @@
       id: 'openrouter_img',
       name: 'OpenRouter Images',
       models: [
-        'google/gemini-2.5-flash-image',
-        'google/gemini-3.1-flash-image-preview',
-        'google/gemini-3-pro-image-preview',
-        'openai/gpt-5-image-mini',
-        'openai/gpt-5-image',
+        'google/gemini-2.5-flash-preview:thinking',
+        'google/gemini-2.0-flash-exp:free',
         'openai/gpt-image-1',
-        'black-forest-labs/flux.2-max',
-        'black-forest-labs/flux.2-pro',
-        'black-forest-labs/flux.2-flex',
-        'black-forest-labs/flux.2-klein-4b'
+        'openai/gpt-4o-image',
+        'black-forest-labs/flux-1.1-pro',
+        'black-forest-labs/flux-1.1-pro:ultra',
+        'black-forest-labs/flux-1-schnell:free',
+        'black-forest-labs/flux-1-dev',
+        'recraft-ai/recraft-v3',
+        'ideogram-ai/ideogram-v2',
       ],
-      icon: providerIconSvg('openrouter')
+      icon: providerIconSvg('openrouter'),
+      badges: ['400+ modèles', 'Gemini · FLUX · GPT']
     },
     {
       id: 'fal_img',
       name: 'fal.ai',
       models: [
-        'fal-ai/flux/schnell',
-        'fal-ai/flux/dev',
-        'fal-ai/flux-pro/v1.1',
         'fal-ai/flux-pro/v1.1-ultra',
+        'fal-ai/flux-pro/v1.1',
+        'fal-ai/flux/dev',
+        'fal-ai/flux/schnell',
         'fal-ai/recraft-v3',
         'fal-ai/ideogram/v2',
-        'fal-ai/stable-diffusion-v3-medium'
+        'fal-ai/hidream-i1-full',
+        'fal-ai/stable-diffusion-3.5-large',
+        'fal-ai/stable-diffusion-v3-medium',
       ],
-      icon: providerIconSvg('fal_img')
+      icon: providerIconSvg('fal_img'),
+      badges: ['FLUX Pro', 'HiDream', 'SD 3.5']
     },
     {
       id: 'together_img',
       name: 'Together AI Images',
       models: [
+        'black-forest-labs/FLUX.1.1-pro',
+        'black-forest-labs/FLUX.1-dev',
         'black-forest-labs/FLUX.1-schnell',
         'black-forest-labs/FLUX.1-schnell-Free',
-        'black-forest-labs/FLUX.1-dev',
-        'black-forest-labs/FLUX.1.1-pro',
+        'stabilityai/stable-diffusion-3-medium',
         'stabilityai/stable-diffusion-xl-base-1.0',
-        'stabilityai/stable-diffusion-3-medium'
       ],
-      icon: providerIconSvg('together')
+      icon: providerIconSvg('together'),
+      badges: ['FLUX · SD', 'Open source']
     },
     {
       id: 'openai_img',
       name: 'OpenAI Images',
-      models: ['gpt-image-1', 'gpt-image-1-mini'],
-      icon: providerIconSvg('openai')
+      models: ['gpt-image-1', 'dall-e-3', 'dall-e-2'],
+      icon: providerIconSvg('openai'),
+      badges: ['DALL-E 3', 'GPT-Image-1']
     },
-    { id: 'stability', name: 'Stability AI', models: ['ultra', 'core'], icon: providerIconSvg('stability') },
+    {
+      id: 'stability',
+      name: 'Stability AI',
+      models: ['stable-image-ultra', 'stable-image-core', 'sd3.5-large', 'sd3.5-medium'],
+      icon: providerIconSvg('stability'),
+      badges: ['SD 3.5', 'Ultra']
+    },
     { id: 'none', name: 'Aucun (texte uniquement)', models: [], icon: providerIconSvg('none') }
   ];
 
@@ -214,21 +285,31 @@
   const IMAGE_MODEL_PATTERN = /(image|flux|sdxl|stable[-_\s]?diffusion|sd3|gpt-image|ideogram|recraft|kandinsky|sana|lumina|dall)/i;
   const TEXT_MODEL_PRIORITIES: Record<string, RegExp[]> = {
     openrouter: [
+      // Free first
       /google\/gemma-4-26b-a4b-it/i,
-      /xiaomi\/mimo-v2-omni/i,
-      /openai\/gpt-5/i,
+      /google\/gemma-4-31b-it/i,
+      /google\/gemma-3-27b-it/i,
+      /meta-llama\/llama-4-scout.*free/i,
+      /meta-llama\/llama-3\.3-70b.*free/i,
+      /qwen\/qwen3-235b/i,
+      /qwen\/qwen3/i,
+      // Mid-range
+      /x-ai\/grok-4\.1-fast/i,
+      /deepseek\/deepseek-v3\.2/i,
+      /mistralai\/mistral-small-2603/i,
+      /meta-llama\/llama-4-maverick/i,
+      /xiaomi\/mimo/i,
+      // Premium
       /anthropic\/claude-(opus|sonnet)-4/i,
       /x-ai\/grok-4/i,
+      /openai\/gpt-5/i,
       /google\/gemini-2\.5-pro/i,
-      /deepseek\/deepseek-r1/i,
-      /meta-llama\/llama-3\.3-70b/i,
-      /qwen\/qwen3/i
     ],
-    openai: [/^gpt-5/i, /^o4/i, /^o3/i, /^gpt-4\.1/i, /^gpt-4o/i],
-    anthropic: [/claude-(opus|sonnet)-4/i, /claude-3\.5-sonnet/i, /haiku/i],
-    mistral: [/magistral/i, /mistral-large/i, /mistral-medium/i, /ministral/i, /mistral-small/i],
-    grok: [/grok-4/i, /grok-3/i, /grok-2/i],
-    together: [/Llama-3\.3-70B/i, /Qwen.*72B/i, /Mixtral-8x7B/i]
+    openai: [/^gpt-4\.1(?!-)/, /^o4/i, /^o3/i, /^gpt-4o(?!-)/, /^gpt-5/i, /mini/i, /nano/i],
+    anthropic: [/opus-4/i, /sonnet-4/i, /haiku-4/i, /3-7-sonnet/i, /3-5-haiku/i],
+    mistral: [/magistral-medium/i, /magistral-small/i, /mistral-medium/i, /mistral-large/i, /pixtral/i, /mistral-small/i, /ministral/i, /codestral/i],
+    grok: [/grok-4\.1-fast/i, /grok-4(?!\.)/i, /grok-3/i, /grok-2/i],
+    together: [/Llama-4-Maverick/i, /Llama-4-Scout/i, /Llama-3\.3-70B/i, /Qwen3-235B/i, /Qwen.*72B/i, /DeepSeek-V3/i, /Mixtral-8x22B/i]
   };
 
   let dynamicTextModels: Record<string, string[]> = {};
@@ -1077,6 +1158,13 @@
                       <span class="provider-active-model" title={preferences.imageModel}>
                         <svg viewBox="0 0 8 8" width="6" height="6"><circle cx="4" cy="4" r="4" fill="currentColor"/></svg>
                         {shortModelName(preferences.imageModel)}
+                      </span>
+                    {/if}
+                    {#if p.badges && p.badges.length}
+                      <span class="provider-badges">
+                        {#each p.badges as badge}
+                          <span class="provider-badge">{badge}</span>
+                        {/each}
                       </span>
                     {/if}
                   </button>
