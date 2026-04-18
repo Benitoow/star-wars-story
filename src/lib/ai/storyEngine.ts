@@ -1563,6 +1563,22 @@ function hasUsableStoryTurnOutput(rawResponse: string, chapter: StoryChapter): b
   return chapter.choices.length > 0;
 }
 
+function buildStrictJsonRecoveryMessages(messages: ChatMessage[]): ChatMessage[] {
+  const recoveryInstruction = `MODE DE REPLI TECHNIQUE (obligatoire):
+- N'utilise aucun tool call.
+- N'écris jamais de balise <tool_call>, <|tool_call|> ni de syntaxe call:xxx.
+- Réponds UNIQUEMENT avec un JSON valide (pas de markdown).
+- Champs requis: chapter_title, chapter_number, section_type, narrative{context,action,dialogue,reflection,atmosphere}, choices(3-4), memory_updates, state_update, scene_description, user_edits_applied.`;
+
+  return [
+    ...messages,
+    {
+      role: 'user',
+      content: recoveryInstruction
+    }
+  ];
+}
+
 function draftToChapter(draft: AgenticDraft, turnNumber: number, rawFallback = ''): StoryChapter {
   const payload = {
     chapter_title: draft.chapter_title,
@@ -1830,7 +1846,35 @@ export async function generateStoryTurn(
   const chapter = parseStoryResponse(rawResponse, turnNumber);
 
   if (!hasUsableStoryTurnOutput(rawResponse, chapter)) {
-    throw new Error('Réponse vide ou inexploitable du modèle IA. Vérifie le modèle sélectionné et la clé API, puis réessaie.');
+    console.warn('[storyEngine] Sortie JSON initiale inexploitable, retry strict JSON.');
+
+    const recoveryMessages = buildStrictJsonRecoveryMessages(messages);
+    const recoveryRawResponse = await callTextModel(recoveryMessages, normalizedConfig);
+    const recoveryChapter = parseStoryResponse(recoveryRawResponse, turnNumber);
+
+    if (hasUsableStoryTurnOutput(recoveryRawResponse, recoveryChapter)) {
+      return {
+        chapter: recoveryChapter,
+        rawResponse: recoveryRawResponse,
+        mode: 'structured-json',
+        steps: 2,
+        toolCalls: 0
+      };
+    }
+
+    console.warn('[storyEngine] Retry strict JSON toujours inexploitable, fallback local non bloquant.');
+    const emergencyChapter = fallbackChapter(
+      `Le flux IA était instable sur ce tour. Le récit continue avec des choix sûrs.`,
+      turnNumber
+    );
+
+    return {
+      chapter: emergencyChapter,
+      rawResponse: JSON.stringify(emergencyChapter),
+      mode: 'structured-json',
+      steps: 2,
+      toolCalls: 0
+    };
   }
 
   return {
