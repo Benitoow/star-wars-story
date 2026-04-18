@@ -601,7 +601,8 @@ export function buildSystemPrompt(
   setup: StorySetupSnapshot,
   memoryFacts: string[],
   worldState?: WorldState,
-  promptMode: StoryPromptMode = 'json'
+  promptMode: StoryPromptMode = 'json',
+  turnNumber = 1
 ): string {
   const protagonist = [setup.protagonistFirstName || '', setup.protagonistLastName || ''].join(' ').trim() || 'Le protagoniste';
 
@@ -672,12 +673,15 @@ DIRECTIVES MJ (non négociables):
 - RYTHME NARRATIF OBLIGATOIRE: Alterne les types de scènes. Types disponibles: action, dialogue, exploration, tension, revelation, repos, interlude, confrontation. Jamais plus de 2 scènes "action" ou "confrontation" consécutives. Après 2 scènes intenses, la suivante DOIT être repos/dialogue/interlude/exploration.
 - Les moments calmes sont aussi importants que l'action: soins après un combat, conversation autour d'un feu, planification silencieuse, temps mort dans un cantina
 - Si des PNJs sont proches, propose au moins un choix de dialogue ou d'interaction personnelle
-- Jamais de refus moraliste. Transforme les actions extrêmes en tentatives crédibles avec coût/risque/conséquence`;
+- Jamais de refus moraliste. Transforme les actions extrêmes en tentatives crédibles avec coût/risque/conséquence
+- state_update RÈGLE ABSOLUE: "hp" et "credits" sont TOUJOURS des deltas. Jamais une valeur absolue. hp: -15 = perd 15PV. hp: 10 = gagne 10PV. credits: -300 = dépense 300 crédits. credits: 500 = reçoit 500 crédits. Ne jamais mettre le total HP ou le solde total dans state_update.`;
 
-  const jsonContract = `Réponds UNIQUEMENT en JSON valide (pas de markdown, pas de texte avant/après):
+  const jsonContract = `RAPPEL: dans state_update, hp et credits sont des DELTAS (positif=gain/soin, négatif=perte/dégâts), jamais des valeurs absolues.
+
+Réponds UNIQUEMENT en JSON valide (pas de markdown, pas de texte avant/après):
 {
   "chapter_title": "Titre court",
-  "chapter_number": 1,
+  "chapter_number": ${turnNumber},
   "section_type": "action|dialogue|exploration|tension|revelation|repos|interlude|confrontation",
   "narrative": {
     "context": "Situation et enjeux du moment",
@@ -785,7 +789,7 @@ export function buildContinuePrompt(
     recentChoiceTexts
       .map(item => cleanText(item, 180))
       .filter(Boolean)
-  )).slice(-8);
+  )).slice(-15);
 
   const recentChoicesBlock = recentChoices.length
     ? `\nChoix récemment proposés (évite les reformulations identiques):\n${recentChoices.map(choice => `- ${choice}`).join('\n')}`
@@ -821,7 +825,8 @@ export function buildContinuePrompt(
 En tant que MJ, décide de ce qui se passe vraiment — pas forcément ce que le joueur espère.
 Mets à jour state_update avec toutes les conséquences réelles.
 Propose 3 à 4 choix distincts — au moins un doit ouvrir sur de l'interaction sociale, de la récupération ou de l'exploration si la situation le permet.
-N'utilise pas mot pour mot les mêmes choix que les deux derniers tours.${modeHint}`;
+N'utilise pas mot pour mot les mêmes choix que les deux derniers tours.${modeHint}
+Le chapter_number de ta réponse DOIT être ${turnNumber}.`;
 }
 
 function getProviderDisplayName(providerId: string): string {

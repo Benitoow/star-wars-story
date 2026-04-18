@@ -281,43 +281,22 @@
     });
   }
 
-  function buildEconomySignalText(chapter: StoryChapter): string {
-    return [
-      chapter.chapter_title,
-      chapter.narrative.context,
-      chapter.narrative.action,
-      chapter.narrative.dialogue,
-      chapter.narrative.reflection,
-      ...(chapter.memory_updates.resources || []),
-      ...(chapter.memory_updates.notes || [])
-    ].join(' ');
-  }
-
-  function hasEconomyGainCue(text: string): boolean {
-    return /(récompense|recompense|prime|bonus|paiement|payé|payee|payée|gagne|gagné|gagn[eé]s?|encaisse|butin|loot|récupère|recupere|trouv[ée])/i.test(text);
-  }
-
-  function hasHealOrDamageCue(text: string): boolean {
-    return /(soin|médikit|medikit|guéri|gueri|récup|recup|stabilis|pansement|bless|tir|impact|explosion|hémorrag|hemorrag|fracture|attaque|coup)/i.test(text);
-  }
-
-  function normalizeHpDelta(rawHp: number, currentHp: number, signalText: string): number {
-    const looksLikeAbsoluteSnapshot = rawHp >= 0 && rawHp <= 100 && Math.abs(rawHp - currentHp) <= 25;
-    if (looksLikeAbsoluteSnapshot && !hasHealOrDamageCue(signalText)) {
-      return rawHp - currentHp;
-    }
+  function normalizeHpDelta(rawHp: number, currentHp: number): number {
+    // Négatif = dégâts (delta clair)
+    if (rawHp < 0) return rawHp;
+    // Positif > 50 : probablement une valeur absolue envoyée par erreur → convertir en delta
+    if (rawHp > 50) return rawHp - currentHp;
+    // Petit positif (1–50) : soin delta
     return rawHp;
   }
 
-  function normalizeCreditsDelta(rawCredits: number, currentCredits: number, hpLooksAbsoluteSnapshot: boolean, signalText: string): number {
-    const nearCurrent = Math.abs(rawCredits - currentCredits) <= Math.max(250, currentCredits * 0.35);
-    const mediumOrLargeValue = Math.abs(rawCredits) >= 250;
-    const looksLikeAbsoluteSnapshot = rawCredits >= 0 && nearCurrent && mediumOrLargeValue;
-
-    if (looksLikeAbsoluteSnapshot && (hpLooksAbsoluteSnapshot || !hasEconomyGainCue(signalText))) {
-      return rawCredits - currentCredits;
-    }
-
+  function normalizeCreditsDelta(rawCredits: number, currentCredits: number): number {
+    // Négatif = dépense (delta clair)
+    if (rawCredits < 0) return rawCredits;
+    // Très grand positif proche du solde actuel → probablement un snapshot absolu → delta
+    const ratio = currentCredits > 0 ? rawCredits / currentCredits : 2;
+    if (ratio >= 0.5 && ratio <= 1.8 && rawCredits > 200) return rawCredits - currentCredits;
+    // Sinon : traiter comme delta de gain
     return rawCredits;
   }
 
@@ -326,16 +305,9 @@
     if (!upd) return;
 
     const p = worldState.player;
-    const signalText = buildEconomySignalText(chapter);
 
-    const hpDelta = upd.hp !== undefined ? normalizeHpDelta(upd.hp, p.hp, signalText) : undefined;
-    const hpLooksAbsoluteSnapshot = upd.hp !== undefined
-      ? upd.hp >= 0 && upd.hp <= 100 && Math.abs(upd.hp - p.hp) <= 25 && hpDelta !== upd.hp
-      : false;
-
-    const creditsDelta = upd.credits !== undefined
-      ? normalizeCreditsDelta(upd.credits, p.credits, hpLooksAbsoluteSnapshot, signalText)
-      : undefined;
+    const hpDelta = upd.hp !== undefined ? normalizeHpDelta(upd.hp, p.hp) : undefined;
+    const creditsDelta = upd.credits !== undefined ? normalizeCreditsDelta(upd.credits, p.credits) : undefined;
 
     // Player vitals
     const newHp = hpDelta !== undefined ? Math.max(0, Math.min(100, p.hp + hpDelta)) : p.hp;
@@ -985,7 +957,7 @@
     }
 
     const promptMode = resolvePromptMode();
-    const systemPrompt = buildSystemPrompt(setup, memoryLog.slice(-20), worldState, promptMode);
+    const systemPrompt = buildSystemPrompt(setup, memoryLog.slice(-20), worldState, promptMode, turn);
     aiMessages = [{ role: 'system', content: systemPrompt }, ...aiMessages.filter(message => message.role !== 'system')];
 
     const requestMessages = trimMessages([
@@ -1070,7 +1042,7 @@
       const recentSummary = chapterHistory.slice(-3).map(chapter => summarizeChapterForPrompt(chapter));
       const recentSectionTypes = chapterHistory.slice(-5).map(c => c.section_type).filter(Boolean);
       const recentChoiceTexts = chapterHistory
-        .slice(-2)
+        .slice(-5)
         .flatMap(chapter => chapter.choices.map(choice => choice.text));
 
       const prompt = buildContinuePrompt(
@@ -1734,7 +1706,7 @@
           {/if}
 
           <!-- ── Living World HUD ───────────────────────── -->
-          <GameHUD {worldState} bind:collapsed={hudCollapsed} />
+          <GameHUD {worldState} bind:collapsed={hudCollapsed} {turnNumber} />
 
           <!-- ── Loading overlay ─────────────────────────── -->
           {#if generating}

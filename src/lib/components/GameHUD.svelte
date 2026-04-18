@@ -3,6 +3,7 @@
 
   export let worldState: WorldState;
   export let collapsed = false;
+  export let turnNumber = 0;
 
   $: p = worldState.player;
   $: hpColor = p.hp >= 70 ? '#4ade80' : p.hp >= 35 ? '#facc15' : '#f87171';
@@ -46,8 +47,13 @@
   {#if !collapsed}
     <div class="hud-body">
 
+      <!-- Turn number -->
+      {#if turnNumber > 0}
+        <div class="hud-turn-capsule">Tour {turnNumber}</div>
+      {/if}
+
       <!-- HP -->
-      <div class="hud-row hud-hp">
+      <div class="hud-row hud-hp" class:hp-critical={p.hp < 20}>
         <span class="hud-icon">❤️</span>
         <div class="hp-track">
           <div class="hp-fill" style="width:{hpPct}%; background:{hpColor}"></div>
@@ -77,7 +83,7 @@
       {#if p.injuries.length}
         <div class="hud-section-label">Blessures</div>
         {#each p.injuries as inj}
-          <div class="hud-row hud-injury">
+          <div class="hud-row hud-injury" class:hud-injury-severe={inj.severity === 'severe'} class:hud-injury-moderate={inj.severity === 'moderate'} class:hud-injury-light={inj.severity === 'light'}>
             <span class="hud-icon">{severityIcon(inj.severity)}</span>
             <span class="hud-text" title={inj.description}>{inj.description}</span>
           </div>
@@ -114,6 +120,18 @@
             </div>
             <span class="faction-label">{factionLabel(id)}</span>
             <span class="faction-score" style="color:{score > 0 ? '#4ade80' : '#f87171'}">{score > 0 ? '+' : ''}{score}</span>
+          </div>
+        {/each}
+      {/if}
+
+      <!-- Inventory -->
+      {#if p.inventory.length}
+        <div class="hud-section-label">Inventaire</div>
+        {#each p.inventory.slice(0, 4) as item}
+          <div class="hud-row">
+            <span class="hud-icon">📦</span>
+            <span class="hud-text">{item.name}</span>
+            {#if item.qty > 1}<span class="hud-qty">×{item.qty}</span>{/if}
           </div>
         {/each}
       {/if}
@@ -284,9 +302,55 @@
     flex-shrink: 0;
   }
 
-  /* Injury */
+  /* Turn capsule */
+  .hud-turn-capsule {
+    display: inline-block;
+    align-self: flex-start;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-gold, #ffe81f);
+    background: rgba(255, 232, 31, 0.1);
+    border: 1px solid rgba(255, 232, 31, 0.25);
+    border-radius: 20px;
+    padding: 1px 8px;
+    margin-bottom: 2px;
+  }
+
+  /* HP critical */
+  .hud-hp.hp-critical .hp-fill {
+    animation: pulseCritical 1.2s ease-in-out infinite;
+  }
+
+  @keyframes pulseCritical {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* Injury severity */
   .hud-injury .hud-text {
     color: #fca5a5;
+  }
+
+  .hud-injury-severe .hud-text {
+    color: #f87171;
+    font-weight: 600;
+  }
+
+  .hud-injury-moderate .hud-text {
+    color: #fbbf24;
+  }
+
+  .hud-injury-light .hud-text {
+    color: #94a3b8;
+  }
+
+  /* Inventory qty */
+  .hud-qty {
+    font-size: 0.65rem;
+    color: var(--color-gold, #ffe81f);
+    flex-shrink: 0;
   }
 
   @media (max-width: 1159px) {
