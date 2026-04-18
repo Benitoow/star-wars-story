@@ -51,7 +51,6 @@
     anthropic: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M17.304 3.541h-3.672L20.328 20.46H24zm-10.608 0L0 20.46h3.744l1.37-3.553h7.005l1.37 3.553h3.744L10.536 3.541Zm-.371 10.223 2.291-5.946 2.292 5.946z"/></svg>`,
     mistral: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M17.143 3.429v3.428h-3.429v3.429h-3.428V6.857H6.857V3.43H3.43v13.714H0v3.428h10.286v-3.428H6.857v-3.429h3.429v3.429h3.429v-3.429h3.428v3.429h-3.428v3.428H24v-3.428h-3.43V3.429z"/></svg>`,
     grok: `<img src="/svg/grok-ai-icon.svg" alt="" loading="lazy" decoding="async" />`,
-    together: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="5" r="4" fill="currentColor"/><circle cx="5" cy="18" r="4" fill="currentColor" opacity="0.5"/><circle cx="19" cy="18" r="4" fill="currentColor" opacity="0.5"/></svg>`,
     ollama: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="6" y="7" width="12" height="10" rx="3" fill="currentColor"/><circle cx="10" cy="12" r="1.5" fill="var(--color-bg-primary)"/><circle cx="14" cy="12" r="1.5" fill="var(--color-bg-primary)"/><path d="M9 4.5h2M13 4.5h2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
     fal_img: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" d="M5 4h9M5 4v16M5 12h7"/><path fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" d="M16 14l3 3-3 3M14 17h5"/></svg>`,
     stability: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 2 2 20h20L12 2Zm0 4.5L19.5 20h-15L12 6.5Z"/><circle cx="12" cy="15" r="1.5" fill="currentColor"/></svg>`,
@@ -86,15 +85,14 @@
         'meta-llama/llama-4-maverick',
         'google/gemini-2.0-flash-001',
         'google/gemini-2.5-flash-preview',
-        'openai/gpt-4.1-mini',
-        'anthropic/claude-3-5-haiku',
+        'openai/gpt-5.4-mini',
+        'anthropic/claude-3-7-sonnet',
         // ── Premium ──
         'anthropic/claude-sonnet-4-5',
-        'openai/gpt-4.1',
+        'openai/gpt-5.4',
         'x-ai/grok-4',
         'google/gemini-2.5-pro',
         'anthropic/claude-opus-4-5',
-        'openai/gpt-5-mini',
         'openai/gpt-5',
       ],
       icon: providerIconSvg('openrouter'),
@@ -105,18 +103,16 @@
       id: 'openai',
       name: 'OpenAI',
       models: [
-        'gpt-4.1',
-        'gpt-4.1-mini',
-        'gpt-4.1-nano',
-        'o4-mini',
-        'o3',
-        'gpt-4o',
-        'gpt-4o-mini',
+        'gpt-5.4',
+        'gpt-5.4-mini',
+        'gpt-5.4-nano',
         'gpt-5-mini',
         'gpt-5',
+        'o4-mini',
+        'o3',
       ],
       icon: providerIconSvg('openai'),
-      badges: ['GPT-4.1 · o3', 'Vision', 'Fonctions']
+      badges: ['GPT-5.4 · o3', 'Vision', 'Fonctions']
     },
     {
       id: 'anthropic',
@@ -124,9 +120,7 @@
       models: [
         'claude-opus-4-5',
         'claude-sonnet-4-5',
-        'claude-haiku-4-5',
         'claude-3-7-sonnet-latest',
-        'claude-3-5-haiku-latest',
       ],
       icon: providerIconSvg('anthropic'),
       badges: ['Claude 4', '200K tokens', 'Vision']
@@ -135,13 +129,9 @@
       id: 'mistral',
       name: 'Mistral AI',
       models: [
-        'magistral-medium-2506',
-        'magistral-small-2506',
+        'mistral-large-latest',
         'mistral-medium-3',
         'mistral-small-2603',
-        'mistral-large-latest',
-        'pixtral-large-latest',
-        'ministral-8b-latest',
         'codestral-latest',
       ],
       icon: providerIconSvg('mistral'),
@@ -161,29 +151,12 @@
       badges: ['Grok 4', '2M tokens', '⚡ Tool calling']
     },
     {
-      id: 'together',
-      name: 'Together AI',
-      models: [
-        'meta-llama/Llama-4-Scout-17B-16E-Instruct',
-        'meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8',
-        'meta-llama/Llama-3.3-70B-Instruct-Turbo',
-        'deepseek-ai/DeepSeek-V3',
-        'deepseek-ai/DeepSeek-R1',
-        'Qwen/Qwen3-235B-A22B-fp8-tput',
-        'Qwen/Qwen3-72B-Instruct-Turbo',
-        'mistralai/Mixtral-8x22B-Instruct-v0.1',
-        'mistralai/Mixtral-8x7B-Instruct-v0.1',
-      ],
-      icon: providerIconSvg('together'),
-      badges: ['Open source', 'Llama 4', 'Inférence rapide']
-    },
-    {
       id: 'ollama',
       name: 'Ollama (local)',
       models: [
         'llama4', 'llama3.3', 'gemma3', 'gemma3:12b',
-        'qwen3', 'qwen2.5', 'phi4', 'phi4-mini',
-        'mistral', 'deepseek-r1', 'codestral',
+        'qwen3.5', 'qwen3.5:32b', 'qwen3', 'phi4', 'phi4-mini',
+        'glm4.7-air', 'glm4', 'mistral', 'deepseek-r1', 'codestral',
       ],
       icon: providerIconSvg('ollama'),
       badges: ['100% local', 'Sans clé API', '🔒 Vie privée']
@@ -228,25 +201,11 @@
       badges: ['FLUX Pro', 'HiDream', 'SD 3.5']
     },
     {
-      id: 'together_img',
-      name: 'Together AI Images',
-      models: [
-        'black-forest-labs/FLUX.1.1-pro',
-        'black-forest-labs/FLUX.1-dev',
-        'black-forest-labs/FLUX.1-schnell',
-        'black-forest-labs/FLUX.1-schnell-Free',
-        'stabilityai/stable-diffusion-3-medium',
-        'stabilityai/stable-diffusion-xl-base-1.0',
-      ],
-      icon: providerIconSvg('together'),
-      badges: ['FLUX · SD', 'Open source']
-    },
-    {
       id: 'openai_img',
       name: 'OpenAI Images',
-      models: ['gpt-image-1', 'dall-e-3', 'dall-e-2'],
+      models: ['gpt-image-1'],
       icon: providerIconSvg('openai'),
-      badges: ['DALL-E 3', 'GPT-Image-1']
+      badges: ['GPT-Image-1']
     },
     {
       id: 'stability',
@@ -302,14 +261,15 @@
       // Premium
       /anthropic\/claude-(opus|sonnet)-4/i,
       /x-ai\/grok-4/i,
+      /openai\/gpt-5\.4/i,
       /openai\/gpt-5/i,
       /google\/gemini-2\.5-pro/i,
     ],
-    openai: [/^gpt-4\.1(?!-)/, /^o4/i, /^o3/i, /^gpt-4o(?!-)/, /^gpt-5/i, /mini/i, /nano/i],
-    anthropic: [/opus-4/i, /sonnet-4/i, /haiku-4/i, /3-7-sonnet/i, /3-5-haiku/i],
-    mistral: [/magistral-medium/i, /magistral-small/i, /mistral-medium/i, /mistral-large/i, /pixtral/i, /mistral-small/i, /ministral/i, /codestral/i],
+    openai: [/^gpt-5\.4/i, /^gpt-5/i, /^o4/i, /^o3/i, /mini/i, /nano/i],
+    anthropic: [/opus-4-5/i, /sonnet-4-5/i, /3-7-sonnet/i],
+    mistral: [/mistral-large/i, /mistral-medium/i, /mistral-small/i, /codestral/i],
     grok: [/grok-4\.1-fast/i, /grok-4(?!\.)/i, /grok-3/i, /grok-2/i],
-    together: [/Llama-4-Maverick/i, /Llama-4-Scout/i, /Llama-3\.3-70B/i, /Qwen3-235B/i, /Qwen.*72B/i, /DeepSeek-V3/i, /Mixtral-8x22B/i]
+    ollama: [/^qwen3\.5/i, /^qwen3/i, /^glm4\.7-air/i, /^glm4/i, /^llama/i, /^gemma/i]
   };
 
   let dynamicTextModels: Record<string, string[]> = {};
@@ -501,15 +461,6 @@
         models = (await fetchModelsFromJsonEndpoint('https://api.x.ai/v1/models', {
           Authorization: `Bearer ${key}`
         })).filter(model => /grok/i.test(model));
-      } else if (providerId === 'together') {
-        const key = requireApiKey(preferences.textApiKey);
-        if (!key) {
-          syncTextMessage = 'Ajoute une clé API Together pour charger les modèles en direct.';
-          return;
-        }
-        models = (await fetchModelsFromJsonEndpoint('https://api.together.xyz/v1/models', {
-          Authorization: `Bearer ${key}`
-        })).filter(model => !IMAGE_MODEL_PATTERN.test(model));
       }
 
       if (!models.length) {
@@ -572,17 +523,6 @@
         if (!models.length) {
           models = ['gpt-image-1'];
         }
-      } else if (providerId === 'together_img') {
-        const key = requireApiKey(preferences.imageApiKey);
-        if (!key) {
-          syncImageMessage = 'Ajoute une clé API Together pour charger les modèles image en direct.';
-          return;
-        }
-
-        const allModels = await fetchModelsFromJsonEndpoint('https://api.together.xyz/v1/models', {
-          Authorization: `Bearer ${key}`
-        });
-        models = allModels.filter(model => IMAGE_MODEL_PATTERN.test(model));
       } else {
         models = IMAGE_PROVIDERS.find(provider => provider.id === providerId)?.models || [];
       }
@@ -645,11 +585,13 @@
 
     const textProviderAlias: Record<string, string> = {
       gemini: 'openrouter',
-      groq: 'grok'
+      groq: 'grok',
+      together: 'openrouter'
     };
     const imageProviderAlias: Record<string, string> = {
       openai: 'openai_img',
-      flux: 'openrouter_img'
+      flux: 'openrouter_img',
+      together_img: 'openrouter_img'
     };
 
     if (next.textProvider && textProviderAlias[next.textProvider]) {
@@ -664,7 +606,8 @@
       next.defaultImageProvider = imageProviderAlias[next.defaultImageProvider];
     }
 
-    if (!next.textProvider) next.textProvider = 'openrouter';
+    const validTextProviderIds = new Set(TEXT_PROVIDERS.map(provider => provider.id));
+    if (!next.textProvider || !validTextProviderIds.has(next.textProvider)) next.textProvider = 'openrouter';
 
     const textProvider = TEXT_PROVIDERS.find(p => p.id === next.textProvider);
     if (!next.textModel) {
@@ -692,8 +635,12 @@
     if (!next.writingPov) next.writingPov = 'troisieme';
     if (!next.writingLength) next.writingLength = 'moyen';
 
+    const validImageProviderIds = new Set(IMAGE_PROVIDERS.map(provider => provider.id));
     if (!next.imageProvider) {
       next.imageProvider = next.defaultImageProvider || 'none';
+    }
+    if (!validImageProviderIds.has(next.imageProvider)) {
+      next.imageProvider = 'none';
     }
 
     const imageProvider = IMAGE_PROVIDERS.find(p => p.id === next.imageProvider);

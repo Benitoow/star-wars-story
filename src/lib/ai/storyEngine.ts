@@ -151,18 +151,16 @@ const OPENAI_COMPATIBLE_BASE_URLS: Record<string, string> = {
   openrouter: 'https://openrouter.ai/api/v1',
   openai: 'https://api.openai.com/v1',
   mistral: 'https://api.mistral.ai/v1',
-  grok: 'https://api.x.ai/v1',
-  together: 'https://api.together.xyz/v1'
+  grok: 'https://api.x.ai/v1'
 };
 
 const DEFAULT_MODELS: Record<string, string> = {
   openrouter: 'google/gemma-3-27b-it:free',  // powerful free model, excellent tool calling
-  openai: 'gpt-4o-mini',
-  anthropic: 'claude-3-5-sonnet-latest',
-  mistral: 'mistral-large-latest',
+  openai: 'gpt-5.4-mini',
+  anthropic: 'claude-sonnet-4-5',
+  mistral: 'mistral-medium-3',
   grok: 'grok-3-mini-beta',
-  together: 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
-  ollama: 'llama3.3'
+  ollama: 'qwen3.5'
 };
 
 function cleanText(value: unknown, maxLength = 2200): string {
@@ -738,7 +736,6 @@ function getProviderDisplayName(providerId: string): string {
     anthropic: 'Anthropic',
     mistral: 'Mistral',
     grok: 'Grok',
-    together: 'Together AI',
     ollama: 'Ollama',
     none: 'Aucun provider'
   };
@@ -1888,7 +1885,9 @@ export function normalizeProviderId(rawProviderId: string | undefined): string {
   const providerId = String(rawProviderId || '').trim().toLowerCase();
   const aliases: Record<string, string> = {
     groq: 'grok',
-    xai: 'grok'
+    xai: 'grok',
+    together: 'openrouter',
+    togetherai: 'openrouter'
   };
   return aliases[providerId] || providerId;
 }
