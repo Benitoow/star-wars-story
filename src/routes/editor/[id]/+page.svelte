@@ -841,15 +841,24 @@
     };
   }
 
+  async function refreshRuntimePreferences(): Promise<UserPreferences> {
+    const preferences = await getPreferences();
+    applySetupDefaultsFromPreferences(preferences);
+    providerConfig = buildProviderConfigFromPreferences(preferences);
+    providerStatus = providerSummary(providerConfig);
+
+    return preferences;
+  }
+
   function providerSummary(config: StoryProviderConfig | null): string {
     if (!config) return 'Aucun provider texte configuré.';
     const modelLabel = config.model || 'modèle auto';
-    const modeLabel = supportsAgenticToolCalling(config.providerId) ? ' · agentique' : '';
+    const modeLabel = supportsAgenticToolCalling(config.providerId, config.model) ? ' · agentique' : '';
     return `${config.providerId} · ${modelLabel}${modeLabel}`;
   }
 
   function resolvePromptMode(): 'json' | 'tool-calls' {
-    return providerConfig && supportsAgenticToolCalling(providerConfig.providerId)
+    return providerConfig && supportsAgenticToolCalling(providerConfig.providerId, providerConfig.model)
       ? 'tool-calls'
       : 'json';
   }
@@ -989,7 +998,7 @@
 
   async function runBackgroundWorldTick(setup: StorySetup, turn: number, recentSectionTypes: string[] = []): Promise<void> {
     if (!providerConfig) return;
-    if (!supportsAgenticToolCalling(providerConfig.providerId)) return;
+    if (!supportsAgenticToolCalling(providerConfig.providerId, providerConfig.model)) return;
 
     const sectionWindow = recentSectionTypes.length
       ? recentSectionTypes.slice(-2)
@@ -1102,6 +1111,8 @@
   }
 
   async function requestStoryChapter(prompt: string, setup: StorySetup, turn: number): Promise<StoryChapter> {
+    await refreshRuntimePreferences();
+
     if (!providerConfig) {
       throw new Error('Aucun provider IA configuré. Ouvre les paramètres IA texte.');
     }
@@ -1431,11 +1442,7 @@
       storyId = null;
     }
 
-    const preferences = await getPreferences();
-    applySetupDefaultsFromPreferences(preferences);
-
-    providerConfig = buildProviderConfigFromPreferences(preferences);
-    providerStatus = providerSummary(providerConfig);
+    const preferences = await refreshRuntimePreferences();
 
     if (storyId) {
       const session = loadInteractiveSession(storyId);
@@ -1820,7 +1827,7 @@
             <!-- Model chip -->
             {#if providerConfig}
               <div class="model-chip" title={providerStatus}>
-                {#if supportsAgenticToolCalling(providerConfig.providerId)}
+                {#if supportsAgenticToolCalling(providerConfig.providerId, providerConfig.model)}
                   <span class="model-chip-dot agentic"></span>
                 {:else}
                   <span class="model-chip-dot"></span>
@@ -1828,7 +1835,7 @@
                 <span class="model-chip-name">
                   {(providerConfig.model || 'auto').split('/').pop()?.split(':')[0] ?? 'auto'}
                 </span>
-                {#if supportsAgenticToolCalling(providerConfig.providerId)}
+                {#if supportsAgenticToolCalling(providerConfig.providerId, providerConfig.model)}
                   <span class="model-chip-tag">⚡</span>
                 {/if}
               </div>

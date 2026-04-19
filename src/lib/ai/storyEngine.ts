@@ -156,7 +156,7 @@ const OPENAI_COMPATIBLE_BASE_URLS: Record<string, string> = {
 };
 
 const DEFAULT_MODELS: Record<string, string> = {
-  openrouter: 'google/gemma-3-27b-it:free',  // powerful free model, excellent tool calling
+  openrouter: 'google/gemma-4-26b-a4b-it',
   openai: 'gpt-5.4-mini',
   anthropic: 'claude-sonnet-4-5',
   mistral: 'mistral-medium-3',
@@ -986,6 +986,12 @@ function withTimeoutSignal(timeoutMs: number): { controller: AbortController; ca
   };
 }
 
+function getOpenAiCompatibleTimeoutMs(caps: ModelCapabilities): number {
+  if (caps.tier === 'large') return 90000;
+  if (caps.tier === 'medium') return 65000;
+  return 50000;
+}
+
 function isAbortError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
 
@@ -1047,6 +1053,8 @@ const DEFAULT_CAPS: ModelCapabilities = {
 
 // Pattern → partial capabilities override (first match wins)
 const MODEL_CAPS_PATTERNS: Array<[RegExp, Partial<ModelCapabilities>]> = [
+  // Gemma 3 free — large, but usually too slow/limited for native agentic tools
+  [/gemma-3-27b-it:free|gemma-3-27b-it/i, { tier: 'large', reasoningStyle: 'none', reasoningEffort: 'low', supportsNativeTools: false, maxOutputTokens: 2400, idealTemperature: 0.9 }],
   // Gemma 4 — small, reasoning capable
   [/gemma-4/,                { tier: 'small',  reasoningStyle: 'openai-effort',      reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 2500, idealTemperature: 1.0 }],
   // GPT-5.4 family
@@ -1140,6 +1148,7 @@ async function callOpenAiCompatibleRaw(
   }
 
   const caps = detectModelCapabilities(config);
+  const timeoutMs = getOpenAiCompatibleTimeoutMs(caps);
   const body: Record<string, unknown> = {
     model: resolveModel(config),
     messages,
@@ -1157,7 +1166,7 @@ async function callOpenAiCompatibleRaw(
     body.tool_choice = options.toolChoice ?? 'auto';
   }
 
-  const { controller, cancel } = withTimeoutSignal(50000);
+  const { controller, cancel } = withTimeoutSignal(timeoutMs);
 
   try {
     const response = await fetch(`${baseUrl}/chat/completions`, {
@@ -1906,9 +1915,14 @@ function applyAgenticToolCall(draft: AgenticDraft, toolName: string, args: Recor
   return { ok: false, note: `unknown tool: ${toolName}` };
 }
 
-export function supportsAgenticToolCalling(providerId: string | undefined): boolean {
+export function supportsAgenticToolCalling(providerId: string | undefined, model?: string): boolean {
   const normalized = normalizeProviderId(providerId);
-  return AGENTIC_TOOL_CALLING_PROVIDERS.has(normalized);
+  if (!AGENTIC_TOOL_CALLING_PROVIDERS.has(normalized)) return false;
+
+  if (!model) return true;
+
+  const caps = detectModelCapabilities({ providerId: normalized, model });
+  return caps.supportsNativeTools;
 }
 
 async function generateStoryTurnWithTools(
@@ -2039,7 +2053,7 @@ export async function generateStoryTurn(
     ? config
     : { ...config, providerId: normalizedProviderId };
 
-  if (supportsAgenticToolCalling(normalizedProviderId)) {
+  if (supportsAgenticToolCalling(normalizedProviderId, normalizedConfig.model)) {
     try {
       const agenticResult = await generateStoryTurnWithTools(messages, normalizedConfig, turnNumber);
       if (hasUsableStoryTurnOutput(agenticResult.rawResponse, agenticResult.chapter)) {
@@ -2318,7 +2332,7 @@ export async function generateBackgroundWorldEvent(
     ? config
     : { ...config, providerId: normalizedProviderId };
 
-  if (supportsAgenticToolCalling(normalizedProviderId)) {
+  if (supportsAgenticToolCalling(normalizedProviderId, normalizedConfig.model)) {
     try {
       return await generateBackgroundWorldEventWithTools(input, normalizedConfig);
     } catch (error) {
