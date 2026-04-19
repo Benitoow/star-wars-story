@@ -423,21 +423,11 @@
 
   function buildSceneAnchor(ws: WorldState, lastChapter: StoryChapter): string {
     const p = ws.player;
-    const hpLabel = p.hp >= 80 ? 'en forme' : p.hp >= 50 ? 'légèrement blessé' : p.hp >= 20 ? 'blessé' : 'état critique';
-    const injuryNote = p.injuries.length
-      ? `, blessures: ${p.injuries.map(i => i.description).join(', ')}`
-      : '';
-    const aliveNpcs = ws.npcs.filter(n => n.alive !== false).slice(0, 5);
-    const npcList = aliveNpcs.length
-      ? aliveNpcs.map(n => `${n.name} (${n.affinity > 30 ? 'allié' : n.affinity < -30 ? 'hostile' : 'neutre'})`).join(', ')
-      : 'aucun PNJ connu';
-    const lastText = (lastChapter.narrative.action || lastChapter.narrative.context || '').slice(0, 220);
-    return `## ANCRAGE SCÈNE — dernier chapitre: "${lastChapter.chapter_title}"
-Lieu actuel: ${p.location} | Date: ${p.date}
-Protagoniste: ${hpLabel} (${p.hp}/100 HP)${injuryNote} | Crédits: ₡${p.credits}
-PNJs connus: ${npcList}
-Dernière scène: "${lastText}${lastText.length >= 220 ? '…' : ''}"
-→ Continue DIRECTEMENT cette scène ou sa suite logique et immédiate.`;
+    const aliveNpcs = ws.npcs.filter(n => n.alive !== false).slice(0, 4)
+      .map(n => `${n.name}(${n.affinity > 30 ? '+' : n.affinity < -30 ? '-' : '~'})`).join(', ');
+    const injNote = p.injuries.length ? ` blessé(${p.injuries.map(i => i.description).join(',')})` : '';
+    const lastText = (lastChapter.narrative.action || lastChapter.narrative.context || '').slice(0, 160);
+    return `[SCÈNE PRÉCÉDENTE: "${lastChapter.chapter_title}" | ${p.location} | ${p.hp}HP${injNote} | PNJs: ${aliveNpcs || 'aucun'} | "${lastText}…"]`;
   }
 
   function chapterLooksLikeTransition(chapter: StoryChapter): boolean {
@@ -788,7 +778,7 @@ Dernière scène: "${lastText}${lastText.length >= 220 ? '…' : ''}"
       : 'json';
   }
 
-  function trimMessages(messages: ChatMessage[], maxWithoutSystem = 18): ChatMessage[] {
+  function trimMessages(messages: ChatMessage[], maxWithoutSystem = 10): ChatMessage[] {
     const systemMessage = messages.find(message => message.role === 'system');
     const others = messages.filter(message => message.role !== 'system').slice(-maxWithoutSystem);
     return systemMessage ? [systemMessage, ...others] : others;
@@ -800,33 +790,16 @@ Dernière scène: "${lastText}${lastText.length >= 220 ? '…' : ''}"
   }
 
   function appendMemoryFromChapter(chapter: StoryChapter): void {
+    // Only keep explicit, factual memory entries — no noisy generic implicit facts
     const explicitFacts = [
       ...chapter.memory_updates.relations.map(item => `Relation: ${item}`),
       ...chapter.memory_updates.places.map(item => `Lieu: ${item}`),
       ...chapter.memory_updates.injuries.map(item => `Blessure: ${item}`),
       ...chapter.memory_updates.resources.map(item => `Ressource: ${item}`),
       ...chapter.memory_updates.notes.map(item => `Note: ${item}`)
-    ];
+    ].filter(f => f.length > 10); // filter empty/trivial entries
 
-    const corpus = [
-      chapter.narrative.context,
-      chapter.narrative.action,
-      chapter.narrative.dialogue,
-      chapter.narrative.reflection
-    ].join(' ');
-
-    const implicitFacts: string[] = [];
-    if (/(bless|hémorrag|fracture|wound|injur|brûlure)/i.test(corpus)) {
-      implicitFacts.push(`Tour ${chapter.chapter_number}: état physique du protagoniste potentiellement dégradé.`);
-    }
-    if (/(crédit|credits|prime|dette|ressource|équipement|blaster|sabrelaser|vaisseau)/i.test(corpus)) {
-      implicitFacts.push(`Tour ${chapter.chapter_number}: ressources matérielles ou financières modifiées.`);
-    }
-    if (/(coruscant|tatouine|mustafar|hoth|dagobah|temple|cantina|station|base|croiseur)/i.test(corpus)) {
-      implicitFacts.push(`Tour ${chapter.chapter_number}: nouveaux lieux importants visités.`);
-    }
-
-    mergeMemoryFacts([...explicitFacts, ...implicitFacts]);
+    mergeMemoryFacts(explicitFacts);
   }
 
   function backgroundEventToSyntheticChapter(event: BackgroundWorldEvent, turn: number): StoryChapter {
@@ -989,7 +962,7 @@ Dernière scène: "${lastText}${lastText.length >= 220 ? '…' : ''}"
     }
 
     const promptMode = resolvePromptMode();
-    const systemPrompt = buildSystemPrompt(setup, memoryLog.slice(-20), worldState, promptMode, turn);
+    const systemPrompt = buildSystemPrompt(setup, memoryLog.slice(-10), worldState, promptMode, turn);
     aiMessages = [{ role: 'system', content: systemPrompt }, ...aiMessages.filter(message => message.role !== 'system')];
 
     const requestMessages = trimMessages([
@@ -1071,10 +1044,10 @@ Dernière scène: "${lastText}${lastText.length >= 220 ? '…' : ''}"
       await ensureStoryExists(setup);
 
       const nextTurn = turnNumber + 1;
-      const recentSummary = chapterHistory.slice(-3).map(chapter => summarizeChapterForPrompt(chapter));
-      const recentSectionTypes = chapterHistory.slice(-5).map(c => c.section_type).filter(Boolean);
+      const recentSummary = chapterHistory.slice(-2).map(chapter => summarizeChapterForPrompt(chapter));
+      const recentSectionTypes = chapterHistory.slice(-4).map(c => c.section_type).filter(Boolean);
       const recentChoiceTexts = chapterHistory
-        .slice(-5)
+        .slice(-3)
         .flatMap(chapter => chapter.choices.map(choice => choice.text));
 
       const lastChapter = chapterHistory[chapterHistory.length - 1];

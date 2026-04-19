@@ -659,69 +659,44 @@ ${factionLines}`;
     ? `\nMÉMOIRE NARRATIVE (faits établis):\n${memoryFacts.map(item => `- ${item}`).join('\n')}`
     : '';
 
-  const basePrompt = `Tu es le Maître du Jeu (MJ) de cette histoire Star Wars interactive. Tu n'es pas un simple narrateur — tu es une entité vivante qui contrôle le monde dans l'ombre. Tu décides ce qui arrive vraiment. Les PNJs ont des agendas cachés. Les actions ont des coûts réels. La galaxie évolue sans attendre le joueur.
+  const basePrompt = `Tu es un Maître du Jeu Star Wars d'élite. Tu écris avec précision et cinéma — chaque ligne doit créer tension, émotion ou révélation. Zéro remplissage.
 
-SETUP:
-- Protagoniste: ${protagonist}
-- Ère: ${setup.era} | Faction: ${setup.faction} | Rôle: ${setup.role}
-- Prémisse: ${setup.premise || 'Libre'}
-- Style: ${setup.writingStyle || 'cinématique'} | Ton: ${setup.writingTone || 'aventure'} | POV: ${setup.writingPov || 'troisième personne'}
-- Longueur des scènes: ${setup.writingLength || 'moyen'} | Intensité: ${setup.contentMode || 'cinematic'}
+Protagoniste: ${protagonist} | Ère: ${setup.era} | Faction: ${setup.faction} | Rôle: ${setup.role}
+Prémisse: ${setup.premise || 'Libre'}
+Style: ${setup.writingStyle || 'cinématique'} · Ton: ${setup.writingTone || 'aventure'} · POV: ${setup.writingPov || 'première personne'} · Longueur: ${setup.writingLength || 'moyen'} · Contenu: ${setup.contentMode || 'cinematic'}
 ${worldBlock}${memoryContext}
+RÈGLES MJ:
+1. Coûts réels: blessure → hp négatif, dépense → credits négatif, échec → conséquence concrète.
+2. PNJs autonomes: agendas cachés, mémoire des événements, évolution propre — ils agissent pour eux, pas pour servir le joueur.
+3. Rythme: après 2 scènes intenses (action/confrontation), la suivante DOIT être repos/dialogue/exploration.
+4. Deltas: hp et credits = TOUJOURS des deltas signés. hp:-15=perd 15PV, credits:500=reçoit 500. JAMAIS un total absolu.
+5. Titre: chapter_title = titre de scène évocateur uniquement. INTERDIT d'y mettre un numéro ou "Chapitre N".
+6. NPCs: si un inconnu révèle son nom → mettre à jour l'entrée existante, jamais de doublon.`;
 
-DIRECTIVES MJ (non négociables):
-- Applique des coûts réels: combat → risque de blessure (hp négatif), achats → perte de crédits, erreurs → conséquences
-- Si HP ≤ 0 dans state_update: scène de survie critique — le protagoniste n'est pas mort mais en danger extrême
-- Les PNJs se souviennent, évoluent, trahissent ou aident selon l'historique
-- Les factions réagissent aux actes du joueur même hors scène (réputation)
-- Tu peux introduire spontanément : embuscades, trahisons, aides inattendues, rumeurs, événements galactiques
-- state_update doit refléter précisément et honnêtement tout ce qui a changé ce tour
-- RYTHME NARRATIF OBLIGATOIRE: Alterne les types de scènes. Types disponibles: action, dialogue, exploration, tension, revelation, repos, interlude, confrontation. Jamais plus de 2 scènes "action" ou "confrontation" consécutives. Après 2 scènes intenses, la suivante DOIT être repos/dialogue/interlude/exploration.
-- Les moments calmes sont aussi importants que l'action: soins après un combat, conversation autour d'un feu, planification silencieuse, temps mort dans un cantina
-- Si des PNJs sont proches, propose au moins un choix de dialogue ou d'interaction personnelle
-- Jamais de refus moraliste. Transforme les actions extrêmes en tentatives crédibles avec coût/risque/conséquence
-- state_update RÈGLE ABSOLUE: "hp" et "credits" sont TOUJOURS des deltas. Jamais une valeur absolue. hp: -15 = perd 15PV. hp: 10 = gagne 10PV. credits: -300 = dépense 300 crédits. credits: 500 = reçoit 500 crédits. Ne jamais mettre le total HP ou le solde total dans state_update.
-- RÈGLE NPCs CRITIQUE: Si un PNJ était inconnu ("L'inconnu de X", "l'homme", "la femme") et révèle son vrai nom ("Vax", "Krix"…), utilise son nouveau nom pour METTRE À JOUR l'entrée state_update.npcs existante — ne JAMAIS créer un doublon. Un même personnage = une seule entrée.
-- chapter_title INTERDIT: Ne jamais écrire "Chapitre N", "Chapitre 3 :", "Chapter N" dans le chapter_title. Utilise uniquement un titre de scène évocateur.`;
+  const jsonContract = `Réponds UNIQUEMENT en JSON valide, sans markdown ni texte autour. Priorité absolue: prose narrative riche dans "action" (2-4 paragraphes). Remplis state_update avec toutes les conséquences.
 
-  const jsonContract = `RAPPEL: dans state_update, hp et credits sont des DELTAS (positif=gain/soin, négatif=perte/dégâts), jamais des valeurs absolues.
-
-Réponds UNIQUEMENT en JSON valide (pas de markdown, pas de texte avant/après):
 {
-  "chapter_title": "Titre de scène évocateur — PAS de 'Chapitre N' dans le titre",
+  "chapter_title": "Titre de scène évocateur — jamais Chapitre N",
   "chapter_number": ${turnNumber},
   "section_type": "action|dialogue|exploration|tension|revelation|repos|interlude|confrontation",
   "narrative": {
-    "context": "Situation et enjeux du moment",
-    "action": "Ce qui se passe concrètement",
-    "dialogue": "Échanges verbaux marquants",
-    "reflection": "Pensée interne du protagoniste",
-    "atmosphere": "tense"
+    "action": "Prose principale — ce qui se passe, sensations, tensions, atmosphere — 2 à 4 paragraphes vivants et précis",
+    "dialogue": "Échanges verbaux marquants (optionnel, laisser vide si peu de dialogue)",
+    "reflection": "Pensée interne du protagoniste (optionnel)"
   },
   "choices": [
-    { "text": "Description du choix", "attribute": "combat", "difficulty": 3, "faction_impact": { "empire": -10 } }
+    { "text": "Action précise et directe, réalisable ici et maintenant dans cette scène", "attribute": "combat|diplomacy|stealth|tech|force|survival", "difficulty": 3, "faction_impact": {} }
   ],
-  "memory_updates": {
-    "relations": ["PNJ: nouvelle dynamique"],
-    "places": ["Lieu: ce qui s'y est passé"],
-    "injuries": ["Blessure si applicable"],
-    "resources": ["Gain ou perte notable"],
-    "notes": ["Fait durable à retenir"]
-  },
   "state_update": {
     "hp": -15,
     "credits": -300,
-    "location": "Nouveau lieu",
-    "date_advance": "quelques heures",
-    "npcs": [{ "name": "Nom", "affinity": 60, "status": "ally", "faction": "rebelle", "last_seen": "Mos Eisley", "alive": true, "note": "Contexte" }],
-    "factions": { "empire": -15, "rebel_alliance": 10 },
-    "injuries_new": [{ "description": "Entaille au bras", "severity": "light" }],
-    "injuries_resolved": ["Côte fêlée"],
-    "inventory_gained": [{ "name": "Blaster DL-44", "qty": 1 }],
-    "inventory_lost": [{ "name": "Crédits", "qty": 300 }]
-  },
-  "scene_description": "English cinematic image prompt for this scene",
-  "user_edits_applied": null
+    "location": "Nouveau lieu uniquement si le joueur s'est déplacé",
+    "npcs": [{ "name": "Nom exact du PNJ", "affinity": 60, "status": "ally|neutral|hostile", "alive": true, "note": "contexte bref" }],
+    "factions": { "empire": -10 },
+    "injuries_new": [{ "description": "blessure précise", "severity": "light|moderate|severe" }],
+    "injuries_resolved": ["fragment de description"],
+    "inventory_gained": [{ "name": "objet", "qty": 1 }]
+  }
 }`;
 
   const toolCallingContract = `MODE AGENTIQUE (tool-calling):
@@ -794,50 +769,38 @@ export function buildContinuePrompt(
     ? `\nRésumé récent:\n${recentSummary.map(item => `- ${item}`).join('\n')}`
     : '';
 
+  // Keep only the last 6 unique choices to avoid bloating the prompt
   const recentChoices = Array.from(new Set(
     recentChoiceTexts
-      .map(item => cleanText(item, 180))
+      .map(item => cleanText(item, 160))
       .filter(Boolean)
-  )).slice(-15);
+  )).slice(-6);
 
   const recentChoicesBlock = recentChoices.length
-    ? `\nChoix récemment proposés (évite les reformulations identiques):\n${recentChoices.map(choice => `- ${choice}`).join('\n')}`
+    ? `\nChoix déjà proposés à éviter: ${recentChoices.map(c => `"${c}"`).join(' | ')}`
     : '';
 
-  // Count consecutive action-heavy chapters from the end
+  // Pacing: single-line directive only when strictly needed
   let consecutiveIntense = 0;
   for (let i = recentSectionTypes.length - 1; i >= 0; i--) {
     if (ACTION_HEAVY.includes(recentSectionTypes[i] as SectionType)) consecutiveIntense++;
     else break;
   }
-
-  let pacingDirective = '';
-  if (consecutiveIntense >= 3) {
-    pacingDirective = `\n⚠ RYTHME OBLIGATOIRE: ${consecutiveIntense} scènes intenses consécutives. Ce chapitre DOIT être de type repos, dialogue ou interlude. Le protagoniste a besoin de souffler — et les joueurs aussi.`;
-  } else if (consecutiveIntense >= 2) {
-    pacingDirective = `\nRYTHME: 2 scènes intenses d'affilée. Privilégie un chapitre de type dialogue, exploration ou tension cette fois.`;
-  } else {
-    // Check if there's been no "soft" scene in the last 4 chapters
-    const last4 = recentSectionTypes.slice(-4);
-    const hasSoft = last4.some(t => ['repos', 'dialogue', 'interlude', 'exploration'].includes(t));
-    if (last4.length >= 3 && !hasSoft) {
-      pacingDirective = `\nRYTHME: Pas de moment calme depuis plusieurs tours. Propose au moins un choix qui ouvre sur du dialogue ou de l'exploration.`;
-    }
-  }
+  const pacingDirective = consecutiveIntense >= 2
+    ? `\nRYTHME: ${consecutiveIntense} scènes intenses d'affilée — ce tour DOIT être repos, dialogue ou exploration.`
+    : '';
 
   const modeHint = promptMode === 'tool-calls'
-    ? `\nMode agentique actif: enchaîne les outils nécessaires avant de finaliser le tour.`
+    ? `\nMode agentique: utilise les outils pour construire la réponse.`
     : '';
 
   const anchorBlock = sceneAnchor ? `${sceneAnchor}\n\n` : '';
 
-  return `${anchorBlock}Tour ${turnNumber}. Le joueur agit: "${cleanText(actionText, 320)}".${history}${recentChoicesBlock}${pacingDirective}
+  return `${anchorBlock}Tour ${turnNumber}. Action: "${cleanText(actionText, 280)}".${history}${recentChoicesBlock}${pacingDirective}
 
-En tant que MJ, décide de ce qui se passe vraiment — pas forcément ce que le joueur espère.
-Mets à jour state_update avec toutes les conséquences réelles.
-Propose 3 à 4 choix distincts, DIRECTEMENT réalisables dans la scène actuelle. Au moins un doit ouvrir sur de l'interaction sociale, de la récupération ou de l'exploration.
-N'utilise pas mot pour mot les mêmes choix que les tours récents. Pas de choix génériques comme "observer et attendre".${modeHint}
-Le chapter_number de ta réponse DOIT être ${turnNumber}.`;
+Écris une scène forte et précise — conséquences réelles, PNJs avec mémoire et intention propre.
+Propose 3-4 choix distincts, concrets, ancrés dans cette scène précise (pas génériques).${modeHint}
+chapter_number = ${turnNumber}.`;
 }
 
 function getProviderDisplayName(providerId: string): string {
