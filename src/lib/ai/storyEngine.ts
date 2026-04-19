@@ -958,6 +958,16 @@ function withTimeoutSignal(timeoutMs: number): { controller: AbortController; ca
   };
 }
 
+function isAbortError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+
+  const name = (error as { name?: unknown }).name;
+  if (name === 'AbortError') return true;
+
+  const message = (error as { message?: unknown }).message;
+  return typeof message === 'string' && /aborted a request|the operation was aborted|abort/i.test(message);
+}
+
 async function parseErrorMessage(response: Response): Promise<string> {
   const raw = await response.text().catch(() => '');
   if (!raw) return `HTTP ${response.status}`;
@@ -2010,52 +2020,88 @@ export async function generateStoryTurn(
 
       console.warn('[storyEngine] Tool-calling a renvoyé une sortie vide/inexploitable, fallback JSON.');
     } catch (error) {
+      if (isAbortError(error)) {
+        console.warn('[storyEngine] Tool-calling interrompu par timeout, fallback local non bloquant.', error);
+        const emergencyChapter = fallbackChapter(
+          `Le générateur IA a dépassé le temps imparti pendant le lancement. Le récit démarre en mode de secours pour ne pas bloquer la partie.`,
+          turnNumber
+        );
+
+        return {
+          chapter: emergencyChapter,
+          rawResponse: JSON.stringify(emergencyChapter),
+          mode: 'structured-json',
+          steps: 0,
+          toolCalls: 0
+        };
+      }
+
       console.warn('[storyEngine] Tool-calling indisponible, fallback JSON.', error);
     }
   }
 
-  const rawResponse = await callTextModel(messages, normalizedConfig);
-  const chapter = parseStoryResponse(rawResponse, turnNumber);
+  try {
+    const rawResponse = await callTextModel(messages, normalizedConfig);
+    const chapter = parseStoryResponse(rawResponse, turnNumber);
 
-  if (!hasUsableStoryTurnOutput(rawResponse, chapter)) {
-    console.warn('[storyEngine] Sortie JSON initiale inexploitable, retry strict JSON.');
+    if (!hasUsableStoryTurnOutput(rawResponse, chapter)) {
+      console.warn('[storyEngine] Sortie JSON initiale inexploitable, retry strict JSON.');
 
-    const recoveryMessages = buildStrictJsonRecoveryMessages(messages);
-    const recoveryRawResponse = await callTextModel(recoveryMessages, normalizedConfig);
-    const recoveryChapter = parseStoryResponse(recoveryRawResponse, turnNumber);
+      const recoveryMessages = buildStrictJsonRecoveryMessages(messages);
+      const recoveryRawResponse = await callTextModel(recoveryMessages, normalizedConfig);
+      const recoveryChapter = parseStoryResponse(recoveryRawResponse, turnNumber);
 
-    if (hasUsableStoryTurnOutput(recoveryRawResponse, recoveryChapter)) {
+      if (hasUsableStoryTurnOutput(recoveryRawResponse, recoveryChapter)) {
+        return {
+          chapter: recoveryChapter,
+          rawResponse: recoveryRawResponse,
+          mode: 'structured-json',
+          steps: 2,
+          toolCalls: 0
+        };
+      }
+
+      console.warn('[storyEngine] Retry strict JSON toujours inexploitable, fallback local non bloquant.');
+      const emergencyChapter = fallbackChapter(
+        `Le flux IA était instable sur ce tour. Le récit continue avec des choix sûrs.`,
+        turnNumber
+      );
+
       return {
-        chapter: recoveryChapter,
-        rawResponse: recoveryRawResponse,
+        chapter: emergencyChapter,
+        rawResponse: JSON.stringify(emergencyChapter),
         mode: 'structured-json',
         steps: 2,
         toolCalls: 0
       };
     }
 
-    console.warn('[storyEngine] Retry strict JSON toujours inexploitable, fallback local non bloquant.');
-    const emergencyChapter = fallbackChapter(
-      `Le flux IA était instable sur ce tour. Le récit continue avec des choix sûrs.`,
-      turnNumber
-    );
-
     return {
-      chapter: emergencyChapter,
-      rawResponse: JSON.stringify(emergencyChapter),
+      chapter,
+      rawResponse,
       mode: 'structured-json',
-      steps: 2,
+      steps: 1,
       toolCalls: 0
     };
-  }
+  } catch (error) {
+    if (isAbortError(error)) {
+      console.warn('[storyEngine] Requête texte interrompue par timeout, fallback local non bloquant.', error);
+      const emergencyChapter = fallbackChapter(
+        `Le générateur IA a mis trop de temps à répondre. Le récit continue avec un chapitre de secours, sans bloquer le lancement.`,
+        turnNumber
+      );
 
-  return {
-    chapter,
-    rawResponse,
-    mode: 'structured-json',
-    steps: 1,
-    toolCalls: 0
-  };
+      return {
+        chapter: emergencyChapter,
+        rawResponse: JSON.stringify(emergencyChapter),
+        mode: 'structured-json',
+        steps: 0,
+        toolCalls: 0
+      };
+    }
+
+    throw error;
+  }
 }
 
 function buildBackgroundWorldSystemPrompt(
@@ -2248,11 +2294,37 @@ export async function generateBackgroundWorldEvent(
     try {
       return await generateBackgroundWorldEventWithTools(input, normalizedConfig);
     } catch (error) {
+      if (isAbortError(error)) {
+        console.warn('[storyEngine] Background tool-calling interrompu par timeout, skip du tick.', error);
+        return {
+          event: null,
+          rawResponse: '',
+          mode: 'structured-json',
+          steps: 0,
+          toolCalls: 0
+        };
+      }
+
       console.warn('[storyEngine] Background tool-calling indisponible, fallback JSON.', error);
     }
   }
 
-  return generateBackgroundWorldEventStructured(input, normalizedConfig);
+  try {
+    return await generateBackgroundWorldEventStructured(input, normalizedConfig);
+  } catch (error) {
+    if (isAbortError(error)) {
+      console.warn('[storyEngine] Background requête texte interrompue par timeout, skip du tick.', error);
+      return {
+        event: null,
+        rawResponse: '',
+        mode: 'structured-json',
+        steps: 0,
+        toolCalls: 0
+      };
+    }
+
+    throw error;
+  }
 }
 
 async function callAnthropic(messages: ChatMessage[], config: StoryProviderConfig): Promise<string> {
