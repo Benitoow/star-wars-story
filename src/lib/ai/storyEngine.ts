@@ -1076,6 +1076,30 @@ const DEFAULT_CAPS: ModelCapabilities = {
 
 // Pattern → partial capabilities override (first match wins)
 const MODEL_CAPS_PATTERNS: Array<[RegExp, Partial<ModelCapabilities>]> = [
+  // Gemini 3 Flash Preview — strong agentic model with configurable thinking levels
+  [/gemini-3-flash-preview/, { tier: 'medium', reasoningStyle: 'openai-effort',      reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3000, idealTemperature: 0.9 }],
+  // Gemini 2.5 Flash Lite — fast/cost-efficient default with thinking usually disabled
+  [/gemini-2\.5-flash-lite/, { tier: 'small',  reasoningStyle: 'none',               reasoningEffort: 'low',    supportsNativeTools: true, maxOutputTokens: 2600, idealTemperature: 0.85 }],
+  // GPT-OSS-120B — high reasoning + native tool use
+  [/gpt-oss-120b/,           { tier: 'large',  reasoningStyle: 'openai-effort',      reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3400, idealTemperature: 0.9 }],
+  // DeepSeek V3.2 — strong reasoning/coding and agentic reliability
+  [/deepseek-v3\.2/,         { tier: 'large',  reasoningStyle: 'openai-effort',      reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3400, idealTemperature: 0.9 }],
+  // Xiaomi MiMo V2 Omni — high-capability omni model used here in text-first mode
+  [/mimo-v2-omni/,          { tier: 'large',  reasoningStyle: 'openai-effort',      reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3400, idealTemperature: 0.9 }],
+  // Xiaomi MiMo V2 Flash — strong agentic profile, balanced reasoning + speed
+  [/mimo-v2-flash/,         { tier: 'medium', reasoningStyle: 'openai-effort',      reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 2800, idealTemperature: 0.95 }],
+  // MiniMax M2.7 — frontier agentic model with long context
+  [/minimax-m2\.7/,         { tier: 'large',  reasoningStyle: 'openai-effort',      reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3400, idealTemperature: 0.9 }],
+  // Qwen 3.5 9B — efficient reasoning/coding profile
+  [/qwen3\.5-9b/,           { tier: 'small',  reasoningStyle: 'openai-effort',      reasoningEffort: 'low',    supportsNativeTools: true, maxOutputTokens: 2400, idealTemperature: 0.9 }],
+  // Grok 4.20 — flagship xAI with 2M context and strong agentic tool use
+  [/grok-4\.20/,            { tier: 'large',  reasoningStyle: 'openai-effort',      reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3600, idealTemperature: 0.9 }],
+  // Grok 4.1 Fast — long context, optimized for agentic tool use
+  [/grok-4\.1-fast/,        { tier: 'large',  reasoningStyle: 'openai-effort',      reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3200, idealTemperature: 0.95 }],
+  // Gemma 4 31B — denser quality profile with slightly larger output budget
+  [/gemma-4-31b-it/,       { tier: 'medium', reasoningStyle: 'openai-effort',      reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3000, idealTemperature: 0.95 }],
+  // Gemma 4 26B A4B — efficient MoE profile
+  [/gemma-4-26b-a4b-it/,   { tier: 'small',  reasoningStyle: 'openai-effort',      reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 2800, idealTemperature: 0.95 }],
   // Gemma 3 free — keep larger timeout profile while allowing agentic extraction
   [/gemma-3-27b-it:free|gemma-3-27b-it/i, { tier: 'large', reasoningStyle: 'none', reasoningEffort: 'low', supportsNativeTools: true, maxOutputTokens: 2400, idealTemperature: 0.9 }],
   // Gemma 4 — reasoning capable and now re-enabled for agentic extraction
@@ -1106,6 +1130,138 @@ function detectModelCapabilities(config: StoryProviderConfig): ModelCapabilities
     }
   }
   return DEFAULT_CAPS;
+}
+
+function getOpenRouterProviderPreferences(modelId: string): Record<string, unknown> | undefined {
+  const normalized = modelId.toLowerCase();
+
+  if (/google\/gemini-3-flash-preview/.test(normalized)) {
+    return {
+      require_parameters: true,
+      order: ['google-ai-studio', 'google-vertex'],
+      preferred_max_latency: { p90: 2 },
+      preferred_min_throughput: { p90: 70 },
+      max_price: { prompt: 0.6, completion: 3.5 },
+      allow_fallbacks: true
+    };
+  }
+
+  if (/google\/gemini-2\.5-flash-lite/.test(normalized)) {
+    return {
+      require_parameters: true,
+      order: ['google-vertex', 'google-ai-studio'],
+      preferred_max_latency: { p90: 1 },
+      preferred_min_throughput: { p90: 100 },
+      max_price: { prompt: 0.2, completion: 0.6 },
+      allow_fallbacks: true
+    };
+  }
+
+  if (/openai\/gpt-oss-120b/.test(normalized)) {
+    return {
+      require_parameters: true,
+      sort: 'throughput',
+      preferred_max_latency: { p90: 2 },
+      preferred_min_throughput: { p90: 50 },
+      max_price: { prompt: 0.2, completion: 0.8 },
+      allow_fallbacks: true
+    };
+  }
+
+  if (/deepseek\/deepseek-v3\.2/.test(normalized)) {
+    return {
+      require_parameters: true,
+      sort: 'throughput',
+      preferred_max_latency: { p90: 3 },
+      preferred_min_throughput: { p90: 20 },
+      max_price: { prompt: 0.45, completion: 1.8 },
+      allow_fallbacks: true
+    };
+  }
+
+  if (/xiaomi\/mimo-v2-omni/.test(normalized)) {
+    return {
+      require_parameters: true,
+      sort: 'throughput',
+      preferred_max_latency: { p90: 3 },
+      preferred_min_throughput: { p90: 45 },
+      allow_fallbacks: true
+    };
+  }
+
+  if (/xiaomi\/mimo-v2-flash/.test(normalized)) {
+    return {
+      require_parameters: true,
+      sort: 'throughput',
+      preferred_max_latency: { p90: 3 },
+      preferred_min_throughput: { p90: 40 },
+      allow_fallbacks: true
+    };
+  }
+
+  if (/x-ai\/grok-4\.1-fast/.test(normalized)) {
+    return {
+      require_parameters: true,
+      sort: 'throughput',
+      preferred_max_latency: { p90: 10 },
+      preferred_min_throughput: { p90: 80 },
+      allow_fallbacks: true
+    };
+  }
+
+  if (/x-ai\/grok-4\.20/.test(normalized)) {
+    return {
+      require_parameters: true,
+      sort: 'throughput',
+      preferred_max_latency: { p90: 2 },
+      preferred_min_throughput: { p90: 90 },
+      max_price: { prompt: 4, completion: 12 },
+      allow_fallbacks: true
+    };
+  }
+
+  if (/minimax\/minimax-m2\.7/.test(normalized)) {
+    return {
+      require_parameters: true,
+      sort: 'throughput',
+      preferred_max_latency: { p90: 3 },
+      preferred_min_throughput: { p90: 30 },
+      max_price: { prompt: 0.6, completion: 2.4 },
+      allow_fallbacks: true
+    };
+  }
+
+  if (/qwen\/qwen3\.5-9b/.test(normalized)) {
+    return {
+      require_parameters: true,
+      order: ['together', 'venice'],
+      preferred_max_latency: { p90: 1 },
+      preferred_min_throughput: { p90: 20 },
+      allow_fallbacks: true
+    };
+  }
+
+  if (/google\/gemma-4-26b-a4b-it/.test(normalized)) {
+    return {
+      require_parameters: true,
+      sort: 'latency',
+      preferred_max_latency: { p90: 2 },
+      preferred_min_throughput: { p90: 25 },
+      allow_fallbacks: true
+    };
+  }
+
+  if (/google\/gemma-4-31b-it/.test(normalized)) {
+    return {
+      require_parameters: true,
+      sort: 'latency',
+      preferred_max_latency: { p90: 3 },
+      preferred_min_throughput: { p90: 12 },
+      allow_fallbacks: true
+    };
+  }
+
+  return undefined;
 }
 
 type OpenAiToolDefinition = {
@@ -1171,13 +1327,21 @@ async function callOpenAiCompatibleRaw(
   }
 
   const caps = detectModelCapabilities(config);
+  const modelId = resolveModel(config);
   const timeoutMs = getOpenAiCompatibleTimeoutMs(caps);
   const body: Record<string, unknown> = {
-    model: resolveModel(config),
+    model: modelId,
     messages,
     max_tokens: options.maxTokens ?? caps.maxOutputTokens,
     temperature: options.temperature ?? caps.idealTemperature
   };
+
+  if (config.providerId === 'openrouter') {
+    const providerPreferences = getOpenRouterProviderPreferences(modelId);
+    if (providerPreferences) {
+      body.provider = providerPreferences;
+    }
+  }
 
   // Inject reasoning for models that support it (OpenRouter / OpenAI-compatible)
   if (caps.reasoningStyle === 'openai-effort' && !options.skipReasoning) {

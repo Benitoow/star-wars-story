@@ -14,6 +14,25 @@ describe('supportsAgenticToolCalling', () => {
     expect(supportsAgenticToolCalling('openrouter', 'my/custom-model-1')).toBe(true);
   });
 
+  it('keeps agentic mode enabled for Xiaomi MiMo-V2-Flash and Grok 4.1 Fast', () => {
+    expect(supportsAgenticToolCalling('openrouter', 'xiaomi/mimo-v2-flash')).toBe(true);
+    expect(supportsAgenticToolCalling('openrouter', 'x-ai/grok-4.1-fast')).toBe(true);
+  });
+
+  it('keeps agentic mode enabled for Grok 4.20, MiniMax M2.7, Qwen3.5-9B and MiMo-V2-Omni', () => {
+    expect(supportsAgenticToolCalling('openrouter', 'x-ai/grok-4.20')).toBe(true);
+    expect(supportsAgenticToolCalling('openrouter', 'minimax/minimax-m2.7')).toBe(true);
+    expect(supportsAgenticToolCalling('openrouter', 'qwen/qwen3.5-9b')).toBe(true);
+    expect(supportsAgenticToolCalling('openrouter', 'xiaomi/mimo-v2-omni')).toBe(true);
+  });
+
+  it('keeps agentic mode enabled for DeepSeek V3.2, GPT-OSS-120B, Gemini 2.5 Flash Lite and Gemini 3 Flash Preview', () => {
+    expect(supportsAgenticToolCalling('openrouter', 'deepseek/deepseek-v3.2')).toBe(true);
+    expect(supportsAgenticToolCalling('openrouter', 'openai/gpt-oss-120b')).toBe(true);
+    expect(supportsAgenticToolCalling('openrouter', 'google/gemini-2.5-flash-lite')).toBe(true);
+    expect(supportsAgenticToolCalling('openrouter', 'google/gemini-3-flash-preview')).toBe(true);
+  });
+
   it('returns false when provider is unsupported', () => {
     expect(supportsAgenticToolCalling('none', 'openai/gpt-5.4-mini')).toBe(false);
   });
