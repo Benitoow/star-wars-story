@@ -95,7 +95,7 @@ body {
   font-family: var(--font-body);
   background: var(--color-bg-primary);
   color: var(--color-text-primary);
-  line-height: 1.6;
+  line-height: 1.7;
   min-height: 100vh;
   overflow-x: hidden;
 }
@@ -462,6 +462,17 @@ a:hover {
 
 @media (min-width: 769px) {
   .hide-desktop { display: none !important; }
+}
+
+/* ─── Narrative Text Utilities ─────────────────── */
+.text-pretty {
+  text-wrap: pretty;
+}
+
+.narrative-width {
+  max-width: 680px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 /* ─── Reduced Motion ─────────────────────────── */

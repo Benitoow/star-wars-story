@@ -1476,7 +1476,7 @@
               <details class="memory-panel">
                 <summary>
                   <svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13"><path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"/></svg>
-                  Mémoire IA <span class="mem-count">({memoryLog.length})</span>
+                  Contexte mémorisé <span class="mem-count">({memoryLog.length})</span>
                 </summary>
                 {#if memoryLog.length}
                   <ul class="mem-list">
@@ -2368,28 +2368,29 @@
   /* ── Narrative flow ─────────────────────── */
   .narrative {
     padding: 0 var(--space-xl) var(--space-md);
-    max-width: 74ch;
+    max-width: 680px;
     margin: 0 auto;
   }
 
   .n-block {
-    padding: calc(var(--space-md) + 2px) 0;
+    padding: calc(var(--space-md) + 4px) 0;
     position: relative;
   }
 
   .n-block + .n-block {
-    border-top: 1px solid color-mix(in srgb, var(--color-border) 40%, transparent);
+    border-top: 1px solid rgba(255, 232, 31, 0.12);
+    margin-top: var(--space-sm);
   }
 
   .n-tag {
     display: block;
-    font-size: 0.62rem;
-    font-weight: 800;
+    font-size: 0.65rem;
+    font-weight: 900;
     text-transform: uppercase;
-    letter-spacing: 1.65px;
+    letter-spacing: 2px;
     color: var(--color-gold);
-    margin-bottom: 8px;
-    opacity: 0.85;
+    margin-bottom: 10px;
+    opacity: 0.9;
   }
 
   .n-tag--action     { color: #c8960f; }
@@ -2399,9 +2400,10 @@
   /* Prose shared */
   .n-block p {
     margin: 0;
-    line-height: 1.84;
+    line-height: 1.9;
     font-size: clamp(1rem, 0.97rem + 0.2vw, 1.07rem);
     text-wrap: pretty;
+    text-align: left;
   }
 
   .n-block p + p { margin-top: 1.1em; }
@@ -2411,13 +2413,24 @@
   }
 
   .n-paragraph--dialogue {
-    margin-left: 0.2rem;
-    padding: 0.15rem 0 0.15rem 0.85rem;
-    border-left: 3px solid color-mix(in srgb, #5aaed4 55%, transparent);
-    background: color-mix(in srgb, #5aaed4 7%, transparent);
-    color: color-mix(in srgb, var(--color-text-primary) 96%, white 4%);
+    margin-left: 0.5rem;
+    padding: 0.4rem 0 0.4rem 1rem;
+    border-left: 3px solid #4FC3F7;
+    background: rgba(79, 195, 247, 0.1);
+    color: #b8e4f4;
     font-style: italic;
-    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 1.02em;
+  }
+
+  .n-paragraph--thought {
+    margin-left: 0.5rem;
+    padding: 0.3rem 0 0.3rem 1rem;
+    border-left: 3px solid #CE93D8;
+    background: rgba(206, 147, 216, 0.08);
+    color: #d4b8e0;
+    font-style: italic;
+    border-radius: 0 4px 4px 0;
   }
 
   /* Context */
@@ -2466,6 +2479,9 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-sm);
+    margin-top: var(--space-lg);
+    padding-top: var(--space-md);
+    border-top: 1px solid rgba(255, 232, 31, 0.2);
   }
 
   .choices-heading {
@@ -2474,6 +2490,19 @@
     font-weight: 700;
     color: var(--color-text-primary);
     letter-spacing: -0.01em;
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+  }
+
+  .choices-heading::before {
+    content: '';
+    display: inline-block;
+    width: 24px;
+    height: 2px;
+    background: var(--color-gold);
+    border-radius: 1px;
+    flex-shrink: 0;
   }
 
   .choice-list {
@@ -2572,15 +2601,15 @@
   }
 
   .choice-attr {
-    font-size: 0.62rem;
-    font-weight: 800;
-    letter-spacing: 1px;
-    text-transform: uppercase;
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    text-transform: capitalize;
     color: var(--color-text-muted);
     background: var(--color-bg-tertiary);
     border: 1px solid var(--color-border);
     border-radius: 3px;
-    padding: 1px 5px;
+    padding: 2px 6px;
   }
 
   .choice-pips {

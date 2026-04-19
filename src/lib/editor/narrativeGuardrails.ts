@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   BackgroundWorldEvent,
   StoryChapter,
   StoryChoice,
@@ -51,6 +51,34 @@ function normalizeDialogueText(text: string): string {
 
   if (!cleaned) return '';
   return cleaned.startsWith('— ') ? cleaned : `— ${cleaned}`;
+}
+
+
+const DIALOGUE_ACTION_VERB_PREFIXES = [
+  "il lève","elle lève","il court","elle court","vous ouvrez","tu ouvres",
+  "il saisit","elle saisit","il pousse","elle pousse","il tire","elle tire",
+  "il tourne","elle tourne","il avance","elle avance","vous avancez",
+  "il frappe","elle frappe","il arrête","elle arrête","vous arrêtez",
+  "il prend","elle prend","vous prenez","je prends","il pose","elle pose",
+  "il montre","elle montre","vous montrez","il pointe","elle pointe",
+  "il désigne","elle désigne","il tend","elle tend","il tend la main",
+  "il fait","elle fait","vous faites","je fais","il attend","elle attend",
+  "il crie","elle crie","vous criez","je crie","il s'écrie","elle s'écrie",
+  "il répond","elle répond","vous répondez","je réponds","je murmure","je chuchote",
+  "je dis","vous dites","tu dis","je lâche","vous lâchez","je sors","vous sortez"
+];
+
+function isIsolatedDialogueLine(line: string): boolean {
+  const trimmed = (line || '').trim();
+  if (!trimmed) return false;
+  if (!/^(?:— |« |")/.test(trimmed)) return false;
+  if (trimmed.length < 3 || trimmed.length > 200) return false;
+  const afterPrefix = trimmed.replace(/^(?:— |« |")+/, '').trim();
+  const lowerLine = afterPrefix.toLowerCase();
+  for (const prefix of DIALOGUE_ACTION_VERB_PREFIXES) {
+    if (lowerLine.startsWith(prefix)) return false;
+  }
+  return true;
 }
 
 function splitParagraphFragments(text: string): NarrativeParagraph[] {

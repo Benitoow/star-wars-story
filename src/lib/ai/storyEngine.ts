@@ -921,7 +921,8 @@ RÈGLES MJ:
 7. Résumé de campagne: s'il est présent, il représente la continuité condensée des tours anciens — prends-le en compte sans le répéter mot à mot.`;
   const narrativeProseRule = `
 8. PROSE UNIQUEMENT dans "narrative.action": pas de markdown, pas de titres H1/H2, pas de listes numérotées, pas de bloc "Que faites-vous ?", pas de répétition des choix. Les choix vivent uniquement dans le tableau "choices".
-9. DIALOGUES: chaque réplique doit être sur son propre paragraphe, idéalement précédée d'un tiret cadratin (—) ou placée dans "narrative.dialogue". Ne colle jamais une réplique au milieu d'un paragraphe d'action.`;
+9. DIALOGUES: chaque réplique doit être sur son propre paragraphe, idéalement précédée d'un tiret cadratin (—) ou placée dans "narrative.dialogue". Ne colle jamais une réplique au milieu d'un paragraphe d'action.
+10. DIALOGUES OBLIGATOIREMENT DANS narrative.dialogue: chaque échange verbal doit être placé dans le champ "dialogue", jamais dans "action". "action" = narration pure et actions, "dialogue" = tous les échanges verbaux. Si un personnage parle, utilise ce champ dédié.;`;
 
   const jsonContract = `Réponds UNIQUEMENT en JSON valide, sans markdown ni texte autour. Priorité absolue: prose narrative riche dans "action" (2-4 paragraphes). Remplis state_update avec toutes les conséquences.
 
@@ -930,9 +931,10 @@ RÈGLES MJ:
   "chapter_number": ${turnNumber},
   "section_type": "action|dialogue|exploration|tension|revelation|repos|interlude|confrontation",
   "narrative": {
-    "action": "Prose principale — ce qui se passe, sensations, tensions, atmosphere — 2 à 4 paragraphes vivants et précis. Si un personnage parle, isole la réplique sur une nouvelle ligne et utilise — ou des guillemets français.",
-    "dialogue": "Échanges verbaux marquants, un dialogue = un paragraphe séparé, idéalement avec — en début de ligne (optionnel, laisser vide si peu de dialogue)",
-    "reflection": "Pensée interne du protagoniste (optionnel)"
+    "action": "Narration pure — actions, descriptions, sensations, tensions. AUCUN dialogue ici. Max 3 paragraphes.",
+    "dialogue": "Tous les échanges verbaux — chaque réplique sur sa propre ligne avec — Personnage en début. Ex: — Leia: « Je comprends votre inquiétude. »",
+    "reflection": "Pensées internes du protagoniste (optionnel, italique)",
+    "atmosphere": "tense|calm|mysterious|eerie|heroic"
   },
   "choices": [
     { "text": "Action précise et directe, réalisable ici et maintenant dans cette scène", "attribute": "combat|diplomacy|stealth|tech|force|survival", "difficulty": 3, "faction_impact": {} }
@@ -1013,7 +1015,8 @@ EXIGENCES DU PREMIER TOUR:
 - Les 3-4 choix doivent être concrets, contrastés et portés par la scène.
 - Le texte de scène ne doit contenir ni markdown ni liste de choix.
 - Tout dialogue doit être isolé sur sa propre ligne, idéalement précédé d'un tiret cadratin (—) et séparé du reste de l'action par un retour à la ligne.
-- chapter_number = 1${modeHint}`;
+- chapter_number = 1${modeHint}
+Les dialogues vont dans le champ "dialogue", jamais dans "action".`;
 }
 
 export const SECTION_TYPES = [
@@ -1073,7 +1076,8 @@ export function buildContinuePrompt(
 Ne mets aucun markdown, aucun titre interne et aucun bloc de choix dans le récit.
 Chaque réplique doit être sur une ligne distincte, idéalement précédée de —, et jamais noyée dans un paragraphe d'action.
 Propose 3-4 choix distincts, concrets, ancrés dans cette scène précise (pas génériques).
-chapter_number = ${turnNumber}.`;
+chapter_number = ${turnNumber}.
+Place tous les dialogues dans le champ "dialogue".`;
 }
 
 function getProviderDisplayName(providerId: string): string {
