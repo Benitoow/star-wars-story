@@ -373,15 +373,23 @@
 
   @media (max-width: 768px) {
     .hud {
-      bottom: 12px;
-      right: 12px;
+      position: relative;
       top: auto;
-      width: min(200px, calc(100vw - 24px));
-      max-height: 55vh;
+      right: auto;
+      bottom: auto;
+      width: calc(100% - 28px);
+      max-height: none;
+      margin: 8px 14px 0;
+      z-index: 2;
+    }
+
+    .hud.collapsed {
+      width: auto;
+      margin-left: auto;
     }
 
     .hud-body {
-      max-height: calc(55vh - 40px);
+      max-height: 34vh;
     }
   }
 </style>

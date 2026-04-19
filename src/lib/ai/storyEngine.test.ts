@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseStoryResponse, supportsAgenticToolCalling } from './storyEngine';
+import { buildSystemPrompt, parseStoryResponse, supportsAgenticToolCalling } from './storyEngine';
 
 describe('supportsAgenticToolCalling', () => {
   it('enables native tool-calling for Gemma 4 models on OpenRouter', () => {
@@ -48,5 +48,69 @@ describe('parseStoryResponse', () => {
     expect(chapter.narrative.action).toContain('Kaelen hésite une seconde avant d\'avancer.');
     expect(chapter.narrative.action.toLowerCase()).not.toContain('chapter_title');
     expect(chapter.narrative.action.trim().startsWith('{')).toBe(false);
+  });
+
+  it('normalizes numbered choice labels from model output', () => {
+    const raw = JSON.stringify({
+      chapter_title: 'Test',
+      chapter_number: 2,
+      section_type: 'action',
+      narrative: { action: 'Scène de test.' },
+      choices: [
+        { text: '1. Inspecter discrètement le hangar', attribute: 'stealth', difficulty: 2 },
+        { text: 'B) Questionner Lira immédiatement', attribute: 'diplomacy', difficulty: 3 },
+        { text: '• Activer le terminal de sécurité', attribute: 'tech', difficulty: 3 }
+      ]
+    });
+
+    const chapter = parseStoryResponse(raw, 2);
+
+    expect(chapter.choices[0]?.text.startsWith('1.')).toBe(false);
+    expect(chapter.choices[1]?.text.startsWith('B)')).toBe(false);
+    expect(chapter.choices[2]?.text.startsWith('•')).toBe(false);
+    expect(chapter.choices[0]?.text).toContain('Inspecter discrètement le hangar');
+  });
+
+  it('recovers inline credits/hp deltas when state_update is missing', () => {
+    const raw = JSON.stringify({
+      chapter_title: 'Pacte dans la poussière',
+      chapter_number: 2,
+      section_type: 'action',
+      narrative: {
+        action: 'Lira glisse une datacarte dans ta main. credits:+200. La pression monte. hp:-10.'
+      },
+      choices: [{ text: 'Continuer', attribute: 'survival', difficulty: 2 }]
+    });
+
+    const chapter = parseStoryResponse(raw, 2);
+
+    expect(chapter.state_update?.credits).toBe(200);
+    expect(chapter.state_update?.hp).toBe(-10);
+  });
+
+  it('keeps dialogue instructions explicit in the system prompt', () => {
+    const prompt = buildSystemPrompt(
+      {
+        era: 'imperial',
+        faction: 'rebels',
+        role: 'smuggler',
+        premise: 'Test prompt',
+        writingStyle: 'cinematic',
+        writingTone: 'tense',
+        writingPov: 'first-person',
+        writingLength: 'medium',
+        contentMode: 'cinematic',
+        protagonistFirstName: 'Ash',
+        protagonistLastName: 'Voss'
+      },
+      [],
+      undefined,
+      'json',
+      1,
+      []
+    );
+
+    expect(prompt).toContain('DIALOGUES: chaque réplique doit être sur son propre paragraphe');
+    expect(prompt).toContain('Ne colle jamais une réplique au milieu d\'un paragraphe d\'action.');
   });
 });

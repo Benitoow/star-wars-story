@@ -1,4 +1,5 @@
 ﻿import { logger } from '$lib/utils/logger';
+import { splitNarrativeParagraphs } from '$lib/editor/narrativeGuardrails';
 import {
   AGENTIC_TOOL_CALLING_PROVIDER_IDS,
   DEFAULT_OLLAMA_URL,
@@ -213,7 +214,12 @@ function sanitizeNarrativeText(value: unknown, maxLength = 2200): string {
 
   if (looksLikeStructuredPayload) {
     const extractedAction = tryExtractNarrativeActionFromPayload(trimmed);
-    if (extractedAction) return extractedAction.slice(0, maxLength);
+    if (extractedAction) {
+      return splitNarrativeParagraphs(extractedAction)
+        .map(item => item.text)
+        .join('\n\n')
+        .slice(0, maxLength);
+    }
     return 'Le passage a été nettoyé automatiquement pour éviter un affichage technique.';
   }
 
@@ -263,7 +269,12 @@ function sanitizeNarrativeText(value: unknown, maxLength = 2200): string {
   }
 
   flush();
-  if (paragraphs.length) return paragraphs.join('\n\n').trim();
+  if (paragraphs.length) {
+    return paragraphs
+      .flatMap(paragraph => splitNarrativeParagraphs(paragraph).map(item => item.text))
+      .join('\n\n')
+      .trim();
+  }
 
   return text ? 'Le passage a été nettoyé automatiquement pour éviter un affichage technique.' : '';
 }
@@ -319,11 +330,31 @@ function inferAttributeFromChoiceText(text: string): StoryAttribute {
   return 'survival';
 }
 
+function sanitizeChoiceText(value: unknown, maxLength = 220): string {
+  let text = cleanText(value, maxLength + 30).trim();
+  if (!text) return '';
+
+  // Remove leading bullets / labels / numbering (e.g. "A)", "2.", "-", "•")
+  const leadingChoiceMarker = /^(?:[-*•]\s*|[A-Da-d]\s*[)\].:-]\s*|\d{1,2}\s*[)\].:-]\s*)/;
+  for (let i = 0; i < 3; i += 1) {
+    const next = text.replace(leadingChoiceMarker, '').trim();
+    if (next === text) break;
+    text = next;
+  }
+
+  text = text
+    .replace(/^["'«»\s]+|["'«»\s]+$/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+  return text.slice(0, maxLength);
+}
+
 function normalizeChoice(choice: unknown): StoryChoice | null {
   if (!choice) return null;
 
   if (typeof choice === 'string') {
-    const text = cleanText(choice, 220);
+    const text = sanitizeChoiceText(choice, 220);
     if (!text) return null;
     return {
       text,
@@ -336,7 +367,7 @@ function normalizeChoice(choice: unknown): StoryChoice | null {
   if (typeof choice !== 'object') return null;
 
   const record = choice as Record<string, unknown>;
-  const text = cleanText(record.text, 220);
+  const text = sanitizeChoiceText(record.text, 220);
   if (!text) return null;
 
   const difficultyNumber = Number(record.difficulty);
@@ -688,6 +719,43 @@ function coerceStateUpdate(source: unknown): StateUpdate | undefined {
   return Object.keys(update).length ? update : undefined;
 }
 
+function sumInlineDelta(text: string, pattern: RegExp, clampAbs: number): number | undefined {
+  const matches = text.matchAll(pattern);
+  let sum = 0;
+  let found = false;
+
+  for (const match of matches) {
+    const parsed = Number(match[1]);
+    if (!Number.isFinite(parsed)) continue;
+    sum += parsed;
+    found = true;
+  }
+
+  if (!found) return undefined;
+  return Math.max(-clampAbs, Math.min(clampAbs, Math.round(sum)));
+}
+
+function extractInlineStateUpdateFromNarrative(narrative: StoryNarrative): StateUpdate | undefined {
+  const corpus = [
+    narrative.context,
+    narrative.action,
+    narrative.dialogue,
+    narrative.reflection
+  ].join('\n');
+
+  if (!corpus.trim()) return undefined;
+
+  const hp = sumInlineDelta(corpus, /\b(?:hp|health|sante|santé)\s*[:=]\s*([+-]?\d{1,4})\b/gi, 100);
+  const credits = sumInlineDelta(corpus, /\b(?:credits?|cr[eé]dits?)\s*[:=]\s*([+-]?\d{1,7})\b/gi, 1000000);
+
+  if (hp === undefined && credits === undefined) return undefined;
+
+  const update: StateUpdate = {};
+  if (hp !== undefined) update.hp = hp;
+  if (credits !== undefined) update.credits = credits;
+  return update;
+}
+
 function extractChoices(source: unknown): StoryChoice[] {
   const list = Array.isArray(source) ? source : [];
   const normalized = list
@@ -747,6 +815,22 @@ export function parseStoryResponse(rawText: string, turnNumber: number): StoryCh
   ].join('\n');
   const safeChoices = choices.length ? choices : defaultChoices(fallbackChoiceSeed, chapterNumber, sectionType);
 
+  let stateUpdate = coerceStateUpdate(parsed.state_update);
+  const inlineStateUpdate = extractInlineStateUpdateFromNarrative(narrative);
+
+  if (inlineStateUpdate) {
+    if (!stateUpdate) {
+      stateUpdate = inlineStateUpdate;
+    } else {
+      if (stateUpdate.hp === undefined && inlineStateUpdate.hp !== undefined) {
+        stateUpdate.hp = inlineStateUpdate.hp;
+      }
+      if (stateUpdate.credits === undefined && inlineStateUpdate.credits !== undefined) {
+        stateUpdate.credits = inlineStateUpdate.credits;
+      }
+    }
+  }
+
   return {
     chapter_title: chapterTitle,
     chapter_number: chapterNumber,
@@ -756,7 +840,7 @@ export function parseStoryResponse(rawText: string, turnNumber: number): StoryCh
     memory_updates: coerceMemoryUpdates(parsed.memory_updates),
     scene_description: cleanText(parsed.scene_description, 160) || 'Cinematic Star Wars scene with dramatic lighting and dynamic action',
     user_edits_applied: cleanText(parsed.user_edits_applied, 180) || null,
-    state_update: coerceStateUpdate(parsed.state_update)
+    state_update: stateUpdate
   };
 }
 
@@ -836,7 +920,8 @@ RÈGLES MJ:
 6. NPCs: si un inconnu révèle son nom → mettre à jour l'entrée existante, jamais de doublon.
 7. Résumé de campagne: s'il est présent, il représente la continuité condensée des tours anciens — prends-le en compte sans le répéter mot à mot.`;
   const narrativeProseRule = `
-8. PROSE UNIQUEMENT dans "narrative.action": pas de markdown, pas de titres H1/H2, pas de listes numérotées, pas de bloc "Que faites-vous ?", pas de répétition des choix. Les choix vivent uniquement dans le tableau "choices".`;
+8. PROSE UNIQUEMENT dans "narrative.action": pas de markdown, pas de titres H1/H2, pas de listes numérotées, pas de bloc "Que faites-vous ?", pas de répétition des choix. Les choix vivent uniquement dans le tableau "choices".
+9. DIALOGUES: chaque réplique doit être sur son propre paragraphe, idéalement précédée d'un tiret cadratin (—) ou placée dans "narrative.dialogue". Ne colle jamais une réplique au milieu d'un paragraphe d'action.`;
 
   const jsonContract = `Réponds UNIQUEMENT en JSON valide, sans markdown ni texte autour. Priorité absolue: prose narrative riche dans "action" (2-4 paragraphes). Remplis state_update avec toutes les conséquences.
 
@@ -845,8 +930,8 @@ RÈGLES MJ:
   "chapter_number": ${turnNumber},
   "section_type": "action|dialogue|exploration|tension|revelation|repos|interlude|confrontation",
   "narrative": {
-    "action": "Prose principale — ce qui se passe, sensations, tensions, atmosphere — 2 à 4 paragraphes vivants et précis",
-    "dialogue": "Échanges verbaux marquants (optionnel, laisser vide si peu de dialogue)",
+    "action": "Prose principale — ce qui se passe, sensations, tensions, atmosphere — 2 à 4 paragraphes vivants et précis. Si un personnage parle, isole la réplique sur une nouvelle ligne et utilise — ou des guillemets français.",
+    "dialogue": "Échanges verbaux marquants, un dialogue = un paragraphe séparé, idéalement avec — en début de ligne (optionnel, laisser vide si peu de dialogue)",
     "reflection": "Pensée interne du protagoniste (optionnel)"
   },
   "choices": [
@@ -870,6 +955,7 @@ PHASE 1 (maintenant): Écris la scène en JSON valide ou en prose libre.
 - Aucun outil disponible dans cette phase.
 - Priorité absolue: prose narrative vivante, conséquences réelles, PNJs avec mémoire et intentions propres.
 - Si JSON: remplis "narrative.action" avec 3-5 paragraphes de prose cinématique.
+- Les dialogues doivent être séparés en paragraphes dédiés (de préférence avec —) et ne jamais être noyés dans le bloc d'action.
 - Aucun markdown, aucun titre interne et aucun bloc de choix dans "narrative.action".
 
 PHASE 2 (ensuite, automatique): Le système extraira l'état structuré via des outils dédiés.
@@ -926,6 +1012,7 @@ EXIGENCES DU PREMIER TOUR:
 - Fais émerger un enjeu politique, relationnel ou moral dès l'ouverture.
 - Les 3-4 choix doivent être concrets, contrastés et portés par la scène.
 - Le texte de scène ne doit contenir ni markdown ni liste de choix.
+- Tout dialogue doit être isolé sur sa propre ligne, idéalement précédé d'un tiret cadratin (—) et séparé du reste de l'action par un retour à la ligne.
 - chapter_number = 1${modeHint}`;
 }
 
@@ -984,6 +1071,7 @@ export function buildContinuePrompt(
 
 Écris une scène forte et précise — conséquences réelles, PNJs avec mémoire et intention propre.
 Ne mets aucun markdown, aucun titre interne et aucun bloc de choix dans le récit.
+Chaque réplique doit être sur une ligne distincte, idéalement précédée de —, et jamais noyée dans un paragraphe d'action.
 Propose 3-4 choix distincts, concrets, ancrés dans cette scène précise (pas génériques).
 chapter_number = ${turnNumber}.`;
 }

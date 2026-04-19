@@ -16,6 +16,161 @@ const TIME_PASS_CHOICE_REGEX = /(attendre|patienter|passer le temps|se reposer|m
 const ACTION_HEAVY_CHOICE_REGEX = /(attaquer|assaut|fusillade|duel|foncer|abattre|détruire|exploser|charge|combat|sabre|blaster|éliminer)/i;
 const TOOL_CALL_LEAK_TEXT_REGEX = /<\|?tool_call\|?>|tool_call|(?:^|\s)call:[a-z_]+\s*\{/i;
 const STRUCTURED_PAYLOAD_HINT_REGEX = /(^|\s)json\s*\{|"chapter_title"\s*:|"chapter_number"\s*:|"narrative"\s*:|"choices"\s*:/i;
+const INLINE_STATE_TOKEN_REGEX = /\b(?:hp|health|sante|santé|credits?|cr[eé]dits?)\s*[:=]\s*[+-]?\d{1,7}\b/gi;
+const LEADING_CHOICE_ENUM_REGEX = /^(?:[-*•]\s*|[A-Da-d]\s*[)\].:-]\s*|\d{1,2}\s*[)\].:-]\s*)/;
+const URGENT_SCENE_HINT_REGEX = /(sir[eè]ne|alarme|chasseur|tie|attaque|embuscade|pas de retour|compte(?:\s|-)?[aà]\s*rebours|dans\s+trois\s+heures|chaos|urgence)/i;
+
+export type NarrativeParagraphKind = 'prose' | 'dialogue';
+
+export interface NarrativeParagraph {
+  kind: NarrativeParagraphKind;
+  text: string;
+}
+
+function stripInlineStateTokens(text: string): string {
+  return String(text || '')
+    .replace(INLINE_STATE_TOKEN_REGEX, '')
+    .replace(/\s+([,.;:!?])/g, '$1')
+    .replace(/\(\s*\)/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+function cleanParagraphText(text: string): string {
+  return String(text || '')
+    .replace(/\s+/g, ' ')
+    .replace(/\s+([,.;:!?])/g, '$1')
+    .trim();
+}
+
+function normalizeDialogueText(text: string): string {
+  const cleaned = cleanParagraphText(text)
+    .replace(/^[—–\-\s]+/, '')
+    .replace(/^['"«»“”]+|['"«»“”]+$/g, '')
+    .trim();
+
+  if (!cleaned) return '';
+  return cleaned.startsWith('— ') ? cleaned : `— ${cleaned}`;
+}
+
+function splitParagraphFragments(text: string): NarrativeParagraph[] {
+  const fragments: NarrativeParagraph[] = [];
+  const source = String(text || '').replace(/\r/g, '\n').trim();
+  if (!source) return fragments;
+
+  const collectDialogueSegments = (line: string): Array<{ start: number; end: number; text: string }> => {
+    const segments: Array<{ start: number; end: number; text: string }> = [];
+
+    for (const match of line.matchAll(/["«“]([^"\n«»“”]{2,240}?)['"»”]/g)) {
+      const content = cleanParagraphText(match[1] || '');
+      if (!content) continue;
+      segments.push({
+        start: match.index ?? 0,
+        end: (match.index ?? 0) + match[0].length,
+        text: content
+      });
+    }
+
+    for (const match of line.matchAll(/(^|[.?!;:]\s+)(—\s*[^—\n]{2,240}?(?:[.!?](?=\s|$)|$))/g)) {
+      const prefix = match[1] || '';
+      const content = cleanParagraphText(match[2] || '');
+      if (!content) continue;
+      const index = match.index ?? 0;
+      segments.push({
+        start: index + prefix.length,
+        end: index + match[0].length,
+        text: content
+      });
+    }
+
+    for (const match of line.matchAll(/(^|[\s(])'([^'\n]{2,240})'(?!\w)/g)) {
+      const prefix = match[1] || '';
+      const content = cleanParagraphText(match[2] || '');
+      if (!content) continue;
+      const index = match.index ?? 0;
+      segments.push({
+        start: index + prefix.length,
+        end: index + match[0].length,
+        text: content
+      });
+    }
+
+    return segments.sort((left, right) => left.start - right.start || left.end - right.end);
+  };
+
+  for (const rawLine of source.split(/\n+/)) {
+    const line = cleanParagraphText(rawLine);
+    if (!line) continue;
+
+    if (/^(?:—|«|“|\")/.test(line)) {
+      const dialogue = normalizeDialogueText(line);
+      if (dialogue) fragments.push({ kind: 'dialogue', text: dialogue });
+      continue;
+    }
+
+    const segments = collectDialogueSegments(line);
+    if (!segments.length) {
+      fragments.push({ kind: 'prose', text: line });
+      continue;
+    }
+
+    let cursor = 0;
+    for (const segment of segments) {
+      if (segment.start < cursor) continue;
+
+      const before = cleanParagraphText(line.slice(cursor, segment.start));
+      if (before) fragments.push({ kind: 'prose', text: before });
+
+      const dialogue = normalizeDialogueText(segment.text);
+      if (dialogue) fragments.push({ kind: 'dialogue', text: dialogue });
+
+      cursor = segment.end;
+    }
+
+    const tail = cleanParagraphText(line.slice(cursor).replace(/^[,;:]+\s*/, ''));
+    if (tail) fragments.push({ kind: 'prose', text: tail });
+  }
+
+  return fragments;
+}
+
+export function splitNarrativeParagraphs(text: string): NarrativeParagraph[] {
+  return splitParagraphFragments(text);
+}
+
+export function isDialogueParagraph(text: string): boolean {
+  const trimmed = String(text || '').trim();
+  return Boolean(trimmed) && (trimmed.startsWith('— ') || trimmed.startsWith('«') || trimmed.startsWith('“') || /^\"/.test(trimmed));
+}
+
+function normalizeChoiceText(text: string): string {
+  let normalized = String(text || '').trim();
+  for (let i = 0; i < 3; i += 1) {
+    const next = normalized.replace(LEADING_CHOICE_ENUM_REGEX, '').trim();
+    if (next === normalized) break;
+    normalized = next;
+  }
+
+  return normalized
+    .replace(/^["'«»\s]+|["'«»\s]+$/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+function normalizeChoiceFormatting(choices: StoryChoice[]): StoryChoice[] {
+  const dedup = new Map<string, StoryChoice>();
+
+  for (const choice of choices) {
+    const text = normalizeChoiceText(choice.text);
+    if (!text) continue;
+    const key = text.toLowerCase();
+    if (!dedup.has(key)) {
+      dedup.set(key, { ...choice, text });
+    }
+  }
+
+  return Array.from(dedup.values()).slice(0, 4);
+}
 
 function tryExtractNarrativeActionFromStructuredPayload(rawText: string): string | null {
   const normalized = String(rawText || '')
@@ -56,7 +211,9 @@ export function sanitizeNarrativeTextForDisplay(text: string): string {
 
   if (looksLikeStructuredPayload) {
     const extractedAction = tryExtractNarrativeActionFromStructuredPayload(trimmed);
-    if (extractedAction) return extractedAction;
+    if (extractedAction) {
+      return splitNarrativeParagraphs(extractedAction).map(item => item.text).join('\n\n');
+    }
     return 'Le passage a été nettoyé automatiquement pour éviter un affichage technique.';
   }
 
@@ -102,11 +259,18 @@ export function sanitizeNarrativeTextForDisplay(text: string): string {
     if (inChoiceBlock) continue;
     if (/^\d+[.)]\s+/.test(normalized)) continue;
 
-    buffer.push(normalized.replace(/\s{2,}/g, ' '));
+    const cleanedLine = stripInlineStateTokens(normalized);
+    if (!cleanedLine) continue;
+    buffer.push(cleanedLine.replace(/\s{2,}/g, ' '));
   }
 
   flush();
-  if (paragraphs.length) return paragraphs.join('\n\n').trim();
+  if (paragraphs.length) {
+    return paragraphs
+      .flatMap(paragraph => splitNarrativeParagraphs(paragraph).map(item => item.text))
+      .join('\n\n')
+      .trim();
+  }
 
   return TOOL_CALL_LEAK_TEXT_REGEX.test(raw)
     ? 'Le système IA a renvoyé une sortie technique non lisible pour ce passage. L\'histoire continue normalement via les choix ci-dessous.'
@@ -306,15 +470,54 @@ export function getNearbyNpcNames(chapter: StoryChapter, worldState: WorldState,
 }
 
 export function enforceTransitionChoiceQuality(chapter: StoryChapter, worldState: WorldState): StoryChapter {
-  if (!chapterLooksLikeTransition(chapter)) return chapter;
+  const normalizedChoices = normalizeChoiceFormatting(chapter.choices);
+  const preparedChapter = normalizedChoices.length
+    ? { ...chapter, choices: normalizedChoices }
+    : chapter;
 
-  const choices = [...chapter.choices];
-  if (!choices.length) return chapter;
+  if (!chapterLooksLikeTransition(preparedChapter)) {
+    const urgencyCorpus = [
+      preparedChapter.chapter_title,
+      preparedChapter.narrative.context,
+      preparedChapter.narrative.action,
+      preparedChapter.narrative.dialogue,
+      preparedChapter.narrative.reflection
+    ].join(' ');
+
+    if (URGENT_SCENE_HINT_REGEX.test(urgencyCorpus)) {
+      const replaceIndex = preparedChapter.choices.findIndex(choice => TIME_PASS_CHOICE_REGEX.test(choice.text));
+      if (replaceIndex >= 0) {
+        const nearbyNpc = getNearbyNpcNames(preparedChapter, worldState, 1)[0];
+        const replacement: StoryChoice = nearbyNpc
+          ? {
+              text: `Interroger ${nearbyNpc} immédiatement pour verrouiller le plan avant l'arrivée ennemie.`,
+              attribute: 'diplomacy',
+              difficulty: 3,
+              faction_impact: {}
+            }
+          : {
+              text: 'Sécuriser immédiatement le périmètre du hangar et préparer une riposte avant l’arrivée des chasseurs.',
+              attribute: 'combat',
+              difficulty: 3,
+              faction_impact: {}
+            };
+
+        const updatedChoices = [...preparedChapter.choices];
+        updatedChoices[replaceIndex] = replacement;
+        return { ...preparedChapter, choices: normalizeChoiceFormatting(updatedChoices) };
+      }
+    }
+
+    return preparedChapter;
+  }
+
+  const choices = [...preparedChapter.choices];
+  if (!choices.length) return preparedChapter;
 
   const hasDialogueChoice = choices.some(choice => DIALOGUE_CHOICE_REGEX.test(choice.text));
   const hasTimePassChoice = choices.some(choice => TIME_PASS_CHOICE_REGEX.test(choice.text));
 
-  const nearbyNpcs = getNearbyNpcNames(chapter, worldState);
+  const nearbyNpcs = getNearbyNpcNames(preparedChapter, worldState);
   let injectedChoice: StoryChoice | null = null;
 
   if (nearbyNpcs.length > 0 && !hasDialogueChoice) {
@@ -355,14 +558,11 @@ export function enforceTransitionChoiceQuality(chapter: StoryChapter, worldState
   }
 
   return {
-    ...chapter,
-    choices
+    ...preparedChapter,
+    choices: normalizeChoiceFormatting(choices)
   };
 }
 
 export function textToParagraphs(text: string): string[] {
-  return String(text || '')
-    .split(/\n+/)
-    .map(line => line.trim())
-    .filter(Boolean);
+  return splitNarrativeParagraphs(text).map(item => item.text);
 }

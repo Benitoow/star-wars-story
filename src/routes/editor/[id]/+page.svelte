@@ -51,9 +51,10 @@
     buildSceneAnchor,
     enforceTransitionChoiceQuality,
     isNearDuplicateBackgroundEvent,
+    sanitizeNarrativeTextForDisplay,
     sanitizeChapterForDisplay,
     sanitizeChapterList,
-    textToParagraphs
+    splitNarrativeParagraphs
   } from '$lib/editor/narrativeGuardrails';
   import {
     buildJournalContent,
@@ -464,7 +465,24 @@
       stateFacts.push(`Obtenu: ${su.inventory_gained.slice(0, 3).map(item => item.qty > 1 ? `${item.qty}× ${item.name}` : item.name).join(', ')}`);
     }
 
-    mergeMemoryFacts([...explicitFacts, ...stateFacts.filter(f => f.length > 10)]);
+    const mergedFacts = [...explicitFacts, ...stateFacts.filter(f => f.length > 10)];
+
+    // Safety net: always keep at least one memory breadcrumb per chapter,
+    // even when models omit memory_updates/state_update.
+    if (!mergedFacts.length) {
+      const narrativeSnippet = sanitizeNarrativeTextForDisplay(
+        chapter.narrative.action || chapter.narrative.context || chapter.narrative.dialogue || ''
+      )
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 160);
+
+      if (narrativeSnippet) {
+        mergedFacts.push(`Tour ${chapter.chapter_number}: ${chapter.chapter_title} — ${narrativeSnippet}`);
+      }
+    }
+
+    mergeMemoryFacts(mergedFacts);
   }
 
   const ARCHIVE_TRIGGER_TURN = 30;
@@ -976,6 +994,10 @@
       }
     }
 
+    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches) {
+      hudCollapsed = true;
+    }
+
     loading = false;
 
     if (preferences.autoSave) {
@@ -1413,8 +1435,8 @@
                     {#if currentChapter.narrative.context}
                       <div class="n-block n-context">
                         <span class="n-tag">Contexte</span>
-                        {#each textToParagraphs(currentChapter.narrative.context) as para}
-                          <p>{para}</p>
+                        {#each splitNarrativeParagraphs(currentChapter.narrative.context) as para}
+                          <p class="n-paragraph" class:n-paragraph--dialogue={para.kind === 'dialogue'}>{para.text}</p>
                         {/each}
                       </div>
                     {/if}
@@ -1422,8 +1444,8 @@
                     {#if currentChapter.narrative.action}
                       <div class="n-block n-action">
                         <span class="n-tag n-tag--action">Action</span>
-                        {#each textToParagraphs(currentChapter.narrative.action) as para}
-                          <p>{para}</p>
+                        {#each splitNarrativeParagraphs(currentChapter.narrative.action) as para}
+                          <p class="n-paragraph" class:n-paragraph--dialogue={para.kind === 'dialogue'}>{para.text}</p>
                         {/each}
                       </div>
                     {/if}
@@ -1431,8 +1453,8 @@
                     {#if currentChapter.narrative.dialogue}
                       <div class="n-block n-dialogue">
                         <span class="n-tag n-tag--dialogue">Dialogue</span>
-                        {#each textToParagraphs(currentChapter.narrative.dialogue) as para}
-                          <p>{para}</p>
+                        {#each splitNarrativeParagraphs(currentChapter.narrative.dialogue) as para}
+                          <p class="n-paragraph" class:n-paragraph--dialogue={para.kind === 'dialogue'}>{para.text}</p>
                         {/each}
                       </div>
                     {/if}
@@ -1440,8 +1462,8 @@
                     {#if currentChapter.narrative.reflection}
                       <div class="n-block n-reflection">
                         <span class="n-tag n-tag--reflection">Réflexion</span>
-                        {#each textToParagraphs(currentChapter.narrative.reflection) as para}
-                          <p>{para}</p>
+                        {#each splitNarrativeParagraphs(currentChapter.narrative.reflection) as para}
+                          <p class="n-paragraph" class:n-paragraph--dialogue={para.kind === 'dialogue'}>{para.text}</p>
                         {/each}
                       </div>
                     {/if}
@@ -1489,6 +1511,7 @@
                       {@const cons = choiceConsequences(choice)}
                       <button
                         class="choice-btn"
+                        data-attr={choice.attribute.toLowerCase()}
                         class:choice-danger={cons.diffBonus > 0}
                         class:choice-disabled={cons.disabled}
                         on:click={() => !cons.disabled && handleChoice(choice)}
@@ -2381,7 +2404,21 @@
     text-wrap: pretty;
   }
 
-  .n-block p + p { margin-top: 0.75em; }
+  .n-block p + p { margin-top: 1.1em; }
+
+  .n-paragraph {
+    padding-left: 0;
+  }
+
+  .n-paragraph--dialogue {
+    margin-left: 0.2rem;
+    padding: 0.15rem 0 0.15rem 0.85rem;
+    border-left: 3px solid color-mix(in srgb, #5aaed4 55%, transparent);
+    background: color-mix(in srgb, #5aaed4 7%, transparent);
+    color: color-mix(in srgb, var(--color-text-primary) 96%, white 4%);
+    font-style: italic;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  }
 
   /* Context */
   .n-context p { color: color-mix(in srgb, var(--color-text-primary) 90%, white 10%); }
@@ -2402,8 +2439,8 @@
   }
 
   .n-dialogue p {
-    color: color-mix(in srgb, var(--color-text-primary) 95%, white 5%);
-    font-style: normal;
+    color: color-mix(in srgb, #5aaed4 90%, white 10%);
+    font-style: italic;
   }
 
   /* Reflection — tinted box */
@@ -2561,6 +2598,13 @@
 
   .pip.on { background: var(--color-gold); }
 
+  /* Dynamic Choice Attributes */
+  .choice-btn[data-attr="combat"] .choice-attr { color: #f87171; border-color: rgba(248, 113, 113, 0.4); background: rgba(248, 113, 113, 0.08); }
+  .choice-btn[data-attr="diplomacy"] .choice-attr { color: #5aaed4; border-color: rgba(90, 174, 212, 0.4); background: rgba(90, 174, 212, 0.08); }
+  .choice-btn[data-attr="tech"] .choice-attr { color: #4ade80; border-color: rgba(74, 222, 128, 0.4); background: rgba(74, 222, 128, 0.08); }
+  .choice-btn[data-attr="survival"] .choice-attr { color: #f59e0b; border-color: rgba(245, 158, 11, 0.4); background: rgba(245, 158, 11, 0.08); }
+  .choice-btn[data-attr="force"] .choice-attr { color: #c084fc; border-color: rgba(192, 132, 252, 0.4); background: rgba(192, 132, 252, 0.08); }
+
   /* ═══════════════════════════════════════════
      CUSTOM ACTION
   ═══════════════════════════════════════════ */
@@ -2586,25 +2630,26 @@
   .custom-input {
     flex: 1;
     border: 1px solid var(--color-border);
-    background: var(--color-bg-secondary);
+    background: color-mix(in srgb, var(--color-bg-secondary) 50%, var(--color-bg-tertiary));
     color: var(--color-text-primary);
     border-radius: var(--radius-lg);
-    padding: 10px var(--space-md);
+    padding: 12px var(--space-md);
     resize: none;
     font: inherit;
-    font-size: 0.93rem;
+    font-size: 0.95rem;
     line-height: 1.55;
-    transition: border-color var(--transition-fast);
+    transition: border-color var(--transition-fast), background var(--transition-fast);
   }
 
   .custom-input:focus {
     outline: none;
     border-color: var(--color-gold);
+    background: var(--color-bg-tertiary);
   }
 
   .custom-input::placeholder {
     color: var(--color-text-muted);
-    opacity: 0.55;
+    opacity: 0.85;
   }
 
   .custom-send {
@@ -2629,10 +2674,17 @@
      MEMORY PANEL
   ═══════════════════════════════════════════ */
   .memory-panel {
-    border: 1px solid var(--color-border);
+    border: 1px dashed color-mix(in srgb, var(--color-border) 60%, transparent);
     border-radius: var(--radius-lg);
-    background: var(--color-bg-secondary);
+    background: color-mix(in srgb, var(--color-bg-secondary) 40%, transparent);
     overflow: hidden;
+    transition: background var(--transition-fast), border-color var(--transition-fast);
+  }
+
+  .memory-panel[open], .memory-panel:hover {
+    border-style: solid;
+    border-color: var(--color-border);
+    background: var(--color-bg-secondary);
   }
 
   .memory-panel summary {
@@ -2764,8 +2816,7 @@
       overflow: hidden;
     }
     .model-chip {
-      font-size: 0.63rem;
-      max-width: 120px;
+      display: none; /* Hide on mobile to free up space */
     }
 
     /* Narrative scroll zone: fills all available height */
