@@ -173,6 +173,71 @@ function cleanText(value: unknown, maxLength = 2200): string {
   return text.slice(0, maxLength);
 }
 
+const NARRATIVE_CHOICE_MARKERS: RegExp[] = [
+  /^(?:que faites-vous|what do you do|choices?|choix|options?|vos choix)\b[:!?]?\s*$/i,
+  /^(?:comment réagissez-vous|how do you respond|next actions?)\b[:!?]?\s*$/i
+];
+
+function sanitizeNarrativeText(value: unknown, maxLength = 2200): string {
+  const text = cleanText(value, maxLength);
+  if (!text) return '';
+
+  const trimmed = text.trim();
+  if ((trimmed.startsWith('{') || trimmed.startsWith('[')) && /"[A-Za-z0-9_\-]+"\s*:/.test(trimmed)) {
+    return 'Le passage a été nettoyé automatiquement pour éviter un affichage technique.';
+  }
+
+  const lines = text.split('\n');
+  const paragraphs: string[] = [];
+  let buffer: string[] = [];
+  let inChoiceBlock = false;
+
+  const flush = (): void => {
+    const paragraph = buffer.join(' ').replace(/\s+/g, ' ').trim();
+    if (paragraph) paragraphs.push(paragraph);
+    buffer = [];
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) {
+      flush();
+      continue;
+    }
+
+    const normalized = line
+      .replace(/^#{1,6}\s*/, '')
+      .replace(/^>\s*/, '')
+      .replace(/^\*\*\s*/, '')
+      .replace(/\s*\*\*$/, '')
+      .replace(/^[_`*]+|[_`*]+$/g, '')
+      .replace(/^\[[^\]]+\]\s*/, '')
+      .trim();
+
+    if (!normalized) continue;
+    if (/^(?:\*{3,}|-{3,}|_{3,})$/.test(normalized)) {
+      flush();
+      continue;
+    }
+
+    if (NARRATIVE_CHOICE_MARKERS.some(pattern => pattern.test(normalized))) {
+      flush();
+      inChoiceBlock = true;
+      continue;
+    }
+
+    if (inChoiceBlock) continue;
+    if (/^\d+[.)]\s+/.test(normalized)) continue;
+
+    buffer.push(normalized.replace(/\s{2,}/g, ' '));
+  }
+
+  flush();
+  if (paragraphs.length) return paragraphs.join('\n\n').trim();
+
+  return text ? 'Le passage a été nettoyé automatiquement pour éviter un affichage technique.' : '';
+}
+
 function normalizeTextForPrompt(value: unknown): string {
   return cleanText(value, 2000)
     .normalize('NFD')
@@ -194,6 +259,36 @@ function normalizeAttribute(rawAttribute: unknown): StoryAttribute {
   return allowed.includes(attr as StoryAttribute) ? (attr as StoryAttribute) : 'survival';
 }
 
+function inferAttributeFromChoiceText(text: string): StoryAttribute {
+  const normalized = normalizeTextForPrompt(text);
+
+  if (/(force|jedi|sith|sabre|telekin|telekinesis|ancrer|canalis|pressent|intuition|prévoir|prevoir)/.test(normalized)) {
+    return 'force';
+  }
+
+  if (/(parler|dialogue|négocier|negocier|convainc|persuad|bluff|marchand|questionn|interrog|discut|intim|menac|coopér|cooper)/.test(normalized)) {
+    return 'diplomacy';
+  }
+
+  if (/(discret|furtif|ombre|camouf|infiltr|se faufiler|se glisser|silenc|subreptic|contourner|éviter|eviter|fuite|fuir|évasion|evasion)/.test(normalized)) {
+    return 'stealth';
+  }
+
+  if (/(hack|pirat|terminal|code|syst[eè]me|verrou|droid|ordinateur|techn|désactiv|desactiv|recalibr)/.test(normalized)) {
+    return 'tech';
+  }
+
+  if (/(combat|attaqu|assaut|duel|blaster|tir|fonc|briser|neutralis|élimin|elim|ripost|battre|frapp)/.test(normalized)) {
+    return 'combat';
+  }
+
+  if (/(surviv|explor|observer|repl|route|chemin|patrouill|travers|march|attend|patient|prépar|prepar|échapper|echapper)/.test(normalized)) {
+    return 'survival';
+  }
+
+  return 'survival';
+}
+
 function normalizeChoice(choice: unknown): StoryChoice | null {
   if (!choice) return null;
 
@@ -202,7 +297,7 @@ function normalizeChoice(choice: unknown): StoryChoice | null {
     if (!text) return null;
     return {
       text,
-      attribute: 'survival',
+      attribute: inferAttributeFromChoiceText(text),
       difficulty: 2,
       faction_impact: {}
     };
@@ -232,7 +327,9 @@ function normalizeChoice(choice: unknown): StoryChoice | null {
 
   return {
     text,
-    attribute: normalizeAttribute(record.attribute),
+    attribute: normalizeAttribute(record.attribute) !== 'survival' || !text
+      ? normalizeAttribute(record.attribute)
+      : inferAttributeFromChoiceText(text),
     difficulty,
     faction_impact: factionImpact
   };
@@ -341,7 +438,7 @@ function defaultMemoryUpdates(): StoryMemoryUpdates {
 function defaultNarrativeFromRaw(rawText: string): StoryNarrative {
   return {
     context: '',
-    action: cleanText(rawText, 2200),
+    action: sanitizeNarrativeText(rawText, 2200),
     dialogue: '',
     reflection: '',
     atmosphere: 'tense'
@@ -447,10 +544,10 @@ function coerceNarrative(source: unknown): StoryNarrative {
   const data = source as Record<string, unknown>;
 
   return {
-    context: cleanText(data.context, 1200),
-    action: cleanText(data.action, 5500),
-    dialogue: cleanText(data.dialogue, 1600),
-    reflection: cleanText(data.reflection, 1400),
+    context: sanitizeNarrativeText(data.context, 1200),
+    action: sanitizeNarrativeText(data.action, 5500),
+    dialogue: sanitizeNarrativeText(data.dialogue, 1600),
+    reflection: sanitizeNarrativeText(data.reflection, 1400),
     atmosphere: cleanText(data.atmosphere, 80) || 'tense'
   };
 }
@@ -571,8 +668,8 @@ export function parseStoryResponse(rawText: string, turnNumber: number): StoryCh
 
   const narrative = coerceNarrative(parsed.narrative);
   if (!narrative.action) {
-    const candidate = cleanText(parsed.action, 2200);
-    const rawFallback = cleanText(rawText, 2200);
+    const candidate = sanitizeNarrativeText(parsed.action, 2200);
+    const rawFallback = sanitizeNarrativeText(rawText, 2200);
     const isJson = (t: string) => /^\s*[{[]/.test(t);
     // Never inject raw JSON as narrative text
     narrative.action = (candidate && !isJson(candidate))
@@ -678,6 +775,8 @@ RÈGLES MJ:
 5. Titre: chapter_title = titre de scène évocateur uniquement. INTERDIT d'y mettre un numéro ou "Chapitre N".
 6. NPCs: si un inconnu révèle son nom → mettre à jour l'entrée existante, jamais de doublon.
 7. Résumé de campagne: s'il est présent, il représente la continuité condensée des tours anciens — prends-le en compte sans le répéter mot à mot.`;
+  const narrativeProseRule = `
+8. PROSE UNIQUEMENT dans "narrative.action": pas de markdown, pas de titres H1/H2, pas de listes numérotées, pas de bloc "Que faites-vous ?", pas de répétition des choix. Les choix vivent uniquement dans le tableau "choices".`;
 
   const jsonContract = `Réponds UNIQUEMENT en JSON valide, sans markdown ni texte autour. Priorité absolue: prose narrative riche dans "action" (2-4 paragraphes). Remplis state_update avec toutes les conséquences.
 
@@ -711,12 +810,13 @@ PHASE 1 (maintenant): Écris la scène en JSON valide ou en prose libre.
 - Aucun outil disponible dans cette phase.
 - Priorité absolue: prose narrative vivante, conséquences réelles, PNJs avec mémoire et intentions propres.
 - Si JSON: remplis "narrative.action" avec 3-5 paragraphes de prose cinématique.
+- Aucun markdown, aucun titre interne et aucun bloc de choix dans "narrative.action".
 
 PHASE 2 (ensuite, automatique): Le système extraira l'état structuré via des outils dédiés.
 
 Tu n'as qu'une seule tâche maintenant: écrire une scène forte.`;
 
-  return `${basePrompt}\n\n${promptMode === 'tool-calls' ? toolCallingContract : jsonContract}`;
+  return `${basePrompt}${narrativeProseRule}\n\n${promptMode === 'tool-calls' ? toolCallingContract : jsonContract}`;
 }
 
 const ERA_CONTEXT: Record<string, string> = {
@@ -765,6 +865,7 @@ EXIGENCES DU PREMIER TOUR:
 - Introduis au moins 1 PNJ mémorable avec un agenda distinct.
 - Fais émerger un enjeu politique, relationnel ou moral dès l'ouverture.
 - Les 3-4 choix doivent être concrets, contrastés et portés par la scène.
+- Le texte de scène ne doit contenir ni markdown ni liste de choix.
 - chapter_number = 1${modeHint}`;
 }
 
@@ -822,6 +923,7 @@ export function buildContinuePrompt(
   return `${anchorBlock}Tour ${turnNumber}. Action: "${cleanText(actionText, 280)}".${history}${recentChoicesBlock}${pacingDirective}
 
 Écris une scène forte et précise — conséquences réelles, PNJs avec mémoire et intention propre.
+Ne mets aucun markdown, aucun titre interne et aucun bloc de choix dans le récit.
 Propose 3-4 choix distincts, concrets, ancrés dans cette scène précise (pas génériques).
 chapter_number = ${turnNumber}.`;
 }
@@ -1659,7 +1761,7 @@ function draftToChapter(draft: AgenticDraft, turnNumber: number, rawFallback = '
 
   const parsed = parseStoryResponse(JSON.stringify(payload), turnNumber);
   if (!parsed.narrative.action && rawFallback) {
-    parsed.narrative.action = cleanText(rawFallback, 5500);
+    parsed.narrative.action = sanitizeNarrativeText(rawFallback, 5500);
   }
   return parsed;
 }
@@ -2278,9 +2380,9 @@ export async function callTextModel(messages: ChatMessage[], config: StoryProvid
 export function summarizeChapterForPrompt(chapter: StoryChapter): string {
   const title = cleanText(chapter.chapter_title, 72);
   const type = cleanText(chapter.section_type, 28) || 'action';
-  const action = cleanText(chapter.narrative.action || chapter.narrative.context, 190);
-  const dialogue = cleanText(chapter.narrative.dialogue, 110);
-  const reflection = cleanText(chapter.narrative.reflection, 110);
+  const action = sanitizeNarrativeText(chapter.narrative.action || chapter.narrative.context, 190);
+  const dialogue = sanitizeNarrativeText(chapter.narrative.dialogue, 110);
+  const reflection = sanitizeNarrativeText(chapter.narrative.reflection, 110);
   const atmosphere = cleanText(chapter.narrative.atmosphere, 90);
 
   const stateBits: string[] = [];

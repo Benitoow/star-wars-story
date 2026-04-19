@@ -31,6 +31,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: wrap;
     gap: var(--space-md);
     padding: var(--space-md) var(--space-lg);
     background: var(--color-bg-secondary);
@@ -44,6 +45,7 @@
     display: flex;
     align-items: center;
     gap: var(--space-md);
+    min-width: 0;
   }
 
   .back-btn {
@@ -77,11 +79,16 @@
     font-weight: 600;
     color: var(--color-text-primary);
     margin: 0;
+    min-width: 0;
   }
 
   .page-header-right {
     display: flex;
     align-items: center;
     gap: var(--space-sm);
+    flex: 1 1 auto;
+    min-width: 0;
+    justify-content: flex-end;
+    flex-wrap: wrap;
   }
 </style>

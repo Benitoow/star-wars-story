@@ -161,9 +161,66 @@
   const TOOL_CALL_LEAK_TEXT_REGEX = /<\|?tool_call\|?>|tool_call|(?:^|\s)call:[a-z_]+\s*\{/i;
   const INTENSE_SECTION_TYPES = new Set(['action', 'confrontation']);
 
-  function sanitizeNarrativeLeak(text: string): string {
-    if (!TOOL_CALL_LEAK_TEXT_REGEX.test(text || '')) return text;
-    return `Le système IA a renvoyé une sortie technique non lisible pour ce passage. L'histoire continue normalement via les choix ci-dessous.`;
+  function sanitizeNarrativeTextForDisplay(text: string): string {
+    const raw = String(text || '').replace(/\r/g, '\n');
+    if (!raw.trim()) return '';
+
+    const trimmed = raw.trim();
+    if ((trimmed.startsWith('{') || trimmed.startsWith('[')) && /"[A-Za-z0-9_\-]+"\s*:/.test(trimmed)) {
+      return 'Le passage a été nettoyé automatiquement pour éviter un affichage technique.';
+    }
+
+    const lines = raw.split('\n');
+    const paragraphs: string[] = [];
+    let buffer: string[] = [];
+    let inChoiceBlock = false;
+
+    const flush = (): void => {
+      const paragraph = buffer.join(' ').replace(/\s+/g, ' ').trim();
+      if (paragraph) paragraphs.push(paragraph);
+      buffer = [];
+    };
+
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line) {
+        flush();
+        continue;
+      }
+
+      const normalized = line
+        .replace(/^#{1,6}\s*/, '')
+        .replace(/^>\s*/, '')
+        .replace(/^\*\*\s*/, '')
+        .replace(/\s*\*\*$/, '')
+        .replace(/^[_`*]+|[_`*]+$/g, '')
+        .replace(/^\[[^\]]+\]\s*/, '')
+        .trim();
+
+      if (!normalized) continue;
+      if (/^(?:\*{3,}|-{3,}|_{3,})$/.test(normalized)) {
+        flush();
+        continue;
+      }
+
+      if (/^(?:que faites-vous|what do you do|choices?|choix|options?|vos choix)\b[:!?]?\s*$/i.test(normalized)) {
+        flush();
+        inChoiceBlock = true;
+        continue;
+      }
+
+      if (inChoiceBlock) continue;
+      if (/^\d+[.)]\s+/.test(normalized)) continue;
+
+      buffer.push(normalized.replace(/\s{2,}/g, ' '));
+    }
+
+    flush();
+    if (paragraphs.length) return paragraphs.join('\n\n').trim();
+
+    return TOOL_CALL_LEAK_TEXT_REGEX.test(raw)
+      ? `Le système IA a renvoyé une sortie technique non lisible pour ce passage. L'histoire continue normalement via les choix ci-dessous.`
+      : `Le passage a été nettoyé automatiquement pour éviter un affichage technique.`;
   }
 
   function sanitizeChapterForDisplay(chapter: StoryChapter | null): StoryChapter | null {
@@ -171,12 +228,13 @@
 
     return {
       ...chapter,
+      chapter_title: sanitizeNarrativeTextForDisplay(chapter.chapter_title),
       narrative: {
         ...chapter.narrative,
-        action: sanitizeNarrativeLeak(chapter.narrative.action),
-        context: sanitizeNarrativeLeak(chapter.narrative.context),
-        dialogue: sanitizeNarrativeLeak(chapter.narrative.dialogue),
-        reflection: sanitizeNarrativeLeak(chapter.narrative.reflection)
+        action: sanitizeNarrativeTextForDisplay(chapter.narrative.action),
+        context: sanitizeNarrativeTextForDisplay(chapter.narrative.context),
+        dialogue: sanitizeNarrativeTextForDisplay(chapter.narrative.dialogue),
+        reflection: sanitizeNarrativeTextForDisplay(chapter.narrative.reflection)
       }
     };
   }
