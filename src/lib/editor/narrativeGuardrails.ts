@@ -15,13 +15,48 @@ const DIALOGUE_CHOICE_REGEX = /(parler|discuter|dialogue|dialoguer|interroger|qu
 const TIME_PASS_CHOICE_REGEX = /(attendre|patienter|passer le temps|se reposer|méditer|observer|planifier|faire le point|préparer|laisser avancer|laisser filer|récupérer)/i;
 const ACTION_HEAVY_CHOICE_REGEX = /(attaquer|assaut|fusillade|duel|foncer|abattre|détruire|exploser|charge|combat|sabre|blaster|éliminer)/i;
 const TOOL_CALL_LEAK_TEXT_REGEX = /<\|?tool_call\|?>|tool_call|(?:^|\s)call:[a-z_]+\s*\{/i;
+const STRUCTURED_PAYLOAD_HINT_REGEX = /(^|\s)json\s*\{|"chapter_title"\s*:|"chapter_number"\s*:|"narrative"\s*:|"choices"\s*:/i;
+
+function tryExtractNarrativeActionFromStructuredPayload(rawText: string): string | null {
+  const normalized = String(rawText || '')
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/```\s*$/i, '')
+    .replace(/^json\s*/i, '')
+    .trim();
+
+  const actionMatch = normalized.match(/"action"\s*:\s*"((?:\\.|[^"\\])*)"/is);
+  if (!actionMatch?.[1]) return null;
+
+  try {
+    const decoded = JSON.parse(`"${actionMatch[1]}"`);
+    return String(decoded || '').trim() || null;
+  } catch {
+    const fallback = actionMatch[1]
+      .replace(/\\"/g, '"')
+      .replace(/\\n/g, '\n')
+      .replace(/\\r/g, '\r')
+      .replace(/\\t/g, '\t')
+      .replace(/\\\\/g, '\\')
+      .trim();
+    return fallback || null;
+  }
+}
 
 export function sanitizeNarrativeTextForDisplay(text: string): string {
   const raw = String(text || '').replace(/\r/g, '\n');
   if (!raw.trim()) return '';
 
   const trimmed = raw.trim();
-  if ((trimmed.startsWith('{') || trimmed.startsWith('[')) && /"[A-Za-z0-9_-]+"\s*:/.test(trimmed)) {
+  const looksLikeStructuredPayload = (
+    trimmed.startsWith('{') ||
+    trimmed.startsWith('[') ||
+    STRUCTURED_PAYLOAD_HINT_REGEX.test(trimmed)
+  );
+
+  if (looksLikeStructuredPayload) {
+    const extractedAction = tryExtractNarrativeActionFromStructuredPayload(trimmed);
+    if (extractedAction) return extractedAction;
     return 'Le passage a été nettoyé automatiquement pour éviter un affichage technique.';
   }
 

@@ -173,12 +173,47 @@ const NARRATIVE_CHOICE_MARKERS: RegExp[] = [
   /^(?:comment réagissez-vous|how do you respond|next actions?)\b[:!?]?\s*$/i
 ];
 
+const STRUCTURED_PAYLOAD_HINT_REGEX = /(^|\s)json\s*\{|"chapter_title"\s*:|"chapter_number"\s*:|"narrative"\s*:|"choices"\s*:/i;
+
+function tryExtractNarrativeActionFromPayload(rawText: string): string | null {
+  const normalized = String(rawText || '')
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/```\s*$/i, '')
+    .replace(/^json\s*/i, '')
+    .trim();
+
+  const actionMatch = normalized.match(/"action"\s*:\s*"((?:\\.|[^"\\])*)"/is);
+  if (!actionMatch?.[1]) return null;
+
+  try {
+    const decoded = JSON.parse(`"${actionMatch[1]}"`);
+    return cleanText(decoded, 5500) || null;
+  } catch {
+    const fallback = actionMatch[1]
+      .replace(/\\"/g, '"')
+      .replace(/\\n/g, '\n')
+      .replace(/\\r/g, '\r')
+      .replace(/\\t/g, '\t')
+      .replace(/\\\\/g, '\\');
+    return cleanText(fallback, 5500) || null;
+  }
+}
+
 function sanitizeNarrativeText(value: unknown, maxLength = 2200): string {
   const text = cleanText(value, maxLength);
   if (!text) return '';
 
   const trimmed = text.trim();
-  if ((trimmed.startsWith('{') || trimmed.startsWith('[')) && /"[A-Za-z0-9_\-]+"\s*:/.test(trimmed)) {
+  const looksLikeStructuredPayload = (
+    trimmed.startsWith('{') ||
+    trimmed.startsWith('[') ||
+    STRUCTURED_PAYLOAD_HINT_REGEX.test(trimmed)
+  );
+
+  if (looksLikeStructuredPayload) {
+    const extractedAction = tryExtractNarrativeActionFromPayload(trimmed);
+    if (extractedAction) return extractedAction.slice(0, maxLength);
     return 'Le passage a été nettoyé automatiquement pour éviter un affichage technique.';
   }
 
@@ -528,6 +563,7 @@ function parseJsonSafely(rawText: string): Record<string, unknown> | null {
     .replace(/^```json\s*/i, '')
     .replace(/^```\s*/i, '')
     .replace(/```\s*$/i, '')
+    .replace(/^json\s*/i, '')
     .trim();
 
   const largest = extractLargestJsonObject(cleaned);
@@ -664,9 +700,10 @@ function extractChoices(source: unknown): StoryChoice[] {
 }
 
 function fallbackChapter(rawText: string, turnNumber: number): StoryChapter {
+  const extractedAction = tryExtractNarrativeActionFromPayload(rawText);
   const visibleSeed = isDiagnosticFallbackText(rawText)
     ? buildEmergencyFallbackSeed(turnNumber)
-    : rawText;
+    : (extractedAction || rawText);
 
   return {
     chapter_title: turnNumber === 1 ? 'Prologue' : `Tour ${turnNumber}`,
