@@ -448,7 +448,7 @@ function coerceNarrative(source: unknown): StoryNarrative {
 
   return {
     context: cleanText(data.context, 1200),
-    action: cleanText(data.action, 2200),
+    action: cleanText(data.action, 5500),
     dialogue: cleanText(data.dialogue, 1600),
     reflection: cleanText(data.reflection, 1400),
     atmosphere: cleanText(data.atmosphere, 80) || 'tense'
@@ -699,17 +699,16 @@ RÈGLES MJ:
   }
 }`;
 
-  const toolCallingContract = `MODE AGENTIQUE (tool-calling):
-- N'écris PAS de JSON monolithique si les outils sont disponibles.
-- Utilise les fonctions fournies pour construire le tour étape par étape.
-- Ordre recommandé:
-  1) set_scene
-  2) update_world / update_npc / update_faction
-  3) add_memory (si nécessaire)
-  4) offer_choices (3 à 4 choix distincts)
-  5) finalize_turn
-- Tu peux faire plusieurs passes et plusieurs appels d'outils avant de finaliser.
-- Si aucun outil n'est accepté, reviens au format JSON complet.`;
+  const toolCallingContract = `MODE AGENTIQUE — 2 phases distinctes:
+
+PHASE 1 (maintenant): Écris la scène en JSON valide ou en prose libre.
+- Aucun outil disponible dans cette phase.
+- Priorité absolue: prose narrative vivante, conséquences réelles, PNJs avec mémoire et intentions propres.
+- Si JSON: remplis "narrative.action" avec 3-5 paragraphes de prose cinématique.
+
+PHASE 2 (ensuite, automatique): Le système extraira l'état structuré via des outils dédiés.
+
+Tu n'as qu'une seule tâche maintenant: écrire une scène forte.`;
 
   return `${basePrompt}\n\n${promptMode === 'tool-calls' ? toolCallingContract : jsonContract}`;
 }
@@ -769,12 +768,12 @@ export function buildContinuePrompt(
     ? `\nRésumé récent:\n${recentSummary.map(item => `- ${item}`).join('\n')}`
     : '';
 
-  // Keep only the last 6 unique choices to avoid bloating the prompt
+  // Dedupe choices — large context window means we can afford to remember many
   const recentChoices = Array.from(new Set(
     recentChoiceTexts
       .map(item => cleanText(item, 160))
       .filter(Boolean)
-  )).slice(-6);
+  )).slice(-20);
 
   const recentChoicesBlock = recentChoices.length
     ? `\nChoix déjà proposés à éviter: ${recentChoices.map(c => `"${c}"`).join(' | ')}`
@@ -790,16 +789,12 @@ export function buildContinuePrompt(
     ? `\nRYTHME: ${consecutiveIntense} scènes intenses d'affilée — ce tour DOIT être repos, dialogue ou exploration.`
     : '';
 
-  const modeHint = promptMode === 'tool-calls'
-    ? `\nMode agentique: utilise les outils pour construire la réponse.`
-    : '';
-
   const anchorBlock = sceneAnchor ? `${sceneAnchor}\n\n` : '';
 
   return `${anchorBlock}Tour ${turnNumber}. Action: "${cleanText(actionText, 280)}".${history}${recentChoicesBlock}${pacingDirective}
 
 Écris une scène forte et précise — conséquences réelles, PNJs avec mémoire et intention propre.
-Propose 3-4 choix distincts, concrets, ancrés dans cette scène précise (pas génériques).${modeHint}
+Propose 3-4 choix distincts, concrets, ancrés dans cette scène précise (pas génériques).
 chapter_number = ${turnNumber}.`;
 }
 
@@ -923,7 +918,7 @@ type OpenAiToolDefinition = {
   };
 };
 
-type OpenAiToolChoice = 'auto' | 'none' | { type: 'function'; function: { name: string } };
+type OpenAiToolChoice = 'auto' | 'none' | 'required' | { type: 'function'; function: { name: string } };
 
 type OpenAiToolCall = {
   id: string;
@@ -1636,7 +1631,7 @@ function draftToChapter(draft: AgenticDraft, turnNumber: number, rawFallback = '
 
   const parsed = parseStoryResponse(JSON.stringify(payload), turnNumber);
   if (!parsed.narrative.action && rawFallback) {
-    parsed.narrative.action = cleanText(rawFallback, 2200);
+    parsed.narrative.action = cleanText(rawFallback, 5500);
   }
   return parsed;
 }
@@ -1753,112 +1748,115 @@ async function generateStoryTurnWithTools(
   config: StoryProviderConfig,
   turnNumber: number
 ): Promise<StoryTurnGenerationResult> {
-  const conversation = toOpenAiMessageList(messages);
+  const stepCaps = detectModelCapabilities(config);
+  const baseConversation = toOpenAiMessageList(messages);
+
+  // ── Phase 1: Narrative generation without tools ─────────────────────────────
+  // The model writes freely — full prose or JSON — unencumbered by tool schemas.
+  // Full reasoning ON, full token budget, ideal temperature.
+  const phase1Response = await callOpenAiCompatibleRaw(baseConversation, config, {
+    maxTokens: stepCaps.maxOutputTokens,
+    temperature: stepCaps.idealTemperature,
+    skipReasoning: false
+  });
+
+  const phase1Text = cleanText(phase1Response.content, 8000);
+
+  // Happy path: model already returned valid structured JSON
+  const phase1Json = parseJsonSafely(phase1Text);
+  if (phase1Json) {
+    const chapter = parseStoryResponse(phase1Text, turnNumber);
+    if (hasPlayableChapterContent(chapter)) {
+      return { chapter, rawResponse: phase1Text, mode: 'structured-json', steps: 1, toolCalls: 0 };
+    }
+  }
+
+  if (!phase1Text) {
+    throw new Error('[storyEngine] Phase 1 retourna une réponse vide.');
+  }
+
+  // ── Phase 2: Structured extraction via tools ────────────────────────────────
+  // We have the narrative. Now extract state updates and choices.
   const draft = createAgenticDraft(turnNumber);
 
-  const rawChunks: string[] = [];
+  // Pre-seed draft with Phase 1 prose (if not JSON, it's the action text)
+  if (!phase1Json) {
+    draft.narrative.action = phase1Text;
+  }
+
+  const extractionConversation: OpenAiMessage[] = [
+    ...baseConversation,
+    { role: 'assistant', content: phase1Text },
+    {
+      role: 'user',
+      content: `Extrais les données structurées de cette scène (sans réécrire la narration):
+• update_world — hp delta, crédits delta, lieu si changé, blessures, inventaire
+• update_npc — chaque PNJ présent: affinity, status, note
+• offer_choices — 3-4 choix distincts et concrets, ancrés dans cette scène précise
+• finalize_turn`
+    }
+  ];
+
+  const rawChunks: string[] = [phase1Text];
   let totalToolCalls = 0;
-  let steps = 0;
-  const stepCaps = detectModelCapabilities(config);
+  let steps = 1;
 
-  for (let step = 1; step <= MAX_AGENTIC_STEPS; step += 1) {
-    steps = step;
+  for (let step = 1; step <= 6; step += 1) {
+    steps = step + 1;
 
-    const assistantMessage = await callOpenAiCompatibleRaw(conversation, config, {
+    const extractMsg = await callOpenAiCompatibleRaw(extractionConversation, config, {
       tools: AGENTIC_GM_TOOLS,
       toolChoice: 'auto',
-      maxTokens: step === 1 ? stepCaps.maxOutputTokens : 900,
-      temperature: step === 1 ? stepCaps.idealTemperature : 0.7,
-      skipReasoning: step > 1
+      maxTokens: 1200,
+      temperature: 0.4,
+      skipReasoning: true
     });
 
-    const assistantContent = cleanText(assistantMessage.content, 12000);
-    if (assistantContent) {
-      rawChunks.push(assistantContent);
-    }
+    const assistantContent = cleanText(extractMsg.content, 4000);
+    if (assistantContent) rawChunks.push(assistantContent);
 
-    const toolCalls = Array.isArray(assistantMessage.tool_calls) ? assistantMessage.tool_calls : [];
-    const hasSupportedStructuredToolCall = toolCalls.some(toolCall => isSupportedAgenticToolName(toolCall.function?.name));
-
-    if (!toolCalls.length || !hasSupportedStructuredToolCall) {
-      const pseudoToolCalls = extractPseudoToolCalls(assistantContent)
-        .filter(pseudoToolCall => isSupportedAgenticToolName(pseudoToolCall.name));
-      if (pseudoToolCalls.length) {
-        conversation.push({
-          role: 'assistant',
-          content: assistantMessage.content ?? ''
-        });
-
-        for (const pseudoToolCall of pseudoToolCalls) {
-          totalToolCalls += 1;
-          applyAgenticToolCall(draft, pseudoToolCall.name, pseudoToolCall.args);
-        }
-
-        if (draft.done && draft.choices.length > 0) {
-          break;
-        }
-
-        if (draftHasMeaningfulData(draft)) {
-          continue;
-        }
-      }
-
-      if (toolCalls.length && !hasSupportedStructuredToolCall) {
-        continue;
-      }
-    }
+    const toolCalls = Array.isArray(extractMsg.tool_calls) ? extractMsg.tool_calls : [];
 
     if (!toolCalls.length) {
-
-      if (assistantContent && !draftHasMeaningfulData(draft)) {
-        const parsedFromText = parseJsonSafely(assistantContent);
-        if (parsedFromText) {
-          return {
-            chapter: parseStoryResponse(assistantContent, turnNumber),
-            rawResponse: assistantContent,
-            mode: 'structured-json',
-            steps,
-            toolCalls: totalToolCalls
-          };
-        }
+      // No structured tool calls — try pseudo tool call parsing
+      const pseudoCalls = extractPseudoToolCalls(assistantContent)
+        .filter(tc => isSupportedAgenticToolName(tc.name));
+      for (const tc of pseudoCalls) {
+        totalToolCalls += 1;
+        applyAgenticToolCall(draft, tc.name, tc.args);
       }
       break;
     }
 
-    conversation.push({
+    extractionConversation.push({
       role: 'assistant',
-      content: assistantMessage.content ?? '',
+      content: extractMsg.content ?? '',
       tool_calls: toolCalls
     });
 
-    for (const toolCall of toolCalls) {
+    for (const tc of toolCalls) {
       totalToolCalls += 1;
-      const args = parseToolArguments(toolCall.function.arguments);
-      const result = applyAgenticToolCall(draft, toolCall.function.name, args);
-
-      conversation.push({
+      const args = parseToolArguments(tc.function.arguments);
+      const result = applyAgenticToolCall(draft, tc.function.name, args);
+      extractionConversation.push({
         role: 'tool',
-        tool_call_id: toolCall.id,
-        name: toolCall.function.name,
+        tool_call_id: tc.id,
+        name: tc.function.name,
         content: JSON.stringify(result)
       });
     }
 
-    if (draft.done && draft.choices.length > 0) {
-      break;
-    }
+    if (draft.done && draft.choices.length > 0) break;
   }
 
   const rawResponse = rawChunks.join('\n\n').trim();
-  const chapter = draftHasMeaningfulData(draft)
-    ? draftToChapter(draft, turnNumber, rawResponse)
-    : parseStoryResponse(rawResponse || `Le modèle n'a pas renvoyé de sortie exploitable.`, turnNumber);
+  const chapter = draftToChapter(draft, turnNumber, phase1Text);
 
   return {
     chapter,
-    rawResponse: rawResponse || JSON.stringify(chapter),
+    rawResponse,
     mode: 'agentic-tools',
-    steps: Math.max(1, steps),
+    steps,
     toolCalls: totalToolCalls
   };
 }

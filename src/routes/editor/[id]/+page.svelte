@@ -778,7 +778,7 @@
       : 'json';
   }
 
-  function trimMessages(messages: ChatMessage[], maxWithoutSystem = 10): ChatMessage[] {
+  function trimMessages(messages: ChatMessage[], maxWithoutSystem = 80): ChatMessage[] {
     const systemMessage = messages.find(message => message.role === 'system');
     const others = messages.filter(message => message.role !== 'system').slice(-maxWithoutSystem);
     return systemMessage ? [systemMessage, ...others] : others;
@@ -861,7 +861,7 @@
         {
           setup,
           worldState,
-          memoryFacts: memoryLog.slice(-25),
+          memoryFacts: memoryLog,
           recentSummary,
           recentBackgroundEvents,
           turnNumber: turn
@@ -962,7 +962,7 @@
     }
 
     const promptMode = resolvePromptMode();
-    const systemPrompt = buildSystemPrompt(setup, memoryLog.slice(-10), worldState, promptMode, turn);
+    const systemPrompt = buildSystemPrompt(setup, memoryLog, worldState, promptMode, turn);
     aiMessages = [{ role: 'system', content: systemPrompt }, ...aiMessages.filter(message => message.role !== 'system')];
 
     const requestMessages = trimMessages([
@@ -1044,10 +1044,10 @@
       await ensureStoryExists(setup);
 
       const nextTurn = turnNumber + 1;
-      const recentSummary = chapterHistory.slice(-2).map(chapter => summarizeChapterForPrompt(chapter));
-      const recentSectionTypes = chapterHistory.slice(-4).map(c => c.section_type).filter(Boolean);
+      const recentSummary = chapterHistory.slice(-10).map(chapter => summarizeChapterForPrompt(chapter));
+      const recentSectionTypes = chapterHistory.slice(-6).map(c => c.section_type).filter(Boolean);
       const recentChoiceTexts = chapterHistory
-        .slice(-3)
+        .slice(-10)
         .flatMap(chapter => chapter.choices.map(choice => choice.text));
 
       const lastChapter = chapterHistory[chapterHistory.length - 1];
