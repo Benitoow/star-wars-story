@@ -393,6 +393,12 @@ function normalizeSearchText(value: string): string {
     .toLowerCase();
 }
 
+function isUnknownLocationToken(location: string): boolean {
+  const normalized = normalizeSearchText(location).trim();
+  if (!normalized) return true;
+  return /\b(?:inconnu(?:e)?|unknown|indetermine|indeterminee?|non\s+renseignee?|n\/?a|aucun\s+lieu)\b/.test(normalized);
+}
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -464,6 +470,7 @@ function chapterLooksLikeTransition(chapter: StoryChapter): boolean {
 
 export function getNearbyNpcNames(chapter: StoryChapter, worldState: WorldState, max = 2): string[] {
   const location = normalizeSearchText((worldState.player.location || '').trim());
+  const locationUnknown = isUnknownLocationToken(location);
   const aliveNpcs = worldState.npcs.filter(npc => npc.alive !== false && npc.status !== 'dead' && npc.name.trim());
   if (!aliveNpcs.length) return [];
 
@@ -473,7 +480,7 @@ export function getNearbyNpcNames(chapter: StoryChapter, worldState: WorldState,
 
   const localNpcs = aliveNpcs.filter(npc => {
     const lastSeen = normalizeSearchText((npc.last_seen || '').trim());
-    if (!lastSeen || !location || location === 'inconnu') return false;
+    if (!lastSeen || !location || locationUnknown) return false;
     return lastSeen.includes(location) || location.includes(lastSeen);
   });
 
@@ -484,7 +491,7 @@ export function getNearbyNpcNames(chapter: StoryChapter, worldState: WorldState,
   const rankedNpcs = [
     ...localNpcs,
     ...mentionedNpcs,
-    ...((!location || location === 'inconnu') ? sociallyRelevantNpcs : [])
+    ...((!location || locationUnknown) ? sociallyRelevantNpcs : [])
   ];
 
   const unique = Array.from(new Map(

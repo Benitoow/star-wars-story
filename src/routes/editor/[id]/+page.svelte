@@ -100,6 +100,124 @@
   let customAction = '';
   let hudCollapsed = false;
 
+  const UNKNOWN_LOCATION_RE = /\b(?:inconnu(?:e)?|unknown|indetermine|ind[ée]termin[ée]|non\s+renseign[ée]|n\/?a|aucun\s+lieu)\b/i;
+  const LOCATION_HINTS: Array<{ pattern: RegExp; label: string }> = [
+    { pattern: /nar\s*shaddaa/i, label: 'Nar Shaddaa' },
+    { pattern: /coruscant/i, label: 'Coruscant' },
+    { pattern: /tatooine/i, label: 'Tatooine' },
+    { pattern: /naboo/i, label: 'Naboo' },
+    { pattern: /corellia/i, label: 'Corellia' },
+    { pattern: /kamino/i, label: 'Kamino' },
+    { pattern: /mustafar/i, label: 'Mustafar' },
+    { pattern: /hoth/i, label: 'Hoth' },
+    { pattern: /bespin|cite\s*des\s*nuages|cloud\s*city/i, label: 'Bespin' },
+    { pattern: /cantina/i, label: 'Cantina locale' },
+    { pattern: /hangar|spatioport|dock|quai d['’]arrimage|baie d['’]arrimage/i, label: 'Hangar / Spatioport' }
+  ];
+  const DIALOGUE_SPEAKER_RE = /[—-]\s*([A-ZÀ-ÖØ-Þ][A-Za-zÀ-ÖØ-öø-ÿ' -]{1,48})\s*:/gu;
+  const DIALOGUE_SPEAKER_STOPWORDS = new Set(['je', 'tu', 'vous', 'il', 'elle', 'on', 'nous', 'ils', 'elles']);
+
+  function normalizeSearchText(value: string): string {
+    return value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+  }
+
+  function isUnknownLocationValue(value: unknown): boolean {
+    const text = String(value || '').trim();
+    if (!text) return true;
+    return UNKNOWN_LOCATION_RE.test(normalizeSearchText(text));
+  }
+
+  function inferLocationFromText(...parts: Array<string | undefined>): string | undefined {
+    const corpus = parts.filter(Boolean).join('\n');
+    if (!corpus) return undefined;
+
+    for (const hint of LOCATION_HINTS) {
+      if (hint.pattern.test(corpus)) {
+        return hint.label;
+      }
+    }
+
+    const phraseCapture = corpus.match(/\b(?:dans|sur|à|au|aux|en)\s+([A-ZÀ-ÖØ-Þ][A-Za-zÀ-ÖØ-öø-ÿ' -]{2,48})/u);
+    if (phraseCapture?.[1]) {
+      return phraseCapture[1].trim();
+    }
+
+    return undefined;
+  }
+
+  function inferLocationFromChapter(chapter: StoryChapter): string | undefined {
+    return inferLocationFromText(
+      chapter.narrative.context,
+      chapter.narrative.action,
+      chapter.narrative.dialogue,
+      chapter.narrative.reflection
+    );
+  }
+
+  function extractNpcSeedsFromDialogue(dialogue: string): string[] {
+    const names = new Set<string>();
+    for (const match of String(dialogue || '').matchAll(DIALOGUE_SPEAKER_RE)) {
+      const candidate = String(match[1] || '').trim();
+      if (!candidate) continue;
+
+      const normalized = normalizeSearchText(candidate);
+      if (DIALOGUE_SPEAKER_STOPWORDS.has(normalized)) continue;
+      names.add(candidate);
+    }
+    return Array.from(names).slice(0, 6);
+  }
+
+  function normalizeNpcStatus(status: NpcRelation['status'] | undefined): NpcRelation['status'] {
+    if (!status || status === 'unknown') return 'neutral';
+    return status;
+  }
+
+  function deriveInitialLocation(setup: StorySetup): string {
+    const factionSeed: Record<string, string> = {
+      empire: 'Coruscant — Secteur Impérial',
+      rebels: 'Cellule rebelle en bordure extérieure',
+      jedi: 'Enclave Jedi isolée',
+      sith: 'Sanctuaire Sith dissimulé',
+      hutt: 'Nar Shaddaa',
+      mandalore: 'Mandalore'
+    };
+
+    if (setup.faction && factionSeed[setup.faction]) {
+      return factionSeed[setup.faction];
+    }
+
+    const eraSeed: Record<string, string> = {
+      old_republic: 'Coruscant',
+      clone_wars: 'Coruscant — secteur militaire',
+      imperial: 'Coruscant — noyau impérial',
+      rebellion: 'Base rebelle mobile',
+      new_republic: 'Hosnian Prime',
+      first_order: 'Avant-poste de la Bordure Extérieure'
+    };
+
+    return eraSeed[setup.era] || 'Secteur frontalier';
+  }
+
+  function cloneWorldState(source: WorldState): WorldState {
+    return {
+      player: {
+        hp: source.player.hp,
+        credits: source.player.credits,
+        location: source.player.location,
+        date: source.player.date,
+        injuries: source.player.injuries.map(injury => ({ ...injury })),
+        inventory: source.player.inventory.map(item => ({ ...item }))
+      },
+      npcs: source.npcs.map(npc => ({ ...npc })),
+      factions: { ...source.factions },
+      chronology: source.chronology.map(entry => ({ ...entry }))
+    };
+  }
+
   function initWorldState(setup: StorySetup): WorldState {
     const startCredits = FACTION_CREDITS[setup.role] ?? FACTION_CREDITS.default;
     const factions: Record<string, number> = {
@@ -116,7 +234,7 @@
       player: {
         hp: 100,
         credits: startCredits,
-        location: 'Inconnu',
+        location: deriveInitialLocation(setup),
         date: ERA_START_DATES[setup.era] ?? 'Ère inconnue, Jour 1',
         injuries: [],
         inventory: []
@@ -128,7 +246,7 @@
   }
 
   let worldState: WorldState = {
-    player: { hp: 100, credits: 1000, location: 'Inconnu', date: '', injuries: [], inventory: [] },
+    player: { hp: 100, credits: 1000, location: 'Secteur frontalier', date: '', injuries: [], inventory: [] },
     npcs: [],
     factions: {},
     chronology: []
@@ -154,49 +272,60 @@
     return rawCredits;
   }
 
-  function applyStateUpdate(chapter: StoryChapter): void {
+  function applyStateUpdateToWorldState(sourceState: WorldState, chapter: StoryChapter): WorldState {
     const upd = chapter.state_update;
-    if (!upd) return;
+    const p = sourceState.player;
 
-    const p = worldState.player;
+    const hpDelta = typeof upd?.hp === 'number' ? normalizeHpDelta(upd.hp, p.hp) : undefined;
+    const creditsDelta = typeof upd?.credits === 'number' ? normalizeCreditsDelta(upd.credits, p.credits) : undefined;
 
-    const hpDelta = upd.hp !== undefined ? normalizeHpDelta(upd.hp, p.hp) : undefined;
-    const creditsDelta = upd.credits !== undefined ? normalizeCreditsDelta(upd.credits, p.credits) : undefined;
+    const inferredLocation = inferLocationFromChapter(chapter);
+    const requestedLocation = String(upd?.location || '').trim();
+    const fallbackLocation = isUnknownLocationValue(p.location) ? inferredLocation : undefined;
+    let newLocation = requestedLocation || fallbackLocation || p.location;
+    if (isUnknownLocationValue(newLocation) && inferredLocation) {
+      newLocation = inferredLocation;
+    }
 
     // Player vitals
     const newHp = hpDelta !== undefined ? Math.max(0, Math.min(100, p.hp + hpDelta)) : p.hp;
     const newCredits = creditsDelta !== undefined ? Math.max(0, p.credits + creditsDelta) : p.credits;
-    const newLocation = upd.location || p.location;
-    const newDate = upd.date_advance ? `${p.date.replace(/ \+.*$/, '')} +${upd.date_advance}` : p.date;
+    const newDate = upd?.date_advance ? `${p.date.replace(/ \+.*$/, '')} +${upd.date_advance}` : p.date;
 
     // Injuries: resolve then add new
-    const resolvedKeywords = upd.injuries_resolved ?? [];
+    const resolvedKeywords = upd?.injuries_resolved ?? [];
     const survivingInjuries = p.injuries.filter(inj =>
       !resolvedKeywords.some(r => inj.description.toLowerCase().includes(r.toLowerCase()))
     );
-    const newInjuries = [...survivingInjuries, ...(upd.injuries_new ?? [])];
+    const newInjuries = [...survivingInjuries, ...(upd?.injuries_new ?? [])];
 
     // Inventory
     let inventory = [...p.inventory];
-    for (const gained of upd.inventory_gained ?? []) {
+    for (const gained of upd?.inventory_gained ?? []) {
       const existing = inventory.find(i => i.name.toLowerCase() === gained.name.toLowerCase());
       if (existing) existing.qty += gained.qty;
       else inventory.push({ ...gained });
     }
-    for (const lost of upd.inventory_lost ?? []) {
+    for (const lost of upd?.inventory_lost ?? []) {
       inventory = inventory
         .map(i => i.name.toLowerCase() === lost.name.toLowerCase() ? { ...i, qty: i.qty - lost.qty } : i)
         .filter(i => i.qty > 0);
     }
 
     // NPCs: upsert by name — with generic-name deduplication
-    const GENERIC_NPC_RE = /^(l['']inconnu|l['']homme|la femme|un homme|une femme|le garde|l['']officier|le soldat|un individu|la silhouette|l['']étranger|un étranger)/i;
-    let npcs = [...worldState.npcs];
-    for (const npcUpd of upd.npcs ?? []) {
+    const GENERIC_NPC_RE = /^(l['’]inconnu|l['’]homme|la femme|un homme|une femme|le garde|l['’]officier|le soldat|un individu|la silhouette|l['’]etranger|l['’]étranger|un etranger|un étranger)/i;
+    let npcs = sourceState.npcs.map(npc => ({ ...npc, status: normalizeNpcStatus(npc.status) }));
+
+    for (const npcUpd of upd?.npcs ?? []) {
       const idx = npcs.findIndex(n => n.name.toLowerCase() === npcUpd.name.toLowerCase());
       if (idx >= 0) {
         // Normal update
-        npcs[idx] = { ...npcs[idx], ...npcUpd } as NpcRelation;
+        npcs[idx] = {
+          ...npcs[idx],
+          ...npcUpd,
+          status: normalizeNpcStatus((npcUpd.status as NpcRelation['status'] | undefined) ?? npcs[idx].status),
+          alive: npcUpd.alive ?? npcs[idx].alive
+        } as NpcRelation;
       } else {
         // Check if this is a "name reveal" of an existing generic/anonymous NPC
         const newAff = npcUpd.affinity ?? 0;
@@ -206,12 +335,17 @@
         );
         if (genericIdx >= 0) {
           // Merge: rename the generic NPC entry instead of creating a duplicate
-          npcs[genericIdx] = { ...npcs[genericIdx], ...npcUpd } as NpcRelation;
+          npcs[genericIdx] = {
+            ...npcs[genericIdx],
+            ...npcUpd,
+            status: normalizeNpcStatus((npcUpd.status as NpcRelation['status'] | undefined) ?? npcs[genericIdx].status),
+            alive: npcUpd.alive ?? npcs[genericIdx].alive
+          } as NpcRelation;
         } else {
           npcs.push({
             name: npcUpd.name,
             affinity: npcUpd.affinity ?? 0,
-            status: npcUpd.status ?? 'neutral',
+            status: normalizeNpcStatus(npcUpd.status as NpcRelation['status'] | undefined),
             faction: npcUpd.faction,
             last_seen: npcUpd.last_seen,
             alive: npcUpd.alive !== false,
@@ -221,15 +355,25 @@
       }
     }
 
+    // Fallback NPC seeds from dialogue when model omitted update_npc
+    const speakerSeeds = extractNpcSeedsFromDialogue(chapter.narrative.dialogue);
+    const existingNames = new Set(npcs.map(npc => npc.name.toLowerCase()));
+    for (const name of speakerSeeds) {
+      const key = name.toLowerCase();
+      if (existingNames.has(key)) continue;
+      npcs.push({ name, affinity: 0, status: 'neutral', alive: true });
+      existingNames.add(key);
+    }
+
     // Factions: apply deltas, clamp -100..100
-    const factions = { ...worldState.factions };
-    for (const [id, delta] of Object.entries(upd.factions ?? {})) {
+    const factions = { ...sourceState.factions };
+    for (const [id, delta] of Object.entries(upd?.factions ?? {})) {
       factions[id] = Math.max(-100, Math.min(100, (factions[id] ?? 0) + delta));
     }
 
     // Chronology entry
     const chronology = [
-      ...worldState.chronology,
+      ...sourceState.chronology,
       {
         chapter: chapter.chapter_number,
         date: newDate,
@@ -238,12 +382,45 @@
       }
     ].slice(-40);
 
-    worldState = {
+    return {
       player: { hp: newHp, credits: newCredits, location: newLocation, date: newDate, injuries: newInjuries, inventory },
       npcs,
       factions,
       chronology
     };
+  }
+
+  function applyStateUpdate(chapter: StoryChapter): void {
+    worldState = applyStateUpdateToWorldState(worldState, chapter);
+  }
+
+  function worldStateNeedsRepair(candidate: WorldState | null | undefined): boolean {
+    if (!candidate) return true;
+    if (isUnknownLocationValue(candidate.player?.location)) return true;
+    if (!candidate.npcs?.length) return true;
+    if (!candidate.chronology?.length) return true;
+    return false;
+  }
+
+  function rebuildWorldStateFromHistory(
+    setup: StorySetup,
+    chapters: StoryChapter[],
+    existingState: WorldState | null | undefined
+  ): WorldState {
+    const seedState = existingState ? cloneWorldState(existingState) : initWorldState(setup);
+    const normalizedSeed: WorldState = {
+      ...seedState,
+      player: {
+        ...seedState.player,
+        location: isUnknownLocationValue(seedState.player.location)
+          ? deriveInitialLocation(setup)
+          : seedState.player.location
+      },
+      chronology: []
+    };
+
+    const orderedChapters = [...chapters].sort((a, b) => (a.chapter_number || 0) - (b.chapter_number || 0));
+    return orderedChapters.reduce<WorldState>((acc, chapter) => applyStateUpdateToWorldState(acc, chapter), normalizedSeed);
   }
 
   // Mechanical consequences: returns display modifiers for a choice
@@ -437,7 +614,7 @@
         if (!name) continue;
         const relation = typeof npc.affinity === 'number'
           ? (npc.affinity > 30 ? 'allié' : npc.affinity < -30 ? 'hostile' : 'neutre')
-          : (npc.status || 'inconnu');
+          : (npc.status && npc.status !== 'unknown' ? npc.status : 'neutre');
         const note = String(npc.note || '').trim();
         stateFacts.push(`PNJ ${name} (${relation}${note ? ` — ${note}` : ''})`);
       }
@@ -975,7 +1152,7 @@
         backgroundEvents = session.backgroundEvents || [];
         campaignArchive = session.campaignArchive || [];
 
-        const snapshot = session.setupSnapshot;
+        const snapshot = session.setupSnapshot || get(currentSetup);
         setSetupField('era', snapshot.era || get(currentSetup).era);
         setSetupField('faction', snapshot.faction || get(currentSetup).faction);
         setSetupField('role', snapshot.role || get(currentSetup).role);
@@ -989,7 +1166,16 @@
         setSetupField('writingLength', snapshot.writingLength || get(currentSetup).writingLength);
         setSetupField('contentMode', snapshot.contentMode || get(currentSetup).contentMode);
 
-        if (session.worldState) worldState = session.worldState;
+        const setupForRepair = ensureSetupDefaults();
+        if (worldStateNeedsRepair(session.worldState)) {
+          worldState = rebuildWorldStateFromHistory(setupForRepair, chapterHistory, session.worldState);
+          saveInteractiveSession();
+        } else if (session.worldState) {
+          worldState = session.worldState;
+        } else {
+          worldState = initWorldState(setupForRepair);
+        }
+
         mode = session.currentChapter ? 'play' : 'setup';
       }
     }
@@ -1466,7 +1652,7 @@
                       <div class="n-block n-dialogue">
                         <span class="n-tag n-tag--dialogue">Dialogue</span>
                         {#each splitNarrativeParagraphs(currentChapter.narrative.dialogue) as para}
-                          <p class="n-paragraph" class:n-paragraph--dialogue={para.kind === 'dialogue'}>{para.text}</p>
+                          <p class="n-paragraph">{para.text}</p>
                         {/each}
                       </div>
                     {/if}

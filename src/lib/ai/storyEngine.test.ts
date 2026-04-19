@@ -88,6 +88,46 @@ describe('parseStoryResponse', () => {
     expect(chapter.state_update?.hp).toBe(-10);
   });
 
+  it('infers location from narrative when model omits world location', () => {
+    const raw = JSON.stringify({
+      chapter_title: 'Ombres sur les docks',
+      chapter_number: 1,
+      section_type: 'action',
+      narrative: {
+        action: 'La sirène retentit dans le hangar de Nar Shaddaa tandis que les contrebandiers verrouillent les portes.'
+      },
+      state_update: {
+        location: 'Inconnu'
+      },
+      choices: [{ text: 'Observer discrètement', attribute: 'stealth', difficulty: 2 }]
+    });
+
+    const chapter = parseStoryResponse(raw, 1);
+
+    expect(chapter.state_update?.location).toBe('Nar Shaddaa');
+    expect(chapter.memory_updates.places).toContain('Nar Shaddaa');
+  });
+
+  it('seeds npc entries from dialogue labels when state_update.npcs is missing', () => {
+    const raw = JSON.stringify({
+      chapter_title: 'Marché noir',
+      chapter_number: 4,
+      section_type: 'dialogue',
+      narrative: {
+        action: 'La foule s’écarte quand deux silhouettes t’encerclent.',
+        dialogue: '— Lira : On ne devrait pas être vus ici.\n— Kesh : Trop tard, ils arrivent.'
+      },
+      choices: [{ text: 'Suivre Lira', attribute: 'diplomacy', difficulty: 2 }]
+    });
+
+    const chapter = parseStoryResponse(raw, 4);
+    const npcNames = chapter.state_update?.npcs?.map(npc => npc.name) ?? [];
+
+    expect(npcNames).toContain('Lira');
+    expect(npcNames).toContain('Kesh');
+    expect(chapter.memory_updates.relations.some(item => item.includes('Lira'))).toBe(true);
+  });
+
   it('keeps dialogue instructions explicit in the system prompt', () => {
     const prompt = buildSystemPrompt(
       {
