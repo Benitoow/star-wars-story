@@ -445,6 +445,30 @@ function defaultNarrativeFromRaw(rawText: string): StoryNarrative {
   };
 }
 
+function isDiagnosticFallbackText(rawText: string): boolean {
+  const text = cleanText(rawText, 320).toLowerCase();
+  return [
+    'temps imparti',
+    'fallback',
+    'non bloquant',
+    'aborted',
+    'aborterror',
+    'inexploitable',
+    'instable',
+    'erreur',
+    'secours',
+    'bloquer'
+  ].some(token => text.includes(token));
+}
+
+function buildEmergencyFallbackSeed(turnNumber: number): string {
+  if (turnNumber <= 1) {
+    return `La baie d'embarquement s'illumine sous des néons fatigués. Quelqu'un approche dans le vacarme des réacteurs, et la première décision est déjà en suspens.`;
+  }
+
+  return `La scène repart dans un souffle de fumée et de métal chaud. Les tensions sont toujours là, et le prochain choix peut faire basculer la situation.`;
+}
+
 function extractLargestJsonObject(rawText: string): string | null {
   const text = String(rawText || '');
   const chunks: string[] = [];
@@ -645,12 +669,16 @@ function extractChoices(source: unknown): StoryChoice[] {
 }
 
 function fallbackChapter(rawText: string, turnNumber: number): StoryChapter {
+  const visibleSeed = isDiagnosticFallbackText(rawText)
+    ? buildEmergencyFallbackSeed(turnNumber)
+    : rawText;
+
   return {
     chapter_title: turnNumber === 1 ? 'Prologue' : `Tour ${turnNumber}`,
     chapter_number: turnNumber,
     section_type: 'action',
-    narrative: defaultNarrativeFromRaw(rawText || `Le modèle n'a pas renvoyé de JSON exploitable.`),
-    choices: defaultChoices(rawText, turnNumber, 'action'),
+    narrative: defaultNarrativeFromRaw(visibleSeed || `Le modèle n'a pas renvoyé de JSON exploitable.`),
+    choices: defaultChoices(visibleSeed, turnNumber, 'action'),
     memory_updates: defaultMemoryUpdates(),
     scene_description: 'Cinematic Star Wars scene with dramatic lighting and dynamic action',
     user_edits_applied: null
