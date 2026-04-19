@@ -13,7 +13,27 @@ const UNKNOWN_LOCATION_PATTERNS = [
   /^$/
 ];
 
-const DIALOGUE_SPEAKER_REGEX = /^\s*(?:[\-•*]+\s*)?(?:[«"']?)([A-ZÀ-ÖØ-Ý][\p{L}\p{N}'’\- ]{1,40}?)(?:[»"']?)\s*[:—-]\s*(.+)$/u;
+const DIALOGUE_SPEAKER_REGEX = /(?:^|\s)(?:[\-—•*]+\s*)?(?:[«"']?)([A-ZÀ-ÖØ-Ý][\p{L}\p{N}'’\- ]{1,40}?)(?:[»"']?)\s*:/gu;
+const SPEECH_ATTRIBUTION_REGEX = /\b([A-ZÀ-ÖØ-Ý][\p{L}'’\-]{1,30})\s+(?:dit|repond|répond|murmure|souffle|crie|grogne|lance|annonce)\b/gu;
+
+const NPC_NAME_STOPWORDS = new Set([
+  'le', 'la', 'les', 'un', 'une', 'des', 'du', 'de', 'd',
+  'je', 'tu', 'il', 'elle', 'on', 'nous', 'vous', 'ils', 'elles',
+  'ici', 'là', 'la-bas', 'là-bas', 'maintenant',
+  'canyon', 'jundland', 'kashyyyk', 'coruscant', 'tatooine', 'naboo', 'bespin',
+  'hangar', 'spatioport', 'cantina', 'secteur',
+  'hutts', 'hutt', 'rodiens', 'rodien',
+  'transport', 'yt-1300', 'yv-666', 'scyk'
+]);
+
+const NON_NPC_ENTITY_PATTERNS: RegExp[] = [
+  /\b(?:jundland|kashyyyk|coruscant|tatooine|naboo|bespin|mustafar|kamino|hoth|endor|dagobah|nar\s+shaddaa)\b/i,
+  /\b(?:hangar|spatioport|cantina|dock|quai|baie\s+d['’]arrimage|secteur|canyon|desert|désert|foret|forêt|ville)\b/i,
+  /\b(?:vaisseau|transport|cargo|navette|croiseur|corvette|yt-1300|yv-666|scyk|x-wing|tie)\b/i,
+  /\b(?:hutts?|rodiens?|wookiees?|mandaloriens?|stormtroopers?)\b/i
+];
+
+const ALLOWED_DROID_NAME_PATTERN = /^(?:r2|c-?3|bb|ig|hk|k2|bd|chopper|ch0pper)\b/i;
 
 function cleanText(value: unknown, maxLength = 2200): string {
   if (value === null || value === undefined) return '';
@@ -36,6 +56,25 @@ function normalizeNpcName(rawName: string): string {
     .trim();
 }
 
+function isLikelyNpcName(candidate: string): boolean {
+  const normalized = cleanText(candidate, 60)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+
+  if (!normalized || isUnknownLocation(normalized)) return false;
+  if (NPC_NAME_STOPWORDS.has(normalized)) return false;
+  if (normalized.split(/\s+/).length > 3) return false;
+  if (/^(?:le|la|les|un|une|des|du|de|d)\s+/.test(normalized)) return false;
+  if (NON_NPC_ENTITY_PATTERNS.some(pattern => pattern.test(normalized))) return false;
+
+  const hasDigits = /\d/.test(normalized);
+  if (hasDigits && !ALLOWED_DROID_NAME_PATTERN.test(normalized)) return false;
+
+  return normalized.length >= 2;
+}
+
 function extractNpcNamesFromDialogue(narrative: StoryNarrative): string[] {
   const corpus = [narrative.dialogue, narrative.context, narrative.action].filter(Boolean).join('\n');
   if (!corpus) return [];
@@ -45,18 +84,16 @@ function extractNpcNamesFromDialogue(narrative: StoryNarrative): string[] {
     const trimmed = line.trim();
     if (!trimmed) continue;
 
-    const speakerMatch = trimmed.match(DIALOGUE_SPEAKER_REGEX);
-    if (speakerMatch?.[1]) {
-      const candidate = normalizeNpcName(speakerMatch[1]);
-      if (candidate && candidate.length >= 2 && !isUnknownLocation(candidate)) {
+    for (const speakerMatch of trimmed.matchAll(DIALOGUE_SPEAKER_REGEX)) {
+      const candidate = normalizeNpcName(speakerMatch[1] || '');
+      if (candidate && isLikelyNpcName(candidate)) {
         names.add(candidate);
       }
     }
 
-    const quotedMatches = trimmed.matchAll(/\b(?:le|la|les|un|une|du|de|des)?\s*([A-ZÀ-ÖØ-Ý][\p{L}\p{N}'’\-]{2,}(?:\s+[A-ZÀ-ÖØ-Ý][\p{L}\p{N}'’\-]{2,}){0,2})\b/gu);
-    for (const quotedMatch of quotedMatches) {
-      const candidate = normalizeNpcName(quotedMatch[1] || '');
-      if (candidate && candidate.length >= 2 && !isUnknownLocation(candidate)) {
+    for (const match of trimmed.matchAll(SPEECH_ATTRIBUTION_REGEX)) {
+      const candidate = normalizeNpcName(match[1] || '');
+      if (candidate && isLikelyNpcName(candidate)) {
         names.add(candidate);
       }
     }
@@ -97,21 +134,6 @@ function seedNpcRelationsFromDialogue(narrative: StoryNarrative, stateUpdate?: S
   return {
     ...(stateUpdate || {}),
     npcs: [...(stateUpdate?.npcs || []), ...additions]
-  };
-}
-
-function seedRelationNotesFromDialogue(narrative: StoryNarrative, memoryUpdates: StoryMemoryUpdates): StoryMemoryUpdates {
-  const names = extractNpcNamesFromDialogue(narrative);
-  if (!names.length) return memoryUpdates;
-
-  const relationSeeds = names.map(name => `Rencontre avec ${name}`);
-
-  return {
-    relations: mergeUniqueStrings(memoryUpdates.relations, relationSeeds),
-    places: [...memoryUpdates.places],
-    injuries: [...memoryUpdates.injuries],
-    resources: [...memoryUpdates.resources],
-    notes: [...memoryUpdates.notes]
   };
 }
 
@@ -173,10 +195,9 @@ export function ensureWorldStateFallbacks(
   }
 
   const seededStateUpdate = seedNpcRelationsFromDialogue(narrative, nextStateUpdate);
-  const seededMemoryUpdates = seedRelationNotesFromDialogue(narrative, nextMemoryUpdates);
 
   return {
     stateUpdate: seededStateUpdate,
-    memoryUpdates: seededMemoryUpdates
+    memoryUpdates: nextMemoryUpdates
   };
 }

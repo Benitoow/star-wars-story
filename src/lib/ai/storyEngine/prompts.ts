@@ -105,11 +105,12 @@ RÈGLES MJ:
 7. ÉTAT MONDE OBLIGATOIRE: chaque tour doit mettre à jour au moins un signal monde via state_update (location, npcs, factions, hp/credits, blessures ou inventaire).
 8. LIEU: state_update.location doit refléter la scène actuelle. Au tour 1, il est obligatoire même sans déplacement.
 9. PNJs NOMMÉS: si un personnage nommé parle/apparaît, ajoute une entrée dans state_update.npcs.
-10. Résumé de campagne: s'il est présent, il représente la continuité condensée des tours anciens — prends-le en compte sans le répéter mot à mot.`;
+10. RÔLE CANONIQUE IMMUTABLE: le protagoniste reste "${setup.role}". Ne le promeus/rétrograde jamais (ex: Padawan ≠ Chevalier/Maître) sans validation explicite du joueur.
+11. Résumé de campagne: s'il est présent, il représente la continuité condensée des tours anciens — prends-le en compte sans le répéter mot à mot.`;
   const narrativeProseRule = `
-11. PROSE UNIQUEMENT dans "narrative.action": pas de markdown, pas de titres H1/H2, pas de listes numérotées, pas de bloc "Que faites-vous ?", pas de répétition des choix. Les choix vivent uniquement dans le tableau "choices".
-12. DIALOGUES: chaque réplique doit être sur son propre paragraphe, idéalement précédée d'un tiret cadratin (—) ou placée dans "narrative.dialogue". Ne colle jamais une réplique au milieu d'un paragraphe d'action.
-13. DIALOGUES OBLIGATOIREMENT DANS narrative.dialogue: chaque échange verbal doit être placé dans le champ "dialogue", jamais dans "action". "action" = narration pure et actions, "dialogue" = tous les échanges verbaux. Si un personnage parle, utilise ce champ dédié.;`;
+12. PROSE UNIQUEMENT dans "narrative.action": pas de markdown, pas de titres H1/H2, pas de listes numérotées, pas de bloc "Que faites-vous ?", pas de répétition des choix. Les choix vivent uniquement dans le tableau "choices".
+13. DIALOGUES: chaque réplique doit être sur son propre paragraphe, idéalement précédée d'un tiret cadratin (—) ou placée dans "narrative.dialogue". Ne colle jamais une réplique au milieu d'un paragraphe d'action.
+14. DIALOGUES OBLIGATOIREMENT DANS narrative.dialogue: chaque échange verbal doit être placé dans le champ "dialogue", jamais dans "action". "action" = narration pure et actions, "dialogue" = tous les échanges verbaux. Si un personnage parle, utilise ce champ dédié.;`;
 
   const jsonContract = `Réponds UNIQUEMENT en JSON valide, sans markdown ni texte autour. Priorité absolue: prose narrative riche dans "action" (2-4 paragraphes). Remplis state_update avec toutes les conséquences.
 
@@ -192,6 +193,7 @@ EXIGENCES DU PREMIER TOUR:
 - Introduis au moins 1 PNJ mémorable avec un agenda distinct.
 - Fais émerger un enjeu politique, relationnel ou moral dès l'ouverture.
 - Les 3-4 choix doivent être concrets, contrastés et portés par la scène.
+- Respecte strictement le rôle canonique choisi (${setup.role}). N'invente pas de promotion de rang au lancement.
 - Le lieu de départ doit être explicite et exploitable pour l'état monde.
 - Le texte de scène ne doit contenir ni markdown ni liste de choix.
 - Tout dialogue doit être isolé sur sa propre ligne, idéalement précédé d'un tiret cadratin (—) et séparé du reste de l'action par un retour à la ligne.
@@ -243,6 +245,7 @@ Ne mets aucun markdown, aucun titre interne et aucun bloc de choix dans le réci
 Chaque réplique doit être sur une ligne distincte, idéalement précédée de —, et jamais noyée dans un paragraphe d'action.
 Propose 3-4 choix distincts, concrets, ancrés dans cette scène précise (pas génériques).
 Fournis assez d'éléments concrets pour extraire au moins un signal monde (location ou PNJ nommé) à ce tour.
+Respecte le rôle canonique du protagoniste défini dans le contexte système (ne pas promouvoir/rétrograder sans validation explicite du joueur).
 chapter_number = ${turnNumber}.
 Place tous les dialogues dans le champ "dialogue".`;
 }

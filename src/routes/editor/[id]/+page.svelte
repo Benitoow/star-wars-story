@@ -116,6 +116,18 @@
   ];
   const DIALOGUE_SPEAKER_RE = /[—-]\s*([A-ZÀ-ÖØ-Þ][A-Za-zÀ-ÖØ-öø-ÿ' -]{1,48})\s*:/gu;
   const DIALOGUE_SPEAKER_STOPWORDS = new Set(['je', 'tu', 'vous', 'il', 'elle', 'on', 'nous', 'ils', 'elles']);
+  const NON_NPC_EXACT = new Set([
+    'les', 'le', 'la', 'un', 'une', 'des', 'du', 'de',
+    'jundland', 'kashyyyk', 'coruscant', 'tatooine', 'naboo', 'bespin',
+    'hangar', 'spatioport', 'cantina', 'canyon', 'secteur',
+    'hutt', 'hutts', 'rodien', 'rodiens',
+    'yt-1300', 'yv-666', 'scyk'
+  ]);
+  const NON_NPC_ENTITY_RE = /\b(?:jundland|kashyyyk|coruscant|tatooine|naboo|bespin|mustafar|kamino|hoth|endor|dagobah|nar\s*shaddaa|hangar|spatioport|cantina|canyon|secteur|transport|vaisseau|cargo|navette|yt-1300|yv-666|scyk|x-wing|tie|hutts?|rodiens?)\b/i;
+  const ALLOWED_DROID_NAME_RE = /^(?:r2|c-?3|bb|ig|hk|k2|bd|chopper|ch0pper)/i;
+  const HOSTILE_RELATION_RE = /\b(?:attaque|menace|hostile|ennemi|trahit|abandonne|frappe|tue|deteste|déteste|insulte|pi[eè]ge|embuscade)\b/i;
+  const ALLY_RELATION_RE = /\b(?:aide|sauve|protege|prot[eè]ge|couvre|soutient|soutien|allie|alli[eé]|confiance|merci|secourt)\b/i;
+  const MEMORY_LOW_SIGNAL_RELATION_RE = /^rencontre\s+avec\s+/i;
 
   function normalizeSearchText(value: string): string {
     return value
@@ -123,6 +135,75 @@
       .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase()
       .trim();
+  }
+
+  function escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  function isLikelyNpcName(value: unknown): boolean {
+    const raw = String(value || '').trim();
+    if (!raw) return false;
+
+    const normalized = normalizeSearchText(raw);
+    if (!normalized || isUnknownLocationValue(normalized)) return false;
+    if (DIALOGUE_SPEAKER_STOPWORDS.has(normalized)) return false;
+    if (NON_NPC_EXACT.has(normalized)) return false;
+    if (/^(?:le|la|les|un|une|des|du|de)\s+/.test(normalized)) return false;
+    if (NON_NPC_ENTITY_RE.test(normalized)) return false;
+    if (normalized.split(/\s+/).length > 3) return false;
+
+    const hasDigits = /\d/.test(normalized);
+    if (hasDigits && !ALLOWED_DROID_NAME_RE.test(normalized)) return false;
+
+    return normalized.length >= 2;
+  }
+
+  function clampAffinity(value: number): number {
+    return Math.max(-100, Math.min(100, Math.round(value)));
+  }
+
+  function deriveStatusFromAffinity(affinity: number, currentStatus?: NpcRelation['status']): NpcRelation['status'] {
+    if (currentStatus === 'dead') return 'dead';
+    if (affinity >= 25) return 'ally';
+    if (affinity <= -25) return 'hostile';
+    return 'neutral';
+  }
+
+  function inferNpcAffinityDelta(chapter: StoryChapter, npcName: string): number {
+    const normalizedName = normalizeSearchText(npcName);
+    if (!normalizedName) return 0;
+
+    const corpus = normalizeSearchText([
+      chapter.narrative.action,
+      chapter.narrative.dialogue,
+      chapter.narrative.reflection
+    ].filter(Boolean).join('\n'));
+
+    if (!corpus || !corpus.includes(normalizedName)) return 0;
+
+    const nameRegex = new RegExp(escapeRegExp(normalizedName), 'gi');
+    let score = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = nameRegex.exec(corpus)) !== null) {
+      const start = Math.max(0, match.index - 90);
+      const end = Math.min(corpus.length, match.index + normalizedName.length + 90);
+      const window = corpus.slice(start, end);
+
+      if (ALLY_RELATION_RE.test(window)) score += 12;
+      if (HOSTILE_RELATION_RE.test(window)) score -= 12;
+    }
+
+    return Math.max(-20, Math.min(20, score));
+  }
+
+  function isMeaningfulNpcMemoryEntry(npc: Partial<NpcRelation> & { name: string }): boolean {
+    if (!isLikelyNpcName(npc.name)) return false;
+    const affinity = typeof npc.affinity === 'number' ? npc.affinity : 0;
+    const status = normalizeNpcStatus(npc.status as NpcRelation['status'] | undefined);
+    const note = String(npc.note || '').trim();
+    return Boolean(note || npc.faction || Math.abs(affinity) >= 15 || status === 'ally' || status === 'hostile' || status === 'dead');
   }
 
   function isUnknownLocationValue(value: unknown): boolean {
@@ -166,6 +247,7 @@
 
       const normalized = normalizeSearchText(candidate);
       if (DIALOGUE_SPEAKER_STOPWORDS.has(normalized)) continue;
+      if (!isLikelyNpcName(candidate)) continue;
       names.add(candidate);
     }
     return Array.from(names).slice(0, 6);
@@ -361,8 +443,58 @@
     for (const name of speakerSeeds) {
       const key = name.toLowerCase();
       if (existingNames.has(key)) continue;
-      npcs.push({ name, affinity: 0, status: 'neutral', alive: true });
+      if (!isLikelyNpcName(name)) continue;
+      npcs.push({
+        name,
+        affinity: 0,
+        status: 'neutral',
+        alive: true,
+        last_seen: !isUnknownLocationValue(newLocation) ? newLocation : undefined
+      });
       existingNames.add(key);
+    }
+
+    const explicitNpcUpdates = new Map(
+      (upd?.npcs ?? [])
+        .filter(item => item?.name)
+        .map(item => [String(item.name).toLowerCase(), item] as const)
+    );
+
+    for (const npc of npcs) {
+      if (!isLikelyNpcName(npc.name)) continue;
+
+      const normalizedName = normalizeSearchText(npc.name);
+      const chapterCorpus = normalizeSearchText([
+        chapter.narrative.action,
+        chapter.narrative.dialogue,
+        chapter.narrative.reflection
+      ].filter(Boolean).join('\n'));
+
+      const isMentionedThisTurn = Boolean(normalizedName && chapterCorpus.includes(normalizedName));
+      if (!isMentionedThisTurn) continue;
+
+      if (!isUnknownLocationValue(newLocation)) {
+        npc.last_seen = newLocation;
+      }
+
+      const explicit = explicitNpcUpdates.get(npc.name.toLowerCase());
+      const hasExplicitRelationSignal = Boolean(
+        explicit && (
+          typeof explicit.affinity === 'number' ||
+          typeof explicit.status === 'string'
+        )
+      );
+
+      if (!hasExplicitRelationSignal) {
+        const delta = inferNpcAffinityDelta(chapter, npc.name);
+        if (delta !== 0) {
+          npc.affinity = clampAffinity((npc.affinity ?? 0) + delta);
+        }
+      }
+
+      if (typeof npc.affinity === 'number') {
+        npc.status = deriveStatusFromAffinity(npc.affinity, npc.status);
+      }
     }
 
     // Factions: apply deltas, clamp -100..100
@@ -584,13 +716,39 @@
   }
 
   function mergeMemoryFacts(nextFacts: string[]): void {
-    const merged = Array.from(new Set([...memoryLog, ...nextFacts].filter(Boolean)));
+    const cleanedFacts = nextFacts
+      .map(item => String(item || '').trim())
+      .filter(Boolean)
+      .filter(item => item.length >= 10)
+      .filter(item => !/^Relation:\s+Rencontre\s+avec\s+/i.test(item))
+      .filter(item => !MEMORY_LOW_SIGNAL_RELATION_RE.test(item));
+
+    const merged = Array.from(new Set([...memoryLog, ...cleanedFacts]));
     memoryLog = merged.slice(-120);
+  }
+
+  function getRoleLabel(roleId: string): string {
+    return ROLES.find(role => role.id === roleId)?.name || roleId;
+  }
+
+  function buildCanonicalIdentityFacts(setup: StorySetup): string[] {
+    const roleLabel = getRoleLabel(setup.role || 'aventurier');
+    return [
+      `Canon protagoniste: rôle ${roleLabel} (${setup.role || 'inconnu'}).`,
+      `Canon protagoniste: faction ${setup.faction || 'indépendant'} · ère ${setup.era || 'inconnue'}.`,
+      `Règle canonique: ne pas changer le rang/role (ex: Padawan ≠ Chevalier/Maître) sans validation explicite du joueur.`
+    ];
+  }
+
+  function ensureCanonicalIdentityMemory(setup: StorySetup): void {
+    mergeMemoryFacts(buildCanonicalIdentityFacts(setup));
   }
 
   function appendMemoryFromChapter(chapter: StoryChapter): void {
     const explicitFacts = [
-      ...chapter.memory_updates.relations.map(item => `Relation: ${item}`),
+      ...chapter.memory_updates.relations
+        .filter(item => !MEMORY_LOW_SIGNAL_RELATION_RE.test(item))
+        .map(item => `Relation: ${item}`),
       ...chapter.memory_updates.places.map(item => `Lieu: ${item}`),
       ...chapter.memory_updates.injuries.map(item => `Blessure: ${item}`),
       ...chapter.memory_updates.resources.map(item => `Ressource: ${item}`),
@@ -609,7 +767,12 @@
     }
 
     if (su?.npcs?.length) {
-      for (const npc of su.npcs.slice(0, 4)) {
+      const meaningfulNpcs = su.npcs
+        .filter((npc): npc is Partial<NpcRelation> & { name: string } => Boolean(npc?.name))
+        .filter(npc => isMeaningfulNpcMemoryEntry(npc))
+        .slice(0, 3);
+
+      for (const npc of meaningfulNpcs) {
         const name = String(npc.name || '').trim();
         if (!name) continue;
         const relation = typeof npc.affinity === 'number'
@@ -644,16 +807,20 @@
 
     const mergedFacts = [...explicitFacts, ...stateFacts.filter(f => f.length > 10)];
 
+    const narrativeSnippet = sanitizeNarrativeTextForDisplay(
+      chapter.narrative.action || chapter.narrative.context || chapter.narrative.dialogue || ''
+    )
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 160);
+
+    if (narrativeSnippet) {
+      mergedFacts.unshift(`Tour ${chapter.chapter_number}: ${chapter.chapter_title} — ${narrativeSnippet}`);
+    }
+
     // Safety net: always keep at least one memory breadcrumb per chapter,
     // even when models omit memory_updates/state_update.
     if (!mergedFacts.length) {
-      const narrativeSnippet = sanitizeNarrativeTextForDisplay(
-        chapter.narrative.action || chapter.narrative.context || chapter.narrative.dialogue || ''
-      )
-        .replace(/\s+/g, ' ')
-        .trim()
-        .slice(0, 160);
-
       if (narrativeSnippet) {
         mergedFacts.push(`Tour ${chapter.chapter_number}: ${chapter.chapter_title} — ${narrativeSnippet}`);
       }
@@ -815,7 +982,11 @@
     archiveOldTurnsIfNeeded();
 
     const promptMode = resolvePromptMode();
-    const systemPrompt = buildSystemPrompt(setup, memoryLog, worldState, promptMode, turn, campaignArchive);
+    const memoryFactsForPrompt = Array.from(new Set([
+      ...buildCanonicalIdentityFacts(setup),
+      ...memoryLog
+    ]));
+    const systemPrompt = buildSystemPrompt(setup, memoryFactsForPrompt, worldState, promptMode, turn, campaignArchive);
     aiMessages = [{ role: 'system', content: systemPrompt }, ...aiMessages.filter(message => message.role !== 'system')];
 
     const requestMessages = trimMessages([
@@ -862,6 +1033,7 @@
       campaignArchive = [];
       customAction = '';
       worldState = initWorldState(setup);
+      ensureCanonicalIdentityMemory(setup);
 
       const trameLabel = TRAMES.find(item => item.id === selectedTrame)?.name || null;
       const prompt = buildStartPrompt(setup, trameLabel, resolvePromptMode());
@@ -1167,6 +1339,7 @@
         setSetupField('contentMode', snapshot.contentMode || get(currentSetup).contentMode);
 
         const setupForRepair = ensureSetupDefaults();
+        ensureCanonicalIdentityMemory(setupForRepair);
         if (worldStateNeedsRepair(session.worldState)) {
           worldState = rebuildWorldStateFromHistory(setupForRepair, chapterHistory, session.worldState);
           saveInteractiveSession();

@@ -125,7 +125,29 @@ describe('parseStoryResponse', () => {
 
     expect(npcNames).toContain('Lira');
     expect(npcNames).toContain('Kesh');
-    expect(chapter.memory_updates.relations.some(item => item.includes('Lira'))).toBe(true);
+    expect(chapter.memory_updates.relations.some(item => /^Rencontre avec\s+/i.test(item))).toBe(false);
+  });
+
+  it('does not seed locations or vehicles as npc names', () => {
+    const raw = JSON.stringify({
+      chapter_title: 'Échos du canyon',
+      chapter_number: 8,
+      section_type: 'action',
+      narrative: {
+        action: 'Le YT-1300 file vers le Canyon de Jundland. Kashyyyk n\'est plus qu\'un souvenir lointain.',
+        dialogue: '— Vex : On décroche maintenant.'
+      },
+      choices: [{ text: 'Suivre Vex', attribute: 'survival', difficulty: 2 }]
+    });
+
+    const chapter = parseStoryResponse(raw, 8);
+    const npcNames = new Set((chapter.state_update?.npcs ?? []).map(npc => npc.name));
+
+    expect(npcNames.has('Vex')).toBe(true);
+    expect(npcNames.has('Jundland')).toBe(false);
+    expect(npcNames.has('Canyon')).toBe(false);
+    expect(npcNames.has('Kashyyyk')).toBe(false);
+    expect(npcNames.has('YT-1300')).toBe(false);
   });
 
   it('keeps dialogue instructions explicit in the system prompt', () => {
@@ -152,5 +174,32 @@ describe('parseStoryResponse', () => {
 
     expect(prompt).toContain('DIALOGUES: chaque réplique doit être sur son propre paragraphe');
     expect(prompt).toContain('Ne colle jamais une réplique au milieu d\'un paragraphe d\'action.');
+  });
+
+  it('locks canonical role in the system prompt', () => {
+    const prompt = buildSystemPrompt(
+      {
+        era: 'imperial',
+        faction: 'jedi',
+        role: 'padawan',
+        premise: 'Test role lock',
+        writingStyle: 'cinematic',
+        writingTone: 'tense',
+        writingPov: 'first-person',
+        writingLength: 'medium',
+        contentMode: 'cinematic',
+        protagonistFirstName: 'Ash',
+        protagonistLastName: 'Voss'
+      },
+      [],
+      undefined,
+      'json',
+      1,
+      []
+    );
+
+    expect(prompt).toContain('RÔLE CANONIQUE IMMUTABLE');
+    expect(prompt).toContain('"padawan"');
+    expect(prompt).toContain('Padawan ≠ Chevalier/Maître');
   });
 });
