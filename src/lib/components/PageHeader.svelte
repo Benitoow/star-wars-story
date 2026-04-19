@@ -3,6 +3,7 @@
 
   export let title = '';
   export let showBack = false;
+  export let breadcrumbs: Array<{ label: string; href?: string }> = [];
 
   const dispatch = createEventDispatcher<{ back: void }>();
 </script>
@@ -17,7 +18,19 @@
         Retour
       </button>
     {/if}
-    {#if title}
+
+    {#if breadcrumbs.length > 0}
+      <nav class="breadcrumb" aria-label="Fil d'Ariane">
+        {#each breadcrumbs as crumb, i}
+          {#if crumb.href && i < breadcrumbs.length - 1}
+            <a href={crumb.href} class="crumb-link">{crumb.label}</a>
+            <span class="crumb-sep" aria-hidden="true">›</span>
+          {:else}
+            <span class="crumb-current" aria-current="page">{crumb.label}</span>
+          {/if}
+        {/each}
+      </nav>
+    {:else if title}
       <h1 class="page-title">{title}</h1>
     {/if}
   </div>
@@ -46,6 +59,7 @@
     align-items: center;
     gap: var(--space-md);
     min-width: 0;
+    flex: 1;
   }
 
   .back-btn {
@@ -61,6 +75,8 @@
     cursor: pointer;
     transition: all var(--transition-fast);
     white-space: nowrap;
+    flex-shrink: 0;
+    font-family: var(--font-body);
   }
 
   .back-btn:hover {
@@ -71,6 +87,42 @@
   .back-btn svg {
     width: 16px;
     height: 16px;
+  }
+
+  /* Breadcrumb */
+  .breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .crumb-link {
+    font-size: 0.82rem;
+    color: var(--color-text-muted);
+    text-decoration: none;
+    white-space: nowrap;
+    transition: color var(--transition-fast);
+    flex-shrink: 0;
+  }
+
+  .crumb-link:hover { color: var(--color-gold); }
+
+  .crumb-sep {
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+    flex-shrink: 0;
+    opacity: 0.5;
+  }
+
+  .crumb-current {
+    font-size: 0.82rem;
+    color: var(--color-text-primary);
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .page-title {
@@ -86,7 +138,6 @@
     display: flex;
     align-items: center;
     gap: var(--space-sm);
-    flex: 1 1 auto;
     min-width: 0;
     justify-content: flex-end;
     flex-wrap: wrap;

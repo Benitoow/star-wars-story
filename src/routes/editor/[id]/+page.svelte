@@ -1020,6 +1020,10 @@
       title={mode === 'setup' ? "Création d'histoire IA" : 'Aventure interactive'}
       showBack={true}
       on:back={() => goto('/')}
+      breadcrumbs={[
+        { label: 'Mes Histoires', href: '/' },
+        { label: mode === 'setup' ? 'Nouvelle aventure' : (currentChapter?.chapter_title || 'Aventure') }
+      ]}
     >
       <div class="header-actions">
         <button class="btn btn-ghost btn-icon-label" on:click={startNewStory} disabled={generating || saving} title="Nouvelle partie">
@@ -1407,10 +1411,18 @@
             <!-- ── Loading indicator ───────────────────── -->
             {#if generating}
               <div class="play-generating" in:fly={{ y: 6, duration: 180 }}>
-                <div class="gen-dot-row">
-                  <span></span><span></span><span></span>
+                <div class="holonet-loader" aria-label="Connexion au Holonet en cours">
+                  <div class="holonet-ring"></div>
+                  <div class="holonet-ring holonet-ring--2"></div>
+                  <div class="holonet-core">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16">
+                      <circle cx="12" cy="12" r="3"/>
+                      <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                    </svg>
+                  </div>
                 </div>
-                <p>L'IA compose la suite…</p>
+                <p class="gen-label">Connexion au Holonet…</p>
+                <p class="gen-sub">L'IA compose la suite</p>
               </div>
             {/if}
 
@@ -2285,31 +2297,70 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
-    padding: var(--space-lg);
+    gap: 12px;
+    padding: var(--space-xl);
     color: var(--color-text-muted);
-    font-size: 0.82rem;
   }
 
-  .gen-dot-row {
+  .holonet-loader {
+    position: relative;
+    width: 52px;
+    height: 52px;
     display: flex;
-    gap: 5px;
+    align-items: center;
+    justify-content: center;
   }
 
-  .gen-dot-row span {
-    width: 7px;
-    height: 7px;
+  .holonet-ring {
+    position: absolute;
+    inset: 0;
+    border: 2px solid rgba(255, 232, 31, 0.15);
     border-radius: 50%;
-    background: var(--color-gold);
-    animation: gen-bounce 1.3s ease-in-out infinite;
+    animation: holonet-spin 1.4s linear infinite;
   }
 
-  .gen-dot-row span:nth-child(2) { animation-delay: 0.18s; }
-  .gen-dot-row span:nth-child(3) { animation-delay: 0.36s; }
+  .holonet-ring--2 {
+    inset: 7px;
+    border-color: rgba(255, 232, 31, 0.3);
+    animation-direction: reverse;
+    animation-duration: 0.9s;
+  }
 
-  @keyframes gen-bounce {
-    0%, 80%, 100% { transform: translateY(0)    scale(0.6); opacity: 0.35; }
-    40%           { transform: translateY(-5px) scale(1);   opacity: 1; }
+  .holonet-core {
+    width: 24px;
+    height: 24px;
+    background: rgba(255, 232, 31, 0.12);
+    border: 1px solid rgba(255, 232, 31, 0.4);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-gold);
+    animation: holonet-pulse 1.4s ease-in-out infinite;
+  }
+
+  @keyframes holonet-spin {
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes holonet-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 232, 31, 0.4); }
+    50% { box-shadow: 0 0 0 6px rgba(255, 232, 31, 0); }
+  }
+
+  .gen-label {
+    margin: 0;
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--color-gold);
+    letter-spacing: 0.3px;
+    font-family: var(--font-display);
+  }
+
+  .gen-sub {
+    margin: 0;
+    font-size: 0.78rem;
+    color: var(--color-text-muted);
   }
 
   /* ═══════════════════════════════════════════
