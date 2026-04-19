@@ -2474,16 +2474,6 @@
     font-size: 1.02em;
   }
 
-  .n-paragraph--thought {
-    margin-left: 0.5rem;
-    padding: 0.3rem 0 0.3rem 1rem;
-    border-left: 3px solid #CE93D8;
-    background: rgba(206, 147, 216, 0.08);
-    color: #d4b8e0;
-    font-style: italic;
-    border-radius: 0 4px 4px 0;
-  }
-
   /* Context */
   .n-context p { color: color-mix(in srgb, var(--color-text-primary) 90%, white 10%); }
 

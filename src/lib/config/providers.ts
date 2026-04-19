@@ -22,7 +22,7 @@ export const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
 };
 
 export const DEFAULT_TEXT_PROVIDER_ID = 'openrouter';
-export const DEFAULT_TEXT_MODEL_ID = 'google/gemma-4-26b-a4b-it';
+export const DEFAULT_TEXT_MODEL_ID = 'qwen/qwen3.5-9b';
 export const DEFAULT_OLLAMA_URL = 'http://localhost:11434';
 export const DEFAULT_IMAGE_PROVIDER_ID = 'none';
 export const DEFAULT_IMAGE_MODEL_ID = '';
@@ -35,7 +35,7 @@ export const OPENAI_COMPATIBLE_BASE_URLS: Record<string, string> = {
 };
 
 export const DEFAULT_TEXT_MODELS: Record<string, string> = {
-  openrouter: 'google/gemma-4-26b-a4b-it',
+  openrouter: 'qwen/qwen3.5-9b',
   openai: 'gpt-5.4-mini',
   anthropic: 'claude-sonnet-4-5',
   mistral: 'mistral-medium-3',
@@ -67,6 +67,7 @@ export const TEXT_PROVIDERS: ProviderCatalog[] = [
     id: 'openrouter',
     name: 'OpenRouter',
     models: [
+      'qwen/qwen3.5-9b',
       'google/gemma-3-27b-it:free',
       'google/gemma-4-26b-a4b-it',
       'google/gemma-4-31b-it',
@@ -75,7 +76,6 @@ export const TEXT_PROVIDERS: ProviderCatalog[] = [
       'mistralai/mistral-small-3.2-24b-instruct:free',
       'qwen/qwen3-30b-a3b:free',
       'qwen/qwen3-235b-a22b:free',
-      'qwen/qwen3.5-9b',
       'xiaomi/mimo-v2-flash',
       'xiaomi/mimo-v2-omni',
       'x-ai/grok-4.1-fast',
