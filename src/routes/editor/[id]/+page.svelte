@@ -85,6 +85,7 @@
     setupSnapshot: StorySetup;
     backgroundEvents?: LoggedBackgroundEvent[];
     worldState?: WorldState;
+    campaignArchive?: string[];
   }
 
   let setupScreenIndex = 0;
@@ -100,6 +101,7 @@
   let aiMessages: ChatMessage[] = [];
   let memoryLog: string[] = [];
   let backgroundEvents: LoggedBackgroundEvent[] = [];
+  let campaignArchive: string[] = [];
   let customAction = '';
   let hudCollapsed = false;
 
@@ -157,6 +159,7 @@
   const TIME_PASS_CHOICE_REGEX = /(attendre|patienter|passer le temps|se reposer|méditer|observer|planifier|faire le point|préparer|laisser avancer|laisser filer|récupérer)/i;
   const ACTION_HEAVY_CHOICE_REGEX = /(attaquer|assaut|fusillade|duel|foncer|abattre|détruire|exploser|charge|combat|sabre|blaster|éliminer)/i;
   const TOOL_CALL_LEAK_TEXT_REGEX = /<\|?tool_call\|?>|tool_call|(?:^|\s)call:[a-z_]+\s*\{/i;
+  const INTENSE_SECTION_TYPES = new Set(['action', 'confrontation']);
 
   function sanitizeNarrativeLeak(text: string): string {
     if (!TOOL_CALL_LEAK_TEXT_REGEX.test(text || '')) return text;
@@ -423,11 +426,22 @@
 
   function buildSceneAnchor(ws: WorldState, lastChapter: StoryChapter): string {
     const p = ws.player;
-    const aliveNpcs = ws.npcs.filter(n => n.alive !== false).slice(0, 4)
-      .map(n => `${n.name}(${n.affinity > 30 ? '+' : n.affinity < -30 ? '-' : '~'})`).join(', ');
-    const injNote = p.injuries.length ? ` blessé(${p.injuries.map(i => i.description).join(',')})` : '';
-    const lastText = (lastChapter.narrative.action || lastChapter.narrative.context || '').slice(0, 160);
-    return `[SCÈNE PRÉCÉDENTE: "${lastChapter.chapter_title}" | ${p.location} | ${p.hp}HP${injNote} | PNJs: ${aliveNpcs || 'aucun'} | "${lastText}…"]`;
+    const aliveNpcs = ws.npcs
+      .filter(n => n.alive !== false)
+      .slice(0, 5)
+      .map(n => `${n.name}(${n.affinity > 30 ? '★' : n.affinity < -30 ? '✖' : '~'}${n.status !== 'neutral' ? `,${n.status}` : ''})`)
+      .join(', ');
+    const injNote = p.injuries.length
+      ? ` | Blessures: ${p.injuries.map(i => `${i.description}[${i.severity}]`).join(', ')}`
+      : '';
+    const factionNote = Object.entries(ws.factions)
+      .filter(([, score]) => Math.abs(score) > 20)
+      .sort(([, a], [, b]) => Math.abs(b) - Math.abs(a))
+      .slice(0, 2)
+      .map(([id, score]) => `${id}:${score > 0 ? '+' : ''}${score}`)
+      .join(', ');
+    const lastText = (lastChapter.narrative.action || lastChapter.narrative.context || '').replace(/\s+/g, ' ').slice(0, 220);
+    return `[ANCRE Tour ${lastChapter.chapter_number}: "${lastChapter.chapter_title}" | ${p.location} | ${p.hp}HP ${p.credits}₡${injNote}${factionNote ? ` | Factions: ${factionNote}` : ''} | PNJs: ${aliveNpcs || 'aucun'} | "${lastText}…"]`;
   }
 
   function chapterLooksLikeTransition(chapter: StoryChapter): boolean {
@@ -654,7 +668,8 @@
       memoryLog,
       backgroundEvents,
       setupSnapshot: get(currentSetup),
-      worldState
+      worldState,
+      campaignArchive
     };
 
     localStorage.setItem(storySessionKey(storyId), JSON.stringify(payload));
@@ -681,7 +696,10 @@
         memoryLog: Array.isArray(parsed.memoryLog) ? parsed.memoryLog : [],
         backgroundEvents: Array.isArray(parsed.backgroundEvents) ? parsed.backgroundEvents : [],
         setupSnapshot: (parsed.setupSnapshot as StorySetup) || get(currentSetup),
-        worldState: parsed.worldState as WorldState | undefined
+        worldState: parsed.worldState as WorldState | undefined,
+        campaignArchive: Array.isArray(parsed.campaignArchive)
+          ? parsed.campaignArchive.filter((item): item is string => typeof item === 'string')
+          : []
       };
     } catch {
       return null;
@@ -790,16 +808,80 @@
   }
 
   function appendMemoryFromChapter(chapter: StoryChapter): void {
-    // Only keep explicit, factual memory entries — no noisy generic implicit facts
     const explicitFacts = [
       ...chapter.memory_updates.relations.map(item => `Relation: ${item}`),
       ...chapter.memory_updates.places.map(item => `Lieu: ${item}`),
       ...chapter.memory_updates.injuries.map(item => `Blessure: ${item}`),
       ...chapter.memory_updates.resources.map(item => `Ressource: ${item}`),
       ...chapter.memory_updates.notes.map(item => `Note: ${item}`)
-    ].filter(f => f.length > 10); // filter empty/trivial entries
+    ].filter(f => f.length > 10);
 
-    mergeMemoryFacts(explicitFacts);
+    const stateFacts: string[] = [];
+    const su = chapter.state_update;
+
+    if (su?.location) {
+      stateFacts.push(`Tour ${chapter.chapter_number}: déplacement vers ${su.location} (scène: ${chapter.chapter_title})`);
+    }
+
+    if (su?.date_advance) {
+      stateFacts.push(`Temps avancé: ${su.date_advance}`);
+    }
+
+    if (su?.npcs?.length) {
+      for (const npc of su.npcs.slice(0, 4)) {
+        const name = String(npc.name || '').trim();
+        if (!name) continue;
+        const relation = typeof npc.affinity === 'number'
+          ? (npc.affinity > 30 ? 'allié' : npc.affinity < -30 ? 'hostile' : 'neutre')
+          : (npc.status || 'inconnu');
+        const note = String(npc.note || '').trim();
+        stateFacts.push(`PNJ ${name} (${relation}${note ? ` — ${note}` : ''})`);
+      }
+    }
+
+    if (su?.factions) {
+      const factionFacts = Object.entries(su.factions)
+        .filter(([, delta]) => delta !== 0)
+        .slice(0, 4)
+        .map(([id, delta]) => `${id}:${delta > 0 ? '+' : ''}${delta}`);
+      if (factionFacts.length) stateFacts.push(`Réputation: ${factionFacts.join(', ')}`);
+    }
+
+    if (su?.injuries_new?.length) {
+      for (const injury of su.injuries_new.slice(0, 3)) {
+        stateFacts.push(`Blessure reçue [${injury.severity}]: ${injury.description}`);
+      }
+    }
+
+    if (su?.injuries_resolved?.length) {
+      stateFacts.push(`Blessures résolues: ${su.injuries_resolved.slice(0, 3).join(', ')}`);
+    }
+
+    if (su?.inventory_gained?.length) {
+      stateFacts.push(`Obtenu: ${su.inventory_gained.slice(0, 3).map(item => item.qty > 1 ? `${item.qty}× ${item.name}` : item.name).join(', ')}`);
+    }
+
+    mergeMemoryFacts([...explicitFacts, ...stateFacts.filter(f => f.length > 10)]);
+  }
+
+  const ARCHIVE_TRIGGER_TURN = 30;
+  const KEEP_RAW_TURNS = 20;
+
+  function archiveOldTurnsIfNeeded(): void {
+    const archiveCount = Math.max(0, chapterHistory.length - KEEP_RAW_TURNS);
+    if (chapterHistory.length <= ARCHIVE_TRIGGER_TURN || archiveCount <= campaignArchive.length) return;
+
+    const newlyOld = chapterHistory.slice(campaignArchive.length, archiveCount);
+    if (newlyOld.length) {
+      campaignArchive = [...campaignArchive, ...newlyOld.map(chapter => summarizeChapterForPrompt(chapter))];
+    }
+
+    const systemMessage = aiMessages.find(message => message.role === 'system');
+    const otherMessages = aiMessages.filter(message => message.role !== 'system');
+    if (otherMessages.length > KEEP_RAW_TURNS * 2) {
+      const recentMessages = otherMessages.slice(-(KEEP_RAW_TURNS * 2));
+      aiMessages = systemMessage ? [systemMessage, ...recentMessages] : recentMessages;
+    }
   }
 
   function backgroundEventToSyntheticChapter(event: BackgroundWorldEvent, turn: number): StoryChapter {
@@ -847,9 +929,14 @@
     return `bg-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   }
 
-  async function runBackgroundWorldTick(setup: StorySetup, turn: number): Promise<void> {
+  async function runBackgroundWorldTick(setup: StorySetup, turn: number, recentSectionTypes: string[] = []): Promise<void> {
     if (!providerConfig) return;
     if (!supportsAgenticToolCalling(providerConfig.providerId)) return;
+
+    const sectionWindow = recentSectionTypes.length
+      ? recentSectionTypes.slice(-2)
+      : chapterHistory.slice(-2).map(chapter => chapter.section_type);
+    if (sectionWindow.length === 2 && sectionWindow.every(type => INTENSE_SECTION_TYPES.has(type))) return;
 
     const recentSummary = chapterHistory.slice(-4).map(chapter => summarizeChapterForPrompt(chapter));
     const recentBackgroundEvents = backgroundEvents
@@ -961,8 +1048,10 @@
       throw new Error('Aucun provider IA configuré. Ouvre les paramètres IA texte.');
     }
 
+    archiveOldTurnsIfNeeded();
+
     const promptMode = resolvePromptMode();
-    const systemPrompt = buildSystemPrompt(setup, memoryLog, worldState, promptMode, turn);
+    const systemPrompt = buildSystemPrompt(setup, memoryLog, worldState, promptMode, turn, campaignArchive);
     aiMessages = [{ role: 'system', content: systemPrompt }, ...aiMessages.filter(message => message.role !== 'system')];
 
     const requestMessages = trimMessages([
@@ -1006,6 +1095,7 @@
       aiMessages = [];
       memoryLog = [];
       backgroundEvents = [];
+      campaignArchive = [];
       customAction = '';
       worldState = initWorldState(setup);
 
@@ -1019,6 +1109,7 @@
 
       applyStateUpdate(chapter);
       appendMemoryFromChapter(chapter);
+      archiveOldTurnsIfNeeded();
       await persistInteractiveState(setup);
 
       mode = 'play';
@@ -1072,8 +1163,9 @@
 
       applyStateUpdate(chapter);
       appendMemoryFromChapter(chapter);
+      archiveOldTurnsIfNeeded();
 
-      await runBackgroundWorldTick(setup, nextTurn);
+      await runBackgroundWorldTick(setup, nextTurn, recentSectionTypes);
       await persistInteractiveState(setup);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erreur inconnue';
@@ -1263,6 +1355,7 @@
     aiMessages = [];
     memoryLog = [];
     backgroundEvents = [];
+    campaignArchive = [];
     customAction = '';
 
     void goto('/editor/new');
@@ -1297,6 +1390,7 @@
         aiMessages = session.aiMessages;
         memoryLog = session.memoryLog;
         backgroundEvents = session.backgroundEvents || [];
+        campaignArchive = session.campaignArchive || [];
 
         const snapshot = session.setupSnapshot;
         setSetupField('era', snapshot.era || get(currentSetup).era);

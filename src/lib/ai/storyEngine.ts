@@ -608,7 +608,8 @@ export function buildSystemPrompt(
   memoryFacts: string[],
   worldState?: WorldState,
   promptMode: StoryPromptMode = 'json',
-  turnNumber = 1
+  turnNumber = 1,
+  campaignArchive: string[] = []
 ): string {
   const protagonist = [setup.protagonistFirstName || '', setup.protagonistLastName || ''].join(' ').trim() || 'Le protagoniste';
 
@@ -659,19 +660,24 @@ ${factionLines}`;
     ? `\nMÉMOIRE NARRATIVE (faits établis):\n${memoryFacts.map(item => `- ${item}`).join('\n')}`
     : '';
 
+  const campaignArchiveContext = campaignArchive.length
+    ? `\nRÉSUMÉ DE CAMPAGNE (tours anciens condensés):\n${campaignArchive.map(item => `- ${cleanText(item, 260)}`).join('\n')}`
+    : '';
+
   const basePrompt = `Tu es un Maître du Jeu Star Wars d'élite. Tu écris avec précision et cinéma — chaque ligne doit créer tension, émotion ou révélation. Zéro remplissage.
 
 Protagoniste: ${protagonist} | Ère: ${setup.era} | Faction: ${setup.faction} | Rôle: ${setup.role}
 Prémisse: ${setup.premise || 'Libre'}
 Style: ${setup.writingStyle || 'cinématique'} · Ton: ${setup.writingTone || 'aventure'} · POV: ${setup.writingPov || 'première personne'} · Longueur: ${setup.writingLength || 'moyen'} · Contenu: ${setup.contentMode || 'cinematic'}
-${worldBlock}${memoryContext}
+${worldBlock}${memoryContext}${campaignArchiveContext}
 RÈGLES MJ:
 1. Coûts réels: blessure → hp négatif, dépense → credits négatif, échec → conséquence concrète.
 2. PNJs autonomes: agendas cachés, mémoire des événements, évolution propre — ils agissent pour eux, pas pour servir le joueur.
 3. Rythme: après 2 scènes intenses (action/confrontation), la suivante DOIT être repos/dialogue/exploration.
 4. Deltas: hp et credits = TOUJOURS des deltas signés. hp:-15=perd 15PV, credits:500=reçoit 500. JAMAIS un total absolu.
 5. Titre: chapter_title = titre de scène évocateur uniquement. INTERDIT d'y mettre un numéro ou "Chapitre N".
-6. NPCs: si un inconnu révèle son nom → mettre à jour l'entrée existante, jamais de doublon.`;
+6. NPCs: si un inconnu révèle son nom → mettre à jour l'entrée existante, jamais de doublon.
+7. Résumé de campagne: s'il est présent, il représente la continuité condensée des tours anciens — prends-le en compte sans le répéter mot à mot.`;
 
   const jsonContract = `Réponds UNIQUEMENT en JSON valide, sans markdown ni texte autour. Priorité absolue: prose narrative riche dans "action" (2-4 paragraphes). Remplis state_update avec toutes les conséquences.
 
@@ -713,6 +719,16 @@ Tu n'as qu'une seule tâche maintenant: écrire une scène forte.`;
   return `${basePrompt}\n\n${promptMode === 'tool-calls' ? toolCallingContract : jsonContract}`;
 }
 
+const ERA_CONTEXT: Record<string, string> = {
+  old_republic: 'Ancienne République — guerres mandaloriennes, Jedi au zénith, Sith encore tapis dans l\'ombre.',
+  clone_wars: 'Guerres des Clones — la galaxie se déchire, les Jedi deviennent généraux et Palpatine tisse son plan.',
+  imperial: 'Ère Impériale — l\'Empire règne par la peur, les Jedi sont traqués et la Rébellion cherche des alliés.',
+  empire: 'Empire galactique — l\'Empire impose son ordre, la surveillance s\'étend et la moindre dissidence devient un risque.',
+  new_republic: 'Nouvelle République — l\'Empire s\'effondre, le pouvoir se reconstruit et les menaces de l\'ancien monde persistent.',
+  first_order: 'Premier Ordre — la République vacille, la Résistance survit et les vieux fantômes de l\'Empire reviennent.',
+  high_republic: 'Haute République — âge d\'or de la galaxie, expansion, exploration et menaces aux confins de l\'espace.'
+};
+
 export function buildStartPrompt(
   setup: StorySetupSnapshot,
   selectedTrameLabel?: string | null,
@@ -720,24 +736,36 @@ export function buildStartPrompt(
 ): string {
   const firstName = cleanText(setup.protagonistFirstName, 60);
   const lastName = cleanText(setup.protagonistLastName, 60);
-  const displayName = [firstName, lastName].filter(Boolean).join(' ').trim() || 'personnage principal';
+  const displayName = [firstName, lastName].filter(Boolean).join(' ').trim() || 'le protagoniste';
+
+  const eraContext = ERA_CONTEXT[setup.era || ''] || 'Galaxie lointaine, très lointaine — une époque de conflits, de choix lourds et de destins qui basculent.';
 
   const modeHint = promptMode === 'tool-calls'
-    ? `\nMode agentique actif: utilise les outils pour poser la scène, appliquer les conséquences et proposer les choix.`
+    ? `\nMode agentique actif: utilise les outils pour poser la scène, matérialiser les conséquences puis finaliser le prologue.`
     : '';
 
-  return `Commence l'histoire interactive Star Wars maintenant.
+  return `Lance une histoire interactive Star Wars avec un prologue immédiatement jouable.
 
-Données de départ:
+CADRE D'OUVERTURE:
 - Protagoniste: ${displayName}
+- Ère: ${setup.era || 'inconnue'} — ${eraContext}
+- Faction: ${setup.faction || 'libre'}
+- Rôle: ${setup.role || 'aventurier'}
 - Trame: ${selectedTrameLabel || 'Libre'}
-- Prémisse: ${setup.premise || 'Libre'}
+- Prémisse: ${setup.premise || 'Crée une situation tendue et immédiatement jouable.'}
+- Style: ${setup.writingStyle || 'cinématique'}
+- Ton: ${setup.writingTone || 'aventure'}
+- POV: ${setup.writingPov || 'première personne'}
+- Longueur: ${setup.writingLength || 'moyen'}
+- Contenu: ${setup.contentMode || 'cinematic'}
 
-Objectif du premier tour:
-- Ouvrir sur une scène forte, immédiatement jouable.
-- Donner 3 à 4 choix pertinents.
-- Installer au moins un enjeu relationnel ou politique.
-- Faire avancer l'histoire dès le prologue.${modeHint}`;
+EXIGENCES DU PREMIER TOUR:
+- Ouvre in medias res, sans préambule explicatif.
+- Donne immédiatement une tension claire, un lieu vivant et un objectif.
+- Introduis au moins 1 PNJ mémorable avec un agenda distinct.
+- Fais émerger un enjeu politique, relationnel ou moral dès l'ouverture.
+- Les 3-4 choix doivent être concrets, contrastés et portés par la scène.
+- chapter_number = 1${modeHint}`;
 }
 
 export const SECTION_TYPES = [
@@ -2248,10 +2276,74 @@ export async function callTextModel(messages: ChatMessage[], config: StoryProvid
 }
 
 export function summarizeChapterForPrompt(chapter: StoryChapter): string {
-  const chapterTitle = cleanText(chapter.chapter_title, 60);
-  const action = cleanText(chapter.narrative.action, 180);
-  const consequence = cleanText(chapter.memory_updates.notes[0], 80);
-  return `${chapterTitle}: ${action}${consequence ? ` (note: ${consequence})` : ''}`.trim();
+  const title = cleanText(chapter.chapter_title, 72);
+  const type = cleanText(chapter.section_type, 28) || 'action';
+  const action = cleanText(chapter.narrative.action || chapter.narrative.context, 190);
+  const dialogue = cleanText(chapter.narrative.dialogue, 110);
+  const reflection = cleanText(chapter.narrative.reflection, 110);
+  const atmosphere = cleanText(chapter.narrative.atmosphere, 90);
+
+  const stateBits: string[] = [];
+  const su = chapter.state_update;
+  if (su) {
+    if (typeof su.location === 'string' && su.location.trim()) stateBits.push(`déplacement vers ${cleanText(su.location, 50)}`);
+    if (typeof su.date_advance === 'string' && su.date_advance.trim()) stateBits.push(`temps avancé de ${cleanText(su.date_advance, 40)}`);
+    if (typeof su.hp === 'number' && su.hp !== 0) stateBits.push(`HP${su.hp > 0 ? '+' : ''}${su.hp}`);
+    if (typeof su.credits === 'number' && su.credits !== 0) stateBits.push(`crédits${su.credits > 0 ? '+' : ''}${su.credits}`);
+
+    const npcNames = Array.from(new Set(
+      (su.npcs || [])
+        .map(npc => cleanText(npc.name, 60))
+        .filter(Boolean)
+    )).slice(0, 3);
+    if (npcNames.length) stateBits.push(`PNJs: ${npcNames.join(', ')}`);
+
+    const factionBits = Object.entries(su.factions || {})
+      .filter(([, delta]) => typeof delta === 'number' && delta !== 0)
+      .slice(0, 3)
+      .map(([id, delta]) => `${id}${delta > 0 ? '+' : ''}${delta}`);
+    if (factionBits.length) stateBits.push(`factions: ${factionBits.join(', ')}`);
+
+    const injuries = (su.injuries_new || [])
+      .map(injury => cleanText(injury.description, 60))
+      .filter(Boolean)
+      .slice(0, 2);
+    if (injuries.length) stateBits.push(`blessures: ${injuries.join(', ')}`);
+
+    const gained = (su.inventory_gained || [])
+      .map(item => `${item.qty > 1 ? `${item.qty}× ` : ''}${cleanText(item.name, 50)}`)
+      .filter(Boolean)
+      .slice(0, 2);
+    if (gained.length) stateBits.push(`gain: ${gained.join(', ')}`);
+
+    const resolved = (su.injuries_resolved || [])
+      .map(item => cleanText(item, 60))
+      .filter(Boolean)
+      .slice(0, 2);
+    if (resolved.length) stateBits.push(`résolu: ${resolved.join(', ')}`);
+  }
+
+  const narrativeBits = [
+    action,
+    dialogue ? `dialogue: ${dialogue}` : '',
+    reflection ? `intérieur: ${reflection}` : ''
+  ].filter(Boolean).join(' ');
+
+  const memoryNotes = [
+    ...chapter.memory_updates.relations.slice(0, 2).map(item => cleanText(item, 70)),
+    ...chapter.memory_updates.places.slice(0, 1).map(item => cleanText(item, 70)),
+    ...chapter.memory_updates.notes.slice(0, 1).map(item => cleanText(item, 100))
+  ].filter(Boolean);
+
+  const summaryParts = [
+    `Tour ${chapter.chapter_number}: ${title} (${type})`,
+    narrativeBits,
+    stateBits.length ? `Conséquences: ${stateBits.join('; ')}` : '',
+    memoryNotes.length ? `Mémoire: ${memoryNotes.join(' · ')}` : '',
+    atmosphere ? `Ambiance: ${atmosphere}` : ''
+  ].filter(Boolean);
+
+  return cleanText(summaryParts.join(' — '), 420);
 }
 
 export function normalizeProviderId(rawProviderId: string | undefined): string {
