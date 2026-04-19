@@ -6,7 +6,7 @@
   let langOpen = false;
   let langBtnEl: HTMLButtonElement | null = null;
 
-  function handleNewStory() { goto('/editor/new'); }
+  function handleNewStory() { goto('/stories/new'); }
 
   function selectLang(code: UiLanguageCode) {
     uiLanguage.set(code);

@@ -1,4 +1,12 @@
 import type { UiLanguageCode } from '$lib/config/languages';
+import {
+  DEFAULT_IMAGE_MODEL_ID,
+  DEFAULT_IMAGE_PROVIDER_ID,
+  DEFAULT_OLLAMA_URL,
+  DEFAULT_TEXT_PROVIDER_ID,
+  normalizeImageProviderId,
+  normalizeTextProviderId
+} from '$lib/config/providers';
 
 export const DATA_SCHEMA_VERSION = 2;
 
@@ -143,13 +151,19 @@ function normalizePreferencesRecord(preferences: unknown) {
     ? preferences.theme
     : 'dark';
 
-  const imageProvider = typeof preferences.imageProvider === 'string'
-    ? preferences.imageProvider
-    : (typeof preferences.defaultImageProvider === 'string' ? preferences.defaultImageProvider : undefined);
+  const textProvider = normalizeTextProviderId(
+    typeof preferences.textProvider === 'string' ? preferences.textProvider : DEFAULT_TEXT_PROVIDER_ID
+  );
+
+  const imageProvider = normalizeImageProviderId(
+    typeof preferences.imageProvider === 'string'
+      ? preferences.imageProvider
+      : (typeof preferences.defaultImageProvider === 'string' ? preferences.defaultImageProvider : DEFAULT_IMAGE_PROVIDER_ID)
+  );
 
   const imageModel = typeof preferences.imageModel === 'string'
     ? preferences.imageModel
-    : (typeof preferences.defaultImgModel === 'string' ? preferences.defaultImgModel : undefined);
+    : (typeof preferences.defaultImgModel === 'string' ? preferences.defaultImgModel : DEFAULT_IMAGE_MODEL_ID);
 
   const contentMode = typeof preferences.contentMode === 'string'
     ? preferences.contentMode
@@ -162,10 +176,10 @@ function normalizePreferencesRecord(preferences: unknown) {
     avatarEmoji: typeof preferences.avatarEmoji === 'string' ? preferences.avatarEmoji : undefined,
     uiLanguage,
     theme,
-    textProvider: typeof preferences.textProvider === 'string' ? preferences.textProvider : undefined,
+    textProvider,
     textModel: typeof preferences.textModel === 'string' ? preferences.textModel : undefined,
     textApiKey: typeof preferences.textApiKey === 'string' ? preferences.textApiKey : undefined,
-    ollamaUrl: typeof preferences.ollamaUrl === 'string' ? preferences.ollamaUrl : undefined,
+    ollamaUrl: typeof preferences.ollamaUrl === 'string' ? preferences.ollamaUrl : DEFAULT_OLLAMA_URL,
     imageProvider,
     imageModel,
     imageApiKey: typeof preferences.imageApiKey === 'string' ? preferences.imageApiKey : undefined,
@@ -175,7 +189,7 @@ function normalizePreferencesRecord(preferences: unknown) {
     writingLength: typeof preferences.writingLength === 'string' ? preferences.writingLength : undefined,
     contentMode,
     defaultImageProvider: typeof preferences.defaultImageProvider === 'string'
-      ? preferences.defaultImageProvider
+      ? normalizeImageProviderId(preferences.defaultImageProvider)
       : imageProvider,
     defaultImgModel: typeof preferences.defaultImgModel === 'string'
       ? preferences.defaultImgModel

@@ -19,10 +19,46 @@
     type StorySetup
   } from '$lib/stores/editor';
   import { showToast } from '$lib/stores/ui';
+  import { logger } from '$lib/utils/logger';
   import { getPreferences, type UserPreferences } from '$lib/db';
   import SvgIcon from '$lib/components/SvgIcon.svelte';
   import PageHeader from '$lib/components/PageHeader.svelte';
   import GameHUD from '$lib/components/GameHUD.svelte';
+  import {
+    AVATARS,
+    CONTENT_MODES,
+    defaultRoleForFaction,
+    ERA_START_DATES,
+    ERAS,
+    FACTIONS,
+    FACTION_CREDITS,
+    ROLES,
+    SETUP_SCREENS,
+    TRAMES,
+    WRITING_LENGTHS,
+    WRITING_POVS,
+    WRITING_STYLES,
+    WRITING_TONES
+  } from '$lib/editor/setupCatalog';
+  import {
+    clearInteractiveSessionPayload,
+    loadInteractiveSessionPayload,
+    saveInteractiveSessionPayload,
+    type InteractiveSessionPayload,
+    type LoggedBackgroundEvent
+  } from '$lib/editor/interactiveSession';
+  import {
+    buildSceneAnchor,
+    enforceTransitionChoiceQuality,
+    isNearDuplicateBackgroundEvent,
+    sanitizeChapterForDisplay,
+    sanitizeChapterList,
+    textToParagraphs
+  } from '$lib/editor/narrativeGuardrails';
+  import {
+    buildJournalContent,
+    buildStoryTitle
+  } from '$lib/editor/storyJournal';
   import {
     buildContinuePrompt,
     buildStartPrompt,
@@ -46,48 +82,6 @@
   let mode: 'setup' | 'play' = 'setup';
   let storyId: string | null = null;
 
-  type SetupScreenId = 'era' | 'faction_role' | 'premise' | 'style' | 'profile' | 'review';
-  type SetupScreen = {
-    id: SetupScreenId;
-    label: string;
-    subtitle: string;
-  };
-
-  const SETUP_SCREENS: SetupScreen[] = [
-    { id: 'era', label: 'Ère', subtitle: 'Quand commence votre histoire ?' },
-    { id: 'faction_role', label: 'Faction & rôle', subtitle: 'Qui êtes-vous dans cette galaxie ?' },
-    { id: 'premise', label: 'Trame', subtitle: 'Quel est le point de départ ?' },
-    { id: 'style', label: 'Style IA', subtitle: `Comment doit écrire l'IA ?` },
-    { id: 'profile', label: 'Protagoniste', subtitle: 'Nom facultatif, avatar rapide' },
-    { id: 'review', label: 'Lancement', subtitle: `On démarre l'aventure immédiatement` }
-  ];
-
-  const INTERACTIVE_SESSION_PREFIX = 'sw_svelte_interactive_story_';
-
-  interface LoggedBackgroundEvent {
-    id: string;
-    turn: number;
-    title: string;
-    summary: string;
-    promptHook?: string;
-    privateSummary?: string;
-  }
-
-  interface InteractiveSessionPayload {
-    version: 1;
-    turnNumber: number;
-    selectedTrame: string | null;
-    currentChapter: StoryChapter | null;
-    chapterHistory: StoryChapter[];
-    actionHistory: string[];
-    aiMessages: ChatMessage[];
-    memoryLog: string[];
-    setupSnapshot: StorySetup;
-    backgroundEvents?: LoggedBackgroundEvent[];
-    worldState?: WorldState;
-    campaignArchive?: string[];
-  }
-
   let setupScreenIndex = 0;
   let setupSlideDir = 1;
   let selectedTrame: string | null = null;
@@ -104,21 +98,6 @@
   let campaignArchive: string[] = [];
   let customAction = '';
   let hudCollapsed = false;
-
-  const ERA_START_DATES: Record<string, string> = {
-    old_republic: '3950 AVBY, Jour 1',
-    clone_wars: '22 AVBY, Jour 1',
-    imperial: '19 AVBY, Jour 1',
-    new_republic: '4 APBY, Jour 1',
-    first_order: '34 APBY, Jour 1'
-  };
-
-  const FACTION_CREDITS: Record<string, number> = {
-    imperial_officer: 3000, bounty_hunter: 1500, hutt_enforcer: 2000,
-    smuggler: 800, rebel_pilot: 600, rebel_leader: 900,
-    jedi_knight: 500, jedi_master: 800, sith_lord: 2500, sith_apprentice: 1000,
-    mandalorian_warrior: 1200, senator: 5000, scavenger: 300, default: 1000
-  };
 
   function initWorldState(setup: StorySetup): WorldState {
     const startCredits = FACTION_CREDITS[setup.role] ?? FACTION_CREDITS.default;
@@ -153,194 +132,7 @@
     factions: {},
     chronology: []
   };
-
-  const TRANSITION_CHAPTER_REGEX = /(transition|transit|travel|journey|voyage|trajet|marche|route|en route|approche|attente|interlude|repos|pause|accalmie|campement|surveillance|transfert|navette)/i;
-  const DIALOGUE_CHOICE_REGEX = /(parler|discuter|dialogue|dialoguer|interroger|questionner|négocier|convaincre|échanger|demander|écouter|sonder)/i;
-  const TIME_PASS_CHOICE_REGEX = /(attendre|patienter|passer le temps|se reposer|méditer|observer|planifier|faire le point|préparer|laisser avancer|laisser filer|récupérer)/i;
-  const ACTION_HEAVY_CHOICE_REGEX = /(attaquer|assaut|fusillade|duel|foncer|abattre|détruire|exploser|charge|combat|sabre|blaster|éliminer)/i;
-  const TOOL_CALL_LEAK_TEXT_REGEX = /<\|?tool_call\|?>|tool_call|(?:^|\s)call:[a-z_]+\s*\{/i;
   const INTENSE_SECTION_TYPES = new Set(['action', 'confrontation']);
-
-  function sanitizeNarrativeTextForDisplay(text: string): string {
-    const raw = String(text || '').replace(/\r/g, '\n');
-    if (!raw.trim()) return '';
-
-    const trimmed = raw.trim();
-    if ((trimmed.startsWith('{') || trimmed.startsWith('[')) && /"[A-Za-z0-9_\-]+"\s*:/.test(trimmed)) {
-      return 'Le passage a été nettoyé automatiquement pour éviter un affichage technique.';
-    }
-
-    const lines = raw.split('\n');
-    const paragraphs: string[] = [];
-    let buffer: string[] = [];
-    let inChoiceBlock = false;
-
-    const flush = (): void => {
-      const paragraph = buffer.join(' ').replace(/\s+/g, ' ').trim();
-      if (paragraph) paragraphs.push(paragraph);
-      buffer = [];
-    };
-
-    for (const rawLine of lines) {
-      const line = rawLine.trim();
-      if (!line) {
-        flush();
-        continue;
-      }
-
-      const normalized = line
-        .replace(/^#{1,6}\s*/, '')
-        .replace(/^>\s*/, '')
-        .replace(/^\*\*\s*/, '')
-        .replace(/\s*\*\*$/, '')
-        .replace(/^[_`*]+|[_`*]+$/g, '')
-        .replace(/^\[[^\]]+\]\s*/, '')
-        .trim();
-
-      if (!normalized) continue;
-      if (/^(?:\*{3,}|-{3,}|_{3,})$/.test(normalized)) {
-        flush();
-        continue;
-      }
-
-      if (/^(?:que faites-vous|what do you do|choices?|choix|options?|vos choix)\b[:!?]?\s*$/i.test(normalized)) {
-        flush();
-        inChoiceBlock = true;
-        continue;
-      }
-
-      if (inChoiceBlock) continue;
-      if (/^\d+[.)]\s+/.test(normalized)) continue;
-
-      buffer.push(normalized.replace(/\s{2,}/g, ' '));
-    }
-
-    flush();
-    if (paragraphs.length) return paragraphs.join('\n\n').trim();
-
-    return TOOL_CALL_LEAK_TEXT_REGEX.test(raw)
-      ? `Le système IA a renvoyé une sortie technique non lisible pour ce passage. L'histoire continue normalement via les choix ci-dessous.`
-      : `Le passage a été nettoyé automatiquement pour éviter un affichage technique.`;
-  }
-
-  function sanitizeChapterForDisplay(chapter: StoryChapter | null): StoryChapter | null {
-    if (!chapter) return null;
-
-    return {
-      ...chapter,
-      chapter_title: sanitizeNarrativeTextForDisplay(chapter.chapter_title),
-      narrative: {
-        ...chapter.narrative,
-        action: sanitizeNarrativeTextForDisplay(chapter.narrative.action),
-        context: sanitizeNarrativeTextForDisplay(chapter.narrative.context),
-        dialogue: sanitizeNarrativeTextForDisplay(chapter.narrative.dialogue),
-        reflection: sanitizeNarrativeTextForDisplay(chapter.narrative.reflection)
-      }
-    };
-  }
-
-  function sanitizeChapterList(chapters: StoryChapter[]): StoryChapter[] {
-    return chapters.map(chapter => sanitizeChapterForDisplay(chapter) as StoryChapter);
-  }
-
-  function normalizeEventText(value: string): string {
-    return String(value || '')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-  }
-
-  function eventTokenSet(value: string): Set<string> {
-    return new Set(
-      normalizeEventText(value)
-        .split(' ')
-        .map(token => token.trim())
-        .filter(token => token.length >= 4)
-    );
-  }
-
-  function tokenOverlapRatio(left: string, right: string): number {
-    const a = eventTokenSet(left);
-    const b = eventTokenSet(right);
-    if (!a.size || !b.size) return 0;
-
-    let common = 0;
-    for (const token of a) {
-      if (b.has(token)) common += 1;
-    }
-
-    return common / Math.max(a.size, b.size);
-  }
-
-  function isNearDuplicateBackgroundEvent(event: BackgroundWorldEvent): boolean {
-    const incomingTitle = normalizeEventText(event.title);
-    const incomingSummary = normalizeEventText(event.summary_public || event.prompt_hook || '');
-    if (!incomingTitle && !incomingSummary) return false;
-
-    return backgroundEvents.slice(0, 6).some(previous => {
-      const previousTitle = normalizeEventText(previous.title);
-      const previousSummary = normalizeEventText(previous.summary);
-
-      const titleMatch = Boolean(
-        incomingTitle &&
-        previousTitle &&
-        (incomingTitle === previousTitle || incomingTitle.includes(previousTitle) || previousTitle.includes(incomingTitle))
-      );
-
-      const summaryMatch = Boolean(
-        incomingSummary &&
-        previousSummary &&
-        (incomingSummary === previousSummary || incomingSummary.includes(previousSummary) || previousSummary.includes(incomingSummary))
-      );
-
-      const overlap = tokenOverlapRatio(incomingSummary || incomingTitle, previousSummary || previousTitle);
-      return (titleMatch && (summaryMatch || overlap >= 0.72)) || (summaryMatch && overlap >= 0.72) || overlap >= 0.85;
-    });
-  }
-
-  function normalizeSearchText(value: string): string {
-    return String(value || '')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase();
-  }
-
-  function escapeRegExp(value: string): string {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  }
-
-  function chapterCorpusForNpcDetection(chapter: StoryChapter): string {
-    return [
-      chapter.chapter_title,
-      chapter.narrative.context,
-      chapter.narrative.action,
-      chapter.narrative.dialogue,
-      chapter.narrative.reflection,
-      ...chapter.choices.map(choice => choice.text)
-    ].join(' ');
-  }
-
-  function textMentionsNpc(corpus: string, npcName: string): boolean {
-    const haystack = ` ${normalizeSearchText(corpus)} `;
-    const normalizedName = normalizeSearchText(npcName).trim();
-    if (!normalizedName) return false;
-
-    const fullNamePattern = new RegExp(`(^|[^a-z0-9])${escapeRegExp(normalizedName)}([^a-z0-9]|$)`);
-    if (fullNamePattern.test(haystack)) return true;
-
-    const parts = normalizedName
-      .split(/\s+/)
-      .map(part => part.trim())
-      .filter(part => part.length >= 4);
-
-    return parts.some(part => {
-      const partPattern = new RegExp(`(^|[^a-z0-9])${escapeRegExp(part)}([^a-z0-9]|$)`);
-      return partPattern.test(haystack);
-    });
-  }
 
   function normalizeHpDelta(rawHp: number, currentHp: number): number {
     // Négatif = dégâts (delta clair)
@@ -482,239 +274,15 @@
     return { warning, diffBonus, disabled };
   }
 
-  function buildSceneAnchor(ws: WorldState, lastChapter: StoryChapter): string {
-    const p = ws.player;
-    const aliveNpcs = ws.npcs
-      .filter(n => n.alive !== false)
-      .slice(0, 5)
-      .map(n => `${n.name}(${n.affinity > 30 ? '★' : n.affinity < -30 ? '✖' : '~'}${n.status !== 'neutral' ? `,${n.status}` : ''})`)
-      .join(', ');
-    const injNote = p.injuries.length
-      ? ` | Blessures: ${p.injuries.map(i => `${i.description}[${i.severity}]`).join(', ')}`
-      : '';
-    const factionNote = Object.entries(ws.factions)
-      .filter(([, score]) => Math.abs(score) > 20)
-      .sort(([, a], [, b]) => Math.abs(b) - Math.abs(a))
-      .slice(0, 2)
-      .map(([id, score]) => `${id}:${score > 0 ? '+' : ''}${score}`)
-      .join(', ');
-    const lastText = (lastChapter.narrative.action || lastChapter.narrative.context || '').replace(/\s+/g, ' ').slice(0, 220);
-    return `[ANCRE Tour ${lastChapter.chapter_number}: "${lastChapter.chapter_title}" | ${p.location} | ${p.hp}HP ${p.credits}₡${injNote}${factionNote ? ` | Factions: ${factionNote}` : ''} | PNJs: ${aliveNpcs || 'aucun'} | "${lastText}…"]`;
-  }
-
-  function chapterLooksLikeTransition(chapter: StoryChapter): boolean {
-    const sectionType = chapter.section_type || '';
-    if (TRANSITION_CHAPTER_REGEX.test(sectionType)) return true;
-
-    const corpus = [
-      chapter.chapter_title,
-      chapter.narrative.context,
-      chapter.narrative.action,
-      chapter.narrative.dialogue,
-      chapter.narrative.reflection
-    ].join(' ');
-
-    return TRANSITION_CHAPTER_REGEX.test(corpus);
-  }
-
-  function getNearbyNpcNames(chapter: StoryChapter, max = 2): string[] {
-    const location = normalizeSearchText((worldState.player.location || '').trim());
-    const aliveNpcs = worldState.npcs.filter(npc => npc.alive !== false && npc.status !== 'dead' && npc.name.trim());
-    if (!aliveNpcs.length) return [];
-
-    const chapterCorpus = chapterCorpusForNpcDetection(chapter);
-
-    const mentionedNpcs = aliveNpcs.filter(npc => textMentionsNpc(chapterCorpus, npc.name));
-
-    const localNpcs = aliveNpcs.filter(npc => {
-      const lastSeen = normalizeSearchText((npc.last_seen || '').trim());
-      if (!lastSeen || !location || location === 'inconnu') return false;
-      return lastSeen.includes(location) || location.includes(lastSeen);
-    });
-
-    const sociallyRelevantNpcs = aliveNpcs
-      .filter(npc => npc.status === 'ally' || npc.status === 'neutral')
-      .sort((left, right) => (right.affinity ?? 0) - (left.affinity ?? 0));
-
-    const rankedNpcs = [
-      ...localNpcs,
-      ...mentionedNpcs,
-      ...((!location || location === 'inconnu') ? sociallyRelevantNpcs : [])
-    ];
-
-    const unique = Array.from(new Map(
-      rankedNpcs.map(npc => [normalizeSearchText(npc.name), npc])
-    ).values());
-
-    return unique
-      .map(npc => npc.name.trim())
-      .filter(Boolean)
-      .slice(0, max);
-  }
-
-  function enforceTransitionChoiceQuality(chapter: StoryChapter): StoryChapter {
-    if (!chapterLooksLikeTransition(chapter)) return chapter;
-
-    const choices = [...chapter.choices];
-    if (!choices.length) return chapter;
-
-    const hasDialogueChoice = choices.some(choice => DIALOGUE_CHOICE_REGEX.test(choice.text));
-    const hasTimePassChoice = choices.some(choice => TIME_PASS_CHOICE_REGEX.test(choice.text));
-
-    const nearbyNpcs = getNearbyNpcNames(chapter);
-    let injectedChoice: StoryChoice | null = null;
-
-    if (nearbyNpcs.length > 0 && !hasDialogueChoice) {
-      const npcLabel = nearbyNpcs.length > 1
-        ? `${nearbyNpcs[0]} et ${nearbyNpcs[1]}`
-        : nearbyNpcs[0];
-
-      injectedChoice = {
-        text: `Engager la conversation avec ${npcLabel} pour clarifier la situation avant d'agir.`,
-        attribute: 'diplomacy',
-        difficulty: 2,
-        faction_impact: {}
-      };
-    } else if (!hasTimePassChoice) {
-      injectedChoice = {
-        text: 'Profiter du trajet pour observer, planifier la suite et laisser le temps avancer.',
-        attribute: 'survival',
-        difficulty: 1,
-        faction_impact: {}
-      };
-    }
-
-    if (!injectedChoice) return chapter;
-
-    const dedup = new Set(choices.map(choice => choice.text.trim().toLowerCase()));
-    if (dedup.has(injectedChoice.text.trim().toLowerCase())) return chapter;
-
-    if (choices.length >= 4) {
-      const replaceIndex = choices.findIndex(choice =>
-        choice.attribute === 'combat' ||
-        choice.attribute === 'force' ||
-        ACTION_HEAVY_CHOICE_REGEX.test(choice.text)
-      );
-      const targetIndex = replaceIndex >= 0 ? replaceIndex : choices.length - 1;
-      choices[targetIndex] = injectedChoice;
-    } else {
-      choices.push(injectedChoice);
-    }
-
-    return {
-      ...chapter,
-      choices
-    };
-  }
-
   let providerConfig: StoryProviderConfig | null = null;
   let providerStatus = 'Aucun provider texte configuré.';
 
-  const ERAS = [
-    { id: 'old_republic', name: 'Ancienne République', years: '25 000 - 1000 AVBY', icon: 'AncientRepublic.svg' },
-    { id: 'clone_wars', name: 'Guerres des Clones', years: '22 - 19 AVBY', icon: 'jedi-order-svgrepo-com.svg' },
-    { id: 'imperial', name: 'Ère Impériale', years: '19 - 4 AVBY', icon: 'Emblem_of_the_First_Galactic_Empire.svg' },
-    { id: 'new_republic', name: 'Nouvelle République', years: '4 - 28 APBY', icon: 'NR_Seal.svg' },
-    { id: 'first_order', name: 'Premier Ordre', years: '28 - 35 APBY', icon: 'Emblem_of_the_First_Order.svg' }
-  ];
-
-  const FACTIONS = [
-    { id: 'jedi', name: 'Ordre Jedi', color: '#4ec9b0', icon: 'jedi-order-svgrepo-com.svg' },
-    { id: 'sith', name: 'Ordre Sith', color: '#e51414', icon: 'starwars-sith-svgrepo-com.svg' },
-    { id: 'empire', name: 'Empire Galactique', color: '#c41e3a', icon: 'Emblem_of_the_First_Galactic_Empire.svg' },
-    { id: 'rebels', name: 'Alliance Rebelle', color: '#f39c12', icon: 'millennium-falcon-svgrepo-com.svg' },
-    { id: 'republic', name: 'République Galactique', color: '#3498db', icon: 'brand-galactic-republic-svgrepo-com.svg' },
-    { id: 'mandalore', name: 'Mandaloriens', color: '#9b59b6', icon: 'mandalorian-svgrepo-com.svg' },
-    { id: 'first_order', name: 'Premier Ordre', color: '#1a1a2e', icon: 'Emblem_of_the_First_Order.svg' },
-    { id: 'hutt', name: 'Cartel Hutt', color: '#27ae60', icon: 'Desilijic_clan_vector.svg' },
-    { id: 'neutral', name: 'Indépendant', color: '#95a5a6', icon: 'alone-characterized-embodied-svgrepo-com.svg' }
-  ];
-
-  const ROLES = [
-    { id: 'jedi_knight', name: 'Chevalier Jedi', faction: 'jedi', icon: 'luke-skywalker-lightsaber-svgrepo-com.svg' },
-    { id: 'jedi_master', name: 'Maître Jedi', faction: 'jedi', icon: 'jedi-order-svgrepo-com.svg' },
-    { id: 'padawan', name: 'Padawan', faction: 'jedi', icon: 'lightsaber-svgrepo-com.svg' },
-    { id: 'sith_lord', name: 'Seigneur Sith', faction: 'sith', icon: 'SithEmblem-Traced-TORkit.svg' },
-    { id: 'sith_apprentice', name: 'Apprenti Sith', faction: 'sith', icon: 'starwars-sith-svgrepo-com.svg' },
-    { id: 'imperial_officer', name: 'Officier Impérial', faction: 'empire', icon: 'Emblem_of_the_First_Galactic_Empire.svg' },
-    { id: 'stormtrooper', name: 'Stormtrooper', faction: 'empire', icon: 'noun-storm-trooper-49992.svg' },
-    { id: 'rebel_pilot', name: 'Pilote Rebelle', faction: 'rebels', icon: 'millennium-falcon-svgrepo-com.svg' },
-    { id: 'rebel_leader', name: 'Leader Rebelle', faction: 'rebels', icon: 'brand-galactic-republic-svgrepo-com.svg' },
-    { id: 'senator', name: 'Sénateur', faction: 'republic', icon: 'brand-galactic-republic-svgrepo-com.svg' },
-    { id: 'clone_trooper', name: 'Clone Trooper', faction: 'republic', icon: 'noun-storm-trooper-49992.svg' },
-    { id: 'mandalorian_warrior', name: 'Guerrier Mandalorien', faction: 'mandalore', icon: 'mandalorian-svgrepo-com.svg' },
-    { id: 'first_order_trooper', name: 'Soldat du Premier Ordre', faction: 'first_order', icon: 'Emblem_of_the_First_Order.svg' },
-    { id: 'resistance_member', name: 'Membre de la Résistance', faction: 'rebels', icon: 'millennium-falcon-svgrepo-com.svg' },
-    { id: 'hutt_enforcer', name: 'Main du Hutt', faction: 'hutt', icon: 'Desilijic_clan_vector.svg' },
-    { id: 'bounty_hunter', name: 'Chasseur de Primes', faction: 'neutral', icon: 'scifi-starwars-boba-fett-svgrepo-com.svg' },
-    { id: 'smuggler', name: 'Contrebandier', faction: 'neutral', icon: 'millennium-falcon-svgrepo-com.svg' },
-    { id: 'scavenger', name: 'Éclaireur', faction: 'neutral', icon: 'alone-characterized-embodied-svgrepo-com.svg' },
-    { id: 'force_sensitive', name: 'Sensible à la Force', faction: 'neutral', icon: 'lightsaber-svgrepo-com.svg' },
-    { id: 'jedi_exile', name: 'Jedi Banni', faction: 'neutral', icon: 'alone-characterized-embodied-svgrepo-com.svg' }
-  ];
-
-  const TRAMES = [
-    { id: 'solo',     name: 'Le Solitaire',   icon: '🚀', premise: `Vous acceptez un contrat en apparence simple, mais il vous entraîne dans un conflit galactique majeur.` },
-    { id: 'chosen',   name: "L'Élu",          icon: '✨', premise: `Une intuition de la Force vous pousse sur une piste que personne ne comprend encore.` },
-    { id: 'exile',    name: 'Le Banni',        icon: '🌑', premise: `Exilé après un incident obscur, vous survivez dans l'ombre jusqu'au jour où tout bascule.` },
-    { id: 'rebel',    name: 'Le Résistant',    icon: '⚡', premise: `Vous combattez l'oppresseur et découvrez un enjeu plus grand que votre vengeance.` },
-    { id: 'redeemed', name: 'La Rédemption',   icon: '🔥', premise: `Ancien serviteur de l'Obscur, vous tentez de réparer ce qui peut encore l'être.` },
-    { id: 'spy',      name: "L'Infiltrateur",  icon: '🕵️', premise: `Votre mission d'infiltration brouille progressivement la frontière entre vos deux identités.` },
-    { id: 'custom',   name: 'Libre',           icon: '✏️', premise: '' }
-  ];
-
-  const AVATARS = ['🧑‍🚀', '👩‍🚀', '🧙', '🧙‍♀️', '⚔️', '🤖', '👾', '🦾', '🌌', '💫', '🔵', '🔴'];
-
-  const WRITING_STYLES = [
-    { id: 'cinematique', name: 'Cinématique', desc: 'Scènes courtes, rythme intense' },
-    { id: 'litteraire', name: 'Littéraire', desc: 'Descriptions riches et profondes' },
-    { id: 'epique', name: 'Épique', desc: 'Grandeur et destin héroïque' },
-    { id: 'immersif', name: 'Immersif', desc: 'Mode jeu de rôle très direct' }
-  ];
-
-  const WRITING_TONES = [
-    { id: 'heroique', name: 'Héroïque' },
-    { id: 'sombre', name: 'Sombre' },
-    { id: 'aventure', name: 'Aventure' },
-    { id: 'drame', name: 'Dramatique' }
-  ];
-
-  const WRITING_POVS = [
-    { id: 'premiere', name: '1ère personne — Je' },
-    { id: 'troisieme', name: '3ème personne — Il/Elle' }
-  ];
-
-  const WRITING_LENGTHS = [
-    { id: 'court', name: 'Court' },
-    { id: 'moyen', name: 'Moyen' },
-    { id: 'long', name: 'Long' }
-  ];
-
-  const CONTENT_MODES = [
-    { id: 'cinematic', icon: '🎬', name: 'Cinéma', desc: 'Intense mais équilibré' },
-    { id: 'dark', icon: '🌒', name: 'Sombre', desc: 'Ambiance dure et tendue' },
-    { id: 'adult', icon: '🔞', name: 'Adulte', desc: 'Mature et frontal' },
-    { id: 'raw', icon: '⚠️', name: 'Brut', desc: 'Très frontal quand le modèle le permet' }
-  ];
 
   $: activeSetupStep = SETUP_SCREENS[setupScreenIndex];
   $: isLastSetupStep = setupScreenIndex === SETUP_SCREENS.length - 1;
   $: providerMissing = !providerConfig;
 
-  function textToParagraphs(text: string): string[] {
-    return String(text || '')
-      .split(/\n+/)
-      .map(line => line.trim())
-      .filter(Boolean);
-  }
-
-  function storySessionKey(id: string): string {
-    return `${INTERACTIVE_SESSION_PREFIX}${id}`;
-  }
-
   function saveInteractiveSession(): void {
-    if (!storyId || typeof localStorage === 'undefined') return;
-
     const payload: InteractiveSessionPayload = {
       version: 1,
       turnNumber,
@@ -730,43 +298,15 @@
       campaignArchive
     };
 
-    localStorage.setItem(storySessionKey(storyId), JSON.stringify(payload));
+    saveInteractiveSessionPayload(storyId, payload);
   }
 
   function loadInteractiveSession(id: string): InteractiveSessionPayload | null {
-    if (typeof localStorage === 'undefined') return null;
-
-    const raw = localStorage.getItem(storySessionKey(id));
-    if (!raw) return null;
-
-    try {
-      const parsed = JSON.parse(raw) as Partial<InteractiveSessionPayload>;
-      if (!Array.isArray(parsed.chapterHistory) || !parsed.chapterHistory.length) return null;
-
-      return {
-        version: 1,
-        turnNumber: Number(parsed.turnNumber || parsed.chapterHistory.length || 0),
-        selectedTrame: typeof parsed.selectedTrame === 'string' ? parsed.selectedTrame : null,
-        currentChapter: parsed.currentChapter ?? parsed.chapterHistory[parsed.chapterHistory.length - 1] ?? null,
-        chapterHistory: parsed.chapterHistory,
-        actionHistory: Array.isArray(parsed.actionHistory) ? parsed.actionHistory : [],
-        aiMessages: Array.isArray(parsed.aiMessages) ? parsed.aiMessages : [],
-        memoryLog: Array.isArray(parsed.memoryLog) ? parsed.memoryLog : [],
-        backgroundEvents: Array.isArray(parsed.backgroundEvents) ? parsed.backgroundEvents : [],
-        setupSnapshot: (parsed.setupSnapshot as StorySetup) || get(currentSetup),
-        worldState: parsed.worldState as WorldState | undefined,
-        campaignArchive: Array.isArray(parsed.campaignArchive)
-          ? parsed.campaignArchive.filter((item): item is string => typeof item === 'string')
-          : []
-      };
-    } catch {
-      return null;
-    }
+    return loadInteractiveSessionPayload(id, get(currentSetup));
   }
 
   function clearInteractiveSession(id: string): void {
-    if (typeof localStorage === 'undefined') return;
-    localStorage.removeItem(storySessionKey(id));
+    clearInteractiveSessionPayload(id);
   }
 
   function setSetupField<K extends keyof StorySetup>(field: K, value: StorySetup[K]): void {
@@ -774,10 +314,6 @@
     if (current !== value) {
       updateSetupField(field, value);
     }
-  }
-
-  function defaultRoleForFaction(factionId: string): string {
-    return ROLES.find(role => role.faction === factionId)?.id || ROLES[0].id;
   }
 
   function ensureSetupDefaults(): StorySetup {
@@ -1025,7 +561,7 @@
 
       const event = generation.event;
       if (!event || !event.inject_now) return;
-      if (isNearDuplicateBackgroundEvent(event)) return;
+      if (isNearDuplicateBackgroundEvent(event, backgroundEvents)) return;
 
       if (event.state_update) {
         applyStateUpdate(backgroundEventToSyntheticChapter(event, turn));
@@ -1050,49 +586,13 @@
         showToast(`Événement galactique: ${summary}`, 'warning');
       }
     } catch (error) {
-      console.warn('[editor] Tick hors-écran ignoré:', error);
+      logger.warn('editor: tick hors-écran ignoré.', error);
     }
-  }
-
-  function chapterToJournalMarkdown(chapter: StoryChapter, index: number): string {
-    const lines: string[] = [];
-    lines.push(`## Chapitre ${chapter.chapter_number || index + 1} — ${chapter.chapter_title}`);
-
-    if (chapter.narrative.context) lines.push(`**Contexte**\n${chapter.narrative.context}`);
-    if (chapter.narrative.action) lines.push(`**Action**\n${chapter.narrative.action}`);
-    if (chapter.narrative.dialogue) lines.push(`**Dialogue**\n${chapter.narrative.dialogue}`);
-    if (chapter.narrative.reflection) lines.push(`**Réflexion**\n${chapter.narrative.reflection}`);
-
-    if (chapter.choices.length) {
-      lines.push('**Choix proposés**');
-      chapter.choices.forEach((choice, choiceIndex) => {
-        lines.push(`${choiceIndex + 1}. ${choice.text} [${choice.attribute} · diff ${choice.difficulty}]`);
-      });
-    }
-
-    if (chapter.memory_updates.notes.length) {
-      lines.push(`**Mémoire (notes)**\n- ${chapter.memory_updates.notes.join('\n- ')}`);
-    }
-
-    return lines.join('\n\n');
-  }
-
-  function buildJournalContent(): string {
-    if (!chapterHistory.length) return '';
-    return chapterHistory.map((chapter, index) => chapterToJournalMarkdown(chapter, index)).join('\n\n---\n\n');
-  }
-
-  function buildStoryTitle(setup: StorySetup): string {
-    const eraLabel = ERAS.find(era => era.id === setup.era)?.name || 'Star Wars';
-    const firstName = (setup.protagonistFirstName || '').trim();
-    const lastName = (setup.protagonistLastName || '').trim();
-    const fullName = [firstName, lastName].filter(Boolean).join(' ').trim();
-    return fullName ? `${fullName} — ${eraLabel}` : `Chroniques ${eraLabel}`;
   }
 
   async function persistInteractiveState(setup: StorySetup): Promise<void> {
     updateTitle(buildStoryTitle(setup));
-    updateContent(buildJournalContent());
+    updateContent(buildJournalContent(chapterHistory));
 
     if (storyId) {
       await saveStory();
@@ -1129,7 +629,7 @@
     ]);
 
     const generation = await generateStoryTurn(requestMessages, providerConfig, turn);
-    const chapter = sanitizeChapterForDisplay(enforceTransitionChoiceQuality(generation.chapter)) as StoryChapter;
+    const chapter = sanitizeChapterForDisplay(enforceTransitionChoiceQuality(generation.chapter, worldState)) as StoryChapter;
     const assistantContent = generation.rawResponse || JSON.stringify(chapter);
 
     aiMessages = trimMessages([
@@ -1267,7 +767,7 @@
       showToast('Histoire sauvegardée', 'success');
     } catch (error) {
       showToast('Erreur lors de la sauvegarde', 'error');
-      console.error(error);
+      logger.error('editor: sauvegarde manuelle échouée.', error);
     } finally {
       saving = false;
     }
@@ -1427,7 +927,7 @@
     campaignArchive = [];
     customAction = '';
 
-    void goto('/editor/new');
+    void goto('/stories/new');
   }
 
   onMount(async () => {
@@ -2086,7 +1586,6 @@
   }
 
   .loading-state,
-  .play-loading,
   .play-empty {
     display: flex;
     flex-direction: column;
@@ -2372,7 +1871,6 @@
   }
 
   .premise-input,
-  .custom-action-input,
   .name-input {
     width: 100%;
     border: 1px solid var(--color-border);
@@ -2386,7 +1884,6 @@
   }
 
   .premise-input:focus,
-  .custom-action-input:focus,
   .name-input:focus {
     outline: none;
     border-color: var(--color-gold);
@@ -3317,7 +2814,6 @@
     .custom-row { flex-direction: row; gap: 8px; }
     .custom-input {
       font-size: 16px; /* prevent iOS zoom */
-      rows: 1;
       min-height: 44px;
       padding: 10px 12px;
     }

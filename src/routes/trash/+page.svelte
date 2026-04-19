@@ -262,8 +262,8 @@
 <!-- Empty Trash Confirmation Modal -->
 {#if showEmptyTrashModal}
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-  <div class="modal-overlay" on:click={() => showEmptyTrashModal = false}>
-    <div class="modal" on:click|stopPropagation role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div class="modal-overlay" on:click={(event) => { if (event.target === event.currentTarget) showEmptyTrashModal = false; }}>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <div class="modal-header">
         <h2 id="modal-title">Vider la corbeille</h2>
         <button class="modal-close" on:click={() => showEmptyTrashModal = false}>

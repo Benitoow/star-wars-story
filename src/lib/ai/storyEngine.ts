@@ -1,4 +1,15 @@
-﻿export type StoryAttribute = 'combat' | 'diplomacy' | 'stealth' | 'tech' | 'force' | 'survival';
+﻿import { logger } from '$lib/utils/logger';
+import {
+  AGENTIC_TOOL_CALLING_PROVIDER_IDS,
+  DEFAULT_OLLAMA_URL,
+  DEFAULT_TEXT_MODELS,
+  DEFAULT_TEXT_PROVIDER_ID,
+  OPENAI_COMPATIBLE_BASE_URLS,
+  getProviderDisplayName as getProviderDisplayNameFromConfig,
+  normalizeTextProviderId
+} from '$lib/config/providers';
+
+export type StoryAttribute = 'combat' | 'diplomacy' | 'stealth' | 'tech' | 'force' | 'survival';
 
 export interface StoryChoice {
   text: string;
@@ -147,22 +158,6 @@ export interface StorySetupSnapshot {
   writingLength?: string;
   contentMode?: string;
 }
-
-const OPENAI_COMPATIBLE_BASE_URLS: Record<string, string> = {
-  openrouter: 'https://openrouter.ai/api/v1',
-  openai: 'https://api.openai.com/v1',
-  mistral: 'https://api.mistral.ai/v1',
-  grok: 'https://api.x.ai/v1'
-};
-
-const DEFAULT_MODELS: Record<string, string> = {
-  openrouter: 'google/gemma-4-26b-a4b-it',
-  openai: 'gpt-5.4-mini',
-  anthropic: 'claude-sonnet-4-5',
-  mistral: 'mistral-medium-3',
-  grok: 'grok-3-mini-beta',
-  ollama: 'qwen3.5'
-};
 
 function cleanText(value: unknown, maxLength = 2200): string {
   if (value === null || value === undefined) return '';
@@ -957,16 +952,7 @@ chapter_number = ${turnNumber}.`;
 }
 
 function getProviderDisplayName(providerId: string): string {
-  const names: Record<string, string> = {
-    openrouter: 'OpenRouter',
-    openai: 'OpenAI',
-    anthropic: 'Anthropic',
-    mistral: 'Mistral',
-    grok: 'Grok',
-    ollama: 'Ollama',
-    none: 'Aucun provider'
-  };
-  return names[providerId] || providerId;
+  return getProviderDisplayNameFromConfig(providerId);
 }
 
 function ensureApiKey(providerId: string, apiKey?: string): void {
@@ -1024,7 +1010,7 @@ async function parseErrorMessage(response: Response): Promise<string> {
 function resolveModel(config: StoryProviderConfig): string {
   const model = cleanText(config.model, 120);
   if (model) return model;
-  return DEFAULT_MODELS[config.providerId] || DEFAULT_MODELS.openrouter;
+  return DEFAULT_TEXT_MODELS[config.providerId] || DEFAULT_TEXT_MODELS[DEFAULT_TEXT_PROVIDER_ID];
 }
 
 
@@ -1196,7 +1182,7 @@ async function callOpenAiCompatible(messages: ChatMessage[], config: StoryProvid
   return cleanText(message.content, 12000);
 }
 
-const AGENTIC_TOOL_CALLING_PROVIDERS = new Set<string>(['openrouter', 'openai', 'mistral', 'grok']);
+const AGENTIC_TOOL_CALLING_PROVIDERS = new Set<string>(AGENTIC_TOOL_CALLING_PROVIDER_IDS);
 const MAX_AGENTIC_STEPS = 8;
 
 const AGENTIC_GM_TOOLS: OpenAiToolDefinition[] = [
@@ -2060,10 +2046,10 @@ export async function generateStoryTurn(
         return agenticResult;
       }
 
-      console.warn('[storyEngine] Tool-calling a renvoyé une sortie vide/inexploitable, fallback JSON.');
+      logger.warn('storyEngine: sortie agentique inexploitable, fallback JSON.');
     } catch (error) {
       if (isAbortError(error)) {
-        console.warn('[storyEngine] Tool-calling interrompu par timeout, fallback local non bloquant.', error);
+        logger.warn('storyEngine: timeout agentique, fallback local non bloquant.', error);
         const emergencyChapter = fallbackChapter(
           `Le générateur IA a dépassé le temps imparti pendant le lancement. Le récit démarre en mode de secours pour ne pas bloquer la partie.`,
           turnNumber
@@ -2078,7 +2064,7 @@ export async function generateStoryTurn(
         };
       }
 
-      console.warn('[storyEngine] Tool-calling indisponible, fallback JSON.', error);
+      logger.warn('storyEngine: mode agentique indisponible, fallback JSON.', error);
     }
   }
 
@@ -2087,7 +2073,7 @@ export async function generateStoryTurn(
     const chapter = parseStoryResponse(rawResponse, turnNumber);
 
     if (!hasUsableStoryTurnOutput(rawResponse, chapter)) {
-      console.warn('[storyEngine] Sortie JSON initiale inexploitable, retry strict JSON.');
+      logger.warn('storyEngine: sortie JSON initiale inexploitable, retry strict JSON.');
 
       const recoveryMessages = buildStrictJsonRecoveryMessages(messages);
       const recoveryRawResponse = await callTextModel(recoveryMessages, normalizedConfig);
@@ -2103,7 +2089,7 @@ export async function generateStoryTurn(
         };
       }
 
-      console.warn('[storyEngine] Retry strict JSON toujours inexploitable, fallback local non bloquant.');
+      logger.warn('storyEngine: retry strict JSON inexploitable, fallback local non bloquant.');
       const emergencyChapter = fallbackChapter(
         `Le flux IA était instable sur ce tour. Le récit continue avec des choix sûrs.`,
         turnNumber
@@ -2127,7 +2113,7 @@ export async function generateStoryTurn(
     };
   } catch (error) {
     if (isAbortError(error)) {
-      console.warn('[storyEngine] Requête texte interrompue par timeout, fallback local non bloquant.', error);
+      logger.warn('storyEngine: timeout requête texte, fallback local non bloquant.', error);
       const emergencyChapter = fallbackChapter(
         `Le générateur IA a mis trop de temps à répondre. Le récit continue avec un chapitre de secours, sans bloquer le lancement.`,
         turnNumber
@@ -2337,7 +2323,7 @@ export async function generateBackgroundWorldEvent(
       return await generateBackgroundWorldEventWithTools(input, normalizedConfig);
     } catch (error) {
       if (isAbortError(error)) {
-        console.warn('[storyEngine] Background tool-calling interrompu par timeout, skip du tick.', error);
+        logger.warn('storyEngine: timeout background tool-calling, tick ignoré.', error);
         return {
           event: null,
           rawResponse: '',
@@ -2347,7 +2333,7 @@ export async function generateBackgroundWorldEvent(
         };
       }
 
-      console.warn('[storyEngine] Background tool-calling indisponible, fallback JSON.', error);
+      logger.warn('storyEngine: background tool-calling indisponible, fallback JSON.', error);
     }
   }
 
@@ -2355,7 +2341,7 @@ export async function generateBackgroundWorldEvent(
     return await generateBackgroundWorldEventStructured(input, normalizedConfig);
   } catch (error) {
     if (isAbortError(error)) {
-      console.warn('[storyEngine] Background requête texte interrompue par timeout, skip du tick.', error);
+      logger.warn('storyEngine: timeout requête texte background, tick ignoré.', error);
       return {
         event: null,
         rawResponse: '',
@@ -2430,7 +2416,7 @@ async function callAnthropic(messages: ChatMessage[], config: StoryProviderConfi
 }
 
 async function callOllama(messages: ChatMessage[], config: StoryProviderConfig): Promise<string> {
-  const baseUrl = cleanText(config.ollamaUrl, 200) || 'http://localhost:11434';
+  const baseUrl = cleanText(config.ollamaUrl, 200) || DEFAULT_OLLAMA_URL;
   const normalizedBaseUrl = baseUrl.replace(/\/+$/, '');
 
   const body = {
@@ -2563,12 +2549,5 @@ export function summarizeChapterForPrompt(chapter: StoryChapter): string {
 }
 
 export function normalizeProviderId(rawProviderId: string | undefined): string {
-  const providerId = String(rawProviderId || '').trim().toLowerCase();
-  const aliases: Record<string, string> = {
-    groq: 'grok',
-    xai: 'grok',
-    together: 'openrouter',
-    togetherai: 'openrouter'
-  };
-  return aliases[providerId] || providerId;
+  return normalizeTextProviderId(rawProviderId);
 }

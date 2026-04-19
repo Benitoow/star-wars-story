@@ -61,7 +61,7 @@
     <div class="state-box">
       <h2>{copy.emptyTitle}</h2>
       <p>{copy.emptyText}</p>
-      <a class="btn btn-primary" href="/editor/new">{copy.createStory}</a>
+      <a class="btn btn-primary" href="/stories/new">{copy.createStory}</a>
     </div>
   {:else}
     <div class="folders-grid">

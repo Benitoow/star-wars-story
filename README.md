@@ -3,7 +3,7 @@
 > Créez et vivez des histoires Star Wars interactives propulsées par IA agentique.
 
 [![Cloudflare Pages](https://img.shields.io/badge/Deployed-Cloudflare%20Pages-orange)](https://cloudflare.com)
-[![SvelteKit](https://img.shields.io/badge/SvelteKit-4-FF3E00)](https://kit.svelte.dev)
+[![SvelteKit](https://img.shields.io/badge/SvelteKit-2.5-FF3E00)](https://kit.svelte.dev)
 [![OpenRouter](https://img.shields.io/badge/OpenRouter-primary%20provider-7C3AED)](https://openrouter.ai)
 
 ---
@@ -57,12 +57,13 @@ OpenRouter est le provider **par défaut et recommandé** pour plusieurs raisons
 - Accès à 400+ modèles depuis une seule clé API
 - Tool calling natif (requis pour le mode agentique)
 - Modèles gratuits très performants disponibles
-- Modèle par défaut : `google/gemma-3-27b-it:free` (gratuit, excellent pour le storytelling)
+- Modèle par défaut actuel : `google/gemma-4-26b-a4b-it`
 
 Modèles recommandés (du plus économique au plus puissant) :
 | Modèle | Type | Notes |
 |--------|------|-------|
-| `google/gemma-3-27b-it:free` | Gratuit | Défaut, très bon |
+| `google/gemma-4-26b-a4b-it` | Standard | Défaut actuel |
+| `google/gemma-3-27b-it:free` | Gratuit | Excellente option budget |
 | `meta-llama/llama-3.3-70b-instruct:free` | Gratuit | Excellent raisonnement |
 | `mistralai/mistral-small-3.2-24b-instruct:free` | Gratuit | Rapide |
 | `google/gemini-2.0-flash-001` | Payant | Très rapide, qualité pro |
@@ -82,15 +83,26 @@ Ouvrir [http://localhost:5173](http://localhost:5173)
 
 **Prérequis :** Node.js 18+, une clé API OpenRouter (gratuite sur [openrouter.ai](https://openrouter.ai))
 
+### Qualité & vérification
+
+Le projet est verrouillé avec une suite qualité complète :
+
+- `npm run lint`
+- `npm run check`
+- `npm run test`
+- `npm run build`
+
+Un workflow CI GitHub exécute la même chaîne sur push/pull request.
+
 ### Stack technique
 
 | Composant | Technologie |
 |-----------|-------------|
-| Framework | SvelteKit 4 + Svelte 4 |
+| Framework | SvelteKit 2.5.0 + Svelte 4.2.20 |
 | Base de données | Dexie.js v4 (IndexedDB) |
 | IA | OpenRouter (tool calling) + fallback JSON |
 | Déploiement | Cloudflare Pages |
-| PWA | Service Worker + Web Manifest |
+| PWA | Service Worker custom (`static/sw.js`) + Web Manifest |
 | Style | CSS custom (dark theme, design Star Wars) |
 
 ### Architecture
@@ -140,7 +152,7 @@ Star Wars Story Manager is a local-first PWA for interactive Star Wars storytell
 
 1. Open the app and go to **Settings**
 2. Select **OpenRouter** as provider and paste your API key
-3. The default model (`google/gemma-3-27b-it:free`) is free — no credits needed
+3. The default model is currently `google/gemma-4-26b-a4b-it` (you can switch to free models in Settings)
 4. Go back to the dashboard and create a new story
 5. Complete the setup wizard and launch your adventure
 
@@ -151,6 +163,8 @@ Star Wars Story Manager is a local-first PWA for interactive Star Wars storytell
 - **Smart narrative pacing** — automatically avoids non-stop action
 - **Background world simulation** — galactic events happen off-screen
 - **Fully offline** after first load (PWA)
+- **Offline fallback page** (`/offline.html`) + cache shell/runtime séparés
+- **Safe SW update lifecycle** (skip waiting + reload contrôlé)
 - **Local-first** — no account, no server, your data stays in your browser
 
 ### Release Notes

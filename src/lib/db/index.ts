@@ -4,6 +4,13 @@
 import Dexie, { type Table } from 'dexie';
 import type { UiLanguageCode } from '$lib/config/languages';
 import {
+  DEFAULT_IMAGE_MODEL_ID,
+  DEFAULT_IMAGE_PROVIDER_ID,
+  DEFAULT_OLLAMA_URL,
+  DEFAULT_TEXT_MODEL_ID,
+  DEFAULT_TEXT_PROVIDER_ID
+} from '$lib/config/providers';
+import {
   createAllDataExportEnvelope,
   createStoryExportEnvelope,
   normalizeAppStateForStorage,
@@ -188,20 +195,20 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   avatarEmoji: '🧑‍🚀',
   uiLanguage: 'auto',
   theme: 'dark',
-  textProvider: 'openrouter',
-  textModel: 'google/gemma-4-26b-a4b-it',
+  textProvider: DEFAULT_TEXT_PROVIDER_ID,
+  textModel: DEFAULT_TEXT_MODEL_ID,
   textApiKey: '',
-  ollamaUrl: 'http://localhost:11434',
-  imageProvider: 'none',
-  imageModel: '',
+  ollamaUrl: DEFAULT_OLLAMA_URL,
+  imageProvider: DEFAULT_IMAGE_PROVIDER_ID,
+  imageModel: DEFAULT_IMAGE_MODEL_ID,
   imageApiKey: '',
   writingStyle: 'cinematique',
   writingPov: 'troisieme',
   writingTone: 'aventure',
   writingLength: 'moyen',
   contentMode: 'cinematic',
-  defaultImageProvider: 'none',
-  defaultImgModel: '',
+  defaultImageProvider: DEFAULT_IMAGE_PROVIDER_ID,
+  defaultImgModel: DEFAULT_IMAGE_MODEL_ID,
   autoSave: true,
   autoSaveInterval: 30000,
   showOnboarding: true,

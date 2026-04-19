@@ -3,8 +3,9 @@
 ══════════════════════════════════════════════ */
 import { writable, derived } from 'svelte/store';
 import { browser } from '$app/environment';
-import { getPreferences } from '$db';
+import { getPreferences, savePreferences } from '$db';
 import { resolveUiLanguage, type UiLanguageCode } from '$lib/config/languages';
+import { logger } from '$lib/utils/logger';
 
 // ─── Theme ───────────────────────────────────
 function createThemeStore() {
@@ -40,9 +41,10 @@ function applyTheme(theme: 'light' | 'dark' | 'auto') {
   document.documentElement.setAttribute('data-theme', actualTheme);
 }
 
-async function savePreference(key: string, value: any) {
-  const { savePreferences } = await import('$db');
-  savePreferences({ [key]: value });
+function savePreference(key: string, value: any) {
+  void savePreferences({ [key]: value }).catch((error: unknown) => {
+    logger.warn('ui-store: sauvegarde préférence échouée.', key, error);
+  });
 }
 
 export const theme = createThemeStore();

@@ -24,7 +24,7 @@
     {
       "name": "Nouvelle Histoire",
       "short_name": "Nouveau",
-      "url": "/editor/new",
+      "url": "/stories/new",
       "description": "Créer une nouvelle histoire"
     },
     {

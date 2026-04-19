@@ -5,6 +5,19 @@
   import { getPreferences, savePreferences, exportAllData, importAllData, emptyTrash, type UserPreferences } from '$lib/db';
   import { showToast, theme, uiLanguage } from '$lib/stores/ui';
   import { UI_LANGUAGE_OPTIONS, type UiLanguageCode } from '$lib/config/languages';
+  import {
+    DEFAULT_IMAGE_MODEL_ID,
+    DEFAULT_IMAGE_PROVIDER_ID,
+    DEFAULT_OLLAMA_URL,
+    DEFAULT_TEXT_MODEL_ID,
+    DEFAULT_TEXT_PROVIDER_ID,
+    IMAGE_PROVIDER_ALIAS_MAP,
+    IMAGE_PROVIDERS,
+    TEXT_PROVIDER_ALIAS_MAP,
+    TEXT_PROVIDERS
+  } from '$lib/config/providers';
+  import { AVATARS, CONTENT_MODES, WRITING_STYLES, WRITING_TONES } from '$lib/editor/setupCatalog';
+  import { logger } from '$lib/utils/logger';
   import PageHeader from '$lib/components/PageHeader.svelte';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 
@@ -35,210 +48,6 @@
     slideDir = to >= (from === -1 ? 0 : from) ? 1 : -1;
     currentScreen = id;
   }
-
-  type ProviderConfig = {
-    id: string;
-    name: string;
-    models: string[];
-    icon: string;
-    recommended?: boolean;
-    badges?: string[];
-  };
-
-  const PROVIDER_ICONS: Record<string, string> = {
-    openrouter: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M16.778 1.844v1.919q-.569-.026-1.138-.032-.708-.008-1.415.037c-1.93.126-4.023.728-6.149 2.237-2.911 2.066-2.731 1.95-4.14 2.75-.396.223-1.342.574-2.185.798-.841.225-1.753.333-1.751.333v4.229s.768.108 1.61.333c.842.224 1.789.575 2.185.799 1.41.798 1.228.683 4.14 2.75 2.126 1.509 4.22 2.11 6.148 2.236.88.058 1.716.041 2.555.005v1.918l7.222-4.168-7.222-4.17v2.176c-.86.038-1.611.065-2.278.021-1.364-.09-2.417-.357-3.979-1.465-2.244-1.593-2.866-2.027-3.68-2.508.889-.518 1.449-.906 3.822-2.59 1.56-1.109 2.614-1.377 3.978-1.466.667-.044 1.418-.017 2.278.02v2.176L24 6.014Z"/></svg>`,
-    openai: `<img src="/svg/openai-icon.svg" alt="" loading="lazy" decoding="async" />`,
-    anthropic: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M17.304 3.541h-3.672L20.328 20.46H24zm-10.608 0L0 20.46h3.744l1.37-3.553h7.005l1.37 3.553h3.744L10.536 3.541Zm-.371 10.223 2.291-5.946 2.292 5.946z"/></svg>`,
-    mistral: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M17.143 3.429v3.428h-3.429v3.429h-3.428V6.857H6.857V3.43H3.43v13.714H0v3.428h10.286v-3.428H6.857v-3.429h3.429v3.429h3.429v-3.429h3.428v3.429h-3.428v3.428H24v-3.428h-3.43V3.429z"/></svg>`,
-    grok: `<img src="/svg/grok-ai-icon.svg" alt="" loading="lazy" decoding="async" />`,
-    ollama: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="6" y="7" width="12" height="10" rx="3" fill="currentColor"/><circle cx="10" cy="12" r="1.5" fill="var(--color-bg-primary)"/><circle cx="14" cy="12" r="1.5" fill="var(--color-bg-primary)"/><path d="M9 4.5h2M13 4.5h2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
-    fal_img: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" d="M5 4h9M5 4v16M5 12h7"/><path fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" d="M16 14l3 3-3 3M14 17h5"/></svg>`,
-    stability: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 2 2 20h20L12 2Zm0 4.5L19.5 20h-15L12 6.5Z"/><circle cx="12" cy="15" r="1.5" fill="currentColor"/></svg>`,
-    none: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="3" width="18" height="18" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/><line x1="3" y1="3" x2="21" y2="21" stroke="currentColor" stroke-width="1.5"/></svg>`,
-    default: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>`
-  };
-
-  function providerIconSvg(providerId: string): string {
-    return PROVIDER_ICONS[providerId] ?? PROVIDER_ICONS.default;
-  }
-
-  // ── Config data ───────────────────────────
-  const TEXT_PROVIDERS: ProviderConfig[] = [
-    {
-      id: 'openrouter',
-      name: 'OpenRouter',
-      models: [
-        // ── Free tier ──
-        'google/gemma-3-27b-it:free',
-        'google/gemma-4-26b-a4b-it',
-        'google/gemma-4-31b-it',
-        'meta-llama/llama-4-scout:free',
-        'meta-llama/llama-3.3-70b-instruct:free',
-        'mistralai/mistral-small-3.2-24b-instruct:free',
-        'qwen/qwen3-30b-a3b:free',
-        'qwen/qwen3-235b-a22b:free',
-        'xiaomi/mimo-v2-omni',
-        // ── Milieu de gamme ──
-        'x-ai/grok-4.1-fast',
-        'deepseek/deepseek-v3.2',
-        'mistralai/mistral-small-2603',
-        'meta-llama/llama-4-maverick',
-        'google/gemini-2.0-flash-001',
-        'google/gemini-2.5-flash-preview',
-        'openai/gpt-5.4-mini',
-        'anthropic/claude-3-7-sonnet',
-        // ── Premium ──
-        'anthropic/claude-sonnet-4-5',
-        'openai/gpt-5.4',
-        'x-ai/grok-4',
-        'google/gemini-2.5-pro',
-        'anthropic/claude-opus-4-5',
-        'openai/gpt-5',
-      ],
-      icon: providerIconSvg('openrouter'),
-      recommended: true,
-      badges: ['⚡ Agentique', 'Tool calling natif', '400+ modèles']
-    },
-    {
-      id: 'openai',
-      name: 'OpenAI',
-      models: [
-        'gpt-5.4',
-        'gpt-5.4-mini',
-        'gpt-5.4-nano',
-        'gpt-5-mini',
-        'gpt-5',
-        'o4-mini',
-        'o3',
-      ],
-      icon: providerIconSvg('openai'),
-      badges: ['GPT-5.4 · o3', 'Vision', 'Fonctions']
-    },
-    {
-      id: 'anthropic',
-      name: 'Anthropic',
-      models: [
-        'claude-opus-4-5',
-        'claude-sonnet-4-5',
-        'claude-3-7-sonnet-latest',
-      ],
-      icon: providerIconSvg('anthropic'),
-      badges: ['Claude 4', '200K tokens', 'Vision']
-    },
-    {
-      id: 'mistral',
-      name: 'Mistral AI',
-      models: [
-        'mistral-large-latest',
-        'mistral-medium-3',
-        'mistral-small-2603',
-        'codestral-latest',
-      ],
-      icon: providerIconSvg('mistral'),
-      badges: ['EU hébergé', 'Magistral', 'Codestral']
-    },
-    {
-      id: 'grok',
-      name: 'Grok / xAI',
-      models: [
-        'grok-4.1-fast',
-        'grok-4',
-        'grok-3-beta',
-        'grok-3-mini-beta',
-        'grok-2-vision-1212',
-      ],
-      icon: providerIconSvg('grok'),
-      badges: ['Grok 4', '2M tokens', '⚡ Tool calling']
-    },
-    {
-      id: 'ollama',
-      name: 'Ollama (local)',
-      models: [
-        'llama4', 'llama3.3', 'gemma3', 'gemma3:12b',
-        'qwen3.5', 'qwen3.5:32b', 'qwen3', 'phi4', 'phi4-mini',
-        'glm4.7-air', 'glm4', 'mistral', 'deepseek-r1', 'codestral',
-      ],
-      icon: providerIconSvg('ollama'),
-      badges: ['100% local', 'Sans clé API', '🔒 Vie privée']
-    },
-    { id: 'none', name: 'Aucun (texte manuel)', models: [], icon: providerIconSvg('none') }
-  ];
-
-  const IMAGE_PROVIDERS: ProviderConfig[] = [
-    {
-      id: 'openrouter_img',
-      name: 'OpenRouter Images',
-      models: [
-        'google/gemini-2.5-flash-preview:thinking',
-        'google/gemini-2.0-flash-exp:free',
-        'openai/gpt-image-1',
-        'openai/gpt-4o-image',
-        'black-forest-labs/flux-1.1-pro',
-        'black-forest-labs/flux-1.1-pro:ultra',
-        'black-forest-labs/flux-1-schnell:free',
-        'black-forest-labs/flux-1-dev',
-        'recraft-ai/recraft-v3',
-        'ideogram-ai/ideogram-v2',
-      ],
-      icon: providerIconSvg('openrouter'),
-      badges: ['400+ modèles', 'Gemini · FLUX · GPT']
-    },
-    {
-      id: 'fal_img',
-      name: 'fal.ai',
-      models: [
-        'fal-ai/flux-pro/v1.1-ultra',
-        'fal-ai/flux-pro/v1.1',
-        'fal-ai/flux/dev',
-        'fal-ai/flux/schnell',
-        'fal-ai/recraft-v3',
-        'fal-ai/ideogram/v2',
-        'fal-ai/hidream-i1-full',
-        'fal-ai/stable-diffusion-3.5-large',
-        'fal-ai/stable-diffusion-v3-medium',
-      ],
-      icon: providerIconSvg('fal_img'),
-      badges: ['FLUX Pro', 'HiDream', 'SD 3.5']
-    },
-    {
-      id: 'openai_img',
-      name: 'OpenAI Images',
-      models: ['gpt-image-1'],
-      icon: providerIconSvg('openai'),
-      badges: ['GPT-Image-1']
-    },
-    {
-      id: 'stability',
-      name: 'Stability AI',
-      models: ['stable-image-ultra', 'stable-image-core', 'sd3.5-large', 'sd3.5-medium'],
-      icon: providerIconSvg('stability'),
-      badges: ['SD 3.5', 'Ultra']
-    },
-    { id: 'none', name: 'Aucun (texte uniquement)', models: [], icon: providerIconSvg('none') }
-  ];
-
-  const WRITING_STYLES = [
-    { id: 'cinematique', name: 'Cinématique',  desc: 'Scènes courtes, rythme intense, style film' },
-    { id: 'litteraire',  name: 'Littéraire',   desc: 'Prose riche, descriptions profondes, introspection' },
-    { id: 'epique',      name: 'Épique',        desc: 'Grandeur, batailles, destins héroïques' },
-    { id: 'immersif',    name: 'Immersif',      desc: '2ème personne, style jeu de rôle, vous êtes le héros' },
-  ];
-
-  const WRITING_TONES = [
-    { id: 'heroique', name: 'Héroïque',   desc: 'Courage, sacrifice, lumière' },
-    { id: 'sombre',   name: 'Sombre',     desc: 'Tension, danger, ambiguïté morale' },
-    { id: 'aventure', name: 'Aventure',   desc: 'Action, humour, légèreté' },
-    { id: 'drame',    name: 'Dramatique', desc: 'Émotions, relations, trahisons' },
-  ];
-
-  const CONTENT_MODES = [
-    { id: 'cinematic', name: 'Cinéma', desc: 'Intense mais équilibré. Adapté aux IA filtrées.', icon: '🎬' },
-    { id: 'dark', name: 'Sombre', desc: 'Ambiance dure et tendue, sans gratuité excessive.', icon: '🌒' },
-    { id: 'adult', name: 'Adulte', desc: 'Mature et frontal, selon les limites du provider choisi.', icon: '🔞' },
-    { id: 'raw', name: 'Brut', desc: 'Très frontal et sans concession (quand le modèle le permet).', icon: '⚠️' },
-  ];
-
-  const AVATARS = ['🧑‍🚀', '👩‍🚀', '🧙', '🧙‍♀️', '⚔️', '🤖', '👾', '🦾', '🌌', '💫', '🔵', '🔴'];
 
   // ── Helpers ───────────────────────────────
   const IMAGE_MODEL_PATTERN = /(image|flux|sdxl|stable[-_\s]?diffusion|sd3|gpt-image|ideogram|recraft|kandinsky|sana|lumina|dall)/i;
@@ -351,7 +160,7 @@
   }
 
   function normalizeOllamaUrl(url?: string): string {
-    const source = (url || '').trim() || 'http://localhost:11434';
+    const source = (url || '').trim() || DEFAULT_OLLAMA_URL;
     return source.replace(/\/+$/, '');
   }
 
@@ -583,35 +392,24 @@
     next.profiles = Array.isArray(next.profiles) ? next.profiles : [];
     if (!next.avatarEmoji) next.avatarEmoji = AVATARS[0];
 
-    const textProviderAlias: Record<string, string> = {
-      gemini: 'openrouter',
-      groq: 'grok',
-      together: 'openrouter'
-    };
-    const imageProviderAlias: Record<string, string> = {
-      openai: 'openai_img',
-      flux: 'openrouter_img',
-      together_img: 'openrouter_img'
-    };
-
-    if (next.textProvider && textProviderAlias[next.textProvider]) {
-      next.textProvider = textProviderAlias[next.textProvider];
+    if (next.textProvider && TEXT_PROVIDER_ALIAS_MAP[next.textProvider]) {
+      next.textProvider = TEXT_PROVIDER_ALIAS_MAP[next.textProvider];
     }
 
-    if (next.imageProvider && imageProviderAlias[next.imageProvider]) {
-      next.imageProvider = imageProviderAlias[next.imageProvider];
+    if (next.imageProvider && IMAGE_PROVIDER_ALIAS_MAP[next.imageProvider]) {
+      next.imageProvider = IMAGE_PROVIDER_ALIAS_MAP[next.imageProvider];
     }
 
-    if (next.defaultImageProvider && imageProviderAlias[next.defaultImageProvider]) {
-      next.defaultImageProvider = imageProviderAlias[next.defaultImageProvider];
+    if (next.defaultImageProvider && IMAGE_PROVIDER_ALIAS_MAP[next.defaultImageProvider]) {
+      next.defaultImageProvider = IMAGE_PROVIDER_ALIAS_MAP[next.defaultImageProvider];
     }
 
     const validTextProviderIds = new Set(TEXT_PROVIDERS.map(provider => provider.id));
-    if (!next.textProvider || !validTextProviderIds.has(next.textProvider)) next.textProvider = 'openrouter';
+    if (!next.textProvider || !validTextProviderIds.has(next.textProvider)) next.textProvider = DEFAULT_TEXT_PROVIDER_ID;
 
     const textProvider = TEXT_PROVIDERS.find(p => p.id === next.textProvider);
     if (!next.textModel) {
-      next.textModel = textProvider?.models[0] ?? '';
+      next.textModel = textProvider?.models[0] ?? DEFAULT_TEXT_MODEL_ID;
     }
 
     const legacyContentMode = (next as UserPreferences & { contentIntensity?: string }).contentIntensity;
@@ -637,15 +435,15 @@
 
     const validImageProviderIds = new Set(IMAGE_PROVIDERS.map(provider => provider.id));
     if (!next.imageProvider) {
-      next.imageProvider = next.defaultImageProvider || 'none';
+      next.imageProvider = next.defaultImageProvider || DEFAULT_IMAGE_PROVIDER_ID;
     }
     if (!validImageProviderIds.has(next.imageProvider)) {
-      next.imageProvider = 'none';
+      next.imageProvider = DEFAULT_IMAGE_PROVIDER_ID;
     }
 
     const imageProvider = IMAGE_PROVIDERS.find(p => p.id === next.imageProvider);
     if (!next.imageModel) {
-      next.imageModel = next.defaultImgModel || imageProvider?.models[0] || '';
+      next.imageModel = next.defaultImgModel || imageProvider?.models[0] || DEFAULT_IMAGE_MODEL_ID;
     }
 
     next.defaultImageProvider = next.imageProvider;
@@ -674,7 +472,7 @@
     }
 
     if (providerId === 'ollama' && !preferences.ollamaUrl) {
-      preferences.ollamaUrl = 'http://localhost:11434';
+      preferences.ollamaUrl = DEFAULT_OLLAMA_URL;
     }
 
     preferences = { ...preferences };
@@ -755,7 +553,7 @@
     try {
       preferences = applyPreferenceDefaults(await getPreferences());
     } catch (e) {
-      console.error('Failed to load preferences:', e);
+      logger.error('settings: chargement des préférences échoué.', e);
     }
     loading = false;
   });
@@ -942,8 +740,9 @@
 
               <div class="field-group">
                 <div class="field">
-                  <label>Prénom</label>
+                  <label for="profile-first-name">Prénom</label>
                   <input
+                    id="profile-first-name"
                     type="text"
                     class="input"
                     placeholder="Luke"
@@ -951,8 +750,9 @@
                   />
                 </div>
                 <div class="field">
-                  <label>Nom</label>
+                  <label for="profile-last-name">Nom</label>
                   <input
+                    id="profile-last-name"
                     type="text"
                     class="input"
                     placeholder="Skywalker"
@@ -1013,10 +813,11 @@
                   {#if textProviderModels.length}
                     <div class="field model-picker-field">
                       <div class="model-picker-head">
-                        <label>Modèle</label>
+                        <label for="text-model-search">Modèle</label>
                         <span class="model-count">{textProviderModels.length} disponibles</span>
                       </div>
                       <input
+                        id="text-model-search"
                         type="search"
                         class="input model-search"
                         placeholder="Rechercher un modèle…"
@@ -1047,8 +848,9 @@
 
                   {#if preferences.textProvider !== 'ollama'}
                     <div class="field">
-                      <label>Clé API</label>
+                      <label for="text-api-key">Clé API</label>
                       <input
+                        id="text-api-key"
                         type="password"
                         class="input"
                         placeholder="sk-..."
@@ -1058,11 +860,12 @@
                     </div>
                   {:else}
                     <div class="field">
-                      <label>URL Ollama</label>
+                      <label for="ollama-url">URL Ollama</label>
                       <input
+                        id="ollama-url"
                         type="text"
                         class="input"
-                        placeholder="http://localhost:11434"
+                        placeholder={DEFAULT_OLLAMA_URL}
                         bind:value={preferences.ollamaUrl}
                       />
                     </div>
@@ -1123,10 +926,11 @@
                   {#if imageProviderModels.length}
                     <div class="field model-picker-field">
                       <div class="model-picker-head">
-                        <label>Modèle</label>
+                        <label for="image-model-search">Modèle</label>
                         <span class="model-count">{imageProviderModels.length} disponibles</span>
                       </div>
                       <input
+                        id="image-model-search"
                         type="search"
                         class="input model-search"
                         placeholder="Rechercher un modèle image…"
@@ -1156,8 +960,9 @@
                     </div>
                   {/if}
                   <div class="field">
-                    <label>Clé API</label>
+                    <label for="image-api-key">Clé API</label>
                     <input
+                      id="image-api-key"
                       type="password"
                       class="input"
                       placeholder="Votre clé API..."
@@ -1222,7 +1027,7 @@
 
               <div class="field-group">
                 <div class="field">
-                  <label>Point de vue</label>
+                  <span class="field-label">Point de vue</span>
                   <div class="btn-toggle-group">
                     <button
                       class="btn-toggle"
@@ -1238,7 +1043,7 @@
                 </div>
 
                 <div class="field">
-                  <label>Longueur des passages</label>
+                  <span class="field-label">Longueur des passages</span>
                   <div class="btn-toggle-group">
                     <button class="btn-toggle" class:active={preferences.writingLength === 'court'} on:click={() => { if (preferences) preferences.writingLength = 'court'; }}>Court</button>
                     <button class="btn-toggle" class:active={preferences.writingLength === 'moyen' || !preferences.writingLength} on:click={() => { if (preferences) preferences.writingLength = 'moyen'; }}>Moyen</button>
@@ -1317,8 +1122,9 @@
 
                     <div class="profile-fields">
                       <div class="profile-field">
-                        <label>Ère par défaut</label>
+                        <label for={`profile-era-${profile.id}`}>Ère par défaut</label>
                         <select
+                          id={`profile-era-${profile.id}`}
                           class="select"
                           value={profile.config.defaultEra || ''}
                           on:change={(e) => updateProfileConfig(profile.id, 'defaultEra', getSelectValue(e))}
@@ -1333,8 +1139,9 @@
                       </div>
 
                       <div class="profile-field">
-                        <label>Faction par défaut</label>
+                        <label for={`profile-faction-${profile.id}`}>Faction par défaut</label>
                         <select
+                          id={`profile-faction-${profile.id}`}
                           class="select"
                           value={profile.config.defaultFaction || ''}
                           on:change={(e) => updateProfileConfig(profile.id, 'defaultFaction', getSelectValue(e))}
@@ -1419,7 +1226,7 @@
 
               <div class="field-group">
                 <div class="field">
-                  <label>Thème</label>
+                  <span class="field-label">Thème</span>
                   <div class="btn-toggle-group">
                     <button class="btn-toggle" class:active={preferences.theme === 'dark'} on:click={() => { if (preferences) { preferences.theme = 'dark'; theme.set('dark'); } }}>
                       🌑 Sombre
@@ -1434,8 +1241,9 @@
                 </div>
 
                 <div class="field">
-                  <label>Langue de l'interface</label>
+                  <label for="ui-language">Langue de l'interface</label>
                   <select
+                    id="ui-language"
                     class="select"
                     value={preferences.uiLanguage}
                     on:change={(e) => { if (preferences) { preferences.uiLanguage = getUiLanguageValue(e); uiLanguage.set(preferences.uiLanguage); } }}
@@ -1447,7 +1255,7 @@
                 </div>
 
                 <div class="field">
-                  <label>Sauvegarde automatique</label>
+                  <span class="field-label">Sauvegarde automatique</span>
                   <label class="toggle">
                     <input type="checkbox" checked={preferences.autoSave}
                       on:change={(e) => { if (preferences) preferences.autoSave = getInputChecked(e); }} />
@@ -1457,8 +1265,8 @@
 
                 {#if preferences.autoSave}
                   <div class="field">
-                    <label>Intervalle</label>
-                    <select class="select" bind:value={preferences.autoSaveInterval}>
+                    <label for="auto-save-interval">Intervalle</label>
+                    <select id="auto-save-interval" class="select" bind:value={preferences.autoSaveInterval}>
                       <option value={15000}>15 secondes</option>
                       <option value={30000}>30 secondes</option>
                       <option value={60000}>1 minute</option>
@@ -1694,7 +1502,8 @@
     gap: var(--space-xs);
   }
 
-  .field label {
+  .field label,
+  .field .field-label {
     font-size: 0.8rem;
     font-weight: 600;
     text-transform: uppercase;

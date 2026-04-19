@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased — 2026-04-19
+
+### Lot 4 — Single source of truth config
+
+- Centralisation des providers/modèles/defaults/aliases dans `src/lib/config/providers.ts`
+- Migration des consommateurs principaux : `settings/+page.svelte`, `storyEngine.ts`, `db/index.ts`, `persistence/index.ts`
+- Compatibilité legacy renforcée via alias image `openrouter -> openrouter_img`
+
+### Lot 5 — Runtime & PWA hardening
+
+- `static/sw.js` renforcé : caches séparés shell/runtime, `navigationPreload`, stratégie HTML network-first, assets stale-while-revalidate
+- Ajout d’un fallback hors ligne dédié : `static/offline.html`
+- Lifecycle SW géré côté app (`src/routes/+layout.svelte`) : update detection, `SKIP_WAITING`, rechargement contrôlé
+- Garde-fous runtime : toasts online/offline et persistance des préférences avec gestion d’erreurs
+
+### Lot 6 — Repo cleanup & docs sync
+
+- Harmonisation de la route canonique de création (`/stories/new`) dans les points d’entrée UI
+- Documentation synchronisée (README/SPEC/CHANGELOG) avec l’état réel du projet
+- Validation complète post-cleanup : lint, check, test, build
+
 ## v2.0.0 — 2026-04-18
 
 ### Moteur narratif agentique (refonte majeure)

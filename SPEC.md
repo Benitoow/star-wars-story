@@ -7,35 +7,53 @@
 **Core Functionality:** A sophisticated dashboard for creating, managing, and sharing interactive Star Wars stories with AI-powered generation, local-first storage, and collaborative features.  
 **Target Users:** Star Wars fans and creative writers who want to create personalized interactive stories.
 
+### 1.1 Implementation Status (2026-04-19)
+
+- The SvelteKit application is the active runtime (legacy JS archived under `archives/legacy-js/`).
+- Provider/runtime configuration is centralized in `src/lib/config/providers.ts`.
+- PWA runtime is hardened via custom service worker (`static/sw.js`) + dedicated offline fallback (`static/offline.html`).
+- Quality gates are active and enforced in CI (`lint`, `check`, `test`, `build`).
+
 ## 2. Architecture
 
 ### 2.1 Tech Stack
-- **Framework:** SvelteKit (lightweight, fast, excellent DX)
+- **Framework:** SvelteKit `2.5.0` + Svelte `4.2.20`
 - **Language:** TypeScript
 - **Storage:** Dexie.js (IndexedDB wrapper)
 - **Build:** Vite
 - **Styling:** Custom CSS with CSS variables
-- **PWA:** Vite PWA plugin
+- **PWA:** Custom Service Worker (`static/sw.js`) + Web App Manifest + offline fallback page
 
 ### 2.2 Project Structure
 ```
 star-wars-story/
 ├── src/
 │   ├── lib/
+│   │   ├── ai/             # Story engine (agentic + structured fallback)
 │   │   ├── components/     # Reusable UI components
+│   │   ├── config/         # Providers, assets, languages
+│   │   ├── db/             # Dexie.js database schema
+│   │   ├── editor/         # Editor split modules (catalog, guardrails, journal, session)
+│   │   ├── persistence/    # Import/export + storage normalization
 │   │   ├── stores/         # Svelte stores for state
-│   │   ├── db/              # Dexie.js database schema
-│   │   ├── utils/           # Utility functions
-│   │   └── i18n/           # Internationalization
+│   │   └── utils/          # Utility functions
 │   ├── routes/
-│   │   ├── +page.svelte    # Dashboard (main)
-│   │   ├── story/[id]/     # Story editor/viewer
-│   │   ├── settings/        # User preferences
-│   │   └── onboarding/      # First-time user tour
+│   │   ├── +layout.svelte
+│   │   ├── +page.svelte           # Dashboard
+│   │   ├── editor/[id]/+page.svelte
+│   │   ├── settings/+page.svelte
+│   │   ├── stories/+page.svelte
+│   │   ├── stories/new/+page.svelte
+│   │   ├── folders/+page.svelte
+│   │   ├── folders/[id]/+page.svelte
+│   │   ├── trash/+page.svelte
+│   │   └── story/[id]/*            # Legacy compatibility redirects
 │   └── app.html
 ├── static/
-│   ├── icons/              # PWA icons
-│   └── sw.js              # Service worker
+│   ├── manifest.json
+│   ├── sw.js
+│   ├── offline.html
+│   └── svg/
 ├── SPEC.md
 ├── package.json
 └── svelte.config.js
@@ -228,7 +246,7 @@ db.version(1).stores({
 - **Data Management:** Export backup, import, clear data
 - **Accessibility:** High contrast, reduced motion, screen reader
 
-### 4.10 Onboarding
+### 4.10 Onboarding (Roadmap)
 - **Welcome Tour:** 4-step guided introduction
 - **Feature Highlights:** Contextual tooltips
 - **Sample Story:** Pre-loaded demo story

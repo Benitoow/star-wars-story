@@ -5,6 +5,7 @@ import { writable, derived, get } from 'svelte/store';
 import type { Story } from '$lib/db';
 import { createStory as dbCreateStory, updateStory as dbUpdateStory, getStory as dbGetStory } from '$lib/db';
 import { initializeDB } from '$lib/db';
+import { logger } from '$lib/utils/logger';
 
 // ─── Types ─────────────────────────────────────
 export interface StorySetup {
@@ -226,7 +227,7 @@ export function startAutoSave(intervalMs = 30000) {
       try {
         await saveStory();
       } catch (error) {
-        console.error('Auto-save failed:', error);
+        logger.error('editor-store: auto-save échoué.', error);
       }
     }
   }, intervalMs);
