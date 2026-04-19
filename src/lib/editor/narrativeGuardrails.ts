@@ -27,6 +27,11 @@ export interface NarrativeParagraph {
   text: string;
 }
 
+export interface DialogueDisplayPlan {
+  actionParagraphs: NarrativeParagraph[];
+  dialogueParagraphs: NarrativeParagraph[];
+}
+
 function stripInlineStateTokens(text: string): string {
   return String(text || '')
     .replace(INLINE_STATE_TOKEN_REGEX, '')
@@ -164,6 +169,65 @@ function splitParagraphFragments(text: string): NarrativeParagraph[] {
 
 export function splitNarrativeParagraphs(text: string): NarrativeParagraph[] {
   return splitParagraphFragments(text);
+}
+
+function paragraphDedupKey(text: string): string {
+  return normalizeSearchText(text)
+    .replace(/^[—–\-"'«»\s]+/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function dedupeNarrativeParagraphs(paragraphs: NarrativeParagraph[]): NarrativeParagraph[] {
+  const seen = new Set<string>();
+  const unique: NarrativeParagraph[] = [];
+
+  for (const paragraph of paragraphs) {
+    const text = cleanParagraphText(paragraph.text);
+    if (!text) continue;
+
+    const key = paragraphDedupKey(text);
+    if (!key || seen.has(key)) continue;
+
+    seen.add(key);
+    unique.push({ ...paragraph, text });
+  }
+
+  return unique;
+}
+
+function sectionPrefersStandaloneDialogue(sectionType: string): boolean {
+  return normalizeSearchText(sectionType || '').trim() === 'dialogue';
+}
+
+export function planDialogueDisplay(chapter: StoryChapter): DialogueDisplayPlan {
+  const actionParagraphs = dedupeNarrativeParagraphs(splitNarrativeParagraphs(chapter.narrative.action));
+  const dialogueParagraphs = dedupeNarrativeParagraphs(
+    splitNarrativeParagraphs(chapter.narrative.dialogue)
+      .map(paragraph => ({ ...paragraph, kind: 'dialogue' as const }))
+  );
+
+  if (!dialogueParagraphs.length) {
+    return {
+      actionParagraphs,
+      dialogueParagraphs: []
+    };
+  }
+
+  if (!sectionPrefersStandaloneDialogue(chapter.section_type || '')) {
+    return {
+      actionParagraphs: dedupeNarrativeParagraphs([...actionParagraphs, ...dialogueParagraphs]),
+      dialogueParagraphs: []
+    };
+  }
+
+  const actionKeys = new Set(actionParagraphs.map(paragraph => paragraphDedupKey(paragraph.text)));
+  const standaloneDialogue = dialogueParagraphs.filter(paragraph => !actionKeys.has(paragraphDedupKey(paragraph.text)));
+
+  return {
+    actionParagraphs,
+    dialogueParagraphs: standaloneDialogue
+  };
 }
 
 export function isDialogueParagraph(text: string): boolean {

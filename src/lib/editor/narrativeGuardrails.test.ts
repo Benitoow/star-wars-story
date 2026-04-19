@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { StoryChapter, WorldState } from '$lib/ai/storyEngine';
-import { enforceTransitionChoiceQuality, sanitizeNarrativeTextForDisplay, splitNarrativeParagraphs } from './narrativeGuardrails';
+import {
+  enforceTransitionChoiceQuality,
+  planDialogueDisplay,
+  sanitizeNarrativeTextForDisplay,
+  splitNarrativeParagraphs
+} from './narrativeGuardrails';
 
 describe('sanitizeNarrativeTextForDisplay', () => {
   it('strips inline state directives from narrative prose', () => {
@@ -87,5 +92,74 @@ describe('enforceTransitionChoiceQuality', () => {
 
     expect(allTexts.some(text => text.includes('laisser le temps avancer'))).toBe(false);
     expect(adjusted.choices.some(choice => /^\d+[.)]/.test(choice.text))).toBe(false);
+  });
+});
+
+describe('planDialogueDisplay', () => {
+  it('inlines dialogue into action for non-dialogue scenes and removes duplicates', () => {
+    const chapter: StoryChapter = {
+      chapter_title: 'Sous le feu croisé',
+      chapter_number: 6,
+      section_type: 'action',
+      narrative: {
+        context: '',
+        action: `Le hangar tremble sous les tirs.
+      — Vex : On bouge.
+      Tu ajustes ton blaster.`,
+        dialogue: `— Vex : On bouge.
+      — Lira : Couvre la sortie.`,
+        reflection: '',
+        atmosphere: 'tense'
+      },
+      choices: [],
+      memory_updates: {
+        relations: [],
+        places: [],
+        injuries: [],
+        resources: [],
+        notes: []
+      },
+      scene_description: 'test',
+      user_edits_applied: null
+    };
+
+    const display = planDialogueDisplay(chapter);
+    const actionTexts = display.actionParagraphs.map(paragraph => paragraph.text);
+    const vexLineCount = actionTexts.filter(text => /vex\s*:\s*on bouge/i.test(text)).length;
+
+    expect(display.dialogueParagraphs).toHaveLength(0);
+    expect(actionTexts.some(text => /lira\s*:\s*couvre la sortie/i.test(text))).toBe(true);
+    expect(vexLineCount).toBe(1);
+  });
+
+  it('keeps standalone dialogue block for dialogue scenes', () => {
+    const chapter: StoryChapter = {
+      chapter_title: 'Interrogatoire discret',
+      chapter_number: 3,
+      section_type: 'dialogue',
+      narrative: {
+        context: '',
+        action: 'La pluie tambourine sur le toit de tôle.',
+        dialogue: `— Lira : Écoute-moi.
+      — Vex : On n'a pas beaucoup de temps.`,
+        reflection: '',
+        atmosphere: 'tense'
+      },
+      choices: [],
+      memory_updates: {
+        relations: [],
+        places: [],
+        injuries: [],
+        resources: [],
+        notes: []
+      },
+      scene_description: 'test',
+      user_edits_applied: null
+    };
+
+    const display = planDialogueDisplay(chapter);
+
+    expect(display.actionParagraphs.length).toBeGreaterThan(0);
+    expect(display.dialogueParagraphs.length).toBeGreaterThan(0);
   });
 });

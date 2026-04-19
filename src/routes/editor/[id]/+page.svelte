@@ -51,6 +51,7 @@
     buildSceneAnchor,
     enforceTransitionChoiceQuality,
     isNearDuplicateBackgroundEvent,
+    planDialogueDisplay,
     sanitizeNarrativeTextForDisplay,
     sanitizeChapterForDisplay,
     sanitizeChapterList,
@@ -91,6 +92,8 @@
   let generationError = '';
   let turnNumber = 0;
   let currentChapter: StoryChapter | null = null;
+  let dialogueDisplay: ReturnType<typeof planDialogueDisplay> = { actionParagraphs: [], dialogueParagraphs: [] };
+  let actionTagLabel = 'Action';
   let chapterHistory: StoryChapter[] = [];
   let actionHistory: string[] = [];
   let aiMessages: ChatMessage[] = [];
@@ -591,6 +594,10 @@
   $: activeSetupStep = SETUP_SCREENS[setupScreenIndex];
   $: isLastSetupStep = setupScreenIndex === SETUP_SCREENS.length - 1;
   $: providerMissing = !providerConfig;
+  $: dialogueDisplay = currentChapter
+    ? planDialogueDisplay(currentChapter)
+    : { actionParagraphs: [], dialogueParagraphs: [] };
+  $: actionTagLabel = currentChapter?.narrative.action ? 'Action' : 'Scène';
 
   function saveInteractiveSession(): void {
     const payload: InteractiveSessionPayload = {
@@ -1812,19 +1819,19 @@
                       </div>
                     {/if}
 
-                    {#if currentChapter.narrative.action}
+                    {#if dialogueDisplay.actionParagraphs.length}
                       <div class="n-block n-action">
-                        <span class="n-tag n-tag--action">Action</span>
-                        {#each splitNarrativeParagraphs(currentChapter.narrative.action) as para}
+                        <span class="n-tag n-tag--action">{actionTagLabel}</span>
+                        {#each dialogueDisplay.actionParagraphs as para}
                           <p class="n-paragraph" class:n-paragraph--dialogue={para.kind === 'dialogue'}>{para.text}</p>
                         {/each}
                       </div>
                     {/if}
 
-                    {#if currentChapter.narrative.dialogue}
+                    {#if dialogueDisplay.dialogueParagraphs.length}
                       <div class="n-block n-dialogue">
                         <span class="n-tag n-tag--dialogue">Dialogue</span>
-                        {#each splitNarrativeParagraphs(currentChapter.narrative.dialogue) as para}
+                        {#each dialogueDisplay.dialogueParagraphs as para}
                           <p class="n-paragraph">{para.text}</p>
                         {/each}
                       </div>
