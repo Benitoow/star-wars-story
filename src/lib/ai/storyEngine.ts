@@ -858,6 +858,62 @@ function resolveModel(config: StoryProviderConfig): string {
   return DEFAULT_MODELS[config.providerId] || DEFAULT_MODELS.openrouter;
 }
 
+
+// ── Model capability detection ─────────────────────────────────────────────
+
+type ModelTier = 'small' | 'medium' | 'large';
+type ReasoningStyle = 'openai-effort' | 'anthropic-thinking' | 'none';
+
+interface ModelCapabilities {
+  tier: ModelTier;
+  reasoningStyle: ReasoningStyle;
+  reasoningEffort: 'low' | 'medium' | 'high';
+  supportsNativeTools: boolean;
+  maxOutputTokens: number;
+  idealTemperature: number;
+}
+
+const DEFAULT_CAPS: ModelCapabilities = {
+  tier: 'small',
+  reasoningStyle: 'none',
+  reasoningEffort: 'low',
+  supportsNativeTools: false,
+  maxOutputTokens: 2000,
+  idealTemperature: 0.9
+};
+
+// Pattern → partial capabilities override (first match wins)
+const MODEL_CAPS_PATTERNS: Array<[RegExp, Partial<ModelCapabilities>]> = [
+  // Gemma 4 — small, reasoning capable
+  [/gemma-4/,                { tier: 'small',  reasoningStyle: 'openai-effort',      reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 2500, idealTemperature: 1.0 }],
+  // GPT-5.4 family
+  [/gpt-5\.4-mini/,         { tier: 'small',  reasoningStyle: 'openai-effort',      reasoningEffort: 'low',    supportsNativeTools: true, maxOutputTokens: 2400, idealTemperature: 1.0 }],
+  [/gpt-5\.4/,              { tier: 'medium', reasoningStyle: 'openai-effort',      reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3500, idealTemperature: 1.0 }],
+  // Claude Opus 4.x — large, extended thinking
+  [/claude-opus-4/,          { tier: 'large',  reasoningStyle: 'anthropic-thinking', reasoningEffort: 'high',   supportsNativeTools: true, maxOutputTokens: 4500, idealTemperature: 1.0 }],
+  // Claude Sonnet 4.x — medium, extended thinking
+  [/claude-sonnet-4/,        { tier: 'medium', reasoningStyle: 'anthropic-thinking', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3000, idealTemperature: 1.0 }],
+  // OpenAI o-series reasoning models
+  [/\/o[1-9][-/]|\/o4-mini/, { tier: 'large', reasoningStyle: 'openai-effort',     reasoningEffort: 'high',   supportsNativeTools: true, maxOutputTokens: 4000, idealTemperature: 1.0 }],
+  // Grok 3
+  [/grok-3-mini/,            { tier: 'small',  reasoningStyle: 'openai-effort',      reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 2400, idealTemperature: 1.0 }],
+  [/grok-3/,                 { tier: 'medium', reasoningStyle: 'openai-effort',      reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3000, idealTemperature: 1.0 }],
+  // Mistral medium/large
+  [/mistral-(medium|large)/,  { tier: 'medium', reasoningStyle: 'none',             reasoningEffort: 'low',    supportsNativeTools: true, maxOutputTokens: 2400, idealTemperature: 0.85 }],
+  // DeepSeek-R / Qwen thinking variants
+  [/deepseek-r|qwen.*think/,  { tier: 'medium', reasoningStyle: 'openai-effort',    reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 2800, idealTemperature: 1.0 }],
+];
+
+function detectModelCapabilities(config: StoryProviderConfig): ModelCapabilities {
+  const modelId = resolveModel(config).toLowerCase();
+  for (const [pattern, overrides] of MODEL_CAPS_PATTERNS) {
+    if (pattern.test(modelId)) {
+      return { ...DEFAULT_CAPS, ...overrides };
+    }
+  }
+  return DEFAULT_CAPS;
+}
+
 type OpenAiToolDefinition = {
   type: 'function';
   function: {
@@ -901,6 +957,7 @@ async function callOpenAiCompatibleRaw(
     toolChoice?: OpenAiToolChoice;
     maxTokens?: number;
     temperature?: number;
+    skipReasoning?: boolean;
   } = {}
 ): Promise<OpenAiMessage> {
   const baseUrl = OPENAI_COMPATIBLE_BASE_URLS[config.providerId];
@@ -919,12 +976,18 @@ async function callOpenAiCompatibleRaw(
     headers['X-Title'] = 'Star Wars Story Manager';
   }
 
+  const caps = detectModelCapabilities(config);
   const body: Record<string, unknown> = {
     model: resolveModel(config),
     messages,
-    max_tokens: options.maxTokens ?? 1800,
-    temperature: options.temperature ?? 0.9
+    max_tokens: options.maxTokens ?? caps.maxOutputTokens,
+    temperature: options.temperature ?? caps.idealTemperature
   };
+
+  // Inject reasoning for models that support it (OpenRouter / OpenAI-compatible)
+  if (caps.reasoningStyle === 'openai-effort' && !options.skipReasoning) {
+    body.reasoning = { effort: caps.reasoningEffort };
+  }
 
   if (options.tools?.length) {
     body.tools = options.tools;
@@ -961,7 +1024,7 @@ async function callOpenAiCompatible(messages: ChatMessage[], config: StoryProvid
   return cleanText(message.content, 12000);
 }
 
-const AGENTIC_TOOL_CALLING_PROVIDERS = new Set<string>(['openrouter']);
+const AGENTIC_TOOL_CALLING_PROVIDERS = new Set<string>(['openrouter', 'openai', 'mistral', 'grok']);
 const MAX_AGENTIC_STEPS = 8;
 
 const AGENTIC_GM_TOOLS: OpenAiToolDefinition[] = [
@@ -1696,6 +1759,7 @@ async function generateStoryTurnWithTools(
   const rawChunks: string[] = [];
   let totalToolCalls = 0;
   let steps = 0;
+  const stepCaps = detectModelCapabilities(config);
 
   for (let step = 1; step <= MAX_AGENTIC_STEPS; step += 1) {
     steps = step;
@@ -1703,8 +1767,9 @@ async function generateStoryTurnWithTools(
     const assistantMessage = await callOpenAiCompatibleRaw(conversation, config, {
       tools: AGENTIC_GM_TOOLS,
       toolChoice: 'auto',
-      maxTokens: 1300,
-      temperature: step === 1 ? 0.9 : 0.7
+      maxTokens: step === 1 ? stepCaps.maxOutputTokens : 900,
+      temperature: step === 1 ? stepCaps.idealTemperature : 0.7,
+      skipReasoning: step > 1
     });
 
     const assistantContent = cleanText(assistantMessage.content, 12000);
@@ -2070,12 +2135,21 @@ async function callAnthropic(messages: ChatMessage[], config: StoryProviderConfi
     .filter(message => message.role !== 'system')
     .map(message => ({ role: message.role, content: message.content }));
 
+  const caps = detectModelCapabilities(config);
   const body: Record<string, unknown> = {
     model: resolveModel(config),
-    max_tokens: 1800,
-    temperature: 0.9,
+    max_tokens: caps.maxOutputTokens,
     messages: conversation
   };
+
+  // Extended thinking for Claude 4+ models
+  if (caps.reasoningStyle === 'anthropic-thinking') {
+    const thinkingBudget = caps.tier === 'large' ? 8000 : 5000;
+    body.thinking = { type: 'enabled', budget_tokens: thinkingBudget };
+    body.temperature = 1; // Required with extended thinking
+  } else {
+    body.temperature = caps.idealTemperature;
+  }
 
   if (systemMessage?.content) {
     body.system = systemMessage.content;
@@ -2102,10 +2176,12 @@ async function callAnthropic(messages: ChatMessage[], config: StoryProviderConfi
     }
 
     const data = await response.json() as {
-      content?: Array<{ text?: string }>;
+      content?: Array<{ type?: string; text?: string; thinking?: string }>;
     };
 
-    return data.content?.[0]?.text || '';
+    // Extended thinking responses have multiple blocks: [{type:'thinking',...},{type:'text',...}]
+    const textBlock = data.content?.find(b => b.type === 'text');
+    return textBlock?.text || data.content?.[0]?.text || '';
   } finally {
     cancel();
   }
