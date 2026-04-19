@@ -1041,8 +1041,8 @@ const DEFAULT_CAPS: ModelCapabilities = {
 const MODEL_CAPS_PATTERNS: Array<[RegExp, Partial<ModelCapabilities>]> = [
   // Gemma 3 free — large, but usually too slow/limited for native agentic tools
   [/gemma-3-27b-it:free|gemma-3-27b-it/i, { tier: 'large', reasoningStyle: 'none', reasoningEffort: 'low', supportsNativeTools: false, maxOutputTokens: 2400, idealTemperature: 0.9 }],
-  // Gemma 4 — small, reasoning capable
-  [/gemma-4/,                { tier: 'small',  reasoningStyle: 'openai-effort',      reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 2500, idealTemperature: 1.0 }],
+  // Gemma 4 — reasoning capable but currently unstable on native tool-calling in production
+  [/gemma-4/,                { tier: 'small',  reasoningStyle: 'openai-effort',      reasoningEffort: 'medium', supportsNativeTools: false, maxOutputTokens: 2500, idealTemperature: 1.0 }],
   // GPT-5.4 family
   [/gpt-5\.4-mini/,         { tier: 'small',  reasoningStyle: 'openai-effort',      reasoningEffort: 'low',    supportsNativeTools: true, maxOutputTokens: 2400, idealTemperature: 1.0 }],
   [/gpt-5\.4/,              { tier: 'medium', reasoningStyle: 'openai-effort',      reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3500, idealTemperature: 1.0 }],
