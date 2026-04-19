@@ -335,22 +335,35 @@
         .filter(i => i.qty > 0);
     }
 
-    // NPCs: upsert by name
+    // NPCs: upsert by name — with generic-name deduplication
+    const GENERIC_NPC_RE = /^(l['']inconnu|l['']homme|la femme|un homme|une femme|le garde|l['']officier|le soldat|un individu|la silhouette|l['']étranger|un étranger)/i;
     let npcs = [...worldState.npcs];
     for (const npcUpd of upd.npcs ?? []) {
       const idx = npcs.findIndex(n => n.name.toLowerCase() === npcUpd.name.toLowerCase());
       if (idx >= 0) {
+        // Normal update
         npcs[idx] = { ...npcs[idx], ...npcUpd } as NpcRelation;
       } else {
-        npcs.push({
-          name: npcUpd.name,
-          affinity: npcUpd.affinity ?? 0,
-          status: npcUpd.status ?? 'neutral',
-          faction: npcUpd.faction,
-          last_seen: npcUpd.last_seen,
-          alive: npcUpd.alive !== false,
-          note: npcUpd.note
-        });
+        // Check if this is a "name reveal" of an existing generic/anonymous NPC
+        const newAff = npcUpd.affinity ?? 0;
+        const genericIdx = npcs.findIndex(n =>
+          GENERIC_NPC_RE.test(n.name) &&
+          Math.abs((n.affinity ?? 0) - newAff) <= 30
+        );
+        if (genericIdx >= 0) {
+          // Merge: rename the generic NPC entry instead of creating a duplicate
+          npcs[genericIdx] = { ...npcs[genericIdx], ...npcUpd } as NpcRelation;
+        } else {
+          npcs.push({
+            name: npcUpd.name,
+            affinity: npcUpd.affinity ?? 0,
+            status: npcUpd.status ?? 'neutral',
+            faction: npcUpd.faction,
+            last_seen: npcUpd.last_seen,
+            alive: npcUpd.alive !== false,
+            note: npcUpd.note
+          });
+        }
       }
     }
 
@@ -406,6 +419,25 @@
     }
 
     return { warning, diffBonus, disabled };
+  }
+
+  function buildSceneAnchor(ws: WorldState, lastChapter: StoryChapter): string {
+    const p = ws.player;
+    const hpLabel = p.hp >= 80 ? 'en forme' : p.hp >= 50 ? 'légèrement blessé' : p.hp >= 20 ? 'blessé' : 'état critique';
+    const injuryNote = p.injuries.length
+      ? `, blessures: ${p.injuries.map(i => i.description).join(', ')}`
+      : '';
+    const aliveNpcs = ws.npcs.filter(n => n.alive !== false).slice(0, 5);
+    const npcList = aliveNpcs.length
+      ? aliveNpcs.map(n => `${n.name} (${n.affinity > 30 ? 'allié' : n.affinity < -30 ? 'hostile' : 'neutre'})`).join(', ')
+      : 'aucun PNJ connu';
+    const lastText = (lastChapter.narrative.action || lastChapter.narrative.context || '').slice(0, 220);
+    return `## ANCRAGE SCÈNE — dernier chapitre: "${lastChapter.chapter_title}"
+Lieu actuel: ${p.location} | Date: ${p.date}
+Protagoniste: ${hpLabel} (${p.hp}/100 HP)${injuryNote} | Crédits: ₡${p.credits}
+PNJs connus: ${npcList}
+Dernière scène: "${lastText}${lastText.length >= 220 ? '…' : ''}"
+→ Continue DIRECTEMENT cette scène ou sa suite logique et immédiate.`;
   }
 
   function chapterLooksLikeTransition(chapter: StoryChapter): boolean {
@@ -1045,13 +1077,17 @@
         .slice(-5)
         .flatMap(chapter => chapter.choices.map(choice => choice.text));
 
+      const lastChapter = chapterHistory[chapterHistory.length - 1];
+      const sceneAnchor = lastChapter ? buildSceneAnchor(worldState, lastChapter) : '';
+
       const prompt = buildContinuePrompt(
         action,
         nextTurn,
         recentSummary,
         resolvePromptMode(),
         recentSectionTypes,
-        recentChoiceTexts
+        recentChoiceTexts,
+        sceneAnchor
       );
 
       const chapter = await requestStoryChapter(prompt, setup, nextTurn);
@@ -1332,20 +1368,23 @@
       on:back={() => goto('/')}
     >
       <div class="header-actions">
-        <button class="btn btn-ghost" on:click={startNewStory} disabled={generating || saving}>
-          Nouvelle
+        <button class="btn btn-ghost btn-icon-label" on:click={startNewStory} disabled={generating || saving} title="Nouvelle partie">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="15" height="15" aria-hidden="true">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          <span class="btn-text">Nouvelle</span>
         </button>
-        <button class="btn btn-secondary" on:click={handleSave} disabled={saving || generating}>
+        <button class="btn btn-secondary btn-icon-label" on:click={handleSave} disabled={saving || generating} title="Sauvegarder">
           {#if saving}
             <span class="spinner"></span>
           {:else}
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" aria-hidden="true">
               <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
               <polyline points="17,21 17,13 7,13 7,21"/>
               <polyline points="7,3 7,8 15,8"/>
             </svg>
           {/if}
-          Sauvegarder
+          <span class="btn-text">Sauvegarder</span>
         </button>
       </div>
     </PageHeader>
@@ -1681,186 +1720,199 @@
             </button>
           </div>
 
-          {#if generationError}
-            <div class="error-banner">{generationError}</div>
-          {/if}
-
-          {#if backgroundEvents.length > 0}
-            <section class="world-events-panel" aria-label="Événements galactiques hors écran">
-              <header class="world-events-header">
-                <h3>Mouvements de la galaxie</h3>
-                <span>{backgroundEvents.length}</span>
-              </header>
-              <div class="world-events-list">
-                {#each backgroundEvents.slice(0, 3) as event}
-                  <article class="world-event-item">
-                    <div class="world-event-meta">
-                      <span>Tour {event.turn}</span>
-                    </div>
-                    <strong>{event.title}</strong>
-                    <p>{event.summary}</p>
-                  </article>
-                {/each}
-              </div>
-            </section>
-          {/if}
-
           <!-- ── Living World HUD ───────────────────────── -->
           <GameHUD {worldState} bind:collapsed={hudCollapsed} {turnNumber} />
 
-          <!-- ── Loading overlay ─────────────────────────── -->
-          {#if generating}
-            <div class="play-generating" in:fly={{ y: 6, duration: 180 }}>
-              <div class="gen-dot-row">
-                <span></span><span></span><span></span>
-              </div>
-              <p>L'IA compose la suite…</p>
-            </div>
-          {/if}
+          <!-- ── Scrollable narrative zone ──────────────── -->
+          <div class="play-scroll-area">
 
-          {#if currentChapter}
-            <!-- ── Chapter card ──────────────────────────── -->
-            {#key currentChapter.chapter_number}
-              <article class="chapter-card" in:fly={{ y: 20, duration: 280, opacity: 0 }}>
-
-                <!-- Eyebrow + title -->
-                <header class="chapter-header">
-                  <div class="chapter-eyebrow">
-                    <span class="chapter-num">Chapitre {currentChapter.chapter_number || turnNumber}</span>
-                    <span class="chapter-sep">·</span>
-                    <span class="chapter-type">{currentChapter.section_type}</span>
-                  </div>
-                  <h2 class="chapter-title">{currentChapter.chapter_title}</h2>
-                </header>
-
-                <!-- Narrative flow -->
-                <div class="narrative">
-
-                  {#if currentChapter.narrative.context}
-                    <div class="n-block n-context">
-                      <span class="n-tag">Contexte</span>
-                      {#each textToParagraphs(currentChapter.narrative.context) as para}
-                        <p>{para}</p>
-                      {/each}
-                    </div>
-                  {/if}
-
-                  {#if currentChapter.narrative.action}
-                    <div class="n-block n-action">
-                      <span class="n-tag n-tag--action">Action</span>
-                      {#each textToParagraphs(currentChapter.narrative.action) as para}
-                        <p>{para}</p>
-                      {/each}
-                    </div>
-                  {/if}
-
-                  {#if currentChapter.narrative.dialogue}
-                    <div class="n-block n-dialogue">
-                      <span class="n-tag n-tag--dialogue">Dialogue</span>
-                      {#each textToParagraphs(currentChapter.narrative.dialogue) as para}
-                        <p>{para}</p>
-                      {/each}
-                    </div>
-                  {/if}
-
-                  {#if currentChapter.narrative.reflection}
-                    <div class="n-block n-reflection">
-                      <span class="n-tag n-tag--reflection">Réflexion</span>
-                      {#each textToParagraphs(currentChapter.narrative.reflection) as para}
-                        <p>{para}</p>
-                      {/each}
-                    </div>
-                  {/if}
-
-                </div>
-              </article>
-            {/key}
-
-            <!-- ── Choices ────────────────────────────────── -->
-            {#if currentChapter.choices.length > 0}
-              <section class="choices-section">
-                <h3 class="choices-heading">Que faites-vous ?</h3>
-                <div class="choice-list">
-                  {#each currentChapter.choices as choice, i}
-                    {@const cons = choiceConsequences(choice)}
-                    <button
-                      class="choice-btn"
-                      class:choice-danger={cons.diffBonus > 0}
-                      class:choice-disabled={cons.disabled}
-                      on:click={() => !cons.disabled && handleChoice(choice)}
-                      disabled={generating || cons.disabled}
-                    >
-                      <span class="choice-key">{String.fromCharCode(65 + i)}</span>
-                      <span class="choice-content">
-                        <span class="choice-text">{choice.text}</span>
-                        <span class="choice-meta">
-                          <span class="choice-attr">{choice.attribute}</span>
-                          <span class="choice-pips">
-                            {#each Array(5) as _, d}
-                              <span class="pip" class:on={d < choice.difficulty + cons.diffBonus}
-                                class:pip-bonus={d >= choice.difficulty && d < choice.difficulty + cons.diffBonus}></span>
-                            {/each}
-                          </span>
-                          {#if cons.warning}
-                            <span class="choice-warning">{cons.warning}</span>
-                          {/if}
-                        </span>
-                      </span>
-                    </button>
-                  {/each}
-                </div>
-              </section>
+            {#if generationError}
+              <div class="error-banner">{generationError}</div>
             {/if}
 
-            <!-- ── Custom action ──────────────────────────── -->
-            <form class="custom-form" on:submit|preventDefault={handleCustomActionSubmit}>
-              <label class="custom-label" for="custom-action">— ou jouez librement</label>
-              <div class="custom-row">
-                <textarea
-                  id="custom-action"
-                  class="custom-input"
-                  bind:value={customAction}
-                  placeholder="Décrivez votre action…"
-                  rows="2"
-                  disabled={generating}
-                ></textarea>
-                <button
-                  class="custom-send"
-                  type="submit"
-                  disabled={generating || !customAction.trim()}
-                  title="Envoyer"
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16">
-                    <line x1="22" y1="2" x2="11" y2="13"/>
-                    <polygon points="22,2 15,22 11,13 2,9"/>
-                  </svg>
-                </button>
-              </div>
-            </form>
-
-            <!-- ── Memory panel ───────────────────────────── -->
-            <details class="memory-panel">
-              <summary>
-                <svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13"><path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"/></svg>
-                Mémoire IA <span class="mem-count">({memoryLog.length})</span>
-              </summary>
-              {#if memoryLog.length}
-                <ul class="mem-list">
-                  {#each [...memoryLog].reverse().slice(0, 25) as item}
-                    <li>{item}</li>
+            {#if backgroundEvents.length > 0}
+              <details class="world-events-panel" aria-label="Événements galactiques hors écran">
+                <summary class="world-events-header">
+                  <h3>Mouvements de la galaxie</h3>
+                  <span class="world-events-count">{backgroundEvents.length}</span>
+                </summary>
+                <div class="world-events-list">
+                  {#each backgroundEvents.slice(0, 3) as event}
+                    <article class="world-event-item">
+                      <div class="world-event-meta">
+                        <span>Tour {event.turn}</span>
+                      </div>
+                      <strong>{event.title}</strong>
+                      <p>{event.summary}</p>
+                    </article>
                   {/each}
-                </ul>
-              {:else}
-                <p class="memory-empty">La mémoire se remplit au fil des tours.</p>
-              {/if}
-            </details>
+                </div>
+              </details>
+            {/if}
 
-          {:else}
-            <div class="play-empty">
-              <p>Aucun chapitre actif. Retournez à la configuration pour lancer l'aventure.</p>
-              <button class="btn btn-primary" on:click={goBackToSetupFromPlay}>Retour à la configuration</button>
-            </div>
+            <!-- ── Loading indicator ───────────────────── -->
+            {#if generating}
+              <div class="play-generating" in:fly={{ y: 6, duration: 180 }}>
+                <div class="gen-dot-row">
+                  <span></span><span></span><span></span>
+                </div>
+                <p>L'IA compose la suite…</p>
+              </div>
+            {/if}
+
+            {#if currentChapter}
+              <!-- ── Chapter card ────────────────────────── -->
+              {#key currentChapter.chapter_number}
+                <article class="chapter-card" in:fly={{ y: 20, duration: 280, opacity: 0 }}>
+
+                  <!-- Eyebrow + title -->
+                  <header class="chapter-header">
+                    <div class="chapter-eyebrow">
+                      <span class="chapter-num">Tour {currentChapter.chapter_number || turnNumber}</span>
+                      <span class="chapter-sep">·</span>
+                      <span class="chapter-type">{currentChapter.section_type}</span>
+                    </div>
+                    <h2 class="chapter-title">{currentChapter.chapter_title}</h2>
+                  </header>
+
+                  <!-- Narrative flow -->
+                  <div class="narrative">
+
+                    {#if currentChapter.narrative.context}
+                      <div class="n-block n-context">
+                        <span class="n-tag">Contexte</span>
+                        {#each textToParagraphs(currentChapter.narrative.context) as para}
+                          <p>{para}</p>
+                        {/each}
+                      </div>
+                    {/if}
+
+                    {#if currentChapter.narrative.action}
+                      <div class="n-block n-action">
+                        <span class="n-tag n-tag--action">Action</span>
+                        {#each textToParagraphs(currentChapter.narrative.action) as para}
+                          <p>{para}</p>
+                        {/each}
+                      </div>
+                    {/if}
+
+                    {#if currentChapter.narrative.dialogue}
+                      <div class="n-block n-dialogue">
+                        <span class="n-tag n-tag--dialogue">Dialogue</span>
+                        {#each textToParagraphs(currentChapter.narrative.dialogue) as para}
+                          <p>{para}</p>
+                        {/each}
+                      </div>
+                    {/if}
+
+                    {#if currentChapter.narrative.reflection}
+                      <div class="n-block n-reflection">
+                        <span class="n-tag n-tag--reflection">Réflexion</span>
+                        {#each textToParagraphs(currentChapter.narrative.reflection) as para}
+                          <p>{para}</p>
+                        {/each}
+                      </div>
+                    {/if}
+
+                  </div>
+                </article>
+              {/key}
+
+              <!-- ── Memory panel (in scroll area) ─────── -->
+              <details class="memory-panel">
+                <summary>
+                  <svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13"><path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"/></svg>
+                  Mémoire IA <span class="mem-count">({memoryLog.length})</span>
+                </summary>
+                {#if memoryLog.length}
+                  <ul class="mem-list">
+                    {#each [...memoryLog].reverse().slice(0, 25) as item}
+                      <li>{item}</li>
+                    {/each}
+                  </ul>
+                {:else}
+                  <p class="memory-empty">La mémoire se remplit au fil des tours.</p>
+                {/if}
+              </details>
+
+            {:else}
+              <div class="play-empty">
+                <p>Aucun chapitre actif. Retournez à la configuration pour lancer l'aventure.</p>
+                <button class="btn btn-primary" on:click={goBackToSetupFromPlay}>Retour à la configuration</button>
+              </div>
+            {/if}
+
+          </div><!-- /.play-scroll-area -->
+
+          <!-- ── Action zone (sticky to bottom on mobile) ── -->
+          {#if currentChapter}
+            <div class="play-action-zone">
+
+              <!-- Choices -->
+              {#if currentChapter.choices.length > 0}
+                <section class="choices-section">
+                  <h3 class="choices-heading">Que faites-vous ?</h3>
+                  <div class="choice-list">
+                    {#each currentChapter.choices as choice, i}
+                      {@const cons = choiceConsequences(choice)}
+                      <button
+                        class="choice-btn"
+                        class:choice-danger={cons.diffBonus > 0}
+                        class:choice-disabled={cons.disabled}
+                        on:click={() => !cons.disabled && handleChoice(choice)}
+                        disabled={generating || cons.disabled}
+                      >
+                        <span class="choice-key">{String.fromCharCode(65 + i)}</span>
+                        <span class="choice-content">
+                          <span class="choice-text">{choice.text}</span>
+                          <span class="choice-meta">
+                            <span class="choice-attr">{choice.attribute}</span>
+                            <span class="choice-pips">
+                              {#each Array(5) as _, d}
+                                <span class="pip" class:on={d < choice.difficulty + cons.diffBonus}
+                                  class:pip-bonus={d >= choice.difficulty && d < choice.difficulty + cons.diffBonus}></span>
+                              {/each}
+                            </span>
+                            {#if cons.warning}
+                              <span class="choice-warning">{cons.warning}</span>
+                            {/if}
+                          </span>
+                        </span>
+                      </button>
+                    {/each}
+                  </div>
+                </section>
+              {/if}
+
+              <!-- Custom action -->
+              <form class="custom-form" on:submit|preventDefault={handleCustomActionSubmit}>
+                <label class="custom-label" for="custom-action">— ou jouez librement</label>
+                <div class="custom-row">
+                  <textarea
+                    id="custom-action"
+                    class="custom-input"
+                    bind:value={customAction}
+                    placeholder="Décrivez votre action…"
+                    rows="2"
+                    disabled={generating}
+                  ></textarea>
+                  <button
+                    class="custom-send"
+                    type="submit"
+                    disabled={generating || !customAction.trim()}
+                    title="Envoyer"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16">
+                      <line x1="22" y1="2" x2="11" y2="13"/>
+                      <polygon points="22,2 15,22 11,13 2,9"/>
+                    </svg>
+                  </button>
+                </div>
+              </form>
+
+            </div><!-- /.play-action-zone -->
           {/if}
+
         </div>
       {/if}
     </div>
@@ -2373,6 +2425,26 @@
     }
   }
 
+  /* Scroll / action zone wrappers — desktop: regular flex columns */
+  .play-scroll-area {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xl);
+  }
+
+  .play-action-zone {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xl);
+  }
+
+  /* Header icon-label buttons */
+  .btn-icon-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
   .world-events-panel {
     border: 1px solid color-mix(in srgb, var(--color-gold) 25%, var(--color-border));
     background: color-mix(in srgb, var(--color-gold) 4%, var(--color-bg-secondary));
@@ -2383,11 +2455,16 @@
     gap: var(--space-sm);
   }
 
+  .world-events-panel summary { list-style: none; }
+  .world-events-panel summary::-webkit-details-marker { display: none; }
+
   .world-events-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: var(--space-sm);
+    cursor: pointer;
+    user-select: none;
   }
 
   .world-events-header h3 {
@@ -2398,7 +2475,7 @@
     color: var(--color-text-muted);
   }
 
-  .world-events-header span {
+  .world-events-count {
     font-size: 0.7rem;
     color: var(--color-text-muted);
     border: 1px solid var(--color-border);
@@ -3022,41 +3099,109 @@
   /* ── Mobile (≤ 768px) ────────────────────── */
   @media (max-width: 768px) {
 
-    /* Topbar play */
-    .play-topbar {
-      flex-wrap: wrap;
-      gap: 6px;
-      padding: 8px 12px;
+    /* ── Header: icon-only buttons ─────────── */
+    .btn-text { display: none; }
+    .header-actions { gap: 6px; }
+    .btn-icon-label { padding: 8px 10px; }
+
+    /* ── editor-content: remove padding, allow flex ── */
+    .editor-content {
+      padding: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
     }
-    .model-chip { font-size: 0.65rem; }
+
+    /* ── Play shell: messenger layout ──────── */
+    .play-shell {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      padding: 0;
+      padding-bottom: 0;
+      max-width: 100%;
+      margin: 0;
+    }
+
+    /* Topbar: compact strip */
+    .play-topbar {
+      flex-shrink: 0;
+      flex-wrap: nowrap;
+      gap: 6px;
+      padding: 8px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      overflow: hidden;
+    }
+    .model-chip {
+      font-size: 0.63rem;
+      max-width: 120px;
+    }
+
+    /* Narrative scroll zone: fills all available height */
+    .play-scroll-area {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 12px 14px 8px;
+    }
+
+    /* Action zone: sticky at bottom, always visible */
+    .play-action-zone {
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 12px 14px max(14px, env(safe-area-inset-bottom));
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(8, 8, 12, 0.97);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: 0 -10px 28px rgba(0, 0, 0, 0.45);
+    }
 
     /* Chapter header & narrative */
-    .chapter-header { padding: 16px 16px 10px; }
-    .narrative { padding: 0 16px 16px; max-width: none; }
-    .chapter-title { font-size: 1.4rem; }
+    .chapter-header { padding: 14px 14px 10px; }
+    .chapter-title { font-size: 1.25rem; }
+    .narrative { padding: 0 14px 12px; max-width: none; }
+    .n-block p { line-height: 1.7; font-size: 0.97rem; }
+    .n-dialogue { padding: var(--space-xs) var(--space-sm); }
 
-    /* Choice buttons — touch-friendly */
-    .choice-btn {
-      min-height: 56px;
-      font-size: 0.9rem;
-    }
-    .choice-content {
-      padding: 14px var(--space-md);
-    }
+    /* World events: collapsed by default on mobile */
+    .world-events-panel .world-events-list { margin-top: 8px; }
 
-    /* Custom action form */
-    .custom-row {
-      flex-direction: column;
-      gap: 8px;
-    }
+    /* Choice buttons: bigger touch targets */
+    .choice-btn { min-height: 56px; }
+    .choice-content { padding: 12px 12px; }
+    .choice-text { font-size: 0.88rem; }
+    .choices-heading { font-size: 0.88rem; }
+
+    /* Custom action form: stacked */
+    .custom-row { flex-direction: row; gap: 8px; }
     .custom-input {
-      width: 100%;
-      font-size: 16px; /* évite zoom iOS */
+      font-size: 16px; /* prevent iOS zoom */
+      rows: 1;
+      min-height: 44px;
+      padding: 10px 12px;
     }
     .custom-send {
-      width: 100%;
+      width: 44px;
       height: 44px;
+      flex-shrink: 0;
     }
+    .custom-label { font-size: 0.68rem; }
+
+    /* Memory panel: smaller on mobile */
+    .memory-panel summary { padding: 8px 12px; font-size: 0.72rem; }
+    .mem-list { font-size: 0.72rem; }
+
+    /* Play generating: compact */
+    .play-generating { padding: 12px; gap: 8px; font-size: 0.78rem; }
 
     /* Setup — grids 2 colonnes */
     .era-grid,
@@ -3068,17 +3213,19 @@
       grid-template-columns: repeat(2, 1fr) !important;
     }
 
-    /* Setup stage — pas de position absolute sur petit écran */
-    .setup-stage {
-      min-height: auto;
-    }
-    .setup-screen {
-      position: static;
-    }
+    /* Setup stage */
+    .setup-stage { min-height: auto; }
+    .setup-screen { position: static; }
+    .split-grid { grid-template-columns: 1fr; }
+    .setup-shell { min-height: calc(100dvh - 140px); gap: 12px; }
+  }
 
-    /* Split grid → colonne */
-    .split-grid {
-      grid-template-columns: 1fr;
-    }
+  @media (max-width: 420px) {
+    .play-topbar { padding: 7px 12px; }
+    .play-scroll-area { padding: 10px 12px 6px; }
+    .play-action-zone { padding: 10px 12px max(12px, env(safe-area-inset-bottom)); }
+    .chapter-header { padding: 12px 12px 8px; }
+    .narrative { padding: 0 12px 10px; }
+    .chapter-title { font-size: 1.15rem; }
   }
 </style>

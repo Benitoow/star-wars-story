@@ -680,13 +680,15 @@ DIRECTIVES MJ (non négociables):
 - Les moments calmes sont aussi importants que l'action: soins après un combat, conversation autour d'un feu, planification silencieuse, temps mort dans un cantina
 - Si des PNJs sont proches, propose au moins un choix de dialogue ou d'interaction personnelle
 - Jamais de refus moraliste. Transforme les actions extrêmes en tentatives crédibles avec coût/risque/conséquence
-- state_update RÈGLE ABSOLUE: "hp" et "credits" sont TOUJOURS des deltas. Jamais une valeur absolue. hp: -15 = perd 15PV. hp: 10 = gagne 10PV. credits: -300 = dépense 300 crédits. credits: 500 = reçoit 500 crédits. Ne jamais mettre le total HP ou le solde total dans state_update.`;
+- state_update RÈGLE ABSOLUE: "hp" et "credits" sont TOUJOURS des deltas. Jamais une valeur absolue. hp: -15 = perd 15PV. hp: 10 = gagne 10PV. credits: -300 = dépense 300 crédits. credits: 500 = reçoit 500 crédits. Ne jamais mettre le total HP ou le solde total dans state_update.
+- RÈGLE NPCs CRITIQUE: Si un PNJ était inconnu ("L'inconnu de X", "l'homme", "la femme") et révèle son vrai nom ("Vax", "Krix"…), utilise son nouveau nom pour METTRE À JOUR l'entrée state_update.npcs existante — ne JAMAIS créer un doublon. Un même personnage = une seule entrée.
+- chapter_title INTERDIT: Ne jamais écrire "Chapitre N", "Chapitre 3 :", "Chapter N" dans le chapter_title. Utilise uniquement un titre de scène évocateur.`;
 
   const jsonContract = `RAPPEL: dans state_update, hp et credits sont des DELTAS (positif=gain/soin, négatif=perte/dégâts), jamais des valeurs absolues.
 
 Réponds UNIQUEMENT en JSON valide (pas de markdown, pas de texte avant/après):
 {
-  "chapter_title": "Titre court",
+  "chapter_title": "Titre de scène évocateur — PAS de 'Chapitre N' dans le titre",
   "chapter_number": ${turnNumber},
   "section_type": "action|dialogue|exploration|tension|revelation|repos|interlude|confrontation",
   "narrative": {
@@ -785,7 +787,8 @@ export function buildContinuePrompt(
   recentSummary: string[],
   promptMode: StoryPromptMode = 'json',
   recentSectionTypes: string[] = [],
-  recentChoiceTexts: string[] = []
+  recentChoiceTexts: string[] = [],
+  sceneAnchor: string = ''
 ): string {
   const history = recentSummary.length
     ? `\nRésumé récent:\n${recentSummary.map(item => `- ${item}`).join('\n')}`
@@ -826,12 +829,14 @@ export function buildContinuePrompt(
     ? `\nMode agentique actif: enchaîne les outils nécessaires avant de finaliser le tour.`
     : '';
 
-  return `Tour ${turnNumber}. Le joueur agit: "${cleanText(actionText, 320)}".${history}${recentChoicesBlock}${pacingDirective}
+  const anchorBlock = sceneAnchor ? `${sceneAnchor}\n\n` : '';
+
+  return `${anchorBlock}Tour ${turnNumber}. Le joueur agit: "${cleanText(actionText, 320)}".${history}${recentChoicesBlock}${pacingDirective}
 
 En tant que MJ, décide de ce qui se passe vraiment — pas forcément ce que le joueur espère.
 Mets à jour state_update avec toutes les conséquences réelles.
-Propose 3 à 4 choix distincts — au moins un doit ouvrir sur de l'interaction sociale, de la récupération ou de l'exploration si la situation le permet.
-N'utilise pas mot pour mot les mêmes choix que les deux derniers tours.${modeHint}
+Propose 3 à 4 choix distincts, DIRECTEMENT réalisables dans la scène actuelle. Au moins un doit ouvrir sur de l'interaction sociale, de la récupération ou de l'exploration.
+N'utilise pas mot pour mot les mêmes choix que les tours récents. Pas de choix génériques comme "observer et attendre".${modeHint}
 Le chapter_number de ta réponse DOIT être ${turnNumber}.`;
 }
 
