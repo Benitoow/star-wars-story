@@ -570,6 +570,36 @@ export function coerceStateUpdate(source: unknown): StateUpdate | undefined {
       .filter(i => i.name);
   }
 
+  if (Array.isArray(d.clocks_new)) {
+    update.clocks_new = d.clocks_new
+      .filter((c): c is Record<string, unknown> => !!c && typeof c === 'object')
+      .map(c => ({ name: cleanText(c.name, 60), max_steps: Math.max(1, Number(c.max_steps) || 4) }))
+      .filter(c => c.name);
+  }
+
+  if (d.clocks_advance && typeof d.clocks_advance === 'object' && !Array.isArray(d.clocks_advance)) {
+    const cmap: Record<string, number> = {};
+    for (const [k, v] of Object.entries(d.clocks_advance as Record<string, unknown>)) {
+      const n = Number(v);
+      if (Number.isFinite(n)) cmap[k] = Math.max(-10, Math.min(10, n));
+    }
+    if (Object.keys(cmap).length) update.clocks_advance = cmap;
+  }
+
+  if (d.sector_influence && typeof d.sector_influence === 'object' && !Array.isArray(d.sector_influence)) {
+    const smap: Record<string, number> = {};
+    for (const [k, v] of Object.entries(d.sector_influence as Record<string, unknown>)) {
+      const n = Number(v);
+      if (Number.isFinite(n)) smap[k] = Math.max(-100, Math.min(100, n));
+    }
+    if (Object.keys(smap).length) update.sector_influence = smap;
+  }
+
+  if (Array.isArray(d.rumors_new)) update.rumors_new = uniqueStrings(d.rumors_new, 5);
+
+  if (typeof d.environment_status === 'string') update.environment_status = cleanText(d.environment_status, 120);
+  if (typeof d.director_instruction === 'string') update.director_instruction = cleanText(d.director_instruction, 220);
+
   return Object.keys(update).length ? update : undefined;
 }
 

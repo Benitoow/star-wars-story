@@ -17,6 +17,10 @@
     .filter(([, v]) => Math.abs(v) >= 10)
     .sort(([, a], [, b]) => Math.abs(b) - Math.abs(a))
     .slice(0, 3);
+  $: activeClocks = Object.entries(worldState.clocks ?? {});
+  $: sectorInfluences = Object.entries(worldState.sector_influence ?? {});
+  $: activeRumors = worldState.rumors ?? [];
+  $: environmentStatus = worldState.environment_status;
 
   const FACTION_LABELS: Record<string, string> = {
     empire: 'Empire', rebel_alliance: 'Alliance Rebelle', jedi_order: 'Ordre Jedi',
@@ -115,6 +119,40 @@
         </div>
       {/if}
 
+      {#if environmentStatus}
+        <div class="hud-row hud-environment">
+          <span class="hud-icon">⛈️</span>
+          <span class="hud-text" title={environmentStatus}>{environmentStatus}</span>
+        </div>
+      {/if}
+
+      <!-- Rumors -->
+      {#if activeRumors.length > 0}
+        <div class="hud-section-label">Rumeurs</div>
+        {#each activeRumors as rumor}
+          <div class="hud-row hud-rumor">
+            <span class="hud-icon">🗣️</span>
+            <span class="hud-text dim" title={rumor}>{rumor}</span>
+          </div>
+        {/each}
+      {/if}
+
+      <!-- Clocks -->
+      {#if activeClocks.length > 0}
+        <div class="hud-section-label">Tensions</div>
+        {#each activeClocks as [id, c]}
+          <div class="hud-row hud-clock">
+            <span class="hud-icon">⏱️</span>
+            <span class="hud-text" title={id}>{id}</span>
+            <div class="clock-track">
+               {#each Array.from({ length: c.max }) as _, i}
+                 <div class="clock-tick" class:filled={i < c.current}></div>
+               {/each}
+            </div>
+          </div>
+        {/each}
+      {/if}
+
       {#if playerRoleLabel || playerFactionLabel}
         <div class="hud-section-label">Identité</div>
         {#if playerRoleLabel}
@@ -177,6 +215,20 @@
             {/if}
             <span class="faction-status">{factionReputationLabel(score)}</span>
             <span class="faction-score" style="color:{score > 0 ? '#4ade80' : '#f87171'}">{score > 0 ? '+' : ''}{score}</span>
+          </div>
+        {/each}
+      {/if}
+
+      <!-- Sector Influence -->
+      {#if sectorInfluences.length > 0}
+        <div class="hud-section-label">Influence Secteur</div>
+        {#each sectorInfluences as [id, pct]}
+          <div class="hud-row hud-faction">
+            <div class="faction-bar-track">
+              <div class="faction-bar-fill" style="width:{pct}%; background:#3b82f6"></div>
+            </div>
+            <span class="faction-label">{factionLabel(id)}</span>
+            <span class="faction-score" style="color:#60a5fa">{pct}%</span>
           </div>
         {/each}
       {/if}
@@ -380,6 +432,28 @@
     font-size: 0.65rem;
     font-weight: 600;
     flex-shrink: 0;
+  }
+
+  /* Clocks */
+  .clock-track {
+    display: flex;
+    gap: 3px;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+
+  .clock-tick {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 232, 31, 0.4);
+    background: transparent;
+  }
+
+  .clock-tick.filled {
+    background: #f87171;
+    border-color: #f87171;
+    box-shadow: 0 0 5px rgba(248, 113, 113, 0.5);
   }
 
   /* Turn capsule */

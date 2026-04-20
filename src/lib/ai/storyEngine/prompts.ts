@@ -65,6 +65,12 @@ export function buildSystemPrompt(
       .map(([id, score]) => `  • ${id}: ${score > 0 ? '+' : ''}${score}`)
       .join('\n') || '  (neutre partout)';
 
+    const envStr = worldState.environment_status ? `\nCondition Environnementale:\n  • ${worldState.environment_status}` : '';
+    const clocksStr = Object.keys(worldState.clocks || {}).length ? `\nHorloges de Tension:\n${Object.entries(worldState.clocks || {}).map(([id, c]) => `  • ${id} [${c.current}/${c.max}]`).join('\n')}` : '';
+    const rumorsStr = (worldState.rumors || []).length ? `\nRumeurs locales:\n${(worldState.rumors || []).map(r => `  • ${r}`).join('\n')}` : '';
+    const sectorsStr = Object.keys(worldState.sector_influence || {}).length ? `\nInfluence Sectorielle:\n${Object.entries(worldState.sector_influence || {}).map(([id, val]) => `  • ${id}: ${val}%`).join('\n')}` : '';
+    const directorStr = worldState.director_instruction ? `\n\nDIRECTIVE DU DIRECTEUR DE JEU (OBLIGATOIRE):\n" ${worldState.director_instruction} "` : '';
+
     worldBlock = `
 ÉTAT DU MONDE ACTUEL:
 Protagoniste: ${protagonist}
@@ -77,7 +83,7 @@ ${inventoryLines}
 PNJs connus:
 ${npcLines}${deadLines}
 Réputation par faction:
-${factionLines}`;
+${factionLines}${envStr}${clocksStr}${sectorsStr}${rumorsStr}${directorStr}`;
   }
 
   // ── Memory block ──────────────────────────────

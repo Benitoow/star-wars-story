@@ -40,6 +40,8 @@ export interface NpcRelation {
   status: 'ally' | 'neutral' | 'hostile' | 'dead' | 'unknown';
   faction?: string;
   last_seen?: string;
+  current_location?: string;
+  current_goal?: string;
   alive: boolean;
   note?: string;
 }
@@ -56,6 +58,11 @@ export interface WorldState {
   npcs: NpcRelation[];
   factions: Record<string, number>;  // faction_id → -100..100
   chronology: ChronologyEntry[];
+  clocks?: Record<string, { current: number; max: number }>;
+  sector_influence?: Record<string, number>;
+  rumors?: string[];
+  environment_status?: string;
+  director_instruction?: string;
 }
 
 export interface StateUpdate {
@@ -69,6 +76,12 @@ export interface StateUpdate {
   injuries_resolved?: string[];       // partial match on description
   inventory_gained?: { name: string; qty: number }[];
   inventory_lost?: { name: string; qty: number }[];
+  clocks_new?: { name: string; max_steps: number }[];
+  clocks_advance?: Record<string, number>; // name -> delta
+  sector_influence?: Record<string, number>; // faction_id -> delta
+  rumors_new?: string[];
+  environment_status?: string;
+  director_instruction?: string;
   gm_note?: string;  // private GM note (not shown to player)
 }
 

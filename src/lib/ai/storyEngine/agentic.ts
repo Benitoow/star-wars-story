@@ -84,6 +84,21 @@ function mergeStateUpdates(base: StateUpdate | undefined, patch: StateUpdate | u
     for (const [id, delta] of Object.entries(patch.factions ?? {})) factionIndex[id] = (factionIndex[id] ?? 0) + delta;
     merged.factions = factionIndex;
   }
+  if (base.clocks_new || patch.clocks_new) merged.clocks_new = [...(base.clocks_new ?? []), ...(patch.clocks_new ?? [])];
+  if (base.clocks_advance || patch.clocks_advance) {
+    const clockAdv: Record<string, number> = { ...(base.clocks_advance ?? {}) };
+    for (const [id, delta] of Object.entries(patch.clocks_advance ?? {})) clockAdv[id] = (clockAdv[id] ?? 0) + delta;
+    merged.clocks_advance = clockAdv;
+  }
+  if (base.sector_influence || patch.sector_influence) {
+    const sectInf: Record<string, number> = { ...(base.sector_influence ?? {}) };
+    for (const [id, delta] of Object.entries(patch.sector_influence ?? {})) sectInf[id] = (sectInf[id] ?? 0) + delta;
+    merged.sector_influence = sectInf;
+  }
+  merged.rumors_new = mergeStringLists(base.rumors_new ?? [], patch.rumors_new ?? []);
+  if (patch.environment_status !== undefined) merged.environment_status = patch.environment_status;
+  if (patch.director_instruction !== undefined) merged.director_instruction = patch.director_instruction;
+
   merged.injuries_resolved = mergeStringLists(base.injuries_resolved ?? [], patch.injuries_resolved ?? []);
   merged.injuries_new = [...(base.injuries_new ?? []), ...(patch.injuries_new ?? [])].filter(entry => cleanText(entry.description, 120));
   merged.inventory_gained = mergeInventoryEntries(base.inventory_gained, patch.inventory_gained);
@@ -214,6 +229,9 @@ function draftHasWorldSignals(draft: AgenticDraft): boolean {
     if (Object.keys(state.factions ?? {}).length > 0) return true;
     if (state.hp !== undefined || state.credits !== undefined || state.date_advance) return true;
     if ((state.injuries_new ?? []).length > 0 || (state.inventory_gained ?? []).length > 0 || (state.inventory_lost ?? []).length > 0) return true;
+    if ((state.clocks_new ?? []).length > 0 || Object.keys(state.clocks_advance ?? {}).length > 0) return true;
+    if (Object.keys(state.sector_influence ?? {}).length > 0 || (state.rumors_new ?? []).length > 0) return true;
+    if (state.environment_status || state.director_instruction) return true;
   }
   return draft.memory_updates.relations.length > 0 || draft.memory_updates.places.length > 0;
 }
@@ -494,7 +512,7 @@ const AGENTIC_GM_TOOLS: any[] = [
 ];
 
 const AGENTIC_BACKGROUND_TOOLS: any[] = [
-  { type: 'function', function: { name: 'queue_world_event', description: 'Crée ou met à jour un événement hors-écran du monde.', parameters: { type: 'object', properties: { title: { type: 'string' }, summary_public: { type: 'string' }, summary_private: { type: 'string' }, inject_now: { type: 'boolean' }, prompt_hook: { type: 'string' }, memory_updates: { type: 'object' }, state_update: { type: 'object' }, hp: { type: 'number' }, credits: { type: 'number' }, location: { type: 'string' }, date_advance: { type: 'string' }, npcs: { type: 'array' }, factions: { type: 'object' }, injuries_new: { type: 'array' }, injuries_resolved: { type: 'array' }, inventory_gained: { type: 'array' }, inventory_lost: { type: 'array' } } } } },
+  { type: 'function', function: { name: 'queue_world_event', description: 'Crée ou met à jour un événement hors-écran du monde.', parameters: { type: 'object', properties: { title: { type: 'string' }, summary_public: { type: 'string' }, summary_private: { type: 'string' }, inject_now: { type: 'boolean' }, prompt_hook: { type: 'string' }, memory_updates: { type: 'object' }, state_update: { type: 'object' }, hp: { type: 'number' }, credits: { type: 'number' }, location: { type: 'string' }, date_advance: { type: 'string' }, npcs: { type: 'array' }, factions: { type: 'object' }, injuries_new: { type: 'array' }, injuries_resolved: { type: 'array' }, inventory_gained: { type: 'array' }, inventory_lost: { type: 'array' }, clocks_new: { type: 'array' }, clocks_advance: { type: 'object' }, sector_influence: { type: 'object' }, rumors_new: { type: 'array' }, environment_status: { type: 'string' }, director_instruction: { type: 'string' } } } } },
   { type: 'function', function: { name: 'finalize_background_tick', description: 'Termine le tick de monde hors-écran.', parameters: { type: 'object', properties: { done: { type: 'boolean' }, reason: { type: 'string' } } } } }
 ];
 
@@ -508,9 +526,14 @@ function buildBackgroundWorldSystemPrompt(input: BackgroundWorldInput, promptMod
     const p = input.worldState.player;
     const topFactions = Object.entries(input.worldState.factions).sort(([, left], [, right]) => right - left).slice(0, 5).map(([id, score]) => `${id}=${score > 0 ? '+' : ''}${score}`).join(', ');
     const npcs = input.worldState.npcs.filter(npc => npc.alive !== false).slice(0, 8).map(npc => `${npc.name}(${npc.status}, aff=${npc.affinity})`).join(', ');
-    worldBlock = `\nÉTAT MONDE:\n- HP=${p.hp}/100 | Crédits=${p.credits}\n- Lieu=${p.location} | Date=${p.date}\n- PNJs=${npcs || 'aucun'}\n- Factions=${topFactions || 'neutre'}`;
+    const envStr = input.worldState.environment_status ? `\n- Météo/Env=${input.worldState.environment_status}` : '';
+    const clocksStr = Object.entries(input.worldState.clocks ?? {}).map(([id, c]) => `${id}(${c.current}/${c.max})`).join(', ');
+    const rumorsStr = (input.worldState.rumors ?? []).join(' | ');
+    const sectorsStr = Object.entries(input.worldState.sector_influence ?? {}).map(([id, val]) => `${id}=${val}%`).join(', ');
+    
+    worldBlock = `\nÉTAT MONDE:\n- HP=${p.hp}/100 | Crédits=${p.credits}\n- Lieu=${p.location} | Date=${p.date}${envStr}\n- PNJs=${npcs || 'aucun'}\n- Factions=${topFactions || 'neutre'}\n- Tensions (Clocks)=${clocksStr || 'aucune'}\n- Influence Sectorielle=${sectorsStr || 'neutre'}\n- Rumeurs Actuelles=${rumorsStr || 'aucune'}`;
   }
-  const base = `Tu es le Simulateur Galactique hors-écran d'une campagne Star Wars.\nTu résous uniquement les dynamiques de fond entre les tours du joueur.\n\nSETUP:\n- Protagoniste: ${protagonist}\n- Ère: ${setup.era} | Faction: ${setup.faction} | Rôle: ${setup.role}\n- Prémisse: ${setup.premise || 'Libre'}${worldBlock}${recentBlock}${memoryBlock}`;
+  const base = `Tu es le Simulateur Galactique hors-écran d'une campagne Star Wars.\nTu résous uniquement les dynamiques de fond entre les tours du joueur. Tu peux manipuler les Horloges (clocks), propager des rumeurs, ou changer le climat (environment_status).\n\nSETUP:\n- Protagoniste: ${protagonist}\n- Ère: ${setup.era} | Faction: ${setup.faction} | Rôle: ${setup.role}\n- Prémisse: ${setup.premise || 'Libre'}${worldBlock}${recentBlock}${memoryBlock}`;
   const jsonContract = `Réponds UNIQUEMENT en JSON valide: {"title":"Titre court","summary_public":"Message bref","summary_private":"Contexte MJ optionnel","inject_now":false,"prompt_hook":"Consigne courte","memory_updates":{"relations":[],"places":[],"injuries":[],"resources":[],"notes":[]},"state_update":{"hp":0,"credits":0,"location":"","date_advance":"","npcs":[],"factions":{},"injuries_new":[],"injuries_resolved":[],"inventory_gained":[],"inventory_lost":[],"gm_note":""}}`;
   return `${base}\n\n${jsonContract}`;
 }
