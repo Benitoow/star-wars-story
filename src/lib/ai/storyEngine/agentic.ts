@@ -96,6 +96,37 @@ function dedupeChoices(choices: StoryChoice[]): StoryChoice[] {
   return Array.from(new Map(choices.map(choice => ({ ...choice, text: cleanText(choice.text, 220) })).filter(choice => Boolean(choice.text)).map(choice => [choice.text.toLowerCase(), choice] as const)).values()).slice(0, 4);
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function isOpenRouterGrok41Fast(config: StoryProviderConfig): boolean {
+  const providerId = normalizeProviderId(config.providerId);
+  if (providerId !== 'openrouter') return false;
+  return /x-ai\/grok-4\.1-fast/i.test(cleanText(config.model, 160));
+}
+
+function isOpenRouterMimoV2Flash(config: StoryProviderConfig): boolean {
+  const providerId = normalizeProviderId(config.providerId);
+  if (providerId !== 'openrouter') return false;
+  return /xiaomi\/mimo-v2-flash/i.test(cleanText(config.model, 160));
+}
+
+function getStoryExtractionMaxTokens(caps: ModelCapabilities, config: StoryProviderConfig): number {
+  const tierScale = caps.tier === 'large' ? 0.3 : caps.tier === 'medium' ? 0.34 : 0.38;
+  const adaptive = Math.round(caps.maxOutputTokens * tierScale);
+  const base = clamp(adaptive, 700, 1200);
+  if (isOpenRouterMimoV2Flash(config)) return Math.min(base, 900);
+  return isOpenRouterGrok41Fast(config) ? Math.min(base, 1000) : base;
+}
+
+function getBackgroundExtractionMaxTokens(caps: ModelCapabilities, config: StoryProviderConfig): number {
+  const adaptive = Math.round(caps.maxOutputTokens * 0.24);
+  const base = clamp(adaptive, 520, 900);
+  if (isOpenRouterMimoV2Flash(config)) return Math.min(base, 680);
+  return isOpenRouterGrok41Fast(config) ? Math.min(base, 760) : base;
+}
+
 type AgenticDraft = {
   chapter_title: string;
   section_type: string;
@@ -361,6 +392,12 @@ export async function generateStoryTurn(messages: ChatMessage[], config: StoryPr
 
 async function generateStoryTurnWithTools(messages: ChatMessage[], config: StoryProviderConfig, turnNumber: number): Promise<StoryTurnGenerationResult> {
   const stepCaps: ModelCapabilities = detectModelCapabilities(config);
+  const extractionMaxTokens = getStoryExtractionMaxTokens(stepCaps, config);
+  const extractionTemperature = isOpenRouterGrok41Fast(config)
+    ? 0.35
+    : isOpenRouterMimoV2Flash(config)
+      ? 0.32
+      : 0.4;
   const baseConversation = messages.map(message => ({ role: message.role, content: message.content }));
   const phase1Response = await callOpenAiCompatibleRaw(baseConversation, config, { maxTokens: stepCaps.maxOutputTokens, temperature: stepCaps.idealTemperature, skipReasoning: false });
   const phase1Text = cleanText(phase1Response.content, 8000);
@@ -373,14 +410,39 @@ async function generateStoryTurnWithTools(messages: ChatMessage[], config: Story
 
   const draft = createAgenticDraft(turnNumber);
   if (!phase1Json) draft.narrative.action = phase1Text;
-  const extractionConversation: any[] = [...baseConversation, { role: 'assistant', content: phase1Text }, { role: 'user', content: `Extrais les données structurées de cette scène (sans réécrire la narration):\n• update_world\n• update_npc\n• offer_choices\n• finalize_turn` }];
+
+  const phase1AssistantTurn: Record<string, unknown> = { role: 'assistant', content: phase1Text };
+  if (typeof phase1Response.reasoning === 'string' && phase1Response.reasoning.trim()) {
+    phase1AssistantTurn.reasoning = phase1Response.reasoning;
+  }
+  if (typeof phase1Response.reasoning_content === 'string' && phase1Response.reasoning_content.trim()) {
+    phase1AssistantTurn.reasoning_content = phase1Response.reasoning_content;
+  }
+  if (Array.isArray(phase1Response.reasoning_details) && phase1Response.reasoning_details.length) {
+    phase1AssistantTurn.reasoning_details = phase1Response.reasoning_details;
+  }
+
+  const extractionConversation: any[] = [
+    ...baseConversation,
+    phase1AssistantTurn,
+    {
+      role: 'user',
+      content: `Extrais les données structurées de cette scène (sans réécrire la narration):\n• update_world\n• update_npc\n• offer_choices\n• finalize_turn`
+    }
+  ];
   const rawChunks: string[] = [phase1Text];
   let totalToolCalls = 0;
   let steps = 1;
 
   for (let step = 1; step <= 6; step += 1) {
     steps = step + 1;
-    const extractMsg = await callOpenAiCompatibleRaw(extractionConversation, config, { tools: AGENTIC_GM_TOOLS, toolChoice: 'auto', maxTokens: 1200, temperature: 0.4, skipReasoning: true });
+    const extractMsg = await callOpenAiCompatibleRaw(extractionConversation, config, {
+      tools: AGENTIC_GM_TOOLS,
+      toolChoice: 'auto',
+      maxTokens: extractionMaxTokens,
+      temperature: extractionTemperature,
+      skipReasoning: true
+    });
     const assistantContent = cleanText(extractMsg.content, 4000);
     if (assistantContent) rawChunks.push(assistantContent);
     const toolCalls = Array.isArray(extractMsg.tool_calls) ? extractMsg.tool_calls : [];
@@ -388,7 +450,21 @@ async function generateStoryTurnWithTools(messages: ChatMessage[], config: Story
       for (const tc of extractPseudoToolCalls(assistantContent).filter(tc => isSupportedAgenticToolName(tc.name))) { totalToolCalls += 1; applyAgenticToolCall(draft, tc.name, tc.args); }
       break;
     }
-    extractionConversation.push({ role: 'assistant', content: extractMsg.content ?? '', tool_calls: toolCalls });
+    const assistantTurn: Record<string, unknown> = {
+      role: 'assistant',
+      content: extractMsg.content ?? '',
+      tool_calls: toolCalls
+    };
+    if (typeof extractMsg.reasoning === 'string' && extractMsg.reasoning.trim()) {
+      assistantTurn.reasoning = extractMsg.reasoning;
+    }
+    if (typeof extractMsg.reasoning_content === 'string' && extractMsg.reasoning_content.trim()) {
+      assistantTurn.reasoning_content = extractMsg.reasoning_content;
+    }
+    if (Array.isArray(extractMsg.reasoning_details) && extractMsg.reasoning_details.length) {
+      assistantTurn.reasoning_details = extractMsg.reasoning_details;
+    }
+    extractionConversation.push(assistantTurn);
     for (const tc of toolCalls) {
       totalToolCalls += 1;
       const args = parseToolArguments(tc.function.arguments);
@@ -455,18 +531,46 @@ function applyBackgroundToolCall(draft: BackgroundEventDraft, toolName: string, 
 }
 
 async function generateBackgroundWorldEventWithTools(input: BackgroundWorldInput, config: StoryProviderConfig): Promise<BackgroundWorldGenerationResult> {
+  const stepCaps: ModelCapabilities = detectModelCapabilities(config);
+  const extractionMaxTokens = getBackgroundExtractionMaxTokens(stepCaps, config);
+  const firstStepTemperature = isOpenRouterGrok41Fast(config)
+    ? 0.72
+    : isOpenRouterMimoV2Flash(config)
+      ? 0.68
+      : 0.8;
+  const followupStepTemperature = isOpenRouterGrok41Fast(config)
+    ? 0.58
+    : isOpenRouterMimoV2Flash(config)
+      ? 0.54
+      : 0.65;
   const conversation: ChatMessage[] = [{ role: 'system', content: buildBackgroundWorldSystemPrompt(input, 'tool-calls') }, { role: 'user', content: buildBackgroundWorldTickPrompt(input.turnNumber) }];
   const draft = createBackgroundEventDraft();
   const rawChunks: string[] = [];
   let totalToolCalls = 0; let steps = 0;
   for (let step = 1; step <= 5; step += 1) {
     steps = step;
-    const assistantMessage = await callOpenAiCompatibleRaw(conversation as any, config, { tools: AGENTIC_BACKGROUND_TOOLS as any, toolChoice: 'auto', maxTokens: 900, temperature: step === 1 ? 0.8 : 0.65 });
+    const assistantMessage = await callOpenAiCompatibleRaw(conversation as any, config, {
+      tools: AGENTIC_BACKGROUND_TOOLS as any,
+      toolChoice: 'auto',
+      maxTokens: extractionMaxTokens,
+      temperature: step === 1 ? firstStepTemperature : followupStepTemperature,
+      skipReasoning: true
+    });
     const assistantContent = cleanText(assistantMessage.content, 8000);
     if (assistantContent) rawChunks.push(assistantContent);
     const toolCalls = Array.isArray(assistantMessage.tool_calls) ? assistantMessage.tool_calls : [];
     if (!toolCalls.length) { if (assistantContent) { const parsed = parseJsonSafely(assistantContent); const patch = coerceBackgroundWorldEvent(parsed); if (patch) mergeBackgroundEventDraft(draft, patch); } break; }
-    conversation.push({ role: 'assistant', content: assistantMessage.content ?? '', tool_calls: toolCalls } as any);
+    const assistantTurn: Record<string, unknown> = { role: 'assistant', content: assistantMessage.content ?? '', tool_calls: toolCalls };
+    if (typeof assistantMessage.reasoning === 'string' && assistantMessage.reasoning.trim()) {
+      assistantTurn.reasoning = assistantMessage.reasoning;
+    }
+    if (typeof assistantMessage.reasoning_content === 'string' && assistantMessage.reasoning_content.trim()) {
+      assistantTurn.reasoning_content = assistantMessage.reasoning_content;
+    }
+    if (Array.isArray(assistantMessage.reasoning_details) && assistantMessage.reasoning_details.length) {
+      assistantTurn.reasoning_details = assistantMessage.reasoning_details;
+    }
+    conversation.push(assistantTurn as any);
     for (const toolCall of toolCalls) { totalToolCalls += 1; const args = parseToolArguments(toolCall.function.arguments); const result = applyBackgroundToolCall(draft, toolCall.function.name, args); conversation.push({ role: 'tool', tool_call_id: toolCall.id, name: toolCall.function.name, content: JSON.stringify(result) } as any); }
     if (draft.done) break;
   }

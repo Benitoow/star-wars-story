@@ -1,5 +1,16 @@
-import { describe, expect, it } from 'vitest';
-import { buildSystemPrompt, parseStoryResponse, supportsAgenticToolCalling } from './storyEngine';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  buildSystemPrompt,
+  callOpenAiCompatibleRaw,
+  detectModelCapabilities,
+  parseStoryResponse,
+  supportsAgenticToolCalling
+} from './storyEngine';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 describe('supportsAgenticToolCalling', () => {
   it('enables native tool-calling for Gemma 4 models on OpenRouter', () => {
@@ -35,6 +46,134 @@ describe('supportsAgenticToolCalling', () => {
 
   it('returns false when provider is unsupported', () => {
     expect(supportsAgenticToolCalling('none', 'openai/gpt-5.4-mini')).toBe(false);
+  });
+});
+
+describe('grok-4.1-fast optimization profile', () => {
+  it('uses low-effort reasoning with an expanded output budget', () => {
+    const caps = detectModelCapabilities({ providerId: 'openrouter', model: 'x-ai/grok-4.1-fast' });
+
+    expect(caps.reasoningStyle).toBe('openai-effort');
+    expect(caps.reasoningEffort).toBe('low');
+    expect(caps.maxOutputTokens).toBe(3600);
+  });
+
+  it('disables reasoning explicitly when skipReasoning=true', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [
+          {
+            message: { role: 'assistant', content: 'ok' }
+          }
+        ]
+      })
+    } as Response);
+    vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
+
+    await callOpenAiCompatibleRaw(
+      [{ role: 'user', content: 'test extraction pass' }],
+      { providerId: 'openrouter', model: 'x-ai/grok-4.1-fast', apiKey: 'test-key' },
+      { skipReasoning: true, maxTokens: 800 }
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(String(requestInit.body)) as Record<string, any>;
+
+    expect(body.reasoning).toEqual({ enabled: false });
+    expect(body.provider?.preferred_max_latency).toEqual({ p90: 4, p99: 8 });
+    expect(body.provider?.preferred_min_throughput).toEqual({ p90: 90, p99: 55 });
+  });
+
+  it('enables explicit reasoning for normal narrative calls', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [
+          {
+            message: { role: 'assistant', content: 'ok' }
+          }
+        ]
+      })
+    } as Response);
+    vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
+
+    await callOpenAiCompatibleRaw(
+      [{ role: 'user', content: 'test narrative pass' }],
+      { providerId: 'openrouter', model: 'x-ai/grok-4.1-fast', apiKey: 'test-key' },
+      { skipReasoning: false, maxTokens: 1200 }
+    );
+
+    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(String(requestInit.body)) as Record<string, any>;
+
+    expect(body.reasoning).toEqual({ enabled: true, effort: 'low' });
+  });
+});
+
+describe('mimo-v2-flash optimization profile', () => {
+  it('uses low-effort profile with an expanded output budget', () => {
+    const caps = detectModelCapabilities({ providerId: 'openrouter', model: 'xiaomi/mimo-v2-flash' });
+
+    expect(caps.reasoningStyle).toBe('openai-effort');
+    expect(caps.reasoningEffort).toBe('low');
+    expect(caps.maxOutputTokens).toBe(3200);
+  });
+
+  it('uses boolean reasoning toggle + latency-first provider tuning', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [
+          {
+            message: { role: 'assistant', content: 'ok' }
+          }
+        ]
+      })
+    } as Response);
+    vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
+
+    await callOpenAiCompatibleRaw(
+      [{ role: 'user', content: 'test mimo normal pass' }],
+      { providerId: 'openrouter', model: 'xiaomi/mimo-v2-flash', apiKey: 'test-key' },
+      { skipReasoning: false, maxTokens: 900 }
+    );
+
+    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(String(requestInit.body)) as Record<string, any>;
+
+    expect(body.reasoning).toEqual({ enabled: true });
+    expect(body.reasoning?.effort).toBeUndefined();
+    expect(body.provider?.sort).toBe('latency');
+    expect(body.provider?.preferred_max_latency).toEqual({ p90: 2, p99: 4.5 });
+    expect(body.provider?.preferred_min_throughput).toEqual({ p90: 45, p99: 20 });
+    expect(body.provider?.max_price).toEqual({ prompt: 0.12, completion: 0.45 });
+  });
+
+  it('disables reasoning explicitly when skipReasoning=true', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [
+          {
+            message: { role: 'assistant', content: 'ok' }
+          }
+        ]
+      })
+    } as Response);
+    vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
+
+    await callOpenAiCompatibleRaw(
+      [{ role: 'user', content: 'test mimo extraction pass' }],
+      { providerId: 'openrouter', model: 'xiaomi/mimo-v2-flash', apiKey: 'test-key' },
+      { skipReasoning: true, maxTokens: 700 }
+    );
+
+    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(String(requestInit.body)) as Record<string, any>;
+
+    expect(body.reasoning).toEqual({ enabled: false });
   });
 });
 

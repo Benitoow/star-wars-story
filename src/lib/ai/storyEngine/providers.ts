@@ -101,11 +101,11 @@ const MODEL_CAPS_PATTERNS: Array<[RegExp, Partial<ModelCapabilities>]> = [
   [/gpt-oss-120b/, { tier: 'large', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3400, idealTemperature: 0.9 }],
   [/deepseek-v3\.2/, { tier: 'large', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3400, idealTemperature: 0.9 }],
   [/mimo-v2-omni/, { tier: 'large', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3400, idealTemperature: 0.9 }],
-  [/mimo-v2-flash/, { tier: 'medium', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 2800, idealTemperature: 0.95 }],
+  [/mimo-v2-flash/, { tier: 'medium', reasoningStyle: 'openai-effort', reasoningEffort: 'low', supportsNativeTools: true, maxOutputTokens: 3200, idealTemperature: 0.9 }],
   [/minimax-m2\.7/, { tier: 'large', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3400, idealTemperature: 0.9 }],
   [/qwen3\.5-9b/, { tier: 'small', reasoningStyle: 'openai-effort', reasoningEffort: 'low', supportsNativeTools: true, maxOutputTokens: 2400, idealTemperature: 0.9 }],
   [/grok-4\.20/, { tier: 'large', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3600, idealTemperature: 0.9 }],
-  [/grok-4\.1-fast/, { tier: 'large', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3200, idealTemperature: 0.95 }],
+  [/grok-4\.1-fast/, { tier: 'large', reasoningStyle: 'openai-effort', reasoningEffort: 'low', supportsNativeTools: true, maxOutputTokens: 3600, idealTemperature: 0.9 }],
   [/gemma-4-31b-it/, { tier: 'medium', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3000, idealTemperature: 0.95 }],
   [/gemma-4-26b-a4b-it/, { tier: 'small', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 2800, idealTemperature: 0.95 }],
   [/gemma-3-27b-it:free|gemma-3-27b-it/i, { tier: 'large', reasoningStyle: 'none', reasoningEffort: 'low', supportsNativeTools: true, maxOutputTokens: 2400, idealTemperature: 0.9 }],
@@ -150,10 +150,23 @@ function getOpenRouterProviderPreferences(modelId: string): Record<string, unkno
     return { require_parameters: true, sort: 'throughput', preferred_max_latency: { p90: 3 }, preferred_min_throughput: { p90: 45 }, allow_fallbacks: true };
   }
   if (/xiaomi\/mimo-v2-flash/.test(normalized)) {
-    return { require_parameters: true, sort: 'throughput', preferred_max_latency: { p90: 3 }, preferred_min_throughput: { p90: 40 }, allow_fallbacks: true };
+    return {
+      require_parameters: true,
+      sort: 'latency',
+      preferred_max_latency: { p90: 2, p99: 4.5 },
+      preferred_min_throughput: { p90: 45, p99: 20 },
+      max_price: { prompt: 0.12, completion: 0.45 },
+      allow_fallbacks: true
+    };
   }
   if (/x-ai\/grok-4\.1-fast/.test(normalized)) {
-    return { require_parameters: true, sort: 'throughput', preferred_max_latency: { p90: 10 }, preferred_min_throughput: { p90: 80 }, allow_fallbacks: true };
+    return {
+      require_parameters: true,
+      sort: 'throughput',
+      preferred_max_latency: { p90: 4, p99: 8 },
+      preferred_min_throughput: { p90: 90, p99: 55 },
+      allow_fallbacks: true
+    };
   }
   if (/x-ai\/grok-4\.20/.test(normalized)) {
     return { require_parameters: true, sort: 'throughput', preferred_max_latency: { p90: 2 }, preferred_min_throughput: { p90: 90 }, max_price: { prompt: 4, completion: 12 }, allow_fallbacks: true };
@@ -174,6 +187,42 @@ function getOpenRouterProviderPreferences(modelId: string): Record<string, unkno
   return undefined;
 }
 
+function isOpenRouterGrokFastModel(modelId: string): boolean {
+  return /x-ai\/grok-4\.1-fast/i.test(modelId);
+}
+
+function isOpenRouterMimoV2FlashModel(modelId: string): boolean {
+  return /xiaomi\/mimo-v2-flash/i.test(modelId);
+}
+
+function buildReasoningPayload(
+  caps: ModelCapabilities,
+  providerId: string,
+  modelId: string,
+  skipReasoning = false
+): Record<string, unknown> | undefined {
+  if (caps.reasoningStyle !== 'openai-effort') return undefined;
+
+  if (skipReasoning) {
+    if (providerId === 'openrouter') return { enabled: false };
+    return { effort: 'none' };
+  }
+
+  if (providerId === 'openrouter' && isOpenRouterMimoV2FlashModel(modelId)) {
+    return { enabled: true };
+  }
+
+  const effort = providerId === 'openrouter' && isOpenRouterGrokFastModel(modelId)
+    ? 'low'
+    : caps.reasoningEffort;
+
+  if (providerId === 'openrouter') {
+    return { enabled: true, effort };
+  }
+
+  return { effort };
+}
+
 type OpenAiToolDefinition = {
   type: 'function';
   function: {
@@ -187,12 +236,17 @@ type OpenAiToolChoice = 'auto' | 'none' | 'required' | { type: 'function'; funct
 
 type OpenAiToolCall = { id: string; type: 'function'; function: { name: string; arguments: string } };
 
+type OpenAiReasoningDetail = Record<string, unknown>;
+
 type OpenAiMessage = {
   role: 'system' | 'user' | 'assistant' | 'tool';
   content?: string | null;
   name?: string;
   tool_calls?: OpenAiToolCall[];
   tool_call_id?: string;
+  reasoning?: string;
+  reasoning_content?: string;
+  reasoning_details?: OpenAiReasoningDetail[];
 };
 
 function toOpenAiMessageList(messages: ChatMessage[]): OpenAiMessage[] {
@@ -223,6 +277,7 @@ export async function callOpenAiCompatibleRaw(
   if (config.providerId === 'openrouter') {
     const referer = typeof window !== 'undefined' ? window.location.href : 'https://localhost';
     headers['HTTP-Referer'] = referer;
+    headers['X-OpenRouter-Title'] = 'Star Wars Story Manager';
     headers['X-Title'] = 'Star Wars Story Manager';
   }
 
@@ -241,8 +296,9 @@ export async function callOpenAiCompatibleRaw(
     if (providerPreferences) body.provider = providerPreferences;
   }
 
-  if (caps.reasoningStyle === 'openai-effort' && !options.skipReasoning) {
-    body.reasoning = { effort: caps.reasoningEffort };
+  const reasoningPayload = buildReasoningPayload(caps, config.providerId, modelId, options.skipReasoning === true);
+  if (reasoningPayload) {
+    body.reasoning = reasoningPayload;
   }
 
   if (options.tools?.length) {
