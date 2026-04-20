@@ -4,6 +4,9 @@
   export let worldState: WorldState;
   export let collapsed = false;
   export let turnNumber = 0;
+  export let playerRoleLabel = '';
+  export let playerFactionLabel = '';
+  export let playerFactionId = '';
 
   $: p = worldState.player;
   $: hpColor = p.hp >= 70 ? '#4ade80' : p.hp >= 35 ? '#facc15' : '#f87171';
@@ -21,6 +24,19 @@
     first_order: 'P.Ordre', republic: 'République'
   };
 
+  const SETUP_TO_WORLD_FACTION: Record<string, string> = {
+    jedi: 'jedi_order',
+    sith: 'sith',
+    empire: 'empire',
+    rebels: 'rebel_alliance',
+    republic: 'republic',
+    hutt: 'hutt',
+    mandalore: 'mandalore',
+    first_order: 'first_order'
+  };
+
+  $: primaryFactionId = SETUP_TO_WORLD_FACTION[playerFactionId] ?? playerFactionId;
+
   function factionLabel(id: string): string {
     return FACTION_LABELS[id] ?? id;
   }
@@ -37,6 +53,16 @@
     if (aff > -30) return 'Méfiant';
     if (aff > -70) return 'Hostile';
     return 'Ennemi';
+  }
+
+  function factionReputationLabel(score: number): string {
+    if (score >= 70) return 'Allié fort';
+    if (score >= 30) return 'Allié';
+    if (score >= 10) return 'Favorable';
+    if (score > -10) return 'Neutre';
+    if (score > -30) return 'Froid';
+    if (score > -70) return 'Hostile';
+    return 'Ennemi déclaré';
   }
 </script>
 
@@ -89,6 +115,22 @@
         </div>
       {/if}
 
+      {#if playerRoleLabel || playerFactionLabel}
+        <div class="hud-section-label">Identité</div>
+        {#if playerRoleLabel}
+          <div class="hud-row">
+            <span class="hud-icon">🎖️</span>
+            <span class="hud-text" title="Rôle / grade narratif">Rôle: {playerRoleLabel}</span>
+          </div>
+        {/if}
+        {#if playerFactionLabel}
+          <div class="hud-row">
+            <span class="hud-icon">🛡️</span>
+            <span class="hud-text" title="Camp de départ">Camp: {playerFactionLabel}</span>
+          </div>
+        {/if}
+      {/if}
+
       <!-- Injuries -->
       {#if p.injuries.length}
         <div class="hud-section-label">Blessures</div>
@@ -116,6 +158,7 @@
       <!-- Factions -->
       {#if topFactions.length}
         <div class="hud-section-label">Factions</div>
+        <div class="hud-help-text">Réputation de -100 (ennemi) à +100 (allié).</div>
         {#each topFactions as [id, score]}
           <div class="hud-row hud-faction">
             <div class="faction-bar-track">
@@ -129,6 +172,10 @@
               ></div>
             </div>
             <span class="faction-label">{factionLabel(id)}</span>
+            {#if primaryFactionId && id === primaryFactionId}
+              <span class="faction-self-chip">Ton camp</span>
+            {/if}
+            <span class="faction-status">{factionReputationLabel(score)}</span>
             <span class="faction-score" style="color:{score > 0 ? '#4ade80' : '#f87171'}">{score > 0 ? '+' : ''}{score}</span>
           </div>
         {/each}
@@ -214,6 +261,13 @@
     color: rgba(255,232,31,0.5);
     margin-top: 8px;
     margin-bottom: 2px;
+  }
+
+  .hud-help-text {
+    font-size: 0.62rem;
+    color: rgba(255,255,255,0.45);
+    margin-bottom: 2px;
+    line-height: 1.35;
   }
 
   .hud-row {
@@ -304,6 +358,22 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .faction-self-chip {
+    font-size: 0.58rem;
+    letter-spacing: 0.03em;
+    color: #0b0b0f;
+    background: #4ade80;
+    border-radius: 999px;
+    padding: 1px 5px;
+    flex-shrink: 0;
+  }
+
+  .faction-status {
+    font-size: 0.6rem;
+    color: rgba(255,255,255,0.6);
+    flex-shrink: 0;
   }
 
   .faction-score {

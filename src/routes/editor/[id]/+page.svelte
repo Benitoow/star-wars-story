@@ -598,6 +598,8 @@
     ? planDialogueDisplay(currentChapter)
     : { actionParagraphs: [], dialogueParagraphs: [] };
   $: actionTagLabel = currentChapter?.narrative.action ? 'Action' : 'Scène';
+  $: currentRoleLabel = ROLES.find(role => role.id === $currentSetup.role)?.name || $currentSetup.role || '';
+  $: currentFactionLabel = FACTIONS.find(faction => faction.id === $currentSetup.faction)?.name || $currentSetup.faction || '';
 
   function saveInteractiveSession(): void {
     const payload: InteractiveSessionPayload = {
@@ -1745,7 +1747,14 @@
           </div>
 
           <!-- ── Living World HUD ───────────────────────── -->
-          <GameHUD {worldState} bind:collapsed={hudCollapsed} {turnNumber} />
+          <GameHUD
+            {worldState}
+            bind:collapsed={hudCollapsed}
+            {turnNumber}
+            playerRoleLabel={currentRoleLabel}
+            playerFactionLabel={currentFactionLabel}
+            playerFactionId={$currentSetup.faction}
+          />
 
           <!-- ── Scrollable narrative zone ──────────────── -->
           <div class="play-scroll-area">
