@@ -104,6 +104,26 @@
   let hudCollapsed = false;
 
   const UNKNOWN_LOCATION_RE = /\b(?:inconnu(?:e)?|unknown|indetermine|ind[ée]termin[ée]|non\s+renseign[ée]|n\/?a|aucun\s+lieu)\b/i;
+  const FACTION_LOCATION_LEAK_EXACT = new Set([
+    'jedi',
+    'ordre jedi',
+    'jedi order',
+    'sith',
+    'empire',
+    'alliance rebelle',
+    'rebelles',
+    'rebels',
+    'republique',
+    'république',
+    'republic',
+    'premier ordre',
+    'first order',
+    'hutt',
+    'cartel hutt',
+    'mandalore',
+    'mandaloriens',
+    'mandalorians'
+  ]);
   const LOCATION_HINTS: Array<{ pattern: RegExp; label: string }> = [
     { pattern: /nar\s*shaddaa/i, label: 'Nar Shaddaa' },
     { pattern: /coruscant/i, label: 'Coruscant' },
@@ -213,6 +233,63 @@
     const text = String(value || '').trim();
     if (!text) return true;
     return UNKNOWN_LOCATION_RE.test(normalizeSearchText(text));
+  }
+
+  function looksLikeFactionLabel(value: unknown): boolean {
+    const text = String(value || '').trim();
+    if (!text) return false;
+
+    const normalized = normalizeSearchText(text).replace(/\s+/g, ' ');
+    if (FACTION_LOCATION_LEAK_EXACT.has(normalized)) return true;
+
+    return /^(?:jedi|ordre jedi|jedi order|sith|empire|alliance rebelle|rebelles?|republic|republique|premier ordre|first order|hutt|cartel hutt|mandalore|mandaloriens|mandalorians)$/.test(normalized);
+  }
+
+  function normalizeNarrativeDate(baseDate: string, dateAdvance?: string): string {
+    const base = String(baseDate || '')
+      .replace(/\s*,\s*/g, ', ')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+
+    const advance = String(dateAdvance || '')
+      .replace(/^\+\s*/, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+
+    if (!advance) return base;
+
+    const baseDayMatch = base.match(/\bjour\s*(\d+)\b/i);
+    const absoluteDayMatch = advance.match(/^jour\s*(\d+)$/i);
+
+    if (baseDayMatch && absoluteDayMatch) {
+      const baseDay = Number(baseDayMatch[1]);
+      const nextDay = Number(absoluteDayMatch[1]);
+
+      if (Number.isFinite(baseDay) && Number.isFinite(nextDay)) {
+        if (nextDay === baseDay) return base;
+        return base.replace(/\bjour\s*\d+\b/i, `Jour ${Math.max(1, nextDay)}`);
+      }
+    }
+
+    const relativeDayMatch = advance.match(/^([+-]?\d+)\s*jour(?:s)?$/i);
+    if (baseDayMatch && relativeDayMatch) {
+      const baseDay = Number(baseDayMatch[1]);
+      const deltaDays = Number(relativeDayMatch[1]);
+
+      if (Number.isFinite(baseDay) && Number.isFinite(deltaDays)) {
+        const mergedDay = Math.max(1, baseDay + deltaDays);
+        return base.replace(/\bjour\s*\d+\b/i, `Jour ${mergedDay}`);
+      }
+    }
+
+    if (base) {
+      const normalizedBase = normalizeSearchText(base);
+      const normalizedAdvance = normalizeSearchText(advance);
+      if (normalizedAdvance && normalizedBase.includes(normalizedAdvance)) return base;
+      return `${base} +${advance}`;
+    }
+
+    return advance;
   }
 
   function inferLocationFromText(...parts: Array<string | undefined>): string | undefined {
@@ -365,17 +442,26 @@
     const creditsDelta = typeof upd?.credits === 'number' ? normalizeCreditsDelta(upd.credits, p.credits) : undefined;
 
     const inferredLocation = inferLocationFromChapter(chapter);
-    const requestedLocation = String(upd?.location || '').trim();
+    const requestedLocationRaw = String(upd?.location || '').trim();
+    const requestedLocation = looksLikeFactionLabel(requestedLocationRaw) ? '' : requestedLocationRaw;
     const fallbackLocation = isUnknownLocationValue(p.location) ? inferredLocation : undefined;
     let newLocation = requestedLocation || fallbackLocation || p.location;
-    if (isUnknownLocationValue(newLocation) && inferredLocation) {
+
+    if ((isUnknownLocationValue(newLocation) || looksLikeFactionLabel(newLocation)) && inferredLocation) {
       newLocation = inferredLocation;
+    }
+
+    if (looksLikeFactionLabel(newLocation)) {
+      const previousValidLocation = !isUnknownLocationValue(p.location) && !looksLikeFactionLabel(p.location)
+        ? p.location
+        : '';
+      newLocation = previousValidLocation || newLocation;
     }
 
     // Player vitals
     const newHp = hpDelta !== undefined ? Math.max(0, Math.min(100, p.hp + hpDelta)) : p.hp;
     const newCredits = creditsDelta !== undefined ? Math.max(0, p.credits + creditsDelta) : p.credits;
-    const newDate = upd?.date_advance ? `${p.date.replace(/ \+.*$/, '')} +${upd.date_advance}` : p.date;
+    const newDate = normalizeNarrativeDate(p.date, upd?.date_advance);
 
     // Injuries: resolve then add new
     const resolvedKeywords = upd?.injuries_resolved ?? [];

@@ -19,9 +19,9 @@
     .slice(0, 3);
 
   const FACTION_LABELS: Record<string, string> = {
-    empire: 'Empire', rebel_alliance: 'Alliance', jedi_order: 'Jedi',
-    sith: 'Sith', hutt: 'Hutt', mandalore: 'Mandalore',
-    first_order: 'P.Ordre', republic: 'République'
+    empire: 'Empire', rebel_alliance: 'Alliance Rebelle', jedi_order: 'Ordre Jedi',
+    sith: 'Ordre Sith', hutt: 'Cartel Hutt', mandalore: 'Mandaloriens',
+    first_order: 'Premier Ordre', republic: 'République'
   };
 
   const SETUP_TO_WORLD_FACTION: Record<string, string> = {

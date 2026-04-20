@@ -27,6 +27,16 @@ describe('sanitizeNarrativeTextForDisplay', () => {
     expect(paragraphs.some(item => item.includes('dialogue:— On bouge maintenant.'))).toBe(true);
     expect(paragraphs.some(item => item.includes('prose:Le vent se lève.'))).toBe(true);
   });
+
+  it('detects speaker-labelled dialogue lines', () => {
+    const paragraphs = splitNarrativeParagraphs('Grisk : Ils arrivent par la passerelle nord.');
+
+    expect(paragraphs).toHaveLength(1);
+    expect(paragraphs[0]).toEqual({
+      kind: 'dialogue',
+      text: '— Grisk : Ils arrivent par la passerelle nord.'
+    });
+  });
 });
 
 describe('enforceTransitionChoiceQuality', () => {
@@ -96,7 +106,7 @@ describe('enforceTransitionChoiceQuality', () => {
 });
 
 describe('planDialogueDisplay', () => {
-  it('inlines dialogue into action for non-dialogue scenes and removes duplicates', () => {
+  it('interleaves dialogue into action flow for non-dialogue scenes and removes duplicates', () => {
     const chapter: StoryChapter = {
       chapter_title: 'Sous le feu croisé',
       chapter_number: 6,
@@ -104,10 +114,12 @@ describe('planDialogueDisplay', () => {
       narrative: {
         context: '',
         action: `Le hangar tremble sous les tirs.
+      Tu ajustes ton blaster.
       — Vex : On bouge.
-      Tu ajustes ton blaster.`,
+      Les portes commencent à céder.`,
         dialogue: `— Vex : On bouge.
-      — Lira : Couvre la sortie.`,
+      Lira : Couvre la sortie.
+      Grisk : J'ouvre un passage.`,
         reflection: '',
         atmosphere: 'tense'
       },
@@ -126,9 +138,15 @@ describe('planDialogueDisplay', () => {
     const display = planDialogueDisplay(chapter);
     const actionTexts = display.actionParagraphs.map(paragraph => paragraph.text);
     const vexLineCount = actionTexts.filter(text => /vex\s*:\s*on bouge/i.test(text)).length;
+    const liraLineIndex = actionTexts.findIndex(text => /lira\s*:\s*couvre la sortie/i.test(text));
+    const griskLineIndex = actionTexts.findIndex(text => /grisk\s*:\s*j'ouvre un passage/i.test(text));
+    const lateActionIndex = actionTexts.findIndex(text => /portes commencent à céder/i.test(text));
 
     expect(display.dialogueParagraphs).toHaveLength(0);
-    expect(actionTexts.some(text => /lira\s*:\s*couvre la sortie/i.test(text))).toBe(true);
+    expect(liraLineIndex).toBeGreaterThanOrEqual(0);
+    expect(griskLineIndex).toBeGreaterThanOrEqual(0);
+    expect(liraLineIndex).toBeLessThan(lateActionIndex);
+    expect(griskLineIndex).toBeLessThan(lateActionIndex);
     expect(vexLineCount).toBe(1);
   });
 

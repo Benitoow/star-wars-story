@@ -73,6 +73,46 @@ const DIALOGUE_ACTION_VERB_PREFIXES = [
   "je dis","vous dites","tu dis","je lâche","vous lâchez","je sors","vous sortez"
 ];
 
+const SPEAKER_LINE_REGEX = /^(?:[—–-]\s*)?([A-ZÀ-ÖØ-Ý][\p{L}\p{N}'’\- ]{0,48}?)\s*:\s*(.+)$/u;
+const SPEAKER_LINE_STOPWORDS = new Set([
+  'action',
+  'contexte',
+  'context',
+  'dialogue',
+  'reflection',
+  'reflexion',
+  'réflexion',
+  'atmosphere',
+  'atmosphère',
+  'hp',
+  'credits',
+  'crédits'
+]);
+
+function parseSpeakerDialogueLine(line: string): string | null {
+  const match = line.match(SPEAKER_LINE_REGEX);
+  if (!match) return null;
+
+  const speaker = cleanParagraphText(match[1] || '').replace(/\s{2,}/g, ' ').trim();
+  const speech = cleanParagraphText(match[2] || '');
+  if (!speaker || !speech) return null;
+
+  const normalizedSpeaker = normalizeSearchText(speaker).trim();
+  if (SPEAKER_LINE_STOPWORDS.has(normalizedSpeaker)) return null;
+  if (speaker.split(/\s+/).length > 4) return null;
+
+  if (/\d/.test(speaker) && !/^(?:r2|c-?3|bb|ig|hk|k2|bd|chopper|ch0pper)\b/i.test(speaker)) {
+    return null;
+  }
+
+  const normalizedSpeech = cleanParagraphText(speech)
+    .replace(/^['"«»“”]+|['"«»“”]+$/g, '')
+    .trim();
+
+  if (!normalizedSpeech) return null;
+  return `— ${speaker} : ${normalizedSpeech}`;
+}
+
 function isIsolatedDialogueLine(line: string): boolean {
   const trimmed = (line || '').trim();
   if (!trimmed) return false;
@@ -135,6 +175,12 @@ function splitParagraphFragments(text: string): NarrativeParagraph[] {
     const line = cleanParagraphText(rawLine);
     if (!line) continue;
 
+    const speakerDialogue = parseSpeakerDialogueLine(line);
+    if (speakerDialogue) {
+      fragments.push({ kind: 'dialogue', text: speakerDialogue });
+      continue;
+    }
+
     if (/^(?:—|«|“|\")/.test(line)) {
       const dialogue = normalizeDialogueText(line);
       if (dialogue) fragments.push({ kind: 'dialogue', text: dialogue });
@@ -196,6 +242,24 @@ function dedupeNarrativeParagraphs(paragraphs: NarrativeParagraph[]): NarrativeP
   return unique;
 }
 
+function interleaveNarrativeParagraphs(
+  actionParagraphs: NarrativeParagraph[],
+  dialogueParagraphs: NarrativeParagraph[]
+): NarrativeParagraph[] {
+  if (!actionParagraphs.length) return [...dialogueParagraphs];
+  if (!dialogueParagraphs.length) return [...actionParagraphs];
+
+  const merged: NarrativeParagraph[] = [];
+  const maxLength = Math.max(actionParagraphs.length, dialogueParagraphs.length);
+
+  for (let index = 0; index < maxLength; index += 1) {
+    if (index < actionParagraphs.length) merged.push(actionParagraphs[index]);
+    if (index < dialogueParagraphs.length) merged.push(dialogueParagraphs[index]);
+  }
+
+  return merged;
+}
+
 function sectionPrefersStandaloneDialogue(sectionType: string): boolean {
   return normalizeSearchText(sectionType || '').trim() === 'dialogue';
 }
@@ -216,7 +280,7 @@ export function planDialogueDisplay(chapter: StoryChapter): DialogueDisplayPlan 
 
   if (!sectionPrefersStandaloneDialogue(chapter.section_type || '')) {
     return {
-      actionParagraphs: dedupeNarrativeParagraphs([...actionParagraphs, ...dialogueParagraphs]),
+      actionParagraphs: dedupeNarrativeParagraphs(interleaveNarrativeParagraphs(actionParagraphs, dialogueParagraphs)),
       dialogueParagraphs: []
     };
   }
@@ -232,7 +296,13 @@ export function planDialogueDisplay(chapter: StoryChapter): DialogueDisplayPlan 
 
 export function isDialogueParagraph(text: string): boolean {
   const trimmed = String(text || '').trim();
-  return Boolean(trimmed) && (trimmed.startsWith('— ') || trimmed.startsWith('«') || trimmed.startsWith('“') || /^\"/.test(trimmed));
+  return Boolean(trimmed) && (
+    trimmed.startsWith('— ') ||
+    trimmed.startsWith('«') ||
+    trimmed.startsWith('“') ||
+    /^\"/.test(trimmed) ||
+    SPEAKER_LINE_REGEX.test(trimmed)
+  );
 }
 
 function normalizeChoiceText(text: string): string {

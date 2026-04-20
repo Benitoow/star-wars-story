@@ -109,7 +109,7 @@ RÈGLES MJ:
 11. Résumé de campagne: s'il est présent, il représente la continuité condensée des tours anciens — prends-le en compte sans le répéter mot à mot.`;
   const narrativeProseRule = `
 12. PROSE UNIQUEMENT dans "narrative.action": pas de markdown, pas de titres H1/H2, pas de listes numérotées, pas de bloc "Que faites-vous ?", pas de répétition des choix. Les choix vivent uniquement dans le tableau "choices".
-13. DIALOGUES: chaque réplique doit être sur son propre paragraphe, idéalement précédée d'un tiret cadratin (—) ou placée dans "narrative.dialogue". Ne colle jamais une réplique au milieu d'un paragraphe d'action.
+13. DIALOGUES: chaque réplique doit être sur son propre paragraphe, au format "Nom : réplique" (préfixe "—" optionnel), et placée dans "narrative.dialogue". Ne colle jamais une réplique au milieu d'un paragraphe d'action.
 14. DIALOGUES OBLIGATOIREMENT DANS narrative.dialogue: chaque échange verbal doit être placé dans le champ "dialogue", jamais dans "action". "action" = narration pure et actions, "dialogue" = tous les échanges verbaux. Si un personnage parle, utilise ce champ dédié.;`;
 
   const jsonContract = `Réponds UNIQUEMENT en JSON valide, sans markdown ni texte autour. Priorité absolue: prose narrative riche dans "action" (2-4 paragraphes). Remplis state_update avec toutes les conséquences.
@@ -120,7 +120,7 @@ RÈGLES MJ:
   "section_type": "action|dialogue|exploration|tension|revelation|repos|interlude|confrontation",
   "narrative": {
     "action": "Narration pure — actions, descriptions, sensations, tensions. AUCUN dialogue ici. Max 3 paragraphes.",
-    "dialogue": "Tous les échanges verbaux — chaque réplique sur sa propre ligne avec — Personnage en début. Ex: — Leia: « Je comprends votre inquiétude. »",
+    "dialogue": "Tous les échanges verbaux — chaque réplique sur sa propre ligne au format Nom : réplique (préfixe — optionnel). Ex: Leia : « Je comprends votre inquiétude. »",
     "reflection": "Pensées internes du protagoniste (optionnel, italique)",
     "atmosphere": "tense|calm|mysterious|eerie|heroic"
   },
@@ -145,7 +145,7 @@ PHASE 1 (maintenant): Écris la scène en JSON valide ou en prose libre.
 - Aucun outil disponible dans cette phase.
 - Priorité absolue: prose narrative vivante, conséquences réelles, PNJs avec mémoire et intentions propres.
 - Si JSON: remplis "narrative.action" avec 3-5 paragraphes de prose cinématique.
-- Les dialogues doivent être séparés en paragraphes dédiés (de préférence avec —) et ne jamais être noyés dans le bloc d'action.
+- Les dialogues doivent être séparés en paragraphes dédiés au format "Nom : réplique" (préfixe — optionnel) et ne jamais être noyés dans le bloc d'action.
 - Aucun markdown, aucun titre interne et aucun bloc de choix dans "narrative.action".
 
 PHASE 2 (ensuite, automatique): Le système extraira l'état structuré via des outils dédiés.
@@ -196,7 +196,7 @@ EXIGENCES DU PREMIER TOUR:
 - Respecte strictement le rôle canonique choisi (${setup.role}). N'invente pas de promotion de rang au lancement.
 - Le lieu de départ doit être explicite et exploitable pour l'état monde.
 - Le texte de scène ne doit contenir ni markdown ni liste de choix.
-- Tout dialogue doit être isolé sur sa propre ligne, idéalement précédé d'un tiret cadratin (—) et séparé du reste de l'action par un retour à la ligne.
+- Tout dialogue doit être isolé sur sa propre ligne, au format "Nom : réplique" (préfixe — optionnel), et séparé du reste de l'action par un retour à la ligne.
 - chapter_number = 1${modeHint}
 Les dialogues vont dans le champ "dialogue", jamais dans "action".
 Le tour 1 doit permettre d'extraire state_update.location et au moins un PNJ nommé.`;
@@ -242,7 +242,7 @@ export function buildContinuePrompt(
 
 Écris une scène forte et précise — conséquences réelles, PNJs avec mémoire et intention propre.
 Ne mets aucun markdown, aucun titre interne et aucun bloc de choix dans le récit.
-Chaque réplique doit être sur une ligne distincte, idéalement précédée de —, et jamais noyée dans un paragraphe d'action.
+Chaque réplique doit être sur une ligne distincte, au format "Nom : réplique" (préfixe — optionnel), et jamais noyée dans un paragraphe d'action.
 Propose 3-4 choix distincts, concrets, ancrés dans cette scène précise (pas génériques).
 Fournis assez d'éléments concrets pour extraire au moins un signal monde (location ou PNJ nommé) à ce tour.
 Respecte le rôle canonique du protagoniste défini dans le contexte système (ne pas promouvoir/rétrograder sans validation explicite du joueur).
