@@ -73,7 +73,7 @@ function getStepTokenBudget(stepConfig: StoryProviderConfig, step: StoryPipeline
   const caps = detectModelCapabilities(stepConfig);
   if (step === 'scribe') return clamp(Math.round(caps.maxOutputTokens * 0.2), 240, 560);
   if (step === 'writer') return clamp(Math.round(caps.maxOutputTokens * 0.72), 900, 2600);
-  return clamp(Math.round(caps.maxOutputTokens * 0.35), 520, 1400);
+  return clamp(Math.round(caps.maxOutputTokens * 0.58), 900, 2200);
 }
 
 function getStepTemperature(step: StoryPipelineStep): number {
@@ -122,6 +122,54 @@ function fallbackBrainPayload(): Record<string, unknown> {
   };
 }
 
+function normalizeSearchText(value: unknown): string {
+  return cleanText(value, 160)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isGenericChapterTitle(value: unknown): boolean {
+  const normalized = normalizeSearchText(value);
+  if (!normalized) return true;
+  return /^(?:tour|turn|chapitre|chapter|scene|sc[èe]ne)\s*(?:n[o°]\s*)?[\divxlcdm-]*$/i.test(normalized);
+}
+
+function deriveFallbackChapterTitleFromScene(scene: string, turnNumber: number): string {
+  const normalized = normalizeSearchText(scene);
+
+  if (/(hangar|spatioport|dock|quai d['’]arrimage|baie d['’]arrimage)/.test(normalized)) return 'Tension au spatioport';
+  if (/(cantina|bar|taverne|club)/.test(normalized)) return 'Rumeurs de cantina';
+  if (/(embuscade|attaque|assaut|chasseur|blaster|duel|fusillade)/.test(normalized)) return 'Sous le feu ennemi';
+  if (/(negoci|dialog|parler|accord|tr[eê]ve)/.test(normalized)) return 'Négociation sous pression';
+
+  const firstSentence = cleanText(scene, 320)
+    .split(/[.!?\n]/)
+    .map(chunk => chunk.trim())
+    .find(chunk => chunk.length >= 16) || '';
+
+  const words = firstSentence
+    .replace(/["'«»“”():,;]+/g, ' ')
+    .split(/\s+/)
+    .map(item => item.trim())
+    .filter(Boolean)
+    .filter(item => !/^(?:le|la|les|un|une|des|de|du|dans|sur|a|au|aux|et|mais|ou|donc)$/i.test(item))
+    .slice(0, 6);
+
+  if (words.length >= 2) {
+    return cleanText(
+      words
+        .map(word => `${word.charAt(0).toUpperCase()}${word.slice(1).toLowerCase()}`)
+        .join(' '),
+      90
+    );
+  }
+
+  return turnNumber <= 1 ? 'Prologue' : 'Nœud de tension';
+}
+
 function hasPlayableChapterContent(chapter: StoryChapter): boolean {
   return Boolean(cleanText(chapter.narrative.action, 260));
 }
@@ -131,7 +179,10 @@ function buildPipelineStoryPayload(
   writerScene: string,
   brainPayload: Record<string, unknown>
 ): Record<string, unknown> {
-  const chapterTitle = cleanText(brainPayload.chapter_title, 90) || (turnNumber <= 1 ? 'Prologue' : `Tour ${turnNumber}`);
+  const rawChapterTitle = cleanText(brainPayload.chapter_title, 90);
+  const chapterTitle = rawChapterTitle && !isGenericChapterTitle(rawChapterTitle)
+    ? rawChapterTitle
+    : deriveFallbackChapterTitleFromScene(writerScene, turnNumber);
   const sectionType = cleanText(brainPayload.section_type, 40) || 'action';
   const atmosphere = cleanText(brainPayload.atmosphere, 80) || 'tense';
   const userEditsApplied = cleanText(brainPayload.user_edits_applied, 180) || null;

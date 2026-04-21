@@ -20,6 +20,7 @@ const NPC_NAME_STOPWORDS = new Set([
   'le', 'la', 'les', 'un', 'une', 'des', 'du', 'de', 'd',
   'je', 'tu', 'il', 'elle', 'on', 'nous', 'vous', 'ils', 'elles',
   'ici', 'là', 'la-bas', 'là-bas', 'maintenant',
+  'fil', 'fai', 'fait', 'faite', 'faites', 'alors', 'ensuite', 'puis', 'tour',
   'canyon', 'jundland', 'kashyyyk', 'coruscant', 'tatooine', 'naboo', 'bespin',
   'hangar', 'spatioport', 'cantina', 'secteur',
   'hutts', 'hutt', 'rodiens', 'rodien',
@@ -71,6 +72,8 @@ function isLikelyNpcName(candidate: string): boolean {
 
   const hasDigits = /\d/.test(normalized);
   if (hasDigits && !ALLOWED_DROID_NAME_PATTERN.test(normalized)) return false;
+
+  if (normalized.length < 3 && !ALLOWED_DROID_NAME_PATTERN.test(normalized)) return false;
 
   return normalized.length >= 2;
 }

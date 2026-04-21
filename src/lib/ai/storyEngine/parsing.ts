@@ -136,12 +136,90 @@ function normalizeTextForPrompt(value: unknown): string {
     .toLowerCase();
 }
 
+function normalizeMemoryText(value: unknown): string {
+  return cleanText(value, 400)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+const MEMORY_NOISE_PATTERNS: RegExp[] = [
+  /\[object object\]/i,
+  /(?:^|\b)json\s*[\[{]/i,
+  /"chapter_title"\s*:/i,
+  /"chapter_number"\s*:/i,
+  /"narrative"\s*:/i,
+  /"choices"\s*:/i,
+  /<\|?tool_call\|?>|tool_call|(?:^|\s)call:[a-z_]+\s*\{/i,
+  /passage a ete nettoye automatiquement/i,
+  /sortie technique non lisible/i,
+  /fallback|aborterror|aborted|inexploitable|instable/i,
+  /^relation\s*:\s*rencontre\s+avec\s+/i,
+  /^rencontre\s+avec\s+/i
+];
+
+function isMemoryNoise(value: unknown): boolean {
+  const normalized = normalizeMemoryText(value);
+  if (!normalized) return true;
+  return MEMORY_NOISE_PATTERNS.some(pattern => pattern.test(normalized));
+}
+
+function extractMemoryTextFromObject(value: Record<string, unknown>): string {
+  const PRIORITY_KEYS = ['text', 'note', 'description', 'name', 'title', 'value', 'content', 'summary'];
+  const parts: string[] = [];
+
+  for (const key of PRIORITY_KEYS) {
+    const item = value[key];
+    if (typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean') {
+      const cleaned = cleanText(item, 120);
+      if (cleaned) parts.push(cleaned);
+    }
+  }
+
+  const merged = parts.join(' — ');
+  return cleanText(merged, 120);
+}
+
+function coerceMemoryString(value: unknown): string {
+  if (value === null || value === undefined) return '';
+
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return cleanText(value, 120);
+  }
+
+  if (Array.isArray(value)) {
+    const merged = value
+      .map(item => coerceMemoryString(item))
+      .filter(Boolean)
+      .join(' — ');
+    return cleanText(merged, 120);
+  }
+
+  if (typeof value === 'object') {
+    return extractMemoryTextFromObject(value as Record<string, unknown>);
+  }
+
+  return '';
+}
+
 function uniqueStrings(values: unknown, max = 10): string[] {
   const list = Array.isArray(values) ? values : [];
   const cleaned = list
-    .map(item => cleanText(item, 120))
-    .filter(Boolean);
-  return Array.from(new Set(cleaned)).slice(0, max);
+    .map(item => coerceMemoryString(item))
+    .map(item => item.replace(/\s+/g, ' ').trim())
+    .filter(item => item.length >= 4)
+    .filter(item => !isMemoryNoise(item));
+
+  const dedup = new Map<string, string>();
+  for (const item of cleaned) {
+    const key = normalizeMemoryText(item);
+    if (!key) continue;
+    dedup.set(key, item);
+  }
+
+  return Array.from(dedup.values()).slice(0, max);
 }
 
 function normalizeAttribute(rawAttribute: unknown): StoryAttribute {
@@ -651,6 +729,98 @@ function extractChoices(source: unknown): StoryChoice[] {
   return dedup.slice(0, 4);
 }
 
+function enforceChoiceAttributeDiversity(
+  choices: StoryChoice[],
+  seedText: string,
+  sectionType: string
+): StoryChoice[] {
+  if (choices.length < 3) return choices;
+
+  const uniqueBefore = new Set(choices.map(choice => choice.attribute));
+  if (uniqueBefore.size >= 2) return choices;
+
+  const diversified = choices.map(choice => ({ ...choice }));
+  const fallbackAttributes: StoryAttribute[] = [
+    'diplomacy',
+    'stealth',
+    chooseFallbackThirdAttribute(seedText, sectionType)
+  ];
+
+  for (let index = 0; index < diversified.length; index += 1) {
+    const current = diversified[index];
+    const inferred = inferAttributeFromChoiceText(current.text);
+    const target = inferred !== 'survival'
+      ? inferred
+      : fallbackAttributes[index % fallbackAttributes.length];
+
+    if (target !== diversified[0].attribute) {
+      diversified[index] = { ...current, attribute: target };
+    }
+
+    if (new Set(diversified.map(choice => choice.attribute)).size >= 2) {
+      break;
+    }
+  }
+
+  return diversified;
+}
+
+function isGenericChapterTitle(title: string): boolean {
+  const normalized = normalizeTextForPrompt(title).replace(/\s+/g, ' ').trim();
+  if (!normalized) return true;
+
+  return /^(?:tour|turn|chapitre|chapter|scene|sc[èe]ne)\s*(?:n[o°]\s*)?[\divxlcdm-]*$/i.test(normalized);
+}
+
+function toTitleCase(words: string[]): string {
+  return words
+    .map(word => word ? `${word.charAt(0).toUpperCase()}${word.slice(1).toLowerCase()}` : '')
+    .filter(Boolean)
+    .join(' ');
+}
+
+function deriveChapterTitleFromNarrative(narrative: StoryNarrative, turnNumber: number): string {
+  const corpus = [
+    narrative.action,
+    narrative.context,
+    narrative.dialogue,
+    narrative.reflection
+  ].filter(Boolean).join(' ');
+
+  const normalizedCorpus = normalizeTextForPrompt(corpus);
+  if (/(hangar|spatioport|dock|quai d['’]arrimage|baie d['’]arrimage)/.test(normalizedCorpus)) {
+    return 'Tension au spatioport';
+  }
+  if (/(cantina|bar|taverne|club)/.test(normalizedCorpus)) {
+    return 'Rumeurs de cantina';
+  }
+  if (/(embuscade|attaque|assaut|chasseur|blaster|duel|fusillade)/.test(normalizedCorpus)) {
+    return 'Sous le feu ennemi';
+  }
+  if (/(negoci|dialog|parler|accord|tr[eê]ve)/.test(normalizedCorpus)) {
+    return 'Négociation sous pression';
+  }
+
+  const firstSentence = cleanText(corpus, 320)
+    .split(/[.!?\n]/)
+    .map(item => item.trim())
+    .find(item => item.length >= 16) || '';
+
+  const tokens = firstSentence
+    .replace(/["'«»“”():,;]+/g, ' ')
+    .split(/\s+/)
+    .map(item => item.trim())
+    .filter(Boolean)
+    .filter(item => !/^(?:le|la|les|un|une|des|de|du|dans|sur|a|au|aux|et|mais|ou|donc)$/i.test(item))
+    .slice(0, 6);
+
+  if (tokens.length >= 2) {
+    return cleanText(toTitleCase(tokens), 80);
+  }
+
+  return turnNumber <= 1 ? 'Prologue' : 'Nœud de tension';
+}
+
 export function dedupeChoices(choices: StoryChoice[]): StoryChoice[] {
   return Array.from(
     new Map(
@@ -667,12 +837,16 @@ function fallbackChapter(rawText: string, turnNumber: number): StoryChapter {
   const visibleSeed = isDiagnosticFallbackText(rawText)
     ? buildEmergencyFallbackSeed(turnNumber)
     : (extractedAction || rawText);
+  const narrative = defaultNarrativeFromRaw(visibleSeed || `Le modèle n'a pas renvoyé de JSON exploitable.`);
+  const chapterTitle = turnNumber <= 1
+    ? 'Prologue'
+    : deriveChapterTitleFromNarrative(narrative, turnNumber);
 
   return {
-    chapter_title: turnNumber === 1 ? 'Prologue' : `Tour ${turnNumber}`,
+    chapter_title: chapterTitle,
     chapter_number: turnNumber,
     section_type: 'action',
-    narrative: defaultNarrativeFromRaw(visibleSeed || `Le modèle n'a pas renvoyé de JSON exploitable.`),
+    narrative,
     choices: defaultChoices(visibleSeed, turnNumber, 'action'),
     memory_updates: defaultMemoryUpdates(),
     scene_description: 'Cinematic Star Wars scene with dramatic lighting and dynamic action',
@@ -686,7 +860,6 @@ export function parseStoryResponse(rawText: string, turnNumber: number): StoryCh
 
   const chapterNumberRaw = Number(parsed.chapter_number);
   const chapterNumber = Number.isFinite(chapterNumberRaw) ? chapterNumberRaw : turnNumber;
-  const chapterTitle = cleanText(parsed.chapter_title, 80) || (chapterNumber <= 1 ? 'Prologue' : `Tour ${chapterNumber}`);
   const sectionType = cleanText(parsed.section_type, 40) || 'action';
 
   const narrative = coerceNarrative(parsed.narrative);
@@ -699,6 +872,11 @@ export function parseStoryResponse(rawText: string, turnNumber: number): StoryCh
       : (!isJson(rawFallback) ? rawFallback : '');
   }
 
+  const rawChapterTitle = cleanText(parsed.chapter_title, 80);
+  const chapterTitle = rawChapterTitle && !isGenericChapterTitle(rawChapterTitle)
+    ? rawChapterTitle
+    : deriveChapterTitleFromNarrative(narrative, chapterNumber);
+
   const choices = extractChoices(parsed.choices);
   const fallbackChoiceSeed = [
     chapterTitle,
@@ -708,6 +886,9 @@ export function parseStoryResponse(rawText: string, turnNumber: number): StoryCh
     narrative.reflection
   ].join('\n');
   const safeChoices = choices.length ? choices : defaultChoices(fallbackChoiceSeed, chapterNumber, sectionType);
+  const diverseChoices = dedupeChoices(
+    enforceChoiceAttributeDiversity(safeChoices, fallbackChoiceSeed, sectionType)
+  );
 
   let memoryUpdates = coerceMemoryUpdates(parsed.memory_updates);
   let stateUpdate = coerceStateUpdate(parsed.state_update);
@@ -735,7 +916,7 @@ export function parseStoryResponse(rawText: string, turnNumber: number): StoryCh
     chapter_number: chapterNumber,
     section_type: sectionType,
     narrative,
-    choices: safeChoices,
+    choices: diverseChoices,
     memory_updates: memoryUpdates,
     scene_description: cleanText(parsed.scene_description, 160) || 'Cinematic Star Wars scene with dramatic lighting and dynamic action',
     user_edits_applied: cleanText(parsed.user_edits_applied, 180) || null,

@@ -139,9 +139,13 @@
     { pattern: /hangar|spatioport|dock|quai d['’]arrimage|baie d['’]arrimage/i, label: 'Hangar / Spatioport' }
   ];
   const DIALOGUE_SPEAKER_RE = /^(?:[—–\-]\s*)?([A-ZÀ-ÖØ-Ý][A-Za-zÀ-ÖØ-öø-ÿ' -]{1,48})\s*:/gum;
-  const DIALOGUE_SPEAKER_STOPWORDS = new Set(['je', 'tu', 'vous', 'il', 'elle', 'on', 'nous', 'ils', 'elles']);
+  const DIALOGUE_SPEAKER_STOPWORDS = new Set([
+    'je', 'tu', 'vous', 'il', 'elle', 'on', 'nous', 'ils', 'elles',
+    'fai', 'fil', 'fait', 'faite', 'faites', 'alors', 'ensuite', 'puis', 'tour'
+  ]);
   const NON_NPC_EXACT = new Set([
     'les', 'le', 'la', 'un', 'une', 'des', 'du', 'de',
+    'fai', 'fil', 'fait', 'faite', 'faites',
     'jundland', 'kashyyyk', 'coruscant', 'tatooine', 'naboo', 'bespin',
     'hangar', 'spatioport', 'cantina', 'canyon', 'secteur',
     'hutt', 'hutts', 'rodien', 'rodiens',
@@ -152,6 +156,7 @@
   const HOSTILE_RELATION_RE = /\b(?:attaque|menace|hostile|ennemi|trahit|abandonne|frappe|tue|deteste|déteste|insulte|pi[eè]ge|embuscade)\b/i;
   const ALLY_RELATION_RE = /\b(?:aide|sauve|protege|prot[eè]ge|couvre|soutient|soutien|allie|alli[eé]|confiance|merci|secourt)\b/i;
   const MEMORY_LOW_SIGNAL_RELATION_RE = /^rencontre\s+avec\s+/i;
+  const MEMORY_TECHNICAL_NOISE_RE = /\[object object\]|(?:^|\b)json\s*[\[{]|"chapter_title"\s*:|"chapter_number"\s*:|"narrative"\s*:|"choices"\s*:|<\|?tool_call\|?>|tool_call|(?:^|\s)call:[a-z_]+\s*\{|passage a ete nettoye automatiquement|sortie technique non lisible|fallback|aborterror|aborted|inexploitable|instable|non bloquant/i;
 
   function normalizeSearchText(value: string): string {
     return value
@@ -179,6 +184,8 @@
 
     const hasDigits = /\d/.test(normalized);
     if (hasDigits && !ALLOWED_DROID_NAME_RE.test(normalized)) return false;
+
+    if (normalized.length < 3 && !ALLOWED_DROID_NAME_RE.test(normalized)) return false;
 
     return normalized.length >= 2;
   }
@@ -807,16 +814,51 @@
     return systemMessage ? [systemMessage, ...others] : others;
   }
 
-  function mergeMemoryFacts(nextFacts: string[]): void {
-    const cleanedFacts = nextFacts
-      .map(item => String(item || '').trim())
-      .filter(Boolean)
-      .filter(item => item.length >= 10)
-      .filter(item => !/^Relation:\s+Rencontre\s+avec\s+/i.test(item))
-      .filter(item => !MEMORY_LOW_SIGNAL_RELATION_RE.test(item));
+  function normalizeMemoryFactValue(value: unknown): string {
+    return String(value || '')
+      .replace(/\r/g, '\n')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 240);
+  }
 
-    const merged = Array.from(new Set([...memoryLog, ...cleanedFacts]));
-    memoryLog = merged.slice(-260); // Augmenté pour éviter le verrouillage mémoire trop précoce
+  function isMemoryNoiseFact(value: unknown): boolean {
+    const raw = normalizeMemoryFactValue(value);
+    if (!raw) return true;
+
+    const normalized = normalizeSearchText(raw).replace(/\s+/g, ' ').trim();
+    if (!normalized) return true;
+    if (raw.length < 10) return true;
+
+    return (
+      MEMORY_LOW_SIGNAL_RELATION_RE.test(normalized) ||
+      /^relation\s*:\s*rencontre\s+avec\s+/i.test(normalized) ||
+      MEMORY_TECHNICAL_NOISE_RE.test(normalized)
+    );
+  }
+
+  function memoryFactDedupKey(value: string): string {
+    return normalizeSearchText(value)
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function normalizeMemoryFacts(values: string[]): string[] {
+    const dedup = new Map<string, string>();
+
+    for (const entry of values) {
+      const normalizedEntry = normalizeMemoryFactValue(entry);
+      if (!normalizedEntry || isMemoryNoiseFact(normalizedEntry)) continue;
+      const key = memoryFactDedupKey(normalizedEntry);
+      if (!key) continue;
+      dedup.set(key, normalizedEntry);
+    }
+
+    return Array.from(dedup.values()).slice(-260);
+  }
+
+  function mergeMemoryFacts(nextFacts: string[]): void {
+    memoryLog = normalizeMemoryFacts([...memoryLog, ...nextFacts]);
   }
 
 
@@ -1290,7 +1332,7 @@
         chapterHistory = sanitizeChapterList(session.chapterHistory);
         actionHistory = session.actionHistory;
         aiMessages = session.aiMessages;
-        memoryLog = session.memoryLog;
+        memoryLog = normalizeMemoryFacts(session.memoryLog || []);
         backgroundEvents = session.backgroundEvents || [];
         campaignArchive = session.campaignArchive || [];
 

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   buildSystemPrompt,
   callOpenAiCompatibleRaw,
+  coerceMemoryUpdates,
   detectModelCapabilities,
   parseStoryResponse,
   supportsAgenticToolCalling
@@ -287,6 +288,63 @@ describe('parseStoryResponse', () => {
     expect(npcNames.has('Canyon')).toBe(false);
     expect(npcNames.has('Kashyyyk')).toBe(false);
     expect(npcNames.has('YT-1300')).toBe(false);
+  });
+
+  it('filters technical memory noise and object artifacts from memory updates', () => {
+    const memory = coerceMemoryUpdates({
+      relations: ['Rencontre avec inconnu', { text: 'Lira te couvre sous le feu.' }],
+      notes: [
+        { description: 'Piste fiable vers un relais HoloNet.' },
+        '[object Object]',
+        'Le passage a été nettoyé automatiquement pour éviter un affichage technique.',
+        '"chapter_title": "Test"'
+      ]
+    });
+
+    expect(memory.relations.some(item => /rencontre avec/i.test(item))).toBe(false);
+    expect(memory.relations).toContain('Lira te couvre sous le feu.');
+    expect(memory.notes).toContain('Piste fiable vers un relais HoloNet.');
+    expect(memory.notes.some(item => /\[object object\]/i.test(item))).toBe(false);
+    expect(memory.notes.some(item => /chapter_title/i.test(item))).toBe(false);
+  });
+
+  it('diversifies choice attributes when model returns a mono-attribute set', () => {
+    const raw = JSON.stringify({
+      chapter_title: 'Incident de quai',
+      chapter_number: 5,
+      section_type: 'action',
+      narrative: {
+        action: 'Le hangar tremble sous la poussée des moteurs tandis que les gardes ferment les accès.'
+      },
+      choices: [
+        { text: 'Négocier un passage immédiat avec le chef de quai', attribute: 'survival', difficulty: 2 },
+        { text: 'Contourner discrètement les patrouilles', attribute: 'survival', difficulty: 3 },
+        { text: 'Forcer le verrou du terminal de sécurité', attribute: 'survival', difficulty: 3 }
+      ]
+    });
+
+    const chapter = parseStoryResponse(raw, 5);
+    const attributes = new Set(chapter.choices.map(choice => choice.attribute));
+
+    expect(chapter.choices.length).toBeGreaterThanOrEqual(3);
+    expect(attributes.size).toBeGreaterThanOrEqual(2);
+  });
+
+  it('replaces generic chapter titles with contextual fallbacks', () => {
+    const raw = JSON.stringify({
+      chapter_title: 'Tour 9',
+      chapter_number: 9,
+      section_type: 'action',
+      narrative: {
+        action: 'La sirène hurle dans le hangar de Nar Shaddaa, et chaque issue se referme.'
+      },
+      choices: [{ text: 'Réagir vite', attribute: 'survival', difficulty: 2 }]
+    });
+
+    const chapter = parseStoryResponse(raw, 9);
+
+    expect(chapter.chapter_title).toBe('Tension au spatioport');
+    expect(/^Tour\s+9$/i.test(chapter.chapter_title)).toBe(false);
   });
 
   it('keeps dialogue instructions explicit in the system prompt', () => {

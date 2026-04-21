@@ -104,28 +104,22 @@ ${cleanText(scribeSummary, 1500)}
 
 export function buildPipelineBrainUserPrompt(writerScene: string): string {
   return `Voici la scène qui vient de se dérouler:
-${cleanText(writerScene, 5200)}
+${cleanText(writerScene, 2800)}
 
 Déduis-en les conséquences mécaniques et propose 3 choix pour la suite.
-Réponds EXCLUSIVEMENT en JSON strict avec ce schéma:
+Réponds EXCLUSIVEMENT en JSON strict (sans markdown) avec ce contrat:
 {
   "state_update": {
     "hp": 0,
     "credits": 0,
     "location": "",
     "date_advance": "",
-    "npcs": [],
+    "npcs": [{ "name": "", "affinity": 0, "status": "neutral", "alive": true }],
     "factions": {},
     "injuries_new": [],
     "injuries_resolved": [],
     "inventory_gained": [],
-    "inventory_lost": [],
-    "clocks_new": [],
-    "clocks_advance": {},
-    "sector_influence": {},
-    "rumors_new": [],
-    "environment_status": "",
-    "director_instruction": ""
+    "inventory_lost": []
   },
   "memory_updates": {
     "relations": [],
@@ -135,11 +129,14 @@ Réponds EXCLUSIVEMENT en JSON strict avec ce schéma:
     "notes": []
   },
   "choices": [
-    { "text": "", "attribute": "survival", "difficulty": 2, "faction_impact": {} },
-    { "text": "", "attribute": "survival", "difficulty": 2, "faction_impact": {} },
-    { "text": "", "attribute": "survival", "difficulty": 2, "faction_impact": {} }
+    { "text": "", "attribute": "combat|diplomacy|stealth|tech|force|survival", "difficulty": 2, "faction_impact": {} }
   ]
-}`;
+}
+
+Contraintes:
+- 3 ou 4 choices concrets, distincts, sans doublons de texte.
+- Évite que tous les choices aient le même attribute.
+- Les champs non pertinents peuvent être omis.`;
 }
 
 export function buildSystemPrompt(
