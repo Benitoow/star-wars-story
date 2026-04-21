@@ -1,0 +1,213 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - complementary [ref=e4]:
+      - generic [ref=e5]:
+        - link "Star Wars" [ref=e6] [cursor=pointer]:
+          - /url: /
+          - img [ref=e7]
+          - generic [ref=e9]: Star Wars
+        - button "Fermer le menu latéral" [ref=e10] [cursor=pointer]:
+          - img [ref=e11]
+      - navigation [ref=e14]:
+        - link "Dashboard" [ref=e15] [cursor=pointer]:
+          - /url: /
+          - img [ref=e17]
+          - generic [ref=e20]: Dashboard
+        - link "Mes Histoires" [ref=e21] [cursor=pointer]:
+          - /url: /stories
+          - img [ref=e23]
+          - generic [ref=e26]: Mes Histoires
+        - link "Dossiers" [ref=e27] [cursor=pointer]:
+          - /url: /folders
+          - img [ref=e29]
+          - generic [ref=e31]: Dossiers
+        - link "Corbeille" [ref=e32] [cursor=pointer]:
+          - /url: /trash
+          - img [ref=e34]
+          - generic [ref=e36]: Corbeille
+        - link "Paramètres" [ref=e37] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e39]
+          - generic [ref=e42]: Paramètres
+      - 'link "Langue de l''interface: Auto (navigateur)" [ref=e44] [cursor=pointer]':
+        - /url: /settings
+        - img [ref=e45]
+        - generic [ref=e48]: "Langue :"
+        - generic [ref=e49]: Auto (navigateur)
+    - main [ref=e50]:
+      - generic [ref=e51]:
+        - generic [ref=e58]:
+          - button "Recherche" [ref=e59] [cursor=pointer]:
+            - img [ref=e60]
+          - textbox "Rechercher…" [ref=e63]
+        - generic [ref=e64]:
+          - button "Auto (navigateur)" [ref=e66] [cursor=pointer]:
+            - img [ref=e67]
+            - generic [ref=e70]: Auto (navigateur)
+            - img [ref=e71]
+          - generic [ref=e73]:
+            - button "Vue grille" [ref=e74] [cursor=pointer]:
+              - img [ref=e75]
+            - button "Vue liste" [ref=e80] [cursor=pointer]:
+              - img [ref=e81]
+          - button "Nouvelle Histoire" [ref=e85] [cursor=pointer]:
+            - img [ref=e86]
+            - generic [ref=e87]: Nouvelle Histoire
+      - main [ref=e94]:
+        - generic [ref=e95]:
+          - generic [ref=e96]:
+            - button "Retour" [ref=e97] [cursor=pointer]:
+              - img [ref=e98]
+              - text: Retour
+            - navigation "Fil d'Ariane" [ref=e100]:
+              - link "Mes Histoires" [ref=e101] [cursor=pointer]:
+                - /url: /
+              - generic [ref=e102]: ›
+              - generic [ref=e103]: Nouvelle aventure
+          - generic [ref=e105]:
+            - button "Nouvelle" [ref=e106] [cursor=pointer]:
+              - img [ref=e107]
+              - generic [ref=e108]: Nouvelle
+            - button "Sauvegarder" [ref=e109] [cursor=pointer]:
+              - img [ref=e110]
+              - generic [ref=e114]: Sauvegarder
+        - generic [ref=e116]:
+          - generic "Progression de la création d'histoire" [ref=e117]:
+            - button "1 Ère" [ref=e118] [cursor=pointer]:
+              - generic [ref=e119]: "1"
+              - generic [ref=e120]: Ère
+            - button "2 Faction & rôle" [ref=e121] [cursor=pointer]:
+              - generic [ref=e122]: "2"
+              - generic [ref=e123]: Faction & rôle
+            - button "3 Trame" [ref=e124] [cursor=pointer]:
+              - generic [ref=e125]: "3"
+              - generic [ref=e126]: Trame
+            - button "4 Style IA" [ref=e127] [cursor=pointer]:
+              - generic [ref=e128]: "4"
+              - generic [ref=e129]: Style IA
+            - button "5 Protagoniste" [ref=e130] [cursor=pointer]:
+              - generic [ref=e131]: "5"
+              - generic [ref=e132]: Protagoniste
+            - button "6 Lancement" [ref=e133] [cursor=pointer]:
+              - generic [ref=e134]: "6"
+              - generic [ref=e135]: Lancement
+          - generic [ref=e492]:
+            - generic [ref=e493]:
+              - paragraph [ref=e494]: Étape 2 / 6
+              - heading "Faction & rôle" [level=1] [ref=e495]
+              - paragraph [ref=e496]: Qui êtes-vous dans cette galaxie ?
+            - generic [ref=e497]:
+              - generic [ref=e498]:
+                - generic [ref=e499]:
+                  - paragraph [ref=e500]: Allégeance
+                  - paragraph [ref=e501]: La faction place ton personnage dans la galaxie. Sans ça, tu n’as qu’un mannequin en robe.
+                - generic [ref=e502]:
+                  - button "Ordre Jedi" [ref=e503] [cursor=pointer]:
+                    - strong [ref=e505]: Ordre Jedi
+                  - button "Ordre Sith" [ref=e506] [cursor=pointer]:
+                    - strong [ref=e508]: Ordre Sith
+                  - button "Empire Galactique" [ref=e509] [cursor=pointer]:
+                    - strong [ref=e511]: Empire Galactique
+                  - button "Alliance Rebelle" [ref=e512] [cursor=pointer]:
+                    - strong [ref=e514]: Alliance Rebelle
+                  - button "République Galactique" [ref=e515] [cursor=pointer]:
+                    - strong [ref=e517]: République Galactique
+                  - button "Mandaloriens" [ref=e518] [cursor=pointer]:
+                    - strong [ref=e520]: Mandaloriens
+                  - button "Premier Ordre" [ref=e521] [cursor=pointer]:
+                    - strong [ref=e523]: Premier Ordre
+                  - button "Cartel Hutt" [ref=e524] [cursor=pointer]:
+                    - strong [ref=e526]: Cartel Hutt
+                  - button "Indépendant" [ref=e527] [cursor=pointer]:
+                    - strong [ref=e529]: Indépendant
+              - generic [ref=e530]:
+                - generic [ref=e531]:
+                  - paragraph [ref=e532]: Fonction
+                  - paragraph [ref=e533]: Le rôle filtre la fantasy du perso. Un Padawan n’est pas un demi-dieu qui a raté sa sieste.
+                - generic [ref=e534]:
+                  - button "Officier Impérial Empire Galactique" [active] [ref=e535] [cursor=pointer]:
+                    - generic [ref=e537]:
+                      - strong [ref=e538]: Officier Impérial
+                      - generic [ref=e539]: Empire Galactique
+                  - button "Stormtrooper Empire Galactique" [ref=e540] [cursor=pointer]:
+                    - generic [ref=e542]:
+                      - strong [ref=e543]: Stormtrooper
+                      - generic [ref=e544]: Empire Galactique
+                  - button "Chasseur de Primes Indépendant" [ref=e545] [cursor=pointer]:
+                    - generic [ref=e547]:
+                      - strong [ref=e548]: Chasseur de Primes
+                      - generic [ref=e549]: Indépendant
+                  - button "Contrebandier Indépendant" [ref=e550] [cursor=pointer]:
+                    - generic [ref=e552]:
+                      - strong [ref=e553]: Contrebandier
+                      - generic [ref=e554]: Indépendant
+                  - button "Éclaireur Indépendant" [ref=e555] [cursor=pointer]:
+                    - generic [ref=e557]:
+                      - strong [ref=e558]: Éclaireur
+                      - generic [ref=e559]: Indépendant
+                  - button "Jedi Banni Indépendant" [ref=e560] [cursor=pointer]:
+                    - generic [ref=e562]:
+                      - strong [ref=e563]: Jedi Banni
+                      - generic [ref=e564]: Indépendant
+                  - button "Sensible à la Force Indépendant" [ref=e565] [cursor=pointer]:
+                    - generic [ref=e567]:
+                      - strong [ref=e568]: Sensible à la Force
+                      - generic [ref=e569]: Indépendant
+                  - button "Apprenti Sith Ordre Sith" [ref=e570] [cursor=pointer]:
+                    - generic [ref=e572]:
+                      - strong [ref=e573]: Apprenti Sith
+                      - generic [ref=e574]: Ordre Sith
+                  - button "Chevalier Jedi Ordre Jedi" [ref=e575] [cursor=pointer]:
+                    - generic [ref=e577]:
+                      - strong [ref=e578]: Chevalier Jedi
+                      - generic [ref=e579]: Ordre Jedi
+                  - button "Clone Trooper République Galactique" [ref=e580] [cursor=pointer]:
+                    - generic [ref=e582]:
+                      - strong [ref=e583]: Clone Trooper
+                      - generic [ref=e584]: République Galactique
+                  - button "Guerrier Mandalorien Mandaloriens" [ref=e585] [cursor=pointer]:
+                    - generic [ref=e587]:
+                      - strong [ref=e588]: Guerrier Mandalorien
+                      - generic [ref=e589]: Mandaloriens
+                  - button "Leader Rebelle Alliance Rebelle" [ref=e590] [cursor=pointer]:
+                    - generic [ref=e592]:
+                      - strong [ref=e593]: Leader Rebelle
+                      - generic [ref=e594]: Alliance Rebelle
+                  - button "Main du Hutt Cartel Hutt" [ref=e595] [cursor=pointer]:
+                    - generic [ref=e597]:
+                      - strong [ref=e598]: Main du Hutt
+                      - generic [ref=e599]: Cartel Hutt
+                  - button "Maître Jedi Ordre Jedi" [ref=e600] [cursor=pointer]:
+                    - generic [ref=e602]:
+                      - strong [ref=e603]: Maître Jedi
+                      - generic [ref=e604]: Ordre Jedi
+                  - button "Membre de la Résistance Alliance Rebelle" [ref=e605] [cursor=pointer]:
+                    - generic [ref=e607]:
+                      - strong [ref=e608]: Membre de la Résistance
+                      - generic [ref=e609]: Alliance Rebelle
+                  - button "Padawan Ordre Jedi" [ref=e610] [cursor=pointer]:
+                    - generic [ref=e612]:
+                      - strong [ref=e613]: Padawan
+                      - generic [ref=e614]: Ordre Jedi
+                  - button "Pilote Rebelle Alliance Rebelle" [ref=e615] [cursor=pointer]:
+                    - generic [ref=e617]:
+                      - strong [ref=e618]: Pilote Rebelle
+                      - generic [ref=e619]: Alliance Rebelle
+                  - button "Seigneur Sith Ordre Sith" [ref=e620] [cursor=pointer]:
+                    - generic [ref=e622]:
+                      - strong [ref=e623]: Seigneur Sith
+                      - generic [ref=e624]: Ordre Sith
+                  - button "Sénateur République Galactique" [ref=e625] [cursor=pointer]:
+                    - generic [ref=e627]:
+                      - strong [ref=e628]: Sénateur
+                      - generic [ref=e629]: République Galactique
+                  - button "Soldat du Premier Ordre Premier Ordre" [ref=e630] [cursor=pointer]:
+                    - generic [ref=e632]:
+                      - strong [ref=e633]: Soldat du Premier Ordre
+                      - generic [ref=e634]: Premier Ordre
+            - generic [ref=e635]:
+              - button "Retour" [ref=e636] [cursor=pointer]
+              - generic [ref=e637]:
+                - button "Paramètres IA" [ref=e638] [cursor=pointer]
+                - button "Continuer" [ref=e639] [cursor=pointer]
+  - generic [ref=e172]: Nouvelle aventure IA — Star Wars Story Manager

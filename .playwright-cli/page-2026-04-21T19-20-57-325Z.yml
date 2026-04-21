@@ -1,0 +1,124 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - complementary [ref=e4]:
+      - generic [ref=e5]:
+        - link "Star Wars" [ref=e6] [cursor=pointer]:
+          - /url: /
+          - img [ref=e7]
+          - generic [ref=e9]: Star Wars
+        - button "Fermer le menu latéral" [ref=e10] [cursor=pointer]:
+          - img [ref=e11]
+      - navigation [ref=e14]:
+        - link "Dashboard" [ref=e15] [cursor=pointer]:
+          - /url: /
+          - img [ref=e17]
+          - generic [ref=e20]: Dashboard
+        - link "Mes Histoires" [ref=e21] [cursor=pointer]:
+          - /url: /stories
+          - img [ref=e23]
+          - generic [ref=e26]: Mes Histoires
+        - link "Dossiers" [ref=e27] [cursor=pointer]:
+          - /url: /folders
+          - img [ref=e29]
+          - generic [ref=e31]: Dossiers
+        - link "Corbeille" [ref=e32] [cursor=pointer]:
+          - /url: /trash
+          - img [ref=e34]
+          - generic [ref=e36]: Corbeille
+        - link "Paramètres" [ref=e37] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e39]
+          - generic [ref=e42]: Paramètres
+      - 'link "Langue de l''interface: Auto (navigateur)" [ref=e44] [cursor=pointer]':
+        - /url: /settings
+        - img [ref=e45]
+        - generic [ref=e48]: "Langue :"
+        - generic [ref=e49]: Auto (navigateur)
+    - main [ref=e50]:
+      - generic [ref=e51]:
+        - generic [ref=e58]:
+          - button "Recherche" [ref=e59] [cursor=pointer]:
+            - img [ref=e60]
+          - textbox "Rechercher…" [ref=e63]
+        - generic [ref=e64]:
+          - button "Auto (navigateur)" [ref=e66] [cursor=pointer]:
+            - img [ref=e67]
+            - generic [ref=e70]: Auto (navigateur)
+            - img [ref=e71]
+          - generic [ref=e73]:
+            - button "Vue grille" [ref=e74] [cursor=pointer]:
+              - img [ref=e75]
+            - button "Vue liste" [ref=e80] [cursor=pointer]:
+              - img [ref=e81]
+          - button "Nouvelle Histoire" [ref=e85] [cursor=pointer]:
+            - img [ref=e86]
+            - generic [ref=e87]: Nouvelle Histoire
+      - main [ref=e94]:
+        - generic [ref=e95]:
+          - generic [ref=e96]:
+            - button "Retour" [ref=e97] [cursor=pointer]:
+              - img [ref=e98]
+              - text: Retour
+            - navigation "Fil d'Ariane" [ref=e100]:
+              - link "Mes Histoires" [ref=e101] [cursor=pointer]:
+                - /url: /
+              - generic [ref=e102]: ›
+              - generic [ref=e103]: Nouvelle aventure
+          - generic [ref=e105]:
+            - button "Nouvelle" [ref=e106] [cursor=pointer]:
+              - img [ref=e107]
+              - generic [ref=e108]: Nouvelle
+            - button "Sauvegarder" [ref=e109] [cursor=pointer]:
+              - img [ref=e110]
+              - generic [ref=e114]: Sauvegarder
+        - generic [ref=e116]:
+          - generic "Progression de la création d'histoire" [ref=e117]:
+            - button "1 Ère" [ref=e118] [cursor=pointer]:
+              - generic [ref=e119]: "1"
+              - generic [ref=e120]: Ère
+            - button "2 Faction & rôle" [ref=e121] [cursor=pointer]:
+              - generic [ref=e122]: "2"
+              - generic [ref=e123]: Faction & rôle
+            - button "3 Trame" [ref=e124] [cursor=pointer]:
+              - generic [ref=e125]: "3"
+              - generic [ref=e126]: Trame
+            - button "4 Style IA" [ref=e127] [cursor=pointer]:
+              - generic [ref=e128]: "4"
+              - generic [ref=e129]: Style IA
+            - button "5 Protagoniste" [ref=e130] [cursor=pointer]:
+              - generic [ref=e131]: "5"
+              - generic [ref=e132]: Protagoniste
+            - button "6 Lancement" [ref=e133] [cursor=pointer]:
+              - generic [ref=e134]: "6"
+              - generic [ref=e135]: Lancement
+          - generic [ref=e137]:
+            - generic [ref=e138]:
+              - paragraph [ref=e139]: Étape 1 / 6
+              - heading "Ère" [level=1] [ref=e140]
+              - paragraph [ref=e141]: Quand commence votre histoire ?
+            - generic [ref=e142]:
+              - generic [ref=e143]:
+                - paragraph [ref=e144]: Cadre temporel
+                - paragraph [ref=e145]: Choisis l’époque. C’est le carburant de tout le reste, pas un détail cosmétique.
+              - generic [ref=e146]:
+                - button "Ancienne République 25 000 - 1000 AVBY" [ref=e147] [cursor=pointer]:
+                  - strong [ref=e149]: Ancienne République
+                  - generic [ref=e150]: 25 000 - 1000 AVBY
+                - button "Guerres des Clones 22 - 19 AVBY" [ref=e151] [cursor=pointer]:
+                  - strong [ref=e153]: Guerres des Clones
+                  - generic [ref=e154]: 22 - 19 AVBY
+                - button "Ère Impériale 19 - 4 AVBY" [active] [ref=e155] [cursor=pointer]:
+                  - strong [ref=e157]: Ère Impériale
+                  - generic [ref=e158]: 19 - 4 AVBY
+                - button "Nouvelle République 4 - 28 APBY" [ref=e159] [cursor=pointer]:
+                  - strong [ref=e161]: Nouvelle République
+                  - generic [ref=e162]: 4 - 28 APBY
+                - button "Premier Ordre 28 - 35 APBY" [ref=e163] [cursor=pointer]:
+                  - strong [ref=e165]: Premier Ordre
+                  - generic [ref=e166]: 28 - 35 APBY
+            - generic [ref=e167]:
+              - button "Retour" [disabled] [ref=e168]
+              - generic [ref=e169]:
+                - button "Paramètres IA" [ref=e170] [cursor=pointer]
+                - button "Continuer" [ref=e171] [cursor=pointer]
+  - generic [ref=e172]: Nouvelle aventure IA — Star Wars Story Manager

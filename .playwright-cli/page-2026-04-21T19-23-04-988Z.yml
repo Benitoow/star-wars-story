@@ -1,0 +1,180 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - complementary [ref=e4]:
+      - generic [ref=e5]:
+        - link "Star Wars" [ref=e6] [cursor=pointer]:
+          - /url: /
+          - img [ref=e7]
+          - generic [ref=e9]: Star Wars
+        - button "Fermer le menu latéral" [ref=e10] [cursor=pointer]:
+          - img [ref=e11]
+      - navigation [ref=e14]:
+        - link "Dashboard" [ref=e15] [cursor=pointer]:
+          - /url: /
+          - img [ref=e17]
+          - generic [ref=e20]: Dashboard
+        - link "Mes Histoires" [ref=e21] [cursor=pointer]:
+          - /url: /stories
+          - img [ref=e23]
+          - generic [ref=e26]: Mes Histoires
+        - link "Dossiers" [ref=e27] [cursor=pointer]:
+          - /url: /folders
+          - img [ref=e29]
+          - generic [ref=e31]: Dossiers
+        - link "Corbeille" [ref=e32] [cursor=pointer]:
+          - /url: /trash
+          - img [ref=e34]
+          - generic [ref=e36]: Corbeille
+        - link "Paramètres" [ref=e37] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e39]
+          - generic [ref=e42]: Paramètres
+      - 'link "Langue de l''interface: Auto (navigateur)" [ref=e44] [cursor=pointer]':
+        - /url: /settings
+        - img [ref=e45]
+        - generic [ref=e48]: "Langue :"
+        - generic [ref=e49]: Auto (navigateur)
+    - main [ref=e50]:
+      - generic [ref=e51]:
+        - generic [ref=e58]:
+          - button "Recherche" [ref=e59] [cursor=pointer]:
+            - img [ref=e60]
+          - textbox "Rechercher…" [ref=e63]
+        - generic [ref=e64]:
+          - button "Auto (navigateur)" [ref=e66] [cursor=pointer]:
+            - img [ref=e67]
+            - generic [ref=e70]: Auto (navigateur)
+            - img [ref=e71]
+          - generic [ref=e73]:
+            - button "Vue grille" [ref=e74] [cursor=pointer]:
+              - img [ref=e75]
+            - button "Vue liste" [ref=e80] [cursor=pointer]:
+              - img [ref=e81]
+          - button "Nouvelle Histoire" [ref=e85] [cursor=pointer]:
+            - img [ref=e86]
+            - generic [ref=e87]: Nouvelle Histoire
+      - main [ref=e94]:
+        - generic [ref=e95]:
+          - generic [ref=e96]:
+            - button "Retour" [ref=e97] [cursor=pointer]:
+              - img [ref=e98]
+              - text: Retour
+            - navigation "Fil d'Ariane" [ref=e100]:
+              - link "Mes Histoires" [ref=e101] [cursor=pointer]:
+                - /url: /
+              - generic [ref=e102]: ›
+              - generic [ref=e103]: Situation Tendue En Cours
+          - generic [ref=e105]:
+            - button "Nouvelle" [ref=e106] [cursor=pointer]:
+              - img [ref=e107]
+              - generic [ref=e108]: Nouvelle
+            - button "Sauvegarder" [ref=e109] [cursor=pointer]:
+              - img [ref=e110]
+              - generic [ref=e114]: Sauvegarder
+        - generic [ref=e672]:
+          - generic [ref=e673]:
+            - generic [ref=e674]:
+              - text: Tour
+              - strong [ref=e676]: "1"
+            - generic "openrouter · qwen/qwen3.5-9b · pipeline" [ref=e677]:
+              - generic [ref=e679]: qwen3.5-9b
+              - generic [ref=e680]: ⚡
+            - generic "Faits mémorisés par l'IA" [ref=e681]:
+              - img [ref=e682]
+              - text: "6"
+            - button "Config" [ref=e684] [cursor=pointer]
+          - complementary [ref=e685]:
+            - button "Réduire" [ref=e686] [cursor=pointer]:
+              - img [ref=e687]
+            - generic [ref=e689]:
+              - generic [ref=e690]: Tour 1
+              - generic [ref=e691]:
+                - generic [ref=e692]: ❤️
+                - generic [ref=e695]: "100"
+              - generic [ref=e696]:
+                - generic [ref=e697]: ₡
+                - generic [ref=e698]: 3 000
+              - generic [ref=e699]:
+                - generic [ref=e700]: 📍
+                - generic "Lance" [ref=e701]
+              - generic [ref=e702]:
+                - generic [ref=e703]: 🕐
+                - generic [ref=e704]: 19 AVBY, Jour 1
+              - generic [ref=e705]: Identité
+              - generic [ref=e706]:
+                - generic [ref=e707]: 🎖️
+                - generic "Rôle / grade narratif" [ref=e708]: "Rôle: Officier Impérial"
+              - generic [ref=e709]:
+                - generic [ref=e710]: 🛡️
+                - generic "Camp de départ" [ref=e711]: "Camp: Empire Galactique"
+              - generic [ref=e712]: Relations
+              - generic [ref=e713]:
+                - generic [ref=e715]: CADRE D'OUVERTURE
+                - generic [ref=e716]: Neutre
+              - generic [ref=e717]:
+                - generic [ref=e719]: Protagoniste
+                - generic [ref=e720]: Neutre
+              - generic [ref=e721]:
+                - generic [ref=e723]: Ère
+                - generic [ref=e724]: Neutre
+              - generic [ref=e725]:
+                - generic [ref=e727]: Faction
+                - generic [ref=e728]: Neutre
+              - generic [ref=e729]: Factions
+              - generic [ref=e730]: Réputation de -100 (ennemi) à +100 (allié).
+              - generic [ref=e731]:
+                - generic [ref=e734]: Empire
+                - generic [ref=e735]: Ton camp
+                - generic [ref=e736]: Allié
+                - generic [ref=e737]: "+50"
+          - generic [ref=e738]:
+            - article [ref=e739]:
+              - generic [ref=e740]:
+                - generic [ref=e741]:
+                  - generic [ref=e742]: Tour 1
+                  - generic [ref=e743]: ·
+                  - generic [ref=e744]: action
+                - heading "Situation Tendue En Cours" [level=2] [ref=e745]
+              - generic [ref=e747]:
+                - generic [ref=e748]: Action
+                - paragraph [ref=e749]: "Tour 1. Tour 1. Situation tendue en cours. Action immédiate du joueur: Lance une histoire interactive Star Wars avec un prologue immédiatement jouable."
+                - paragraph [ref=e750]: "— CADRE D'OUVERTURE: - Protagoniste: le protagoniste - Ère: imperial — Ère Impériale — l'Empire règne par la peur, les Jedi sont traqués et la Rébellion cherche des alliés. - Faction: empire - Rôle: imperial_officer - Trame: L'Infiltrateur - Prémisse: Votre mission d'infiltrat — CADRE D'OUVERTURE: - Protagoniste: le protagoniste - Ère: imperial — Ère Impériale — l'Empire règne par la peur, les Jedi sont traqués et la Rébellion cherche des alliés. - Faction: empire - Rôle: imperial_officer - Trame: L'Infiltrateur - Prémisse: Votre mission d'infiltration. Les regards se figent, les moteurs grondent au loin, et chaque seconde ajoute du poids à la décision suivante."
+                - paragraph [ref=e751]: La scène bascule sans avertissement quand le protagoniste décide de Lance une histoire interactive Star Wars avec un prologue immédiatement jouable.
+            - group [ref=e752]:
+              - generic "Contexte mémorisé (6)" [ref=e753] [cursor=pointer]:
+                - img [ref=e754]
+                - text: Contexte mémorisé
+                - generic [ref=e756]: (6)
+              - text: — — — — — —
+          - generic [ref=e757]:
+            - generic [ref=e758]:
+              - heading "Que faites-vous ?" [level=3] [ref=e759]
+              - generic [ref=e760]:
+                - button "A Se fondre dans l'environnement dans la zone actuelle pour repérer une ouverture. stealth" [ref=e761] [cursor=pointer]:
+                  - generic [ref=e762]: A
+                  - generic [ref=e763]:
+                    - generic [ref=e764]: Se fondre dans l'environnement dans la zone actuelle pour repérer une ouverture.
+                    - generic [ref=e766]: stealth
+                - button "B Engager calmement le dialogue dans la zone actuelle pour obtenir des informations. diplomacy" [ref=e773] [cursor=pointer]:
+                  - generic [ref=e774]: B
+                  - generic [ref=e775]:
+                    - generic [ref=e776]: Engager calmement le dialogue dans la zone actuelle pour obtenir des informations.
+                    - generic [ref=e778]: diplomacy
+                - button "C Utiliser la perception de la Force dans la zone actuelle pour choisir la meilleure fenêtre. force" [ref=e785] [cursor=pointer]:
+                  - generic [ref=e786]: C
+                  - generic [ref=e787]:
+                    - generic [ref=e788]: Utiliser la perception de la Force dans la zone actuelle pour choisir la meilleure fenêtre.
+                    - generic [ref=e790]: force
+            - generic [ref=e797]:
+              - generic [ref=e798]: — ou jouez librement
+              - generic [ref=e799]:
+                - textbox "— ou jouez librement" [ref=e800]:
+                  - /placeholder: Décrivez votre action…
+                - button "Envoyer" [disabled] [ref=e801]:
+                  - img [ref=e802]
+    - alert [ref=e806]:
+      - img [ref=e808]
+      - generic [ref=e810]: Aventure IA lancée.
+      - button [ref=e811] [cursor=pointer]:
+        - img [ref=e812]
+  - generic [ref=e172]: Aventure interactive — Star Wars Story Manager

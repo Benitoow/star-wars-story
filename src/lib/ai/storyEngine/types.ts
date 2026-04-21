@@ -114,7 +114,7 @@ export type StoryPromptMode = 'json';
 export interface StoryTurnGenerationResult {
   chapter: StoryChapter;
   rawResponse: string;
-  mode: 'structured-json' | 'agentic-tools';
+  mode: 'structured-json' | 'agentic-tools' | 'pipeline';
   steps: number;
   toolCalls: number;
 }
@@ -141,7 +141,7 @@ export interface BackgroundWorldInput {
 export interface BackgroundWorldGenerationResult {
   event: BackgroundWorldEvent | null;
   rawResponse: string;
-  mode: 'structured-json' | 'agentic-tools';
+  mode: 'structured-json' | 'agentic-tools' | 'pipeline';
   steps: number;
   toolCalls: number;
 }

@@ -1,0 +1,135 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - complementary [ref=e4]:
+      - generic [ref=e5]:
+        - link "Star Wars" [ref=e6] [cursor=pointer]:
+          - /url: /
+          - img [ref=e7]
+          - generic [ref=e9]: Star Wars
+        - button "Fermer le menu latéral" [ref=e10] [cursor=pointer]:
+          - img [ref=e11]
+      - navigation [ref=e14]:
+        - link "Dashboard" [ref=e15] [cursor=pointer]:
+          - /url: /
+          - img [ref=e17]
+          - generic [ref=e20]: Dashboard
+        - link "Mes Histoires" [ref=e21] [cursor=pointer]:
+          - /url: /stories
+          - img [ref=e23]
+          - generic [ref=e26]: Mes Histoires
+        - link "Dossiers" [ref=e27] [cursor=pointer]:
+          - /url: /folders
+          - img [ref=e29]
+          - generic [ref=e31]: Dossiers
+        - link "Corbeille" [ref=e32] [cursor=pointer]:
+          - /url: /trash
+          - img [ref=e34]
+          - generic [ref=e36]: Corbeille
+        - link "Paramètres" [ref=e37] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e39]
+          - generic [ref=e42]: Paramètres
+      - 'link "Langue de l''interface: Auto (navigateur)" [ref=e44] [cursor=pointer]':
+        - /url: /settings
+        - img [ref=e45]
+        - generic [ref=e48]: "Langue :"
+        - generic [ref=e49]: Auto (navigateur)
+    - main [ref=e50]:
+      - generic [ref=e51]:
+        - generic [ref=e58]:
+          - button "Recherche" [ref=e59] [cursor=pointer]:
+            - img [ref=e60]
+          - textbox "Rechercher…" [ref=e63]
+        - generic [ref=e64]:
+          - button "Auto (navigateur)" [ref=e66] [cursor=pointer]:
+            - img [ref=e67]
+            - generic [ref=e70]: Auto (navigateur)
+            - img [ref=e71]
+          - generic [ref=e73]:
+            - button "Vue grille" [ref=e74] [cursor=pointer]:
+              - img [ref=e75]
+            - button "Vue liste" [ref=e80] [cursor=pointer]:
+              - img [ref=e81]
+          - button "Nouvelle Histoire" [ref=e85] [cursor=pointer]:
+            - img [ref=e86]
+            - generic [ref=e87]: Nouvelle Histoire
+      - main [ref=e94]:
+        - generic [ref=e95]:
+          - generic [ref=e96]:
+            - button "Retour" [ref=e97] [cursor=pointer]:
+              - img [ref=e98]
+              - text: Retour
+            - navigation "Fil d'Ariane" [ref=e100]:
+              - link "Mes Histoires" [ref=e101] [cursor=pointer]:
+                - /url: /
+              - generic [ref=e102]: ›
+              - generic [ref=e103]: Nouvelle aventure
+          - generic [ref=e105]:
+            - button "Nouvelle" [ref=e106] [cursor=pointer]:
+              - img [ref=e107]
+              - generic [ref=e108]: Nouvelle
+            - button "Sauvegarder" [ref=e109] [cursor=pointer]:
+              - img [ref=e110]
+              - generic [ref=e114]: Sauvegarder
+        - generic [ref=e116]:
+          - generic "Progression de la création d'histoire" [ref=e117]:
+            - button "1 Ère" [ref=e118] [cursor=pointer]:
+              - generic [ref=e119]: "1"
+              - generic [ref=e120]: Ère
+            - button "2 Faction & rôle" [ref=e121] [cursor=pointer]:
+              - generic [ref=e122]: "2"
+              - generic [ref=e123]: Faction & rôle
+            - button "3 Trame" [ref=e124] [cursor=pointer]:
+              - generic [ref=e125]: "3"
+              - generic [ref=e126]: Trame
+            - button "4 Style IA" [ref=e127] [cursor=pointer]:
+              - generic [ref=e128]: "4"
+              - generic [ref=e129]: Style IA
+            - button "5 Protagoniste" [ref=e130] [cursor=pointer]:
+              - generic [ref=e131]: "5"
+              - generic [ref=e132]: Protagoniste
+            - button "6 Lancement" [ref=e133] [cursor=pointer]:
+              - generic [ref=e134]: "6"
+              - generic [ref=e135]: Lancement
+          - generic [ref=e321]:
+            - generic [ref=e322]:
+              - paragraph [ref=e323]: Étape 3 / 6
+              - heading "Trame" [level=1] [ref=e324]
+              - paragraph [ref=e325]: Quel est le point de départ ?
+            - generic [ref=e326]:
+              - generic [ref=e327]:
+                - paragraph [ref=e328]: Trame de départ
+                - paragraph [ref=e329]: Prends une trame solide puis tords-la. L’originalité sans tension de départ, c’est juste du vide bien parfumé.
+              - generic [ref=e330]:
+                - button "Le Solitaire" [ref=e331] [cursor=pointer]:
+                  - generic [ref=e332]: 🚀
+                  - generic [ref=e333]: Le Solitaire
+                - button "L'Élu" [ref=e334] [cursor=pointer]:
+                  - generic [ref=e335]: ✨
+                  - generic [ref=e336]: L'Élu
+                - button "Le Banni" [ref=e337] [cursor=pointer]:
+                  - generic [ref=e338]: 🌑
+                  - generic [ref=e339]: Le Banni
+                - button "Le Résistant" [ref=e340] [cursor=pointer]:
+                  - generic [ref=e341]: ⚡
+                  - generic [ref=e342]: Le Résistant
+                - button "La Rédemption" [ref=e343] [cursor=pointer]:
+                  - generic [ref=e344]: 🔥
+                  - generic [ref=e345]: La Rédemption
+                - button "L'Infiltrateur" [active] [ref=e346] [cursor=pointer]:
+                  - generic [ref=e347]: 🕵️
+                  - generic [ref=e348]: L'Infiltrateur
+                - button "Libre" [ref=e349] [cursor=pointer]:
+                  - generic [ref=e350]: ✏️
+                  - generic [ref=e351]: Libre
+            - generic [ref=e352]:
+              - generic [ref=e353]:
+                - paragraph [ref=e354]: Accroche de départ
+                - paragraph [ref=e355]: Tu peux garder le preset, le réécrire, ou partir en roue libre. Mais donne une vraie direction à l’IA.
+              - textbox "Décris le point de rupture initial, le problème, la promesse, le poison." [ref=e356]: Votre mission d'infiltration brouille progressivement la frontière entre vos deux identités.
+            - generic [ref=e357]:
+              - button "Retour" [ref=e358] [cursor=pointer]
+              - generic [ref=e359]:
+                - button "Paramètres IA" [ref=e360] [cursor=pointer]
+                - button "Continuer" [ref=e361] [cursor=pointer]
+  - generic [ref=e172]: Nouvelle aventure IA — Star Wars Story Manager

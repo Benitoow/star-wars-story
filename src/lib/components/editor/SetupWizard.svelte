@@ -5,9 +5,10 @@
   import SvgIcon from '$lib/components/SvgIcon.svelte';
   import { currentSetup, updateSetupField } from '$lib/stores/editor';
   import {
-    AVATARS, CONTENT_MODES, defaultRoleForFaction, ERAS, FACTIONS, ROLES, 
+    AVATARS, CONTENT_MODES, defaultRoleForFaction, ERAS, FACTIONS, ROLES,
     SETUP_SCREENS, TRAMES, WRITING_LENGTHS, WRITING_POVS, WRITING_STYLES, WRITING_TONES
   } from '$lib/editor/setupCatalog';
+  import type { SetupScreenId } from '$lib/editor/setupCatalog';
 
   export let generating = false;
   export let generationError = '';
@@ -22,12 +23,17 @@
   export let setupScreenIndex = 0;
   export let setupSlideDir = 1;
   export let selectedTrame: string | null = null;
+  let canContinueStep = false;
 
 
   $: activeSetupStep = SETUP_SCREENS[setupScreenIndex];
   $: isLastSetupStep = setupScreenIndex === SETUP_SCREENS.length - 1;
   $: currentRoleLabel = ROLES.find(role => role.id === $currentSetup.role)?.name || $currentSetup.role || '—';
   $: currentFactionLabel = FACTIONS.find(faction => faction.id === $currentSetup.faction)?.name || $currentSetup.faction || '—';
+  $: protagonistDisplayName = [$currentSetup.protagonistFirstName || '', $currentSetup.protagonistLastName || ''].join(' ').trim() || 'Protagoniste sans nom';
+  $: selectedTrameLabel = TRAMES.find(trame => trame.id === selectedTrame)?.name || 'Libre';
+  $: canContinueStep = stepIsComplete(activeSetupStep.id, $currentSetup);
+  $: canLaunch = isSetupReady($currentSetup) && !providerMissing && !generating;
 
   function goToSetupStep(index: number): void {
     const boundedIndex = Math.max(0, Math.min(SETUP_SCREENS.length - 1, index));
@@ -107,7 +113,33 @@
 
   function handlePremiseInput(event: Event): void {
     const target = event.currentTarget as HTMLTextAreaElement;
+    if (!selectedTrame) selectedTrame = 'custom';
+    if (selectedTrame && selectedTrame !== 'custom') {
+      const preset = TRAMES.find(item => item.id === selectedTrame)?.premise?.trim() || '';
+      if (target.value.trim() !== preset) selectedTrame = 'custom';
+    }
     updateSetupField('premise', target.value);
+  }
+
+  function stepIsComplete(stepId: SetupScreenId, setup = get(currentSetup)): boolean {
+    if (stepId === 'era') return Boolean(setup.era);
+    if (stepId === 'faction_role') return Boolean(setup.faction && setup.role);
+    if (stepId === 'premise') return Boolean((setup.premise || '').trim());
+    if (stepId === 'style') {
+      return Boolean(
+        setup.writingStyle &&
+        setup.writingTone &&
+        setup.writingPov &&
+        setup.writingLength &&
+        setup.contentMode
+      );
+    }
+    if (stepId === 'profile') return true;
+    return isSetupReady(setup);
+  }
+
+  function isSetupReady(setup = get(currentSetup)): boolean {
+    return ['era', 'faction_role', 'premise', 'style'].every(step => stepIsComplete(step as SetupScreenId, setup));
   }
 
   function getFilteredRoles() {
@@ -152,6 +184,370 @@
   }
 
 </script>
+
+<div class="setup-shell">
+  <div class="setup-progress" aria-label="Progression de la création d'histoire">
+    {#each SETUP_SCREENS as step, index}
+      <button
+        type="button"
+        class:active={index === setupScreenIndex}
+        class:done={stepIsComplete(step.id) && index < setupScreenIndex}
+        class="progress-pill"
+        on:click={() => goToSetupStep(index)}
+      >
+        <span class="pill-index">{index + 1}</span>
+        <span>{step.label}</span>
+      </button>
+    {/each}
+  </div>
+
+  {#if generationError}
+    <div class="error-banner">{generationError}</div>
+  {/if}
+
+  <div class="setup-stage">
+    {#key activeSetupStep.id}
+      <section
+        class="setup-screen"
+        in:fly={{ x: setupSlideDir * 32, duration: 220 }}
+        out:fly={{ x: setupSlideDir * -24, duration: 170 }}
+      >
+        <header class="setup-screen-header">
+          <p class="subheading">Étape {setupScreenIndex + 1} / {SETUP_SCREENS.length}</p>
+          <h1>{activeSetupStep.label}</h1>
+          <p>{activeSetupStep.subtitle}</p>
+        </header>
+
+        {#if activeSetupStep.id === 'era'}
+          <div class="setup-section">
+            <div class="setup-section-header">
+              <p class="subheading">Cadre temporel</p>
+              <p class="helper-text">Choisis l’époque. C’est le carburant de tout le reste, pas un détail cosmétique.</p>
+            </div>
+            <div class="era-grid">
+              {#each ERAS as era}
+                <button
+                  type="button"
+                  class:selected={$currentSetup.era === era.id}
+                  class="era-card"
+                  on:click={() => selectEra(era.id)}
+                >
+                  <span class="era-icon" aria-hidden="true">
+                    <SvgIcon filename={era.icon} size={42} />
+                  </span>
+                  <strong>{era.name}</strong>
+                  <span class="era-years">{era.years}</span>
+                </button>
+              {/each}
+            </div>
+          </div>
+        {:else if activeSetupStep.id === 'faction_role'}
+          <div class="split-grid">
+            <div class="setup-section">
+              <div class="setup-section-header">
+                <p class="subheading">Allégeance</p>
+                <p class="helper-text">La faction place ton personnage dans la galaxie. Sans ça, tu n’as qu’un mannequin en robe.</p>
+              </div>
+              <div class="faction-grid">
+                {#each FACTIONS as faction}
+                  <button
+                    type="button"
+                    class:selected={$currentSetup.faction === faction.id}
+                    class="faction-card"
+                    style={`--faction-color: ${faction.color};`}
+                    on:click={() => selectFaction(faction.id)}
+                  >
+                    <span class="faction-icon" aria-hidden="true">
+                      <SvgIcon filename={faction.icon} size={30} />
+                    </span>
+                    <strong>{faction.name}</strong>
+                  </button>
+                {/each}
+              </div>
+            </div>
+
+            <div class="setup-section">
+              <div class="setup-section-header">
+                <p class="subheading">Fonction</p>
+                <p class="helper-text">Le rôle filtre la fantasy du perso. Un Padawan n’est pas un demi-dieu qui a raté sa sieste.</p>
+              </div>
+              <div class="role-grid">
+                {#each getFilteredRoles() as role}
+                  <button
+                    type="button"
+                    class:selected={$currentSetup.role === role.id}
+                    class:recommended={role.faction === $currentSetup.faction}
+                    class="role-card"
+                    on:click={() => selectRole(role.id)}
+                  >
+                    <span class="role-icon" aria-hidden="true">
+                      <SvgIcon filename={role.icon} size={24} />
+                    </span>
+                    <span class="role-copy">
+                      <strong>{role.name}</strong>
+                      <span class="role-meta">{FACTIONS.find(faction => faction.id === role.faction)?.name || 'Indépendant'}</span>
+                    </span>
+                  </button>
+                {/each}
+              </div>
+            </div>
+          </div>
+        {:else if activeSetupStep.id === 'premise'}
+          <div class="setup-section">
+            <div class="setup-section-header">
+              <p class="subheading">Trame de départ</p>
+              <p class="helper-text">Prends une trame solide puis tords-la. L’originalité sans tension de départ, c’est juste du vide bien parfumé.</p>
+            </div>
+            <div class="trame-grid">
+              {#each TRAMES as trame}
+                <button
+                  type="button"
+                  class:selected={selectedTrame === trame.id}
+                  class="trame-card"
+                  on:click={() => selectTrame(trame)}
+                >
+                  <span class="trame-icon" aria-hidden="true">{trame.icon}</span>
+                  <span class="trame-name">{trame.name}</span>
+                </button>
+              {/each}
+            </div>
+          </div>
+
+          <div class="setup-section">
+            <div class="setup-section-header">
+              <p class="premise-label">Accroche de départ</p>
+              <p class="helper-text">Tu peux garder le preset, le réécrire, ou partir en roue libre. Mais donne une vraie direction à l’IA.</p>
+            </div>
+            <textarea
+              class="premise-input"
+              rows="7"
+              placeholder="Décris le point de rupture initial, le problème, la promesse, le poison."
+              value={$currentSetup.premise}
+              on:input={handlePremiseInput}
+            />
+          </div>
+        {:else if activeSetupStep.id === 'style'}
+          <div class="style-stack">
+            <div class="setup-section">
+              <div class="setup-section-header">
+                <p class="subheading">Voix de narration</p>
+                <p class="helper-text">Le style décide si ton histoire respire ou si elle récite des bullet points déguisés.</p>
+              </div>
+              <div class="style-grid">
+                {#each WRITING_STYLES as style}
+                  <button
+                    type="button"
+                    class:selected={$currentSetup.writingStyle === style.id}
+                    class="style-card"
+                    on:click={() => selectWritingStyle(style.id)}
+                  >
+                    <span class="style-name">{style.name}</span>
+                    <span class="style-desc">{style.desc}</span>
+                  </button>
+                {/each}
+              </div>
+            </div>
+
+            <div class="double-stack">
+              <div class="setup-section">
+                <p class="subheading">Tonalité</p>
+                <div class="tone-grid">
+                  {#each WRITING_TONES as tone}
+                    <button
+                      type="button"
+                      class:selected={$currentSetup.writingTone === tone.id}
+                      class="tone-chip"
+                      title={tone.desc}
+                      on:click={() => selectWritingTone(tone.id)}
+                    >
+                      {tone.name}
+                    </button>
+                  {/each}
+                </div>
+              </div>
+
+              <div class="setup-section">
+                <p class="subheading">Point de vue</p>
+                <div class="toggle-chip-group">
+                  {#each WRITING_POVS as pov}
+                    <button
+                      type="button"
+                      class:active={$currentSetup.writingPov === pov.id}
+                      class="toggle-chip"
+                      on:click={() => selectWritingPov(pov.id)}
+                    >
+                      {pov.name}
+                    </button>
+                  {/each}
+                </div>
+              </div>
+            </div>
+
+            <div class="double-stack">
+              <div class="setup-section">
+                <p class="subheading">Longueur</p>
+                <div class="toggle-chip-group">
+                  {#each WRITING_LENGTHS as length}
+                    <button
+                      type="button"
+                      class:active={$currentSetup.writingLength === length.id}
+                      class="toggle-chip"
+                      on:click={() => selectWritingLength(length.id)}
+                    >
+                      {length.name}
+                    </button>
+                  {/each}
+                </div>
+              </div>
+
+              <div class="setup-section">
+                <p class="subheading">Mode de contenu</p>
+                <div class="content-mode-grid">
+                  {#each CONTENT_MODES as mode}
+                    <button
+                      type="button"
+                      class:selected={$currentSetup.contentMode === mode.id}
+                      class="content-mode-card"
+                      on:click={() => selectContentMode(mode.id)}
+                    >
+                      <span class="content-mode-icon" aria-hidden="true">{mode.icon}</span>
+                      <strong>{mode.name}</strong>
+                      <span class="content-mode-desc">{mode.desc}</span>
+                    </button>
+                  {/each}
+                </div>
+              </div>
+            </div>
+          </div>
+        {:else if activeSetupStep.id === 'profile'}
+          <div class="profile-card">
+            <div class="setup-section">
+              <div class="setup-section-header">
+                <p class="subheading">Avatar rapide</p>
+                <p class="helper-text">C’est optionnel, mais un visage même symbolique aide à ancrer la fantasy.</p>
+              </div>
+              <div class="avatar-row">
+                {#each AVATARS as avatar}
+                  <button
+                    type="button"
+                    class:selected={$currentSetup.protagonistAvatar === avatar}
+                    class="avatar-btn"
+                    on:click={() => selectAvatar(avatar)}
+                  >
+                    {avatar}
+                  </button>
+                {/each}
+              </div>
+            </div>
+
+            <div class="setup-section">
+              <div class="setup-section-header">
+                <p class="subheading">Identité</p>
+                <p class="helper-text">Nom facultatif. Si tu le laisses vide, l’histoire démarre quand même. Merci le progrès.</p>
+              </div>
+              <div class="name-grid">
+                <label class="name-field">
+                  <span>Prénom</span>
+                  <input
+                    class="name-input"
+                    type="text"
+                    placeholder="Kael"
+                    value={$currentSetup.protagonistFirstName}
+                    on:input={handleFirstNameInput}
+                  />
+                </label>
+                <label class="name-field">
+                  <span>Nom</span>
+                  <input
+                    class="name-input"
+                    type="text"
+                    placeholder="Voss"
+                    value={$currentSetup.protagonistLastName}
+                    on:input={handleLastNameInput}
+                  />
+                </label>
+              </div>
+            </div>
+          </div>
+        {:else}
+          <div class="review-grid">
+            <article class="review-card">
+              <h2>Cadre</h2>
+              <ul>
+                <li>Ère: {getCurrentEraLabel()}</li>
+                <li>Faction: {getCurrentFactionLabel()}</li>
+                <li>Rôle: {getCurrentRoleLabel()}</li>
+                <li>Trame: {selectedTrameLabel}</li>
+              </ul>
+            </article>
+
+            <article class="review-card">
+              <h2>Style IA</h2>
+              <ul>
+                <li>Style: {getCurrentStyleLabel()}</li>
+                <li>Tonalité: {getCurrentToneLabel()}</li>
+                <li>POV: {WRITING_POVS.find(item => item.id === $currentSetup.writingPov)?.name || '—'}</li>
+                <li>Longueur: {WRITING_LENGTHS.find(item => item.id === $currentSetup.writingLength)?.name || '—'}</li>
+                <li>Contenu: {getCurrentContentModeLabel()}</li>
+              </ul>
+            </article>
+
+            <article class="review-card">
+              <h2>Protagoniste</h2>
+              <ul class="feature-list">
+                <li>{($currentSetup.protagonistAvatar || '🧑‍🚀')} {protagonistDisplayName}</li>
+                <li>{($currentSetup.premise || 'Aucune accroche').trim()}</li>
+                <li class="provider-status">Provider: {providerStatus}</li>
+              </ul>
+            </article>
+          </div>
+
+          {#if providerMissing}
+            <div class="provider-warning">
+              <p>Aucun provider texte n’est configuré. Lancer sans moteur, c’est ambitieux même pour Star Wars.</p>
+              <button type="button" class="btn btn-secondary" on:click={() => dispatch('settings')}>
+                Ouvrir les paramètres IA
+              </button>
+            </div>
+          {/if}
+        {/if}
+
+        <footer class="setup-nav">
+          <button
+            type="button"
+            class="btn btn-ghost"
+            on:click={previousSetupStep}
+            disabled={setupScreenIndex === 0 || generating}
+          >
+            Retour
+          </button>
+
+          <div class="setup-nav-actions">
+            <button type="button" class="btn btn-secondary" on:click={() => dispatch('settings')}>
+              Paramètres IA
+            </button>
+            <button
+              type="button"
+              class="btn btn-primary"
+              on:click={nextSetupStep}
+              disabled={!canContinueStep || (isLastSetupStep && !canLaunch)}
+            >
+              {#if isLastSetupStep}
+                {#if generating}
+                  Lancement…
+                {:else}
+                  Lancer l’aventure
+                {/if}
+              {:else}
+                Continuer
+              {/if}
+            </button>
+          </div>
+        </footer>
+      </section>
+    {/key}
+  </div>
+</div>
 
 
 <style>
@@ -241,6 +637,28 @@
   justify-content: space-between;
   align-items: center;
   gap: var(--space-md);
+}
+
+.setup-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.setup-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-bg-tertiary) 55%, transparent);
+}
+
+.setup-section-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .subheading {
@@ -383,6 +801,17 @@
   gap: var(--space-sm);
   padding: var(--space-sm) var(--space-md);
   text-align: left;
+}
+
+.role-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.role-meta {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
 }
 
 .role-card.recommended {
@@ -555,6 +984,14 @@
   padding-left: 0;
 }
 
+.feature-list li {
+  margin-bottom: var(--space-xs);
+}
+
+.provider-status {
+  color: var(--color-text-muted);
+}
+
 .provider-warning {
   margin-top: var(--space-md);
   padding: var(--space-sm);
@@ -575,5 +1012,64 @@
   border-radius: var(--radius-md);
   padding: var(--space-sm) var(--space-md);
   font-size: 0.9rem;
+}
+
+@media (max-width: 920px) {
+  .split-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .setup-screen {
+    padding: var(--space-md);
+  }
+}
+
+@media (max-width: 720px) {
+  .setup-shell {
+    min-height: calc(100vh - 150px);
+  }
+
+  .setup-stage {
+    min-height: 520px;
+  }
+
+  .progress-pill {
+    font-size: 0.7rem;
+    padding: 6px 10px;
+  }
+
+  .setup-nav,
+  .setup-nav-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 768px) {
+  .era-grid,
+  .faction-grid,
+  .role-grid,
+  .trame-grid,
+  .style-grid,
+  .content-mode-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .setup-stage {
+    min-height: auto;
+  }
+
+  .setup-screen {
+    position: static;
+  }
+
+  .split-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .setup-shell {
+    min-height: calc(100dvh - 140px);
+    gap: 12px;
+  }
 }
 </style>

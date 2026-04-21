@@ -1,4 +1,5 @@
 import { logger } from '$lib/utils/logger';
+import { splitNarrativeParagraphs } from '$lib/editor/narrativeGuardrails';
 import type {
   BackgroundWorldEvent,
   BackgroundWorldGenerationResult,
@@ -45,7 +46,7 @@ const DEFAULT_SCENE_DESCRIPTION = 'Cinematic Star Wars scene with dramatic light
 function cleanText(value: unknown, maxLength = 2200): string {
   if (value === null || value === undefined) return '';
   return String(value)
-    .replace(/\r/g, '\n')
+    .replace(/\r\n?/g, '\n')
     .replace(/[ \t]{2,}/g, ' ')
     .trim()
     .slice(0, maxLength);
@@ -171,7 +172,40 @@ function deriveFallbackChapterTitleFromScene(scene: string, turnNumber: number):
 }
 
 function hasPlayableChapterContent(chapter: StoryChapter): boolean {
-  return Boolean(cleanText(chapter.narrative.action, 260));
+  return Boolean(cleanText(chapter.narrative.action, 260) || cleanText(chapter.narrative.dialogue, 260));
+}
+
+function splitWriterScene(writerScene: string): { action: string; dialogue: string } {
+  const paragraphs = splitNarrativeParagraphs(sanitizeNarrativeText(writerScene, 5500));
+  const action = paragraphs
+    .filter(paragraph => paragraph.kind === 'prose')
+    .map(paragraph => paragraph.text)
+    .join('\n\n')
+    .trim();
+  const dialogue = paragraphs
+    .filter(paragraph => paragraph.kind === 'dialogue')
+    .map(paragraph => paragraph.text)
+    .join('\n')
+    .trim();
+
+  return { action, dialogue };
+}
+
+function formatPipelineRawResponse(
+  scribeSummary: string,
+  writerScene: string,
+  brainPayload: Record<string, unknown>
+): string {
+  return [
+    '[PIPELINE:SCRIBE]',
+    cleanText(scribeSummary, 4000),
+    '',
+    '[PIPELINE:WRITER]',
+    cleanText(writerScene, 12000),
+    '',
+    '[PIPELINE:BRAIN]',
+    JSON.stringify(brainPayload, null, 2)
+  ].join('\n');
 }
 
 function buildPipelineStoryPayload(
@@ -201,7 +235,10 @@ function buildPipelineStoryPayload(
   );
 
   const safeChoices = Array.isArray(brainPayload.choices) ? brainPayload.choices : [];
-  const action = sanitizeNarrativeText(writerScene, 5500) || 'Le récit reprend en mode de secours.';
+  const scene = sanitizeNarrativeText(writerScene, 5500) || 'Le récit reprend en mode de secours.';
+  const splitScene = splitWriterScene(scene);
+  const action = splitScene.action || (splitScene.dialogue ? '' : scene);
+  const dialogue = splitScene.dialogue;
 
   return {
     chapter_title: chapterTitle,
@@ -210,7 +247,7 @@ function buildPipelineStoryPayload(
     narrative: {
       context: '',
       action,
-      dialogue: '',
+      dialogue,
       reflection: '',
       atmosphere
     },
@@ -341,16 +378,23 @@ export async function generateStoryTurn(
   }
 
   const payload = buildPipelineStoryPayload(turnNumber, writerScene, brainPayload);
-  const rawResponse = JSON.stringify(payload);
-  const chapter = parseStoryResponse(rawResponse, turnNumber);
+  const payloadRaw = JSON.stringify(payload);
+  const rawResponse = formatPipelineRawResponse(scribeSummary, writerScene, brainPayload);
+  const chapter = parseStoryResponse(payloadRaw, turnNumber);
 
   if (!hasPlayableChapterContent(chapter)) {
-    const emergencyPayload = buildPipelineStoryPayload(turnNumber, fallbackWriterScene(scribeSummary, messages, turnNumber), fallbackBrainPayload());
-    const emergencyRaw = JSON.stringify(emergencyPayload);
+    const emergencyWriterScene = fallbackWriterScene(scribeSummary, messages, turnNumber);
+    const emergencyBrainPayload = fallbackBrainPayload();
+    const emergencyPayload = buildPipelineStoryPayload(turnNumber, emergencyWriterScene, emergencyBrainPayload);
+    const emergencyRaw = formatPipelineRawResponse(
+      scribeSummary,
+      emergencyWriterScene,
+      emergencyBrainPayload
+    );
     return {
-      chapter: parseStoryResponse(emergencyRaw, turnNumber),
+      chapter: parseStoryResponse(JSON.stringify(emergencyPayload), turnNumber),
       rawResponse: emergencyRaw,
-      mode: 'structured-json',
+      mode: 'pipeline',
       steps: Math.max(1, completedSteps),
       toolCalls: 0
     };
@@ -359,7 +403,7 @@ export async function generateStoryTurn(
   return {
     chapter,
     rawResponse,
-    mode: 'structured-json',
+    mode: 'pipeline',
     steps: Math.max(1, completedSteps),
     toolCalls: 0
   };

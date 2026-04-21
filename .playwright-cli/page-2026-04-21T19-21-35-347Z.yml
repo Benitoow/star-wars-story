@@ -1,0 +1,153 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - complementary [ref=e4]:
+      - generic [ref=e5]:
+        - link "Star Wars" [ref=e6] [cursor=pointer]:
+          - /url: /
+          - img [ref=e7]
+          - generic [ref=e9]: Star Wars
+        - button "Fermer le menu latéral" [ref=e10] [cursor=pointer]:
+          - img [ref=e11]
+      - navigation [ref=e14]:
+        - link "Dashboard" [ref=e15] [cursor=pointer]:
+          - /url: /
+          - img [ref=e17]
+          - generic [ref=e20]: Dashboard
+        - link "Mes Histoires" [ref=e21] [cursor=pointer]:
+          - /url: /stories
+          - img [ref=e23]
+          - generic [ref=e26]: Mes Histoires
+        - link "Dossiers" [ref=e27] [cursor=pointer]:
+          - /url: /folders
+          - img [ref=e29]
+          - generic [ref=e31]: Dossiers
+        - link "Corbeille" [ref=e32] [cursor=pointer]:
+          - /url: /trash
+          - img [ref=e34]
+          - generic [ref=e36]: Corbeille
+        - link "Paramètres" [ref=e37] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e39]
+          - generic [ref=e42]: Paramètres
+      - 'link "Langue de l''interface: Auto (navigateur)" [ref=e44] [cursor=pointer]':
+        - /url: /settings
+        - img [ref=e45]
+        - generic [ref=e48]: "Langue :"
+        - generic [ref=e49]: Auto (navigateur)
+    - main [ref=e50]:
+      - generic [ref=e51]:
+        - generic [ref=e58]:
+          - button "Recherche" [ref=e59] [cursor=pointer]:
+            - img [ref=e60]
+          - textbox "Rechercher…" [ref=e63]
+        - generic [ref=e64]:
+          - button "Auto (navigateur)" [ref=e66] [cursor=pointer]:
+            - img [ref=e67]
+            - generic [ref=e70]: Auto (navigateur)
+            - img [ref=e71]
+          - generic [ref=e73]:
+            - button "Vue grille" [ref=e74] [cursor=pointer]:
+              - img [ref=e75]
+            - button "Vue liste" [ref=e80] [cursor=pointer]:
+              - img [ref=e81]
+          - button "Nouvelle Histoire" [ref=e85] [cursor=pointer]:
+            - img [ref=e86]
+            - generic [ref=e87]: Nouvelle Histoire
+      - main [ref=e94]:
+        - generic [ref=e95]:
+          - generic [ref=e96]:
+            - button "Retour" [ref=e97] [cursor=pointer]:
+              - img [ref=e98]
+              - text: Retour
+            - navigation "Fil d'Ariane" [ref=e100]:
+              - link "Mes Histoires" [ref=e101] [cursor=pointer]:
+                - /url: /
+              - generic [ref=e102]: ›
+              - generic [ref=e103]: Nouvelle aventure
+          - generic [ref=e105]:
+            - button "Nouvelle" [ref=e106] [cursor=pointer]:
+              - img [ref=e107]
+              - generic [ref=e108]: Nouvelle
+            - button "Sauvegarder" [ref=e109] [cursor=pointer]:
+              - img [ref=e110]
+              - generic [ref=e114]: Sauvegarder
+        - generic [ref=e116]:
+          - generic "Progression de la création d'histoire" [ref=e117]:
+            - button "1 Ère" [ref=e118] [cursor=pointer]:
+              - generic [ref=e119]: "1"
+              - generic [ref=e120]: Ère
+            - button "2 Faction & rôle" [ref=e121] [cursor=pointer]:
+              - generic [ref=e122]: "2"
+              - generic [ref=e123]: Faction & rôle
+            - button "3 Trame" [ref=e124] [cursor=pointer]:
+              - generic [ref=e125]: "3"
+              - generic [ref=e126]: Trame
+            - button "4 Style IA" [ref=e127] [cursor=pointer]:
+              - generic [ref=e128]: "4"
+              - generic [ref=e129]: Style IA
+            - button "5 Protagoniste" [ref=e130] [cursor=pointer]:
+              - generic [ref=e131]: "5"
+              - generic [ref=e132]: Protagoniste
+            - button "6 Lancement" [ref=e133] [cursor=pointer]:
+              - generic [ref=e134]: "6"
+              - generic [ref=e135]: Lancement
+          - generic [ref=e362]:
+            - generic [ref=e363]:
+              - paragraph [ref=e364]: Étape 4 / 6
+              - heading "Style IA" [level=1] [ref=e365]
+              - paragraph [ref=e366]: Comment doit écrire l'IA ?
+            - generic [ref=e367]:
+              - generic [ref=e368]:
+                - generic [ref=e369]:
+                  - paragraph [ref=e370]: Voix de narration
+                  - paragraph [ref=e371]: Le style décide si ton histoire respire ou si elle récite des bullet points déguisés.
+                - generic [ref=e372]:
+                  - button "Cinématique Scènes courtes, rythme intense, style film" [ref=e373] [cursor=pointer]
+                  - button "Littéraire Prose riche, descriptions profondes, introspection" [ref=e374] [cursor=pointer]
+                  - button "Épique Grandeur, batailles, destins héroïques" [ref=e375] [cursor=pointer]
+                  - button "Immersif 2ème personne, style jeu de rôle, vous êtes le héros" [ref=e376] [cursor=pointer]
+              - generic [ref=e377]:
+                - generic [ref=e378]:
+                  - paragraph [ref=e379]: Tonalité
+                  - generic [ref=e380]:
+                    - button "Héroïque" [ref=e381] [cursor=pointer]
+                    - button "Sombre" [ref=e382] [cursor=pointer]
+                    - button "Aventure" [ref=e383] [cursor=pointer]
+                    - button "Dramatique" [ref=e384] [cursor=pointer]
+                - generic [ref=e385]:
+                  - paragraph [ref=e386]: Point de vue
+                  - generic [ref=e387]:
+                    - button "1ère personne — Je" [ref=e388] [cursor=pointer]
+                    - button "3ème personne — Il/Elle" [ref=e389] [cursor=pointer]
+              - generic [ref=e390]:
+                - generic [ref=e391]:
+                  - paragraph [ref=e392]: Longueur
+                  - generic [ref=e393]:
+                    - button "Court" [ref=e394] [cursor=pointer]
+                    - button "Moyen" [ref=e395] [cursor=pointer]
+                    - button "Long" [ref=e396] [cursor=pointer]
+                - generic [ref=e397]:
+                  - paragraph [ref=e398]: Mode de contenu
+                  - generic [ref=e399]:
+                    - button "Cinéma Intense mais équilibré. Adapté aux IA filtrées." [ref=e400] [cursor=pointer]:
+                      - generic [ref=e401]: 🎬
+                      - strong [ref=e402]: Cinéma
+                      - generic [ref=e403]: Intense mais équilibré. Adapté aux IA filtrées.
+                    - button "Sombre Ambiance dure et tendue, sans gratuité excessive." [ref=e404] [cursor=pointer]:
+                      - generic [ref=e405]: 🌒
+                      - strong [ref=e406]: Sombre
+                      - generic [ref=e407]: Ambiance dure et tendue, sans gratuité excessive.
+                    - button "Adulte Mature et frontal, selon les limites du provider choisi." [ref=e408] [cursor=pointer]:
+                      - generic [ref=e409]: 🔞
+                      - strong [ref=e410]: Adulte
+                      - generic [ref=e411]: Mature et frontal, selon les limites du provider choisi.
+                    - button "Brut Très frontal et sans concession (quand le modèle le permet)." [ref=e412] [cursor=pointer]:
+                      - generic [ref=e413]: ⚠️
+                      - strong [ref=e414]: Brut
+                      - generic [ref=e415]: Très frontal et sans concession (quand le modèle le permet).
+            - generic [ref=e416]:
+              - button "Retour" [ref=e417] [cursor=pointer]
+              - generic [ref=e418]:
+                - button "Paramètres IA" [ref=e419] [cursor=pointer]
+                - button "Continuer" [ref=e420] [cursor=pointer]
+  - generic [ref=e172]: Nouvelle aventure IA — Star Wars Story Manager

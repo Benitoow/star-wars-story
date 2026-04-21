@@ -4,6 +4,7 @@ import {
   callOpenAiCompatibleRaw,
   coerceMemoryUpdates,
   detectModelCapabilities,
+  generateStoryTurn,
   parseStoryResponse,
   supportsAgenticToolCalling
 } from './storyEngine';
@@ -396,5 +397,78 @@ describe('parseStoryResponse', () => {
     expect(prompt).toContain('RÔLE CANONIQUE IMMUTABLE');
     expect(prompt).toContain('"padawan"');
     expect(prompt).toContain('Padawan ≠ Chevalier/Maître');
+  });
+});
+
+describe('provider validation', () => {
+  it('fails explicitly when an OpenAI-compatible provider returns no usable message', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{}]
+      })
+    } as Response);
+    vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
+
+    await expect(() => callOpenAiCompatibleRaw(
+      [{ role: 'user', content: 'test' }],
+      { providerId: 'openrouter', model: 'openai/gpt-5.4-mini', apiKey: 'test-key' }
+    )).rejects.toThrow('réponse vide ou incomplète du provider');
+  });
+});
+
+describe('pipeline story generation', () => {
+  it('keeps dialogue-only scenes playable and exposed as dialogue', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { role: 'assistant', content: 'Tour 7. Lira mène l’échange pendant que la pression monte.' } }]
+        })
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { role: 'assistant', content: '— Lira : On bouge maintenant.\n— Toi : J’active la rampe.' } }]
+        })
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          choices: [{
+            message: {
+              role: 'assistant',
+              content: JSON.stringify({
+                chapter_title: 'Accord sous tension',
+                section_type: 'dialogue',
+                atmosphere: 'tense',
+                choices: [{ text: 'Suivre Lira sans discuter', attribute: 'diplomacy', difficulty: 2 }],
+                memory_updates: { notes: ['Lira prend la main.'] },
+                state_update: {}
+              })
+            }
+          }]
+        })
+      } as Response);
+
+    vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
+
+    const generation = await generateStoryTurn(
+      [
+        { role: 'system', content: 'test' },
+        { role: 'user', content: 'Parler à Lira avant de partir.' }
+      ],
+      { providerId: 'openrouter', model: 'openai/gpt-5.4-mini', apiKey: 'test-key' },
+      7
+    );
+
+    expect(generation.mode).toBe('pipeline');
+    expect(generation.chapter.chapter_title).toBe('Accord sous tension');
+    expect(generation.chapter.narrative.dialogue).toContain('Lira');
+    expect(generation.chapter.narrative.dialogue).toContain('J’active la rampe.');
+    expect(generation.chapter.narrative.action).toBe('');
+    expect(generation.rawResponse).toContain('[PIPELINE:WRITER]');
+    expect(generation.rawResponse).toContain('— Lira : On bouge maintenant.');
   });
 });

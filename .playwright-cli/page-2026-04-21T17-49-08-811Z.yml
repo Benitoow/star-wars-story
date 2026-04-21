@@ -1,0 +1,122 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - link "Star Wars" [ref=e6] [cursor=pointer]:
+        - /url: /
+        - img [ref=e7]
+        - generic [ref=e9]: Star Wars
+      - button "Fermer le menu latéral" [ref=e10] [cursor=pointer]:
+        - img [ref=e11]
+    - navigation [ref=e14]:
+      - link "Dashboard" [ref=e15] [cursor=pointer]:
+        - /url: /
+        - img [ref=e17]
+        - generic [ref=e20]: Dashboard
+      - link "Mes Histoires" [ref=e21] [cursor=pointer]:
+        - /url: /stories
+        - img [ref=e23]
+        - generic [ref=e26]: Mes Histoires
+      - link "Dossiers" [ref=e27] [cursor=pointer]:
+        - /url: /folders
+        - img [ref=e29]
+        - generic [ref=e31]: Dossiers
+      - link "Corbeille" [ref=e32] [cursor=pointer]:
+        - /url: /trash
+        - img [ref=e34]
+        - generic [ref=e36]: Corbeille
+      - link "Paramètres" [ref=e37] [cursor=pointer]:
+        - /url: /settings
+        - img [ref=e39]
+        - generic [ref=e42]: Paramètres
+    - 'link "Langue de l''interface: Auto (navigateur)" [ref=e44] [cursor=pointer]':
+      - /url: /settings
+      - img [ref=e45]
+      - generic [ref=e48]: "Langue :"
+      - generic [ref=e49]: Auto (navigateur)
+  - main [ref=e50]:
+    - generic [ref=e51]:
+      - generic [ref=e54]:
+        - button "Recherche" [ref=e55] [cursor=pointer]:
+          - img [ref=e56]
+        - textbox "Rechercher…" [ref=e59]
+      - generic [ref=e60]:
+        - button "Auto (navigateur)" [ref=e62] [cursor=pointer]:
+          - img [ref=e63]
+          - generic [ref=e66]: Auto (navigateur)
+          - img [ref=e67]
+        - generic [ref=e69]:
+          - button "Vue grille" [ref=e70] [cursor=pointer]:
+            - img [ref=e71]
+          - button "Vue liste" [ref=e76] [cursor=pointer]:
+            - img [ref=e77]
+        - button "Nouvelle Histoire" [ref=e81] [cursor=pointer]:
+          - img [ref=e82]
+          - generic [ref=e83]: Nouvelle Histoire
+    - main [ref=e86]:
+      - generic [ref=e87]:
+        - generic [ref=e88]:
+          - button "Retour" [ref=e89] [cursor=pointer]:
+            - img [ref=e90]
+            - text: Retour
+          - navigation "Fil d'Ariane" [ref=e92]:
+            - link "Mes Histoires" [ref=e93] [cursor=pointer]:
+              - /url: /
+            - generic [ref=e94]: ›
+            - generic [ref=e95]: Nouvelle aventure
+        - generic [ref=e97]:
+          - button "Nouvelle" [ref=e98] [cursor=pointer]:
+            - img [ref=e99]
+            - generic [ref=e100]: Nouvelle
+          - button "Sauvegarder" [ref=e101] [cursor=pointer]:
+            - img [ref=e102]
+            - generic [ref=e106]: Sauvegarder
+      - generic [ref=e108]:
+        - generic "Progression de la création d'histoire" [ref=e109]:
+          - button "1 Ère" [ref=e110] [cursor=pointer]:
+            - generic [ref=e111]: "1"
+            - generic [ref=e112]: Ère
+          - button "2 Faction & rôle" [ref=e113] [cursor=pointer]:
+            - generic [ref=e114]: "2"
+            - generic [ref=e115]: Faction & rôle
+          - button "3 Trame" [ref=e116] [cursor=pointer]:
+            - generic [ref=e117]: "3"
+            - generic [ref=e118]: Trame
+          - button "4 Style IA" [ref=e119] [cursor=pointer]:
+            - generic [ref=e120]: "4"
+            - generic [ref=e121]: Style IA
+          - button "5 Protagoniste" [ref=e122] [cursor=pointer]:
+            - generic [ref=e123]: "5"
+            - generic [ref=e124]: Protagoniste
+          - button "6 Lancement" [ref=e125] [cursor=pointer]:
+            - generic [ref=e126]: "6"
+            - generic [ref=e127]: Lancement
+        - generic [ref=e129]:
+          - generic [ref=e130]:
+            - paragraph [ref=e131]: Étape 1 / 6
+            - heading "Ère" [level=1] [ref=e132]
+            - paragraph [ref=e133]: Quand commence votre histoire ?
+          - generic [ref=e134]:
+            - generic [ref=e135]:
+              - paragraph [ref=e136]: Cadre temporel
+              - paragraph [ref=e137]: Choisis l’époque. C’est le carburant de tout le reste, pas un détail cosmétique.
+            - generic [ref=e138]:
+              - button "Ancienne République 25 000 - 1000 AVBY" [ref=e139] [cursor=pointer]:
+                - strong [ref=e141]: Ancienne République
+                - generic [ref=e142]: 25 000 - 1000 AVBY
+              - button "Guerres des Clones 22 - 19 AVBY" [ref=e143] [cursor=pointer]:
+                - strong [ref=e145]: Guerres des Clones
+                - generic [ref=e146]: 22 - 19 AVBY
+              - button "Ère Impériale 19 - 4 AVBY" [active] [ref=e147] [cursor=pointer]:
+                - strong [ref=e149]: Ère Impériale
+                - generic [ref=e150]: 19 - 4 AVBY
+              - button "Nouvelle République 4 - 28 APBY" [ref=e151] [cursor=pointer]:
+                - strong [ref=e153]: Nouvelle République
+                - generic [ref=e154]: 4 - 28 APBY
+              - button "Premier Ordre 28 - 35 APBY" [ref=e155] [cursor=pointer]:
+                - strong [ref=e157]: Premier Ordre
+                - generic [ref=e158]: 28 - 35 APBY
+          - generic [ref=e159]:
+            - button "Retour" [disabled] [ref=e160]
+            - generic [ref=e161]:
+              - button "Paramètres IA" [ref=e162] [cursor=pointer]
+              - button "Continuer" [disabled] [ref=e163]

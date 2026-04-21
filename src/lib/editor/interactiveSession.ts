@@ -14,6 +14,7 @@ export interface LoggedBackgroundEvent {
   summary: string;
   promptHook?: string;
   privateSummary?: string;
+  visibleNow?: boolean;
 }
 
 export interface InteractiveSessionPayload {
@@ -48,18 +49,25 @@ export function loadInteractiveSessionPayload(id: string, fallbackSetup: StorySe
 
   try {
     const parsed = JSON.parse(raw) as Partial<InteractiveSessionPayload>;
-    if (!Array.isArray(parsed.chapterHistory) || !parsed.chapterHistory.length) return null;
+    const chapterHistory = Array.isArray(parsed.chapterHistory) ? parsed.chapterHistory : [];
+    const currentChapter = parsed.currentChapter ?? chapterHistory[chapterHistory.length - 1] ?? null;
+    const backgroundEvents = Array.isArray(parsed.backgroundEvents)
+      ? parsed.backgroundEvents.map(event => ({
+          ...event,
+          visibleNow: typeof event?.visibleNow === 'boolean' ? event.visibleNow : true
+        }))
+      : [];
 
     return {
       version: 1,
-      turnNumber: Number(parsed.turnNumber || parsed.chapterHistory.length || 0),
+      turnNumber: Number(parsed.turnNumber || chapterHistory.length || 0),
       selectedTrame: typeof parsed.selectedTrame === 'string' ? parsed.selectedTrame : null,
-      currentChapter: parsed.currentChapter ?? parsed.chapterHistory[parsed.chapterHistory.length - 1] ?? null,
-      chapterHistory: parsed.chapterHistory,
+      currentChapter,
+      chapterHistory,
       actionHistory: Array.isArray(parsed.actionHistory) ? parsed.actionHistory : [],
       aiMessages: Array.isArray(parsed.aiMessages) ? parsed.aiMessages : [],
       memoryLog: Array.isArray(parsed.memoryLog) ? parsed.memoryLog : [],
-      backgroundEvents: Array.isArray(parsed.backgroundEvents) ? parsed.backgroundEvents : [],
+      backgroundEvents,
       setupSnapshot: (parsed.setupSnapshot as StorySetup) || fallbackSetup,
       worldState: parsed.worldState as WorldState | undefined,
       campaignArchive: Array.isArray(parsed.campaignArchive)

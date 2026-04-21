@@ -26,13 +26,11 @@
   import PageHeader from '$lib/components/PageHeader.svelte';
   import GameHUD from '$lib/components/GameHUD.svelte';
   import {
+    defaultRoleForFaction,
     AVATARS,
     CONTENT_MODES,
-    defaultRoleForFaction,
-    ERA_START_DATES,
     ERAS,
     FACTIONS,
-    FACTION_CREDITS,
     ROLES,
     SETUP_SCREENS,
     TRAMES,
@@ -48,6 +46,17 @@
     type InteractiveSessionPayload,
     type LoggedBackgroundEvent
   } from '$lib/editor/interactiveSession';
+  import {
+    applyBackgroundWorldEventToRuntime,
+    archiveOldTurnsIfNeeded,
+    appendMemoryFromChapter,
+    buildAssistantTranscript,
+    buildCanonicalIdentityFacts,
+    ensureCanonicalIdentityMemory,
+    getVisibleBackgroundEvents,
+    INTENSE_SECTION_TYPES,
+    normalizeMemoryFacts
+  } from '$lib/editor/storyRuntime';
   import {
     buildSceneAnchor,
     enforceTransitionChoiceQuality,
@@ -76,9 +85,14 @@
     type StoryChapter,
     type StoryChoice,
     type StoryProviderConfig,
-    type WorldState,
-    type NpcRelation
+    type WorldState
   } from '$lib/ai/storyEngine';
+  import {
+    applyStateUpdateToWorldState,
+    initWorldState,
+    rebuildWorldStateFromHistory,
+    worldStateNeedsRepair
+  } from '$lib/editor/worldStateReducer';
 
   let loading = true;
   let saving = false;
@@ -100,556 +114,23 @@
   let aiMessages: ChatMessage[] = [];
   let memoryLog: string[] = [];
   let backgroundEvents: LoggedBackgroundEvent[] = [];
+  let visibleBackgroundEvents: LoggedBackgroundEvent[] = [];
   let campaignArchive: string[] = [];
   let customAction = '';
   let hudCollapsed = false;
-
-  const UNKNOWN_LOCATION_RE = /\b(?:inconnu(?:e)?|unknown|indetermine|ind[ée]termin[ée]|non\s+renseign[ée]|n\/?a|aucun\s+lieu)\b/i;
-  const FACTION_LOCATION_LEAK_EXACT = new Set([
-    'jedi',
-    'ordre jedi',
-    'jedi order',
-    'sith',
-    'empire',
-    'alliance rebelle',
-    'rebelles',
-    'rebels',
-    'republique',
-    'république',
-    'republic',
-    'premier ordre',
-    'first order',
-    'hutt',
-    'cartel hutt',
-    'mandalore',
-    'mandaloriens',
-    'mandalorians'
-  ]);
-  const LOCATION_HINTS: Array<{ pattern: RegExp; label: string }> = [
-    { pattern: /nar\s*shaddaa/i, label: 'Nar Shaddaa' },
-    { pattern: /coruscant/i, label: 'Coruscant' },
-    { pattern: /tatooine/i, label: 'Tatooine' },
-    { pattern: /naboo/i, label: 'Naboo' },
-    { pattern: /corellia/i, label: 'Corellia' },
-    { pattern: /kamino/i, label: 'Kamino' },
-    { pattern: /mustafar/i, label: 'Mustafar' },
-    { pattern: /hoth/i, label: 'Hoth' },
-    { pattern: /bespin|cite\s*des\s*nuages|cloud\s*city/i, label: 'Bespin' },
-    { pattern: /cantina/i, label: 'Cantina locale' },
-    { pattern: /hangar|spatioport|dock|quai d['’]arrimage|baie d['’]arrimage/i, label: 'Hangar / Spatioport' }
-  ];
-  const DIALOGUE_SPEAKER_RE = /^(?:[—–\-]\s*)?([A-ZÀ-ÖØ-Ý][A-Za-zÀ-ÖØ-öø-ÿ' -]{1,48})\s*:/gum;
-  const DIALOGUE_SPEAKER_STOPWORDS = new Set([
-    'je', 'tu', 'vous', 'il', 'elle', 'on', 'nous', 'ils', 'elles',
-    'fai', 'fil', 'fait', 'faite', 'faites', 'alors', 'ensuite', 'puis', 'tour'
-  ]);
-  const NON_NPC_EXACT = new Set([
-    'les', 'le', 'la', 'un', 'une', 'des', 'du', 'de',
-    'fai', 'fil', 'fait', 'faite', 'faites',
-    'jundland', 'kashyyyk', 'coruscant', 'tatooine', 'naboo', 'bespin',
-    'hangar', 'spatioport', 'cantina', 'canyon', 'secteur',
-    'hutt', 'hutts', 'rodien', 'rodiens',
-    'yt-1300', 'yv-666', 'scyk'
-  ]);
-  const NON_NPC_ENTITY_RE = /\b(?:jundland|kashyyyk|coruscant|tatooine|naboo|bespin|mustafar|kamino|hoth|endor|dagobah|nar\s*shaddaa|hangar|spatioport|cantina|canyon|secteur|transport|vaisseau|cargo|navette|yt-1300|yv-666|scyk|x-wing|tie|hutts?|rodiens?)\b/i;
-  const ALLOWED_DROID_NAME_RE = /^(?:r2|c-?3|bb|ig|hk|k2|bd|chopper|ch0pper)/i;
-  const HOSTILE_RELATION_RE = /\b(?:attaque|menace|hostile|ennemi|trahit|abandonne|frappe|tue|deteste|déteste|insulte|pi[eè]ge|embuscade)\b/i;
-  const ALLY_RELATION_RE = /\b(?:aide|sauve|protege|prot[eè]ge|couvre|soutient|soutien|allie|alli[eé]|confiance|merci|secourt)\b/i;
-  const MEMORY_LOW_SIGNAL_RELATION_RE = /^rencontre\s+avec\s+/i;
-  const MEMORY_TECHNICAL_NOISE_RE = /\[object object\]|(?:^|\b)json\s*[\[{]|"chapter_title"\s*:|"chapter_number"\s*:|"narrative"\s*:|"choices"\s*:|<\|?tool_call\|?>|tool_call|(?:^|\s)call:[a-z_]+\s*\{|passage a ete nettoye automatiquement|sortie technique non lisible|fallback|aborterror|aborted|inexploitable|instable|non bloquant/i;
-
-  function normalizeSearchText(value: string): string {
-    return value
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase()
-      .trim();
-  }
-
-  function escapeRegExp(value: string): string {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  }
-
-  function isLikelyNpcName(value: unknown): boolean {
-    const raw = String(value || '').trim();
-    if (!raw) return false;
-
-    const normalized = normalizeSearchText(raw);
-    if (!normalized || isUnknownLocationValue(normalized)) return false;
-    if (DIALOGUE_SPEAKER_STOPWORDS.has(normalized)) return false;
-    if (NON_NPC_EXACT.has(normalized)) return false;
-    if (/^(?:le|la|les|un|une|des|du|de)\s+/.test(normalized)) return false;
-    if (NON_NPC_ENTITY_RE.test(normalized)) return false;
-    if (normalized.split(/\s+/).length > 3) return false;
-
-    const hasDigits = /\d/.test(normalized);
-    if (hasDigits && !ALLOWED_DROID_NAME_RE.test(normalized)) return false;
-
-    if (normalized.length < 3 && !ALLOWED_DROID_NAME_RE.test(normalized)) return false;
-
-    return normalized.length >= 2;
-  }
-
-  function clampAffinity(value: number): number {
-    return Math.max(-100, Math.min(100, Math.round(value)));
-  }
-
-  function deriveStatusFromAffinity(affinity: number, currentStatus?: NpcRelation['status']): NpcRelation['status'] {
-    if (currentStatus === 'dead') return 'dead';
-    if (affinity >= 25) return 'ally';
-    if (affinity <= -25) return 'hostile';
-    return 'neutral';
-  }
-
-  function inferNpcAffinityDelta(chapter: StoryChapter, npcName: string): number {
-    const normalizedName = normalizeSearchText(npcName);
-    if (!normalizedName) return 0;
-
-    const corpus = normalizeSearchText([
-      chapter.narrative.action,
-      chapter.narrative.dialogue,
-      chapter.narrative.reflection
-    ].filter(Boolean).join('\n'));
-
-    if (!corpus || !corpus.includes(normalizedName)) return 0;
-
-    const nameRegex = new RegExp(escapeRegExp(normalizedName), 'gi');
-    let score = 0;
-    let match: RegExpExecArray | null;
-
-    while ((match = nameRegex.exec(corpus)) !== null) {
-      const start = Math.max(0, match.index - 90);
-      const end = Math.min(corpus.length, match.index + normalizedName.length + 90);
-      const window = corpus.slice(start, end);
-
-      if (ALLY_RELATION_RE.test(window)) score += 12;
-      if (HOSTILE_RELATION_RE.test(window)) score -= 12;
-    }
-
-    return Math.max(-20, Math.min(20, score));
-  }
-
-  function isMeaningfulNpcMemoryEntry(npc: Partial<NpcRelation> & { name: string }): boolean {
-    if (!isLikelyNpcName(npc.name)) return false;
-    const affinity = typeof npc.affinity === 'number' ? npc.affinity : 0;
-    const status = normalizeNpcStatus(npc.status as NpcRelation['status'] | undefined);
-    const note = String(npc.note || '').trim();
-    return Boolean(note || npc.faction || Math.abs(affinity) >= 15 || status === 'ally' || status === 'hostile' || status === 'dead');
-  }
-
-  function isUnknownLocationValue(value: unknown): boolean {
-    const text = String(value || '').trim();
-    if (!text) return true;
-    return UNKNOWN_LOCATION_RE.test(normalizeSearchText(text));
-  }
-
-  function looksLikeFactionLabel(value: unknown): boolean {
-    const text = String(value || '').trim();
-    if (!text) return false;
-
-    const normalized = normalizeSearchText(text).replace(/\s+/g, ' ');
-    if (FACTION_LOCATION_LEAK_EXACT.has(normalized)) return true;
-
-    return /^(?:jedi|ordre jedi|jedi order|sith|empire|alliance rebelle|rebelles?|republic|republique|premier ordre|first order|hutt|cartel hutt|mandalore|mandaloriens|mandalorians)$/.test(normalized);
-  }
-
-  function normalizeNarrativeDate(baseDate: string, dateAdvance?: string): string {
-    const base = String(baseDate || '')
-      .replace(/\s*,\s*/g, ', ')
-      .replace(/\s{2,}/g, ' ')
-      .trim();
-
-    const advance = String(dateAdvance || '')
-      .replace(/^\+\s*/, '')
-      .replace(/\s{2,}/g, ' ')
-      .trim();
-
-    if (!advance) return base;
-
-    const baseDayMatch = base.match(/\bjour\s*(\d+)\b/i);
-    const absoluteDayMatch = advance.match(/^jour\s*(\d+)$/i);
-
-    if (baseDayMatch && absoluteDayMatch) {
-      const baseDay = Number(baseDayMatch[1]);
-      const nextDay = Number(absoluteDayMatch[1]);
-
-      if (Number.isFinite(baseDay) && Number.isFinite(nextDay)) {
-        if (nextDay === baseDay) return base;
-        return base.replace(/\bjour\s*\d+\b/i, `Jour ${Math.max(1, nextDay)}`);
-      }
-    }
-
-    const relativeDayMatch = advance.match(/^([+-]?\d+)\s*jour(?:s)?$/i);
-    if (baseDayMatch && relativeDayMatch) {
-      const baseDay = Number(baseDayMatch[1]);
-      const deltaDays = Number(relativeDayMatch[1]);
-
-      if (Number.isFinite(baseDay) && Number.isFinite(deltaDays)) {
-        const mergedDay = Math.max(1, baseDay + deltaDays);
-        return base.replace(/\bjour\s*\d+\b/i, `Jour ${mergedDay}`);
-      }
-    }
-
-    if (base) {
-      const normalizedBase = normalizeSearchText(base);
-      const normalizedAdvance = normalizeSearchText(advance);
-      if (normalizedAdvance && normalizedBase.includes(normalizedAdvance)) return base;
-      return `${base} +${advance}`;
-    }
-
-    return advance;
-  }
-
-  function inferLocationFromText(...parts: Array<string | undefined>): string | undefined {
-    const corpus = parts.filter(Boolean).join('\n');
-    if (!corpus) return undefined;
-
-    for (const hint of LOCATION_HINTS) {
-      if (hint.pattern.test(corpus)) {
-        return hint.label;
-      }
-    }
-
-    const phraseCapture = corpus.match(/\b(?:dans|sur|à|au|aux|en)\s+([A-ZÀ-ÖØ-Þ][A-Za-zÀ-ÖØ-öø-ÿ' -]{2,48})/u);
-    if (phraseCapture?.[1]) {
-      return phraseCapture[1].trim();
-    }
-
-    return undefined;
-  }
-
-  function inferLocationFromChapter(chapter: StoryChapter): string | undefined {
-    return inferLocationFromText(
-      chapter.narrative.context,
-      chapter.narrative.action,
-      chapter.narrative.dialogue,
-      chapter.narrative.reflection
-    );
-  }
-
-  function extractNpcSeedsFromDialogue(dialogue: string): string[] {
-    const names = new Set<string>();
-    for (const match of String(dialogue || '').matchAll(DIALOGUE_SPEAKER_RE)) {
-      const candidate = String(match[1] || '').trim();
-      if (!candidate) continue;
-
-      const normalized = normalizeSearchText(candidate);
-      if (DIALOGUE_SPEAKER_STOPWORDS.has(normalized)) continue;
-      if (!isLikelyNpcName(candidate)) continue;
-      names.add(candidate);
-    }
-    return Array.from(names).slice(0, 6);
-  }
-
-  function normalizeNpcStatus(status: NpcRelation['status'] | undefined): NpcRelation['status'] {
-    if (!status || status === 'unknown') return 'neutral';
-    return status;
-  }
-
-  function deriveInitialLocation(setup: StorySetup): string {
-    const factionSeed: Record<string, string> = {
-      empire: 'Coruscant — Secteur Impérial',
-      rebels: 'Cellule rebelle en bordure extérieure',
-      jedi: 'Enclave Jedi isolée',
-      sith: 'Sanctuaire Sith dissimulé',
-      hutt: 'Nar Shaddaa',
-      mandalore: 'Mandalore'
-    };
-
-    if (setup.faction && factionSeed[setup.faction]) {
-      return factionSeed[setup.faction];
-    }
-
-    const eraSeed: Record<string, string> = {
-      old_republic: 'Coruscant',
-      clone_wars: 'Coruscant — secteur militaire',
-      imperial: 'Coruscant — noyau impérial',
-      rebellion: 'Base rebelle mobile',
-      new_republic: 'Hosnian Prime',
-      first_order: 'Avant-poste de la Bordure Extérieure'
-    };
-
-    return eraSeed[setup.era] || 'Secteur frontalier';
-  }
-
-  function cloneWorldState(source: WorldState): WorldState {
-    return {
-      player: {
-        hp: source.player.hp,
-        credits: source.player.credits,
-        location: source.player.location,
-        date: source.player.date,
-        injuries: source.player.injuries.map(injury => ({ ...injury })),
-        inventory: source.player.inventory.map(item => ({ ...item }))
-      },
-      npcs: source.npcs.map(npc => ({ ...npc })),
-      factions: { ...source.factions },
-      chronology: source.chronology.map(entry => ({ ...entry }))
-    };
-  }
-
-  function initWorldState(setup: StorySetup): WorldState {
-    const startCredits = FACTION_CREDITS[setup.role] ?? FACTION_CREDITS.default;
-    const factions: Record<string, number> = {
-      empire: 0, rebel_alliance: 0, jedi_order: 0, sith: 0, hutt: 0, mandalore: 0
-    };
-    const factionMap: Record<string, string> = {
-      jedi: 'jedi_order', sith: 'sith', empire: 'empire',
-      rebels: 'rebel_alliance', hutt: 'hutt', mandalore: 'mandalore'
-    };
-    const playerFaction = factionMap[setup.faction];
-    if (playerFaction) factions[playerFaction] = 50;
-
-    return {
-      player: {
-        hp: 100,
-        credits: startCredits,
-        location: deriveInitialLocation(setup),
-        date: ERA_START_DATES[setup.era] ?? 'Ère inconnue, Jour 1',
-        injuries: [],
-        inventory: []
-      },
-      npcs: [],
-      factions,
-      chronology: []
-    };
-  }
 
   let worldState: WorldState = {
     player: { hp: 100, credits: 1000, location: 'Secteur frontalier', date: '', injuries: [], inventory: [] },
     npcs: [],
     factions: {},
-    chronology: []
+    chronology: [],
+    clocks: {},
+    sector_influence: {},
+    rumors: []
   };
-  const INTENSE_SECTION_TYPES = new Set(['action', 'confrontation']);
-
-  function normalizeHpDelta(rawHp: number, currentHp: number): number {
-    // Négatif = dégâts (delta clair)
-    if (rawHp < 0) return rawHp;
-    // Positif > 50 : probablement une valeur absolue envoyée par erreur → convertir en delta
-    if (rawHp > 50) return rawHp - currentHp;
-    // Petit positif (1–50) : soin delta
-    return rawHp;
-  }
-
-  function normalizeCreditsDelta(rawCredits: number, currentCredits: number): number {
-    // Négatif = dépense (delta clair)
-    if (rawCredits < 0) return rawCredits;
-    // Très grand positif proche du solde actuel → probablement un snapshot absolu → delta
-    const ratio = currentCredits > 0 ? rawCredits / currentCredits : 2;
-    if (ratio >= 0.5 && ratio <= 1.8 && rawCredits > 200) return rawCredits - currentCredits;
-    // Sinon : traiter comme delta de gain
-    return rawCredits;
-  }
-
-  function applyStateUpdateToWorldState(sourceState: WorldState, chapter: StoryChapter): WorldState {
-    const upd = chapter.state_update;
-    const p = sourceState.player;
-
-    const hpDelta = typeof upd?.hp === 'number' ? normalizeHpDelta(upd.hp, p.hp) : undefined;
-    const creditsDelta = typeof upd?.credits === 'number' ? normalizeCreditsDelta(upd.credits, p.credits) : undefined;
-
-    const inferredLocation = inferLocationFromChapter(chapter);
-    const requestedLocationRaw = String(upd?.location || '').trim();
-    const requestedLocation = looksLikeFactionLabel(requestedLocationRaw) ? '' : requestedLocationRaw;
-    const fallbackLocation = isUnknownLocationValue(p.location) ? inferredLocation : undefined;
-    let newLocation = requestedLocation || fallbackLocation || p.location;
-
-    if ((isUnknownLocationValue(newLocation) || looksLikeFactionLabel(newLocation)) && inferredLocation) {
-      newLocation = inferredLocation;
-    }
-
-    if (looksLikeFactionLabel(newLocation)) {
-      const previousValidLocation = !isUnknownLocationValue(p.location) && !looksLikeFactionLabel(p.location)
-        ? p.location
-        : '';
-      newLocation = previousValidLocation || newLocation;
-    }
-
-    // Player vitals
-    const newHp = hpDelta !== undefined ? Math.max(0, Math.min(100, p.hp + hpDelta)) : p.hp;
-    const newCredits = creditsDelta !== undefined ? Math.max(0, p.credits + creditsDelta) : p.credits;
-    const newDate = normalizeNarrativeDate(p.date, upd?.date_advance);
-
-    // Injuries: resolve then add new
-    const resolvedKeywords = upd?.injuries_resolved ?? [];
-    const survivingInjuries = p.injuries.filter(inj =>
-      !resolvedKeywords.some(r => inj.description.toLowerCase().includes(r.toLowerCase()))
-    );
-    const newInjuries = [...survivingInjuries, ...(upd?.injuries_new ?? [])];
-
-    // Inventory
-    let inventory = [...p.inventory];
-    for (const gained of upd?.inventory_gained ?? []) {
-      const existing = inventory.find(i => i.name.toLowerCase() === gained.name.toLowerCase());
-      if (existing) existing.qty += gained.qty;
-      else inventory.push({ ...gained });
-    }
-    for (const lost of upd?.inventory_lost ?? []) {
-      inventory = inventory
-        .map(i => i.name.toLowerCase() === lost.name.toLowerCase() ? { ...i, qty: i.qty - lost.qty } : i)
-        .filter(i => i.qty > 0);
-    }
-
-    // NPCs: upsert by name — with generic-name deduplication
-    const GENERIC_NPC_RE = /^(l['’]inconnu|l['’]homme|la femme|un homme|une femme|le garde|l['’]officier|le soldat|un individu|la silhouette|l['’]etranger|l['’]étranger|un etranger|un étranger)/i;
-    let npcs = sourceState.npcs.map(npc => ({ ...npc, status: normalizeNpcStatus(npc.status) }));
-
-    for (const npcUpd of upd?.npcs ?? []) {
-      const idx = npcs.findIndex(n => n.name.toLowerCase() === npcUpd.name.toLowerCase());
-      if (idx >= 0) {
-        // Normal update
-        npcs[idx] = {
-          ...npcs[idx],
-          ...npcUpd,
-          status: normalizeNpcStatus((npcUpd.status as NpcRelation['status'] | undefined) ?? npcs[idx].status),
-          alive: npcUpd.alive ?? npcs[idx].alive
-        } as NpcRelation;
-      } else {
-        // Check if this is a "name reveal" of an existing generic/anonymous NPC
-        const newAff = npcUpd.affinity ?? 0;
-        const genericIdx = npcs.findIndex(n =>
-          GENERIC_NPC_RE.test(n.name) &&
-          Math.abs((n.affinity ?? 0) - newAff) <= 30
-        );
-        if (genericIdx >= 0) {
-          // Merge: rename the generic NPC entry instead of creating a duplicate
-          npcs[genericIdx] = {
-            ...npcs[genericIdx],
-            ...npcUpd,
-            status: normalizeNpcStatus((npcUpd.status as NpcRelation['status'] | undefined) ?? npcs[genericIdx].status),
-            alive: npcUpd.alive ?? npcs[genericIdx].alive
-          } as NpcRelation;
-        } else {
-          npcs.push({
-            name: npcUpd.name,
-            affinity: npcUpd.affinity ?? 0,
-            status: normalizeNpcStatus(npcUpd.status as NpcRelation['status'] | undefined),
-            faction: npcUpd.faction,
-            last_seen: npcUpd.last_seen,
-            alive: npcUpd.alive !== false,
-            note: npcUpd.note
-          });
-        }
-      }
-    }
-
-    // Fallback NPC seeds from dialogue when model omitted update_npc
-    const speakerSeeds = extractNpcSeedsFromDialogue(chapter.narrative.dialogue);
-    const existingNames = new Set(npcs.map(npc => npc.name.toLowerCase()));
-    for (const name of speakerSeeds) {
-      const key = name.toLowerCase();
-      if (existingNames.has(key)) continue;
-      if (!isLikelyNpcName(name)) continue;
-      npcs.push({
-        name,
-        affinity: 0,
-        status: 'neutral',
-        alive: true,
-        last_seen: !isUnknownLocationValue(newLocation) ? newLocation : undefined
-      });
-      existingNames.add(key);
-    }
-
-    const explicitNpcUpdates = new Map(
-      (upd?.npcs ?? [])
-        .filter(item => item?.name)
-        .map(item => [String(item.name).toLowerCase(), item] as const)
-    );
-
-    for (const npc of npcs) {
-      if (!isLikelyNpcName(npc.name)) continue;
-
-      const normalizedName = normalizeSearchText(npc.name);
-      const chapterCorpus = normalizeSearchText([
-        chapter.narrative.action,
-        chapter.narrative.dialogue,
-        chapter.narrative.reflection
-      ].filter(Boolean).join('\n'));
-
-      const isMentionedThisTurn = Boolean(normalizedName && chapterCorpus.includes(normalizedName));
-      if (!isMentionedThisTurn) continue;
-
-      if (!isUnknownLocationValue(newLocation)) {
-        npc.last_seen = newLocation;
-      }
-
-      const explicit = explicitNpcUpdates.get(npc.name.toLowerCase());
-      const hasExplicitRelationSignal = Boolean(
-        explicit && (
-          typeof explicit.affinity === 'number' ||
-          typeof explicit.status === 'string'
-        )
-      );
-
-      if (!hasExplicitRelationSignal) {
-        const delta = inferNpcAffinityDelta(chapter, npc.name);
-        if (delta !== 0) {
-          npc.affinity = clampAffinity((npc.affinity ?? 0) + delta);
-        }
-      }
-
-      if (typeof npc.affinity === 'number') {
-        npc.status = deriveStatusFromAffinity(npc.affinity, npc.status);
-      }
-    }
-
-    // Factions: apply deltas, clamp -100..100
-    const factions = { ...sourceState.factions };
-    for (const [id, delta] of Object.entries(upd?.factions ?? {})) {
-      factions[id] = Math.max(-100, Math.min(100, (factions[id] ?? 0) + delta));
-    }
-
-    // Chronology entry
-    const chronology = [
-      ...sourceState.chronology,
-      {
-        chapter: chapter.chapter_number,
-        date: newDate,
-        location: newLocation,
-        summary: chapter.chapter_title
-      }
-    ].slice(-40);
-
-    return {
-      player: { hp: newHp, credits: newCredits, location: newLocation, date: newDate, injuries: newInjuries, inventory },
-      npcs,
-      factions,
-      chronology
-    };
-  }
 
   function applyStateUpdate(chapter: StoryChapter): void {
     worldState = applyStateUpdateToWorldState(worldState, chapter);
-  }
-
-  function worldStateNeedsRepair(candidate: WorldState | null | undefined): boolean {
-    if (!candidate) return true;
-    if (isUnknownLocationValue(candidate.player?.location)) return true;
-    if (!candidate.npcs?.length) return true;
-    if (!candidate.chronology?.length) return true;
-    return false;
-  }
-
-  function rebuildWorldStateFromHistory(
-    setup: StorySetup,
-    chapters: StoryChapter[],
-    existingState: WorldState | null | undefined
-  ): WorldState {
-    const seedState = existingState ? cloneWorldState(existingState) : initWorldState(setup);
-    const normalizedSeed: WorldState = {
-      ...seedState,
-      player: {
-        ...seedState.player,
-        location: isUnknownLocationValue(seedState.player.location)
-          ? deriveInitialLocation(setup)
-          : seedState.player.location
-      },
-      chronology: []
-    };
-
-    const orderedChapters = [...chapters].sort((a, b) => (a.chapter_number || 0) - (b.chapter_number || 0));
-    return orderedChapters.reduce<WorldState>((acc, chapter) => applyStateUpdateToWorldState(acc, chapter), normalizedSeed);
   }
 
   // Mechanical consequences: returns display modifiers for a choice
@@ -690,6 +171,7 @@
     ? planDialogueDisplay(currentChapter)
     : { actionParagraphs: [], dialogueParagraphs: [] };
   $: actionTagLabel = currentChapter?.narrative.action ? 'Action' : 'Scène';
+  $: visibleBackgroundEvents = getVisibleBackgroundEvents(backgroundEvents);
   $: currentRoleLabel = ROLES.find(role => role.id === $currentSetup.role)?.name || $currentSetup.role || '';
   $: currentFactionLabel = FACTIONS.find(faction => faction.id === $currentSetup.faction)?.name || $currentSetup.faction || '';
 
@@ -710,6 +192,19 @@
     };
 
     saveInteractiveSessionPayload(storyId, payload);
+  }
+
+  function flushInteractiveState(): void {
+    const setup = ensureSetupDefaults();
+    updateTitle(buildStoryTitle(setup));
+    updateContent(buildJournalContent(chapterHistory));
+    saveInteractiveSession();
+
+    if (storyId) {
+      void saveStory().catch(error => {
+        logger.warn('editor: flush de sortie partiellement échoué.', error);
+      });
+    }
   }
 
   function loadInteractiveSession(id: string): InteractiveSessionPayload | null {
@@ -814,221 +309,6 @@
     return systemMessage ? [systemMessage, ...others] : others;
   }
 
-  function normalizeMemoryFactValue(value: unknown): string {
-    return String(value || '')
-      .replace(/\r/g, '\n')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 240);
-  }
-
-  function isMemoryNoiseFact(value: unknown): boolean {
-    const raw = normalizeMemoryFactValue(value);
-    if (!raw) return true;
-
-    const normalized = normalizeSearchText(raw).replace(/\s+/g, ' ').trim();
-    if (!normalized) return true;
-    if (raw.length < 10) return true;
-
-    return (
-      MEMORY_LOW_SIGNAL_RELATION_RE.test(normalized) ||
-      /^relation\s*:\s*rencontre\s+avec\s+/i.test(normalized) ||
-      MEMORY_TECHNICAL_NOISE_RE.test(normalized)
-    );
-  }
-
-  function memoryFactDedupKey(value: string): string {
-    return normalizeSearchText(value)
-      .replace(/\s+/g, ' ')
-      .trim();
-  }
-
-  function normalizeMemoryFacts(values: string[]): string[] {
-    const dedup = new Map<string, string>();
-
-    for (const entry of values) {
-      const normalizedEntry = normalizeMemoryFactValue(entry);
-      if (!normalizedEntry || isMemoryNoiseFact(normalizedEntry)) continue;
-      const key = memoryFactDedupKey(normalizedEntry);
-      if (!key) continue;
-      dedup.set(key, normalizedEntry);
-    }
-
-    return Array.from(dedup.values()).slice(-260);
-  }
-
-  function mergeMemoryFacts(nextFacts: string[]): void {
-    memoryLog = normalizeMemoryFacts([...memoryLog, ...nextFacts]);
-  }
-
-
-  function getRoleLabel(roleId: string): string {
-    return ROLES.find(role => role.id === roleId)?.name || roleId;
-  }
-
-  function buildCanonicalIdentityFacts(setup: StorySetup): string[] {
-    const roleLabel = getRoleLabel(setup.role || 'aventurier');
-    return [
-      `Canon protagoniste: rôle ${roleLabel} (${setup.role || 'inconnu'}).`,
-      `Canon protagoniste: faction ${setup.faction || 'indépendant'} · ère ${setup.era || 'inconnue'}.`,
-      `Règle canonique: ne pas changer le rang/role (ex: Padawan ≠ Chevalier/Maître) sans validation explicite du joueur.`
-    ];
-  }
-
-  function ensureCanonicalIdentityMemory(setup: StorySetup): void {
-    mergeMemoryFacts(buildCanonicalIdentityFacts(setup));
-  }
-
-  function appendMemoryFromChapter(chapter: StoryChapter): void {
-    const explicitFacts = [
-      ...chapter.memory_updates.relations
-        .filter(item => !MEMORY_LOW_SIGNAL_RELATION_RE.test(item))
-        .map(item => `Relation: ${item}`),
-      ...chapter.memory_updates.places.map(item => `Lieu: ${item}`),
-      ...chapter.memory_updates.injuries.map(item => `Blessure: ${item}`),
-      ...chapter.memory_updates.resources.map(item => `Ressource: ${item}`),
-      ...chapter.memory_updates.notes.map(item => `Note: ${item}`)
-    ].filter(f => f.length > 10);
-
-    const stateFacts: string[] = [];
-    const su = chapter.state_update;
-
-    if (su?.location) {
-      stateFacts.push(`Tour ${chapter.chapter_number}: déplacement vers ${su.location} (scène: ${chapter.chapter_title})`);
-    }
-
-    if (su?.date_advance) {
-      stateFacts.push(`Temps avancé: ${su.date_advance}`);
-    }
-
-    if (su?.npcs?.length) {
-      const meaningfulNpcs = su.npcs
-        .filter((npc): npc is Partial<NpcRelation> & { name: string } => Boolean(npc?.name))
-        .filter(npc => isMeaningfulNpcMemoryEntry(npc))
-        .slice(0, 3);
-
-      for (const npc of meaningfulNpcs) {
-        const name = String(npc.name || '').trim();
-        if (!name) continue;
-        const relation = typeof npc.affinity === 'number'
-          ? (npc.affinity > 30 ? 'allié' : npc.affinity < -30 ? 'hostile' : 'neutre')
-          : (npc.status && npc.status !== 'unknown' ? npc.status : 'neutre');
-        const note = String(npc.note || '').trim();
-        stateFacts.push(`PNJ ${name} (${relation}${note ? ` — ${note}` : ''})`);
-      }
-    }
-
-    if (su?.factions) {
-      const factionFacts = Object.entries(su.factions)
-        .filter(([, delta]) => delta !== 0)
-        .slice(0, 4)
-        .map(([id, delta]) => `${id}:${delta > 0 ? '+' : ''}${delta}`);
-      if (factionFacts.length) stateFacts.push(`Réputation: ${factionFacts.join(', ')}`);
-    }
-
-    if (su?.injuries_new?.length) {
-      for (const injury of su.injuries_new.slice(0, 3)) {
-        stateFacts.push(`Blessure reçue [${injury.severity}]: ${injury.description}`);
-      }
-    }
-
-    if (su?.injuries_resolved?.length) {
-      stateFacts.push(`Blessures résolues: ${su.injuries_resolved.slice(0, 3).join(', ')}`);
-    }
-
-    if (su?.inventory_gained?.length) {
-      stateFacts.push(`Obtenu: ${su.inventory_gained.slice(0, 3).map(item => item.qty > 1 ? `${item.qty}× ${item.name}` : item.name).join(', ')}`);
-    }
-
-    const mergedFacts = [...explicitFacts, ...stateFacts.filter(f => f.length > 10)];
-
-    const narrativeSnippet = sanitizeNarrativeTextForDisplay(
-      chapter.narrative.action || chapter.narrative.context || chapter.narrative.dialogue || ''
-    )
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 160);
-
-    if (narrativeSnippet) {
-      mergedFacts.unshift(`Tour ${chapter.chapter_number}: ${chapter.chapter_title} — ${narrativeSnippet}`);
-    }
-
-    // Safety net: always keep at least one memory breadcrumb per chapter,
-    // even when models omit memory_updates/state_update.
-    if (!mergedFacts.length) {
-      if (narrativeSnippet) {
-        mergedFacts.push(`Tour ${chapter.chapter_number}: ${chapter.chapter_title} — ${narrativeSnippet}`);
-      }
-    }
-
-    mergeMemoryFacts(mergedFacts);
-  }
-
-  const ARCHIVE_TRIGGER_TURN = 30;
-  const KEEP_RAW_TURNS = 20;
-
-  function archiveOldTurnsIfNeeded(): void {
-    const archiveCount = Math.max(0, chapterHistory.length - KEEP_RAW_TURNS);
-    if (chapterHistory.length <= ARCHIVE_TRIGGER_TURN || archiveCount <= campaignArchive.length) return;
-
-    const newlyOld = chapterHistory.slice(campaignArchive.length, archiveCount);
-    if (newlyOld.length) {
-      campaignArchive = [...campaignArchive, ...newlyOld.map(chapter => summarizeChapterForPrompt(chapter))];
-    }
-
-    const systemMessage = aiMessages.find(message => message.role === 'system');
-    const otherMessages = aiMessages.filter(message => message.role !== 'system');
-    if (otherMessages.length > KEEP_RAW_TURNS * 2) {
-      const recentMessages = otherMessages.slice(-(KEEP_RAW_TURNS * 2));
-      aiMessages = systemMessage ? [systemMessage, ...recentMessages] : recentMessages;
-    }
-  }
-
-  function backgroundEventToSyntheticChapter(event: BackgroundWorldEvent, turn: number): StoryChapter {
-    return {
-      chapter_title: event.title || 'Mouvement de la galaxie',
-      chapter_number: turn,
-      section_type: 'background',
-      narrative: {
-        context: '',
-        action: event.summary_public || '',
-        dialogue: '',
-        reflection: '',
-        atmosphere: 'tense'
-      },
-      choices: [],
-      memory_updates: event.memory_updates,
-      scene_description: 'Off-screen galactic world event',
-      user_edits_applied: null,
-      state_update: event.state_update
-    };
-  }
-
-  function appendMemoryFromBackgroundEvent(event: BackgroundWorldEvent, turn: number): void {
-    const explicitFacts = [
-      ...event.memory_updates.relations.map(item => `Relation (off-screen): ${item}`),
-      ...event.memory_updates.places.map(item => `Lieu (off-screen): ${item}`),
-      ...event.memory_updates.injuries.map(item => `Blessure (off-screen): ${item}`),
-      ...event.memory_updates.resources.map(item => `Ressource (off-screen): ${item}`),
-      ...event.memory_updates.notes.map(item => `Note (off-screen): ${item}`)
-    ];
-
-    const summary = event.summary_private || event.summary_public;
-    const syntheticFacts = [
-      summary ? `Tour ${turn} (galaxie): ${summary}` : '',
-      event.prompt_hook ? `Hook MJ: ${event.prompt_hook}` : ''
-    ];
-
-    mergeMemoryFacts([...explicitFacts, ...syntheticFacts]);
-  }
-
-  function createBackgroundEventId(): string {
-    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-      return crypto.randomUUID();
-    }
-    return `bg-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  }
-
   async function runBackgroundWorldTick(setup: StorySetup, turn: number, recentSectionTypes: string[] = []): Promise<void> {
     if (!providerConfig) return;
 
@@ -1056,30 +336,16 @@
       );
 
       const event = generation.event;
-      if (!event || !event.inject_now) return;
+      if (!event) return;
       if (isNearDuplicateBackgroundEvent(event, backgroundEvents)) return;
 
-      if (event.state_update) {
-        applyStateUpdate(backgroundEventToSyntheticChapter(event, turn));
-      }
+      const applied = applyBackgroundWorldEventToRuntime(worldState, memoryLog, backgroundEvents, event, turn);
+      worldState = applied.worldState;
+      memoryLog = applied.memoryLog;
+      backgroundEvents = applied.backgroundEvents;
 
-      appendMemoryFromBackgroundEvent(event, turn);
-
-      const summary = event.summary_public || event.prompt_hook || event.title;
-      backgroundEvents = [
-        {
-          id: createBackgroundEventId(),
-          turn,
-          title: event.title || 'Mouvement de la galaxie',
-          summary,
-          promptHook: event.prompt_hook,
-          privateSummary: event.summary_private
-        },
-        ...backgroundEvents
-      ].slice(0, 24);
-
-      if (summary) {
-        showToast(`Événement galactique: ${summary}`, 'warning');
+      if (applied.loggedEvent.visibleNow && applied.loggedEvent.summary) {
+        showToast(`Événement galactique: ${applied.loggedEvent.summary}`, 'warning');
       }
     } catch (error) {
       logger.warn('editor: tick hors-écran ignoré.', error);
@@ -1089,12 +355,11 @@
   async function persistInteractiveState(setup: StorySetup): Promise<void> {
     updateTitle(buildStoryTitle(setup));
     updateContent(buildJournalContent(chapterHistory));
+    saveInteractiveSession();
 
     if (storyId) {
       await saveStory();
     }
-
-    saveInteractiveSession();
   }
 
   async function ensureStoryExists(setup: StorySetup): Promise<string> {
@@ -1113,7 +378,7 @@
       throw new Error('Aucun provider IA configuré. Ouvre les paramètres IA texte.');
     }
 
-    archiveOldTurnsIfNeeded();
+    ({ aiMessages, campaignArchive } = archiveOldTurnsIfNeeded(chapterHistory, aiMessages, campaignArchive));
 
     const promptMode = resolvePromptMode();
     const memoryFactsForPrompt = Array.from(new Set([
@@ -1130,7 +395,9 @@
 
     const generation = await generateStoryTurn(requestMessages, providerConfig, turn);
     const chapter = sanitizeChapterForDisplay(enforceTransitionChoiceQuality(generation.chapter, worldState)) as StoryChapter;
-    const assistantContent = generation.rawResponse || JSON.stringify(chapter);
+    const assistantContent = generation.mode === 'pipeline'
+      ? buildAssistantTranscript(chapter)
+      : (generation.rawResponse || JSON.stringify(chapter));
 
     aiMessages = trimMessages([
       ...requestMessages,
@@ -1167,7 +434,7 @@
       campaignArchive = [];
       customAction = '';
       worldState = initWorldState(setup);
-      ensureCanonicalIdentityMemory(setup);
+      memoryLog = ensureCanonicalIdentityMemory(memoryLog, setup);
 
       const trameLabel = TRAMES.find(item => item.id === selectedTrame)?.name || null;
       const prompt = buildStartPrompt(setup, trameLabel, resolvePromptMode());
@@ -1178,8 +445,8 @@
       actionHistory = ['Prologue IA'];
 
       applyStateUpdate(chapter);
-      appendMemoryFromChapter(chapter);
-      archiveOldTurnsIfNeeded();
+      memoryLog = appendMemoryFromChapter(memoryLog, chapter);
+      ({ aiMessages, campaignArchive } = archiveOldTurnsIfNeeded(chapterHistory, aiMessages, campaignArchive));
       await persistInteractiveState(setup);
 
       mode = 'play';
@@ -1232,8 +499,8 @@
       actionHistory = [...actionHistory, action].slice(-60);
 
       applyStateUpdate(chapter);
-      appendMemoryFromChapter(chapter);
-      archiveOldTurnsIfNeeded();
+      memoryLog = appendMemoryFromChapter(memoryLog, chapter);
+      ({ aiMessages, campaignArchive } = archiveOldTurnsIfNeeded(chapterHistory, aiMessages, campaignArchive));
 
       await runBackgroundWorldTick(setup, nextTurn, recentSectionTypes);
       await persistInteractiveState(setup);
@@ -1328,7 +595,9 @@
       if (session) {
         turnNumber = session.turnNumber;
         selectedTrame = session.selectedTrame;
-        currentChapter = sanitizeChapterForDisplay(session.currentChapter);
+        currentChapter = session.currentChapter
+          ? sanitizeChapterForDisplay(session.currentChapter)
+          : null;
         chapterHistory = sanitizeChapterList(session.chapterHistory);
         actionHistory = session.actionHistory;
         aiMessages = session.aiMessages;
@@ -1351,7 +620,7 @@
         setSetupField('contentMode', snapshot.contentMode || get(currentSetup).contentMode);
 
         const setupForRepair = ensureSetupDefaults();
-        ensureCanonicalIdentityMemory(setupForRepair);
+        memoryLog = ensureCanonicalIdentityMemory(memoryLog, setupForRepair);
         if (worldStateNeedsRepair(session.worldState)) {
           worldState = rebuildWorldStateFromHistory(setupForRepair, chapterHistory, session.worldState);
           saveInteractiveSession();
@@ -1369,6 +638,11 @@
       hudCollapsed = true;
     }
 
+    if (typeof window !== 'undefined') {
+      window.addEventListener('pagehide', flushInteractiveState);
+      window.addEventListener('beforeunload', flushInteractiveState);
+    }
+
     loading = false;
 
     if (preferences.autoSave) {
@@ -1377,6 +651,11 @@
   });
 
   onDestroy(() => {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('pagehide', flushInteractiveState);
+      window.removeEventListener('beforeunload', flushInteractiveState);
+    }
+    flushInteractiveState();
     stopAutoSave();
   });
 </script>
@@ -1491,14 +770,14 @@
               <div class="error-banner">{generationError}</div>
             {/if}
 
-            {#if backgroundEvents.length > 0}
+            {#if visibleBackgroundEvents.length > 0}
               <details class="world-events-panel" aria-label="Événements galactiques hors écran">
                 <summary class="world-events-header">
                   <h3>Mouvements de la galaxie</h3>
-                  <span class="world-events-count">{backgroundEvents.length}</span>
+                  <span class="world-events-count">{visibleBackgroundEvents.length}</span>
                 </summary>
                 <div class="world-events-list">
-                  {#each backgroundEvents.slice(0, 3) as event}
+                  {#each visibleBackgroundEvents.slice(0, 3) as event}
                     <article class="world-event-item">
                       <div class="world-event-meta">
                         <span>Tour {event.turn}</span>
@@ -2477,31 +1756,11 @@
   }
 
   @media (max-width: 920px) {
-    .split-grid {
-      grid-template-columns: 1fr;
-    }
-
-    .setup-screen {
-      padding: var(--space-md);
-    }
   }
 
   @media (max-width: 720px) {
     .editor-content {
       padding: var(--space-md);
-    }
-
-    .setup-shell {
-      min-height: calc(100vh - 150px);
-    }
-
-    .setup-stage {
-      min-height: 520px;
-    }
-
-    .progress-pill {
-      font-size: 0.7rem;
-      padding: 6px 10px;
     }
 
     .header-actions {
@@ -2632,22 +1891,6 @@
 
     /* Play generating: compact */
     .play-generating { padding: 12px; gap: 8px; font-size: 0.78rem; }
-
-    /* Setup — grids 2 colonnes */
-    .era-grid,
-    .faction-grid,
-    .role-grid,
-    .trame-grid,
-    .style-grid,
-    .content-mode-grid {
-      grid-template-columns: repeat(2, 1fr) !important;
-    }
-
-    /* Setup stage */
-    .setup-stage { min-height: auto; }
-    .setup-screen { position: static; }
-    .split-grid { grid-template-columns: 1fr; }
-    .setup-shell { min-height: calc(100dvh - 140px); gap: 12px; }
   }
 
   @media (max-width: 420px) {

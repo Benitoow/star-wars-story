@@ -46,6 +46,18 @@ function cloneRecord<T extends Record<string, unknown>>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+function assertSupportedSchemaVersion(schemaVersion: unknown, scope: 'story' | 'data'): number {
+  if (typeof schemaVersion !== 'number' || !Number.isFinite(schemaVersion)) {
+    throw new Error(`Invalid ${scope} export version`);
+  }
+
+  if (schemaVersion > DATA_SCHEMA_VERSION) {
+    throw new Error(`Unsupported ${scope} export version`);
+  }
+
+  return schemaVersion;
+}
+
 function normalizeMetadata(metadata: unknown) {
   const source = isRecord(metadata) ? metadata : {};
 
@@ -380,9 +392,7 @@ export function parseStoryImportEnvelope(json: string) {
     throw new Error('Invalid story export format');
   }
 
-  if (typeof payload.schemaVersion === 'number' && payload.schemaVersion > DATA_SCHEMA_VERSION) {
-    throw new Error('Unsupported story export version');
-  }
+  assertSupportedSchemaVersion(payload.schemaVersion, 'story');
 
   return normalizeStoryRecord(payload.story);
 }
@@ -393,9 +403,7 @@ export function parseAllDataImportEnvelope(json: string) {
     throw new Error('Invalid data export format');
   }
 
-  if (typeof payload.schemaVersion === 'number' && payload.schemaVersion > DATA_SCHEMA_VERSION) {
-    throw new Error('Unsupported data export version');
-  }
+  const schemaVersion = assertSupportedSchemaVersion(payload.schemaVersion, 'data');
 
   const data = payload.data;
   const stories = Array.isArray(data.stories) ? data.stories.map(normalizeStoryRecord) : [];
@@ -407,7 +415,7 @@ export function parseAllDataImportEnvelope(json: string) {
   const appState = data.appState ? normalizeAppStateRecord(data.appState) : undefined;
 
   return {
-    schemaVersion: typeof payload.schemaVersion === 'number' ? payload.schemaVersion : DATA_SCHEMA_VERSION,
+    schemaVersion,
     stories,
     folders,
     storyVersions,

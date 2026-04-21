@@ -42,4 +42,13 @@ describe('persistence normalization', () => {
 
     expect(() => parseAllDataImportEnvelope(payload)).toThrow('Unsupported data export version');
   });
+
+  it('rejects non-numeric schema versions on import', () => {
+    const payload = JSON.stringify({
+      schemaVersion: 'latest',
+      data: {}
+    });
+
+    expect(() => parseAllDataImportEnvelope(payload)).toThrow('Invalid data export version');
+  });
 });

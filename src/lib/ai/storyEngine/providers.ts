@@ -14,7 +14,7 @@ import { parseJsonSafely } from './parsing';
 function cleanText(value: unknown, maxLength = 2200): string {
   if (value === null || value === undefined) return '';
   return String(value)
-    .replace(/\r/g, '\n')
+    .replace(/\r\n?/g, '\n')
     .replace(/[ \t]{2,}/g, ' ')
     .trim()
     .slice(0, maxLength);
@@ -337,7 +337,20 @@ export async function callOpenAiCompatibleRaw(
     }
 
     const data = await response.json() as { choices?: Array<{ message?: OpenAiMessage }> };
-    return data.choices?.[0]?.message ?? { role: 'assistant', content: '' };
+    const message = data.choices?.[0]?.message;
+    const hasContent = Boolean(cleanText(message?.content, 16000));
+    const hasToolCalls = Array.isArray(message?.tool_calls) && message.tool_calls.length > 0;
+    const hasReasoning = Boolean(
+      cleanText(message?.reasoning, 2000) ||
+      cleanText(message?.reasoning_content, 2000) ||
+      (Array.isArray(message?.reasoning_details) && message.reasoning_details.length)
+    );
+
+    if (!message || (!hasContent && !hasToolCalls && !hasReasoning)) {
+      throw new Error(`${getProviderDisplayName(config.providerId)}: réponse vide ou incomplète du provider.`);
+    }
+
+    return message;
   } finally {
     cancel();
   }

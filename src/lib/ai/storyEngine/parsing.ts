@@ -13,7 +13,7 @@ import { ensureWorldStateFallbacks, isUnknownLocation } from './worldStateFallba
 function cleanText(value: unknown, maxLength = 2200): string {
   if (value === null || value === undefined) return '';
   const text = String(value)
-    .replace(/\r/g, '\n')
+    .replace(/\r\n?/g, '\n')
     .replace(/[ \t]{2,}/g, ' ')
     .trim();
   return text.slice(0, maxLength);
@@ -606,8 +606,8 @@ export function coerceStateUpdate(source: unknown): StateUpdate | undefined {
         if (!name) return null;
         const entry: Partial<NpcRelation> & { name: string } = { name };
         if (typeof n.affinity === 'number') entry.affinity = Math.max(-100, Math.min(100, n.affinity));
-        if (['ally','neutral','hostile','dead','unknown'].includes(String(n.status))) {
-          const normalizedStatus = String(n.status).toLowerCase();
+        const normalizedStatus = String(n.status || '').toLowerCase();
+        if (['ally', 'neutral', 'hostile', 'dead', 'unknown'].includes(normalizedStatus)) {
           entry.status = normalizedStatus === 'unknown'
             ? 'neutral'
             : (normalizedStatus as NpcRelation['status']);
@@ -627,7 +627,9 @@ export function coerceStateUpdate(source: unknown): StateUpdate | undefined {
       .filter((i): i is Record<string, unknown> => !!i && typeof i === 'object')
       .map(i => ({
         description: cleanText(i.description, 100),
-        severity: (['light','moderate','severe'].includes(String(i.severity)) ? i.severity : 'light') as 'light'|'moderate'|'severe'
+        severity: (['light', 'moderate', 'severe'].includes(String(i.severity || '').toLowerCase())
+          ? String(i.severity).toLowerCase()
+          : 'light') as 'light' | 'moderate' | 'severe'
       }))
       .filter(i => i.description);
   }
@@ -863,7 +865,7 @@ export function parseStoryResponse(rawText: string, turnNumber: number): StoryCh
   const sectionType = cleanText(parsed.section_type, 40) || 'action';
 
   const narrative = coerceNarrative(parsed.narrative);
-  if (!narrative.action) {
+  if (!narrative.action && !narrative.dialogue) {
     const candidate = sanitizeNarrativeText(parsed.action, 2200);
     const rawFallback = sanitizeNarrativeText(rawText, 2200);
     const isJson = (t: string) => /^\s*[{[]/.test(t);

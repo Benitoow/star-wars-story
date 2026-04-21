@@ -37,9 +37,13 @@ import { FACTION_CREDITS, ERA_START_DATES } from '$lib/editor/setupCatalog';
     { pattern: /hangar|spatioport|dock|quai d['’]arrimage|baie d['’]arrimage/i, label: 'Hangar / Spatioport' }
   ];
   export const DIALOGUE_SPEAKER_RE = /^(?:[—–\-]\s*)?([A-ZÀ-ÖØ-Ý][A-Za-zÀ-ÖØ-öø-ÿ' -]{1,48})\s*:/gum;
-  export const DIALOGUE_SPEAKER_STOPWORDS = new Set(['je', 'tu', 'vous', 'il', 'elle', 'on', 'nous', 'ils', 'elles']);
+  export const DIALOGUE_SPEAKER_STOPWORDS = new Set([
+    'je', 'tu', 'vous', 'il', 'elle', 'on', 'nous', 'ils', 'elles',
+    'fai', 'fil', 'fait', 'faite', 'faites', 'alors', 'ensuite', 'puis', 'tour'
+  ]);
   export const NON_NPC_EXACT = new Set([
     'les', 'le', 'la', 'un', 'une', 'des', 'du', 'de',
+    'fai', 'fil', 'fait', 'faite', 'faites',
     'jundland', 'kashyyyk', 'coruscant', 'tatooine', 'naboo', 'bespin',
     'hangar', 'spatioport', 'cantina', 'canyon', 'secteur',
     'hutt', 'hutts', 'rodien', 'rodiens',
@@ -77,6 +81,8 @@ import { FACTION_CREDITS, ERA_START_DATES } from '$lib/editor/setupCatalog';
 
     const hasDigits = /\d/.test(normalized);
     if (hasDigits && !ALLOWED_DROID_NAME_RE.test(normalized)) return false;
+
+    if (normalized.length < 3 && !ALLOWED_DROID_NAME_RE.test(normalized)) return false;
 
     return normalized.length >= 2;
   }
@@ -552,21 +558,12 @@ import { FACTION_CREDITS, ERA_START_DATES } from '$lib/editor/setupCatalog';
   export function rebuildWorldStateFromHistory(
     setup: StorySetup,
     chapters: StoryChapter[],
-    existingState: WorldState | null | undefined
+    _existingState: WorldState | null | undefined
   ): WorldState {
-    const seedState = existingState ? cloneWorldState(existingState) : initWorldState(setup);
-    const normalizedSeed: WorldState = {
-      ...seedState,
-      player: {
-        ...seedState.player,
-        location: isUnknownLocationValue(seedState.player.location)
-          ? deriveInitialLocation(setup)
-          : seedState.player.location
-      },
-      chronology: []
-    };
-
     const orderedChapters = [...chapters].sort((a, b) => (a.chapter_number || 0) - (b.chapter_number || 0));
-    return orderedChapters.reduce<WorldState>((acc, chapter) => applyStateUpdateToWorldState(acc, chapter), normalizedSeed);
+    return orderedChapters.reduce<WorldState>(
+      (acc, chapter) => applyStateUpdateToWorldState(acc, chapter),
+      initWorldState(setup)
+    );
   }
 
