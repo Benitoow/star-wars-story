@@ -192,6 +192,15 @@ function parseLooseJsonObject(rawObject: string): Record<string, unknown> | null
 function extractPseudoToolCalls(rawText: string): ParsedPseudoToolCall[] {
   const text = String(rawText || '');
   const calls: ParsedPseudoToolCall[] = [];
+
+  const invokeRegex = /<invoke\s+name=["']?([^"'>]+)["']?>([\s\S]*?)<\/invoke>/gi;
+  let match;
+  while ((match = invokeRegex.exec(text)) !== null) {
+      const name = match[1].trim().toLowerCase();
+      const args = parseLooseJsonObject(match[2].trim()) ?? {};
+      calls.push({ name, args });
+  }
+
   let cursor = 0;
   while (cursor < text.length) {
     const callIndex = text.indexOf('call:', cursor);
@@ -410,86 +419,69 @@ export async function generateStoryTurn(messages: ChatMessage[], config: StoryPr
 
 async function generateStoryTurnWithTools(messages: ChatMessage[], config: StoryProviderConfig, turnNumber: number): Promise<StoryTurnGenerationResult> {
   const stepCaps: ModelCapabilities = detectModelCapabilities(config);
-  const extractionMaxTokens = getStoryExtractionMaxTokens(stepCaps, config);
-  const extractionTemperature = isOpenRouterGrok41Fast(config)
-    ? 0.35
-    : isOpenRouterMimoV2Flash(config)
-      ? 0.32
-      : 0.4;
   const baseConversation = messages.map(message => ({ role: message.role, content: message.content }));
-  const phase1Response = await callOpenAiCompatibleRaw(baseConversation, config, { maxTokens: stepCaps.maxOutputTokens, temperature: stepCaps.idealTemperature, skipReasoning: false });
-  const phase1Text = cleanText(phase1Response.content, 8000);
-  const phase1Json = parseJsonSafely(phase1Text);
-  if (phase1Json) {
-    const chapter = parseStoryResponse(phase1Text, turnNumber);
-    if (hasPlayableChapterContent(chapter)) return { chapter, rawResponse: phase1Text, mode: 'structured-json', steps: 1, toolCalls: 0 };
-  }
-  if (!phase1Text) throw new Error('[storyEngine] Phase 1 retourna une réponse vide.');
 
   const draft = createAgenticDraft(turnNumber);
-  if (!phase1Json) draft.narrative.action = phase1Text;
-
-  const phase1AssistantTurn: Record<string, unknown> = { role: 'assistant', content: phase1Text };
-  if (typeof phase1Response.reasoning === 'string' && phase1Response.reasoning.trim()) {
-    phase1AssistantTurn.reasoning = phase1Response.reasoning;
-  }
-  if (typeof phase1Response.reasoning_content === 'string' && phase1Response.reasoning_content.trim()) {
-    phase1AssistantTurn.reasoning_content = phase1Response.reasoning_content;
-  }
-  if (Array.isArray(phase1Response.reasoning_details) && phase1Response.reasoning_details.length) {
-    phase1AssistantTurn.reasoning_details = phase1Response.reasoning_details;
-  }
-
-  const extractionConversation: any[] = [
-    ...baseConversation,
-    phase1AssistantTurn,
-    {
-      role: 'user',
-      content: `Extrais les données structurées de cette scène (sans réécrire la narration):\n• update_world\n• update_npc\n• offer_choices\n• finalize_turn`
-    }
-  ];
-  const rawChunks: string[] = [phase1Text];
+  const rawChunks: string[] = [];
   let totalToolCalls = 0;
-  let steps = 1;
+  let steps = 0;
+
+  const conversation: any[] = [...baseConversation];
 
   for (let step = 1; step <= 6; step += 1) {
-    steps = step + 1;
-    const extractMsg = await callOpenAiCompatibleRaw(extractionConversation, config, {
+    steps = step;
+    const responseMsg = await callOpenAiCompatibleRaw(conversation, config, {
       tools: AGENTIC_GM_TOOLS,
       toolChoice: 'auto',
-      maxTokens: extractionMaxTokens,
-      temperature: extractionTemperature,
-      skipReasoning: true
+      maxTokens: stepCaps.maxOutputTokens,
+      temperature: stepCaps.idealTemperature,
+      skipReasoning: false
     });
-    const assistantContent = cleanText(extractMsg.content, 4000);
+
+    const assistantContent = cleanText(responseMsg.content, 12000);
     if (assistantContent) rawChunks.push(assistantContent);
-    const toolCalls = Array.isArray(extractMsg.tool_calls) ? extractMsg.tool_calls : [];
+
+    const toolCalls = Array.isArray(responseMsg.tool_calls) ? responseMsg.tool_calls : [];
+
     if (!toolCalls.length) {
-      for (const tc of extractPseudoToolCalls(assistantContent).filter(tc => isSupportedAgenticToolName(tc.name))) { totalToolCalls += 1; applyAgenticToolCall(draft, tc.name, tc.args); }
+      for (const tc of extractPseudoToolCalls(assistantContent).filter(tc => isSupportedAgenticToolName(tc.name))) { 
+        totalToolCalls += 1; 
+        applyAgenticToolCall(draft, tc.name, tc.args); 
+      }
+      
+      const jsonParsed = parseJsonSafely(assistantContent);
+      if (jsonParsed && isObjectRecord(jsonParsed)) {
+          if (typeof jsonParsed.chapter_title === 'string') draft.chapter_title = jsonParsed.chapter_title;
+          if (typeof jsonParsed.section_type === 'string') draft.section_type = jsonParsed.section_type;
+          if (isObjectRecord(jsonParsed.narrative)) draft.narrative = { ...draft.narrative, ...coerceNarrative(jsonParsed.narrative) };
+          if (Array.isArray(jsonParsed.choices)) draft.choices = dedupeChoices(jsonParsed.choices.map(c => ({ text: String(c.text || c), attribute: 'survival' } as StoryChoice)));
+          if (isObjectRecord(jsonParsed.state_update)) draft.state_update = mergeStateUpdates(draft.state_update, coerceStateUpdate(jsonParsed.state_update));
+      } else if (!draft.narrative.action) {
+          draft.narrative.action = sanitizeNarrativeText(assistantContent, 4000);
+      }
       break;
     }
+
     const assistantTurn: Record<string, unknown> = {
       role: 'assistant',
-      content: extractMsg.content ?? '',
+      content: responseMsg.content ?? '',
       tool_calls: toolCalls
     };
-    if (typeof extractMsg.reasoning === 'string' && extractMsg.reasoning.trim()) {
-      assistantTurn.reasoning = extractMsg.reasoning;
-    }
-    if (typeof extractMsg.reasoning_content === 'string' && extractMsg.reasoning_content.trim()) {
-      assistantTurn.reasoning_content = extractMsg.reasoning_content;
-    }
-    if (Array.isArray(extractMsg.reasoning_details) && extractMsg.reasoning_details.length) {
-      assistantTurn.reasoning_details = extractMsg.reasoning_details;
-    }
-    extractionConversation.push(assistantTurn);
+    if (typeof responseMsg.reasoning === 'string' && responseMsg.reasoning.trim()) { assistantTurn.reasoning = responseMsg.reasoning; }
+    if (typeof responseMsg.reasoning_content === 'string' && responseMsg.reasoning_content.trim()) { assistantTurn.reasoning_content = responseMsg.reasoning_content; }
+    if (Array.isArray(responseMsg.reasoning_details) && responseMsg.reasoning_details.length) { assistantTurn.reasoning_details = responseMsg.reasoning_details; }
+    
+    conversation.push(assistantTurn);
+
     for (const tc of toolCalls) {
       totalToolCalls += 1;
       const args = parseToolArguments(tc.function.arguments);
       const result = applyAgenticToolCall(draft, tc.function.name, args);
-      extractionConversation.push({ role: 'tool', tool_call_id: tc.id, name: tc.function.name, content: JSON.stringify(result) });
+      conversation.push({ role: 'tool', tool_call_id: tc.id, name: tc.function.name, content: JSON.stringify(result) });
     }
+
     if (draft.done && draft.choices.length > 0 && draftHasWorldSignals(draft)) break;
+    if (step > 2 && draft.choices.length >= 3 && draft.narrative.action) break;
   }
 
   if (!draftHasWorldSignals(draft)) {
@@ -498,7 +490,20 @@ async function generateStoryTurnWithTools(messages: ChatMessage[], config: Story
     draft.memory_updates = repaired.memoryUpdates;
   }
 
-  return { chapter: parseStoryResponse(JSON.stringify({ chapter_title: draft.chapter_title, chapter_number: turnNumber, section_type: draft.section_type, narrative: draft.narrative, choices: draft.choices, memory_updates: draft.memory_updates, state_update: draft.state_update, scene_description: draft.scene_description, user_edits_applied: draft.user_edits_applied }), turnNumber), rawResponse: rawChunks.join('\n\n').trim(), mode: 'agentic-tools', steps, toolCalls: totalToolCalls };
+  if (!draft.narrative.action && rawChunks.length > 0) {
+     const joinedChunks = rawChunks.join('\n\n').trim();
+     if (!TOOL_CALL_LEAK_PATTERN.test(joinedChunks)) { draft.narrative.action = sanitizeNarrativeText(joinedChunks, 4000); }
+  }
+
+  // Nettoyage des balises de réflexion et d'invocation du texte final
+  if (draft.narrative.action) {
+     draft.narrative.action = draft.narrative.action
+       .replace(/<thought>[\s\S]*?<\/thought>/gi, '')
+       .replace(/<invoke\s+name=["']?[^"'>]+["']?>[\s\S]*?<\/invoke>/gi, '')
+       .trim();
+  }
+
+  return { chapter: parseStoryResponse(JSON.stringify({ chapter_title: draft.chapter_title, chapter_number: turnNumber, section_type: draft.section_type, narrative: draft.narrative, choices: draft.choices, memory_updates: draft.memory_updates, state_update: draft.state_update, scene_description: draft.scene_description, user_edits_applied: draft.user_edits_applied }), turnNumber), rawResponse: rawChunks.join('\n\n').trim(), mode: 'agentic-tools', steps: Math.max(1, steps), toolCalls: totalToolCalls };
 }
 
 const AGENTIC_GM_TOOLS: any[] = [

@@ -33,7 +33,6 @@ export function buildSystemPrompt(
   memoryFacts: string[],
   worldState?: WorldState,
   promptMode: StoryPromptMode = 'json',
-  turnNumber = 1,
   campaignArchive: string[] = []
 ): string {
   const protagonist = [setup.protagonistFirstName || '', setup.protagonistLastName || ''].join(' ').trim() || 'Le protagoniste';
@@ -122,7 +121,7 @@ RÈGLES MJ:
 
 {
   "chapter_title": "Titre de scène évocateur — jamais Chapitre N",
-  "chapter_number": ${turnNumber},
+  "chapter_number": "entier (le numéro du tour actuel)",
   "section_type": "action|dialogue|exploration|tension|revelation|repos|interlude|confrontation",
   "narrative": {
     "action": "Narration pure — actions, descriptions, sensations, tensions. AUCUN dialogue ici. Max 3 paragraphes.",
@@ -145,20 +144,46 @@ RÈGLES MJ:
   }
 }`;
 
-  const toolCallingContract = `MODE AGENTIQUE — 2 phases distinctes:
+  const toolCallingContract = `MODE AGENTIQUE (OpenClaw XML Tool Calling):
+Tu agis dans un environnement qui intercepte tes commandes. Tu as accès aux outils suivants :
 
-PHASE 1 (maintenant): Écris la scène en JSON valide ou en prose libre.
-- Aucun outil disponible dans cette phase.
-- Priorité absolue: prose narrative vivante, conséquences réelles, PNJs avec mémoire et intentions propres.
-- Si JSON: remplis "narrative.action" avec 3-5 paragraphes de prose cinématique.
-- Les dialogues doivent être séparés en paragraphes dédiés au format "Nom : réplique" (préfixe — optionnel) et ne jamais être noyés dans le bloc d'action.
-- Aucun markdown, aucun titre interne et aucun bloc de choix dans "narrative.action".
+<tools>
+<tool>
+<name>set_scene</name>
+<description>Définit le titre et le type de scène.</description>
+<parameters>Objet JSON avec "chapter_title" (string) et "section_type" (string).</parameters>
+</tool>
+<tool>
+<name>update_world</name>
+<description>Applique les conséquences (lieu, HP, crédits).</description>
+<parameters>Objet JSON avec "state_update" contenant "location" (string), "hp" (number), "credits" (number).</parameters>
+</tool>
+<tool>
+<name>update_npc</name>
+<description>Met à jour un PNJ s'il apparaît.</description>
+<parameters>Objet JSON avec "name" (string).</parameters>
+</tool>
+<tool>
+<name>offer_choices</name>
+<description>Propose de 3 à 4 choix pour le joueur. OBLIGATOIRE.</description>
+<parameters>Objet JSON avec "choices" (array de { "text": string }).</parameters>
+</tool>
+</tools>
 
-PHASE 2 (ensuite, automatique): Le système extraira l'état structuré via des outils dédiés.
-- Cette extraction doit fournir au minimum: update_world (avec location actuelle) et offer_choices.
-- Dès qu'un PNJ nommé intervient, l'extraction doit inclure update_npc.
+REGLE D'APPEL D'OUTIL :
+Pour utiliser un outil, tu dois formuler une courte réflexion logique puis utiliser la balise invoke avec du pur JSON à l'intérieur.
+Exemple strict :
+<thought>Je déplace le joueur à la Cantina.</thought>
+<invoke name="update_world">
+{ "state_update": { "location": "Cantina" } }
+</invoke>
+<thought>Je donne les choix finaux.</thought>
+<invoke name="offer_choices">
+{ "choices": [{"text": "Tirer le premier"}] }
+</invoke>
 
-Tu n'as qu'une seule tâche maintenant: écrire une scène forte.`;
+INSTRUCTION FINALE :
+Rédige ton texte narratif riche ET ensuite déclenche les balises d'outils (minimum update_world et offer_choices) avant de terminer la réponse.`;
 
   return `${basePrompt}${narrativeProseRule}\n\n${promptMode === 'tool-calls' ? toolCallingContract : jsonContract}`;
 }

@@ -103,7 +103,7 @@ const MODEL_CAPS_PATTERNS: Array<[RegExp, Partial<ModelCapabilities>]> = [
   [/mimo-v2-omni/, { tier: 'large', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3400, idealTemperature: 0.9 }],
   [/mimo-v2-flash/, { tier: 'medium', reasoningStyle: 'openai-effort', reasoningEffort: 'low', supportsNativeTools: true, maxOutputTokens: 3200, idealTemperature: 0.9 }],
   [/minimax-m2\.7/, { tier: 'large', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3400, idealTemperature: 0.9 }],
-  [/qwen3\.5-9b/, { tier: 'small', reasoningStyle: 'openai-effort', reasoningEffort: 'low', supportsNativeTools: true, maxOutputTokens: 2400, idealTemperature: 0.9 }],
+  [/qwen(3\.5|3\.6|.*plus)/, { tier: 'large', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3400, idealTemperature: 0.9 }],
   [/grok-4\.20/, { tier: 'large', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3600, idealTemperature: 0.9 }],
   [/grok-4\.1-fast/, { tier: 'large', reasoningStyle: 'openai-effort', reasoningEffort: 'low', supportsNativeTools: true, maxOutputTokens: 3600, idealTemperature: 0.9 }],
   [/gemma-4-31b-it/, { tier: 'medium', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3000, idealTemperature: 0.95 }],
@@ -254,9 +254,9 @@ function toOpenAiMessageList(messages: ChatMessage[]): OpenAiMessage[] {
 }
 
 function getOpenAiCompatibleTimeoutMs(caps: ModelCapabilities): number {
-  if (caps.tier === 'large') return 90000;
-  if (caps.tier === 'medium') return 65000;
-  return 50000;
+  if (caps.tier === 'large') return 120000;
+  if (caps.tier === 'medium') return 90000;
+  return 75000;
 }
 
 export async function callOpenAiCompatibleRaw(
