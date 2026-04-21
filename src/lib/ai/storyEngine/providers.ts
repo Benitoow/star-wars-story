@@ -234,6 +234,10 @@ type OpenAiToolDefinition = {
 
 type OpenAiToolChoice = 'auto' | 'none' | 'required' | { type: 'function'; function: { name: string } };
 
+type OpenAiResponseFormat = {
+  type: 'json_object';
+};
+
 type OpenAiToolCall = { id: string; type: 'function'; function: { name: string; arguments: string } };
 
 type OpenAiReasoningDetail = Record<string, unknown>;
@@ -262,7 +266,14 @@ function getOpenAiCompatibleTimeoutMs(caps: ModelCapabilities): number {
 export async function callOpenAiCompatibleRaw(
   messages: OpenAiMessage[],
   config: StoryProviderConfig,
-  options: { tools?: OpenAiToolDefinition[]; toolChoice?: OpenAiToolChoice; maxTokens?: number; temperature?: number; skipReasoning?: boolean } = {}
+  options: {
+    tools?: OpenAiToolDefinition[];
+    toolChoice?: OpenAiToolChoice;
+    maxTokens?: number;
+    temperature?: number;
+    skipReasoning?: boolean;
+    responseFormat?: OpenAiResponseFormat;
+  } = {}
 ): Promise<OpenAiMessage> {
   const baseUrl = OPENAI_COMPATIBLE_BASE_URLS[config.providerId];
   if (!baseUrl) throw new Error(`Provider non supporté: ${config.providerId}`);
@@ -299,6 +310,10 @@ export async function callOpenAiCompatibleRaw(
   const reasoningPayload = buildReasoningPayload(caps, config.providerId, modelId, options.skipReasoning === true);
   if (reasoningPayload) {
     body.reasoning = reasoningPayload;
+  }
+
+  if (options.responseFormat) {
+    body.response_format = options.responseFormat;
   }
 
   if (options.tools?.length) {

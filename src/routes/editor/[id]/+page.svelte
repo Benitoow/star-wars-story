@@ -793,14 +793,12 @@
   function providerSummary(config: StoryProviderConfig | null): string {
     if (!config) return 'Aucun provider texte configuré.';
     const modelLabel = config.model || 'modèle auto';
-    const modeLabel = supportsAgenticToolCalling(config.providerId, config.model) ? ' · agentique' : '';
+    const modeLabel = ' · pipeline';
     return `${config.providerId} · ${modelLabel}${modeLabel}`;
   }
 
-  function resolvePromptMode(): 'json' | 'tool-calls' {
-    return providerConfig && supportsAgenticToolCalling(providerConfig.providerId, providerConfig.model)
-      ? 'tool-calls'
-      : 'json';
+  function resolvePromptMode(): 'json' {
+    return 'json';
   }
 
   function trimMessages(messages: ChatMessage[], maxWithoutSystem = 80): ChatMessage[] {
@@ -818,8 +816,9 @@
       .filter(item => !MEMORY_LOW_SIGNAL_RELATION_RE.test(item));
 
     const merged = Array.from(new Set([...memoryLog, ...cleanedFacts]));
-    memoryLog = merged.slice(-120);
+    memoryLog = merged.slice(-260); // Augmenté pour éviter le verrouillage mémoire trop précoce
   }
+
 
   function getRoleLabel(roleId: string): string {
     return ROLES.find(role => role.id === roleId)?.name || roleId;
@@ -990,7 +989,6 @@
 
   async function runBackgroundWorldTick(setup: StorySetup, turn: number, recentSectionTypes: string[] = []): Promise<void> {
     if (!providerConfig) return;
-    if (!supportsAgenticToolCalling(providerConfig.providerId, providerConfig.model)) return;
 
     const sectionWindow = recentSectionTypes.length
       ? recentSectionTypes.slice(-2)
@@ -1080,7 +1078,7 @@
       ...buildCanonicalIdentityFacts(setup),
       ...memoryLog
     ]));
-    const systemPrompt = buildSystemPrompt(setup, memoryFactsForPrompt, worldState, promptMode, turn, campaignArchive);
+    const systemPrompt = buildSystemPrompt(setup, memoryFactsForPrompt, worldState, promptMode, campaignArchive);
     aiMessages = [{ role: 'system', content: systemPrompt }, ...aiMessages.filter(message => message.role !== 'system')];
 
     const requestMessages = trimMessages([

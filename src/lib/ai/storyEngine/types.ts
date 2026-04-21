@@ -109,7 +109,7 @@ export interface StoryProviderConfig {
   ollamaUrl?: string;
 }
 
-export type StoryPromptMode = 'json' | 'tool-calls';
+export type StoryPromptMode = 'json';
 
 export interface StoryTurnGenerationResult {
   chapter: StoryChapter;

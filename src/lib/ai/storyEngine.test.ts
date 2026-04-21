@@ -307,7 +307,6 @@ describe('parseStoryResponse', () => {
       [],
       undefined,
       'json',
-      1,
       []
     );
 
@@ -333,7 +332,6 @@ describe('parseStoryResponse', () => {
       [],
       undefined,
       'json',
-      1,
       []
     );
 

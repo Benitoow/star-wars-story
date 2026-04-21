@@ -1,4 +1,5 @@
 import type {
+  ChatMessage,
   SectionType,
   StoryChapter,
   StoryPromptMode,
@@ -28,11 +29,124 @@ const ERA_CONTEXT: Record<string, string> = {
 
 const ACTION_HEAVY: SectionType[] = ['action', 'confrontation'];
 
+export const STORY_PIPELINE_SCRIBE_SYSTEM_PROMPT = `Tu es le SCRIBE de continuité d'une campagne Star Wars.
+Ta mission est la synthèse factuelle, pas la narration.
+Règles absolues:
+- Résume en 150 mots maximum.
+- Conserve uniquement: situation actuelle, personnages présents, tension immédiate.
+- Ne pas inventer de faits.
+- Pas de JSON, pas de markdown, pas de liste, texte brut uniquement.`;
+
+export const STORY_PIPELINE_WRITER_SYSTEM_PROMPT = `Tu es l'ÉCRIVAIN narratif d'une campagne Star Wars.
+Tu écris une prose cinématique, claire et immersive.
+Règles absolues:
+- Écris 2 à 3 paragraphes.
+- Action, ambiance et dialogue crédibles, sans méta-commentaire.
+- Aucune sortie technique: pas de JSON, pas de markdown, pas de listes.
+- Ne propose pas de choix au joueur.
+- Conserve la continuité du résumé fourni.`;
+
+export const STORY_PIPELINE_BRAIN_SYSTEM_PROMPT = `Tu es le CERVEAU mécanique d'une campagne Star Wars.
+Tu extrais uniquement les conséquences de la scène.
+Règles absolues:
+- Réponds uniquement avec un objet JSON valide.
+- Aucune prose hors JSON.
+- Le JSON doit contenir exactement les clés de premier niveau suivantes:
+  - state_update
+  - memory_updates
+  - choices
+- choices doit contenir 3 à 4 choix concrets.`;
+
+function formatPipelineMessageHistory(messages: ChatMessage[], limit = 14): string {
+  const trimmed = messages
+    .filter(message => message.role !== 'system')
+    .slice(-limit)
+    .map(message => {
+      const label = message.role === 'assistant' ? 'Narrateur' : 'Joueur';
+      return `${label}: ${cleanText(message.content, 420)}`;
+    })
+    .filter(Boolean);
+
+  return trimmed.length ? trimmed.join('\n') : '(historique indisponible)';
+}
+
+export function buildPipelineScribeUserPrompt(messages: ChatMessage[], turnNumber: number): string {
+  const systemContext = cleanText(
+    messages.find(message => message.role === 'system')?.content,
+    3600
+  ) || '(contexte système indisponible)';
+  const historyBlock = formatPipelineMessageHistory(messages, 16);
+  const latestUserAction = cleanText(
+    [...messages].reverse().find(message => message.role === 'user')?.content,
+    320
+  ) || '(action joueur indisponible)';
+
+  return `Voici l'historique récent et l'état du monde. Le joueur vient d'agir au tour ${turnNumber}.
+
+CONTEXTE SYSTÈME DE CAMPAGNE:
+${systemContext}
+
+HISTORIQUE RÉCENT:
+${historyBlock}
+
+ACTION JOUEUR EN COURS:
+${latestUserAction}
+
+Fais un résumé de 150 mots maximum de la situation exacte, des personnages présents et de la tension immédiate.`;
+}
+
+export function buildPipelineWriterUserPrompt(scribeSummary: string): string {
+  return `Résumé validé de la situation:
+${cleanText(scribeSummary, 1500)}
+
+Écris la suite immédiate de la scène en 2 à 3 paragraphes, avec une prose Star Wars forte (action, ambiance, dialogue).`;
+}
+
+export function buildPipelineBrainUserPrompt(writerScene: string): string {
+  return `Voici la scène qui vient de se dérouler:
+${cleanText(writerScene, 5200)}
+
+Déduis-en les conséquences mécaniques et propose 3 choix pour la suite.
+Réponds EXCLUSIVEMENT en JSON strict avec ce schéma:
+{
+  "state_update": {
+    "hp": 0,
+    "credits": 0,
+    "location": "",
+    "date_advance": "",
+    "npcs": [],
+    "factions": {},
+    "injuries_new": [],
+    "injuries_resolved": [],
+    "inventory_gained": [],
+    "inventory_lost": [],
+    "clocks_new": [],
+    "clocks_advance": {},
+    "sector_influence": {},
+    "rumors_new": [],
+    "environment_status": "",
+    "director_instruction": ""
+  },
+  "memory_updates": {
+    "relations": [],
+    "places": [],
+    "injuries": [],
+    "resources": [],
+    "notes": []
+  },
+  "choices": [
+    { "text": "", "attribute": "survival", "difficulty": 2, "faction_impact": {} },
+    { "text": "", "attribute": "survival", "difficulty": 2, "faction_impact": {} },
+    { "text": "", "attribute": "survival", "difficulty": 2, "faction_impact": {} }
+  ]
+}`;
+}
+
 export function buildSystemPrompt(
   setup: StorySetupSnapshot,
   memoryFacts: string[],
   worldState?: WorldState,
-  promptMode: StoryPromptMode = 'json',
+  _promptMode: StoryPromptMode = 'json',
   campaignArchive: string[] = []
 ): string {
   const protagonist = [setup.protagonistFirstName || '', setup.protagonistLastName || ''].join(' ').trim() || 'Le protagoniste';
@@ -144,64 +258,19 @@ RÈGLES MJ:
   }
 }`;
 
-  const toolCallingContract = `MODE AGENTIQUE (OpenClaw XML Tool Calling):
-Tu agis dans un environnement qui intercepte tes commandes. Tu as accès aux outils suivants :
-
-<tools>
-<tool>
-<name>set_scene</name>
-<description>Définit le titre et le type de scène.</description>
-<parameters>Objet JSON avec "chapter_title" (string) et "section_type" (string).</parameters>
-</tool>
-<tool>
-<name>update_world</name>
-<description>Applique les conséquences (lieu, HP, crédits).</description>
-<parameters>Objet JSON avec "state_update" contenant "location" (string), "hp" (number), "credits" (number).</parameters>
-</tool>
-<tool>
-<name>update_npc</name>
-<description>Met à jour un PNJ s'il apparaît.</description>
-<parameters>Objet JSON avec "name" (string).</parameters>
-</tool>
-<tool>
-<name>offer_choices</name>
-<description>Propose de 3 à 4 choix pour le joueur. OBLIGATOIRE.</description>
-<parameters>Objet JSON avec "choices" (array de { "text": string }).</parameters>
-</tool>
-</tools>
-
-REGLE D'APPEL D'OUTIL :
-Pour utiliser un outil, tu dois formuler une courte réflexion logique puis utiliser la balise invoke avec du pur JSON à l'intérieur.
-Exemple strict :
-<thought>Je déplace le joueur à la Cantina.</thought>
-<invoke name="update_world">
-{ "state_update": { "location": "Cantina" } }
-</invoke>
-<thought>Je donne les choix finaux.</thought>
-<invoke name="offer_choices">
-{ "choices": [{"text": "Tirer le premier"}] }
-</invoke>
-
-INSTRUCTION FINALE :
-Rédige ton texte narratif riche ET ensuite déclenche les balises d'outils (minimum update_world et offer_choices) avant de terminer la réponse.`;
-
-  return `${basePrompt}${narrativeProseRule}\n\n${promptMode === 'tool-calls' ? toolCallingContract : jsonContract}`;
+  return `${basePrompt}${narrativeProseRule}\n\n${jsonContract}`;
 }
 
 export function buildStartPrompt(
   setup: StorySetupSnapshot,
   selectedTrameLabel?: string | null,
-  promptMode: StoryPromptMode = 'json'
+  _promptMode: StoryPromptMode = 'json'
 ): string {
   const firstName = cleanText(setup.protagonistFirstName, 60);
   const lastName = cleanText(setup.protagonistLastName, 60);
   const displayName = [firstName, lastName].filter(Boolean).join(' ').trim() || 'le protagoniste';
 
   const eraContext = ERA_CONTEXT[setup.era || ''] || 'Galaxie lointaine, très lointaine — une époque de conflits, de choix lourds et de destins qui basculent.';
-
-  const modeHint = promptMode === 'tool-calls'
-    ? `\nMode agentique actif: utilise les outils pour poser la scène, matérialiser les conséquences puis finaliser le prologue.`
-    : '';
 
   return `Lance une histoire interactive Star Wars avec un prologue immédiatement jouable.
 
@@ -228,7 +297,7 @@ EXIGENCES DU PREMIER TOUR:
 - Le lieu de départ doit être explicite et exploitable pour l'état monde.
 - Le texte de scène ne doit contenir ni markdown ni liste de choix.
 - Tout dialogue doit être isolé sur sa propre ligne, au format "Nom : réplique" (préfixe — optionnel), et séparé du reste de l'action par un retour à la ligne.
-- chapter_number = 1${modeHint}
+- chapter_number = 1
 Les dialogues vont dans le champ "dialogue", jamais dans "action".
 Le tour 1 doit permettre d'extraire state_update.location et au moins un PNJ nommé.`;
 }
@@ -237,7 +306,7 @@ export function buildContinuePrompt(
   actionText: string,
   turnNumber: number,
   recentSummary: string[],
-  promptMode: StoryPromptMode = 'json',
+  _promptMode: StoryPromptMode = 'json',
   recentSectionTypes: string[] = [],
   recentChoiceTexts: string[] = [],
   sceneAnchor: string = ''
@@ -339,9 +408,11 @@ export function summarizeChapterForPrompt(
   ].filter(Boolean).join(' ');
 
   const memoryNotes = [
-    ...chapter.memory_updates.relations.slice(0, 2).map(item => cleanText(item, 70)),
-    ...chapter.memory_updates.places.slice(0, 1).map(item => cleanText(item, 70)),
-    ...chapter.memory_updates.notes.slice(0, 1).map(item => cleanText(item, 100))
+    ...chapter.memory_updates.relations.slice(0, 5).map(item => cleanText(item, 80)),
+    ...chapter.memory_updates.places.slice(0, 3).map(item => cleanText(item, 80)),
+    ...chapter.memory_updates.injuries.slice(0, 3).map(item => cleanText(item, 80)),
+    ...chapter.memory_updates.resources.slice(0, 3).map(item => cleanText(item, 80)),
+    ...chapter.memory_updates.notes.slice(0, 4).map(item => cleanText(item, 100))
   ].filter(Boolean);
 
   const summaryParts = [
