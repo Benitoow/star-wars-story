@@ -131,7 +131,9 @@
   };
 
   function applyStateUpdate(chapter: StoryChapter): void {
-    worldState = applyStateUpdateToWorldState(worldState, chapter);
+    const setup = get(currentSetup);
+    const protagonistNames = [setup.protagonistFirstName, setup.protagonistLastName].filter(Boolean) as string[];
+    worldState = applyStateUpdateToWorldState(worldState, chapter, protagonistNames.length ? protagonistNames : undefined);
   }
 
   // Mechanical consequences: returns display modifiers for a choice
@@ -764,6 +766,8 @@
             playerRoleLabel={currentRoleLabel}
             playerFactionLabel={currentFactionLabel}
             playerFactionId={$currentSetup.faction}
+            protagonistFirstName={$currentSetup.protagonistFirstName ?? ''}
+            protagonistLastName={$currentSetup.protagonistLastName ?? ''}
           />
 
           <!-- ── Scrollable narrative zone ──────────────── -->

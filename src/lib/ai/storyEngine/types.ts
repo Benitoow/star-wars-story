@@ -38,6 +38,7 @@ export interface NpcRelation {
   name: string;
   affinity: number;   // -100 (hostile) to 100 (loyal)
   status: 'ally' | 'neutral' | 'hostile' | 'dead' | 'unknown';
+  bond_type?: string; // narrative bond: 'master', 'padawan', 'lover', 'rival', 'mentor', etc.
   faction?: string;
   last_seen?: string;
   current_location?: string;

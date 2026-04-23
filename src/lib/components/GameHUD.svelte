@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { WorldState } from '$lib/ai/storyEngine';
+  import type { WorldState, NpcRelation } from '$lib/ai/storyEngine';
 
   export let worldState: WorldState;
   export let collapsed = false;
@@ -7,12 +7,27 @@
   export let playerRoleLabel = '';
   export let playerFactionLabel = '';
   export let playerFactionId = '';
+  export let protagonistFirstName = '';
+  export let protagonistLastName = '';
 
   $: p = worldState.player;
   $: hpColor = p.hp >= 70 ? '#4ade80' : p.hp >= 35 ? '#facc15' : '#f87171';
   $: hpPct = Math.max(0, Math.min(100, p.hp));
   $: activeInjuries = p.injuries.filter(i => i.severity !== 'light');
-  $: aliveNpcs = worldState.npcs.filter(n => n.alive !== false).slice(0, 4);
+  $: protagonistExclude = new Set(
+    [protagonistFirstName, protagonistLastName]
+      .filter(Boolean)
+      .flatMap(n => [n, ...n.split(' ')].map(s => s.toLowerCase().trim()).filter(s => s.length >= 2))
+  );
+
+  $: sortedNpcs = [...worldState.npcs]
+    .filter(n => !protagonistExclude.has(n.name.toLowerCase().trim()))
+    .sort((a, b) => {
+      const aAlive = a.alive !== false;
+      const bAlive = b.alive !== false;
+      if (aAlive !== bAlive) return aAlive ? -1 : 1;
+      return Math.abs(b.affinity) - Math.abs(a.affinity);
+    });
   $: topFactions = Object.entries(worldState.factions)
     .filter(([, v]) => Math.abs(v) >= 10)
     .sort(([, a], [, b]) => Math.abs(b) - Math.abs(a))
@@ -49,14 +64,82 @@
     return sev === 'severe' ? '🔴' : sev === 'moderate' ? '🟡' : '⚪';
   }
 
-  function affinityLabel(aff: number): string {
+  const BOND_LABELS: Record<string, string> = {
+    master: 'Maître', maître: 'Maître',
+    apprentice: 'Padawan', padawan: 'Padawan',
+    acolyte: 'Acolyte',
+    lover: 'Amant(e)', amant: 'Amant(e)', amante: 'Amant(e)',
+    partner: 'Compagnon(ne)', compagnon: 'Compagnon(ne)', compagne: 'Compagnon(ne)',
+    mentor: 'Mentor',
+    rival: 'Rival(e)',
+    traitor: 'Traître', traitre: 'Traître',
+    ally: 'Allié(e)', allié: 'Allié(e)',
+    enemy: 'Ennemi(e)', ennemi: 'Ennemi(e)',
+    sworn_enemy: 'Ennemi juré',
+    unknown: 'Inconnu(e)', inconnu: 'Inconnu(e)',
+    distant: 'Distant(e)',
+    friend: 'Ami(e)', ami: 'Ami(e)',
+    guardian: 'Gardien(ne)',
+    commander: 'Commandant(e)',
+    contact: 'Contact',
+    informant: 'Informateur',
+    prisoner: 'Prisonnier(ère)',
+    captive: 'Captif(ve)',
+  };
+
+  const BOND_COLORS: Record<string, string> = {
+    master: '#a78bfa', maître: '#a78bfa',
+    apprentice: '#a78bfa', padawan: '#a78bfa',
+    acolyte: '#a78bfa', mentor: '#a78bfa',
+    lover: '#f472b6', amant: '#f472b6', amante: '#f472b6',
+    partner: '#f472b6', compagnon: '#f472b6', compagne: '#f472b6',
+    rival: '#fbbf24',
+    traitor: '#dc2626', traitre: '#dc2626',
+    sworn_enemy: '#dc2626',
+    enemy: '#f87171', ennemi: '#f87171',
+    unknown: '#94a3b8', inconnu: '#94a3b8',
+    distant: '#94a3b8',
+    ally: '#4ade80', allié: '#4ade80',
+    friend: '#86efac', ami: '#86efac',
+    guardian: '#60a5fa',
+    commander: '#60a5fa',
+    contact: '#94a3b8',
+    informant: '#fbbf24',
+    prisoner: '#fb923c', captive: '#fb923c',
+  };
+
+  function npcLabel(npc: NpcRelation): string {
+    if (npc.bond_type) {
+      const key = npc.bond_type.toLowerCase().trim();
+      if (BOND_LABELS[key]) return BOND_LABELS[key];
+    }
+    const aff = npc.affinity;
+    if (aff >= 90) return 'Dévoué';
     if (aff >= 70) return 'Loyal';
+    if (aff >= 50) return 'Ami proche';
     if (aff >= 30) return 'Ami';
-    if (aff > 0)   return 'Favorable';
-    if (aff === 0) return 'Neutre';
-    if (aff > -30) return 'Méfiant';
+    if (aff >= 10) return 'Favorable';
+    if (aff > -10) return 'Neutre';
+    if (aff > -30) return 'Distant';
+    if (aff > -50) return 'Méfiant';
     if (aff > -70) return 'Hostile';
-    return 'Ennemi';
+    if (aff > -90) return 'Ennemi';
+    return 'Ennemi juré';
+  }
+
+  function npcColor(npc: NpcRelation): string {
+    if (npc.bond_type) {
+      const key = npc.bond_type.toLowerCase().trim();
+      if (BOND_COLORS[key]) return BOND_COLORS[key];
+    }
+    const aff = npc.affinity;
+    if (aff >= 70) return '#4ade80';
+    if (aff >= 30) return '#86efac';
+    if (aff >= 10) return '#a3e4a3';
+    if (aff > -10) return '#94a3b8';
+    if (aff > -50) return '#fb923c';
+    if (aff > -70) return '#f87171';
+    return '#dc2626';
   }
 
   function factionReputationLabel(score: number): string {
@@ -181,14 +264,15 @@
       {/if}
 
       <!-- NPCs -->
-      {#if aliveNpcs.length}
+      {#if sortedNpcs.length}
         <div class="hud-section-label">Relations</div>
-        {#each aliveNpcs as npc}
-          {@const aff = npc.affinity}
-          <div class="hud-row hud-npc">
-            <span class="npc-dot" style="background:{aff > 30 ? '#4ade80' : aff < -30 ? '#f87171' : '#94a3b8'}"></span>
+        {#each sortedNpcs as npc}
+          {@const alive = npc.alive !== false}
+          {@const color = alive ? npcColor(npc) : '#4b5563'}
+          <div class="hud-row hud-npc" class:npc-dead={!alive}>
+            <span class="npc-dot" style="background:{color}"></span>
             <span class="hud-text" title={npc.note ?? ''}>{npc.name}</span>
-            <span class="npc-score" style="color:{aff > 30 ? '#4ade80' : aff < -30 ? '#f87171' : '#94a3b8'}">{affinityLabel(aff)}</span>
+            <span class="npc-score" style="color:{color}">{npcLabel(npc)}{#if !alive} †{/if}</span>
           </div>
         {/each}
       {/if}
@@ -379,6 +463,10 @@
     font-size: 0.68rem;
     font-weight: 600;
     flex-shrink: 0;
+  }
+
+  .npc-dead {
+    opacity: 0.38;
   }
 
   /* Factions */

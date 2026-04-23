@@ -67,6 +67,9 @@ import { FACTION_CREDITS, ERA_START_DATES } from '$lib/editor/setupCatalog';
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
+  // Atmospheric/object nouns that can appear as dialogue speakers but are not characters
+  const ATMOSPHERIC_PREFIX_RE = /^(?:voix|presence|signal|transmission|son\b|bruit|ombre|echo|echos?|silhouette|figure|entite|etre\b|forme\b|lueur|vision|apparition|souvenir|memoire|pensee|emetteur|systeme|terminal|hologramme|holo|droid|droide|machine|ordinateur|unite|capitaine\s+(?:de\s+)|commandant\s+(?:de\s+))/i;
+
   export function isLikelyNpcName(value: unknown): boolean {
     const raw = String(value || '').trim();
     if (!raw) return false;
@@ -77,6 +80,9 @@ import { FACTION_CREDITS, ERA_START_DATES } from '$lib/editor/setupCatalog';
     if (NON_NPC_EXACT.has(normalized)) return false;
     if (/^(?:le|la|les|un|une|des|du|de)\s+/.test(normalized)) return false;
     if (NON_NPC_ENTITY_RE.test(normalized)) return false;
+    if (ATMOSPHERIC_PREFIX_RE.test(normalized)) return false;
+    // Rejects "Voix distordue de l'émetteur" style — preposition chain mid-name = object, not person
+    if (/\s+(?:de\s+l[''`]|de\s+la\s+|du\s+|des\s+)/.test(normalized)) return false;
     if (normalized.split(/\s+/).length > 3) return false;
 
     const hasDigits = /\d/.test(normalized);
@@ -224,7 +230,7 @@ import { FACTION_CREDITS, ERA_START_DATES } from '$lib/editor/setupCatalog';
     );
   }
 
-  export function extractNpcSeedsFromDialogue(dialogue: string): string[] {
+  export function extractNpcSeedsFromDialogue(dialogue: string, excludeNormalized?: Set<string>): string[] {
     const names = new Set<string>();
     for (const match of String(dialogue || '').matchAll(DIALOGUE_SPEAKER_RE)) {
       const candidate = String(match[1] || '').trim();
@@ -233,6 +239,7 @@ import { FACTION_CREDITS, ERA_START_DATES } from '$lib/editor/setupCatalog';
       const normalized = normalizeSearchText(candidate);
       if (DIALOGUE_SPEAKER_STOPWORDS.has(normalized)) continue;
       if (!isLikelyNpcName(candidate)) continue;
+      if (excludeNormalized?.has(normalized)) continue;
       names.add(candidate);
     }
     return Array.from(names).slice(0, 6);
@@ -341,7 +348,16 @@ import { FACTION_CREDITS, ERA_START_DATES } from '$lib/editor/setupCatalog';
     return Number.isFinite(rawCredits) ? Math.round(rawCredits) : 0;
   }
 
-  export function applyStateUpdateToWorldState(sourceState: WorldState, chapter: StoryChapter): WorldState {
+  export function applyStateUpdateToWorldState(
+    sourceState: WorldState,
+    chapter: StoryChapter,
+    protagonistNames?: string[]
+  ): WorldState {
+    const excludedNormalized = new Set<string>(
+      (protagonistNames ?? []).flatMap(n =>
+        [n, ...n.trim().split(/\s+/)].map(s => normalizeSearchText(s)).filter(Boolean)
+      )
+    );
     const upd = chapter.state_update;
     const p = sourceState.player;
 
@@ -395,6 +411,8 @@ import { FACTION_CREDITS, ERA_START_DATES } from '$lib/editor/setupCatalog';
     let npcs = sourceState.npcs.map(npc => ({ ...npc, status: normalizeNpcStatus(npc.status) }));
 
     for (const npcUpd of upd?.npcs ?? []) {
+      if (!isLikelyNpcName(npcUpd.name)) continue;
+      if (excludedNormalized.size && excludedNormalized.has(normalizeSearchText(npcUpd.name))) continue;
       const idx = npcs.findIndex(n => n.name.toLowerCase() === npcUpd.name.toLowerCase());
       if (idx >= 0) {
         const lifeState = synchronizeNpcLifeState(
@@ -446,7 +464,7 @@ import { FACTION_CREDITS, ERA_START_DATES } from '$lib/editor/setupCatalog';
     }
 
     // Fallback NPC seeds from dialogue when model omitted update_npc
-    const speakerSeeds = extractNpcSeedsFromDialogue(chapter.narrative.dialogue);
+    const speakerSeeds = extractNpcSeedsFromDialogue(chapter.narrative.dialogue, excludedNormalized.size ? excludedNormalized : undefined);
     const existingNames = new Set(npcs.map(npc => npc.name.toLowerCase()));
     for (const name of speakerSeeds) {
       const key = name.toLowerCase();
