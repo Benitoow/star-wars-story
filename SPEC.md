@@ -11,6 +11,7 @@
 
 - The SvelteKit application is the active runtime (legacy JS archived under `archives/legacy-js/`).
 - Provider/runtime configuration is centralized in `src/lib/config/providers.ts`.
+- Text generation support is intentionally frozen to `OpenRouter + none`; legacy text providers are not part of the supported runtime.
 - PWA runtime is hardened via custom service worker (`static/sw.js`) + dedicated offline fallback (`static/offline.html`).
 - Quality gates are active and enforced in CI (`lint`, `check`, `test`, `build`).
 
@@ -29,7 +30,7 @@
 star-wars-story/
 ├── src/
 │   ├── lib/
-│   │   ├── ai/             # Story engine (agentic + structured fallback)
+│   │   ├── ai/             # Story engine (sub-agent orchestration + strict validation)
 │   │   ├── components/     # Reusable UI components
 │   │   ├── config/         # Providers, assets, languages
 │   │   ├── db/             # Dexie.js database schema

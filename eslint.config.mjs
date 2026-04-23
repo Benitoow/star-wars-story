@@ -6,7 +6,7 @@ import svelteConfig from './svelte.config.js';
 
 export default tseslint.config(
   {
-    ignores: ['.svelte-kit/**', 'build/**', 'dist/**', 'node_modules/**', 'archives/**']
+    ignores: ['.svelte-kit/**', 'build/**', 'dist/**', 'node_modules/**', 'archives/**', 'output/playwright/**']
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

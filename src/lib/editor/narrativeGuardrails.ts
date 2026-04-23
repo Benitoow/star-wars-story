@@ -360,6 +360,13 @@ function tryExtractNarrativeActionFromStructuredPayload(rawText: string): string
   }
 }
 
+function normalizeChoiceMarkerText(value: string): string {
+  return String(value || '')
+    .replace(/\s+([:!?])/g, '$1')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 export function sanitizeNarrativeTextForDisplay(text: string): string {
   const raw = String(text || '').replace(/\r/g, '\n');
   if (!raw.trim()) return '';
@@ -405,6 +412,7 @@ export function sanitizeNarrativeTextForDisplay(text: string): string {
       .replace(/^[_`*]+|[_`*]+$/g, '')
       .replace(/^\[[^\]]+\]\s*/, '')
       .trim();
+    const choiceMarkerCandidate = normalizeChoiceMarkerText(normalized);
 
     if (!normalized) continue;
     if (/^(?:\*{3,}|-{3,}|_{3,})$/.test(normalized)) {
@@ -412,13 +420,17 @@ export function sanitizeNarrativeTextForDisplay(text: string): string {
       continue;
     }
 
-    if (/^(?:que faites-vous|what do you do|choices?|choix|options?|vos choix)\b[:!?]?\s*$/i.test(normalized)) {
+    if (/^(?:que faites-vous|what do you do|choices?|choix|options?|vos choix)\b[:!?]?\s*$/i.test(choiceMarkerCandidate)) {
       flush();
       inChoiceBlock = true;
       continue;
     }
 
-    if (inChoiceBlock) continue;
+    if (inChoiceBlock) {
+      if (LEADING_CHOICE_ENUM_REGEX.test(normalized)) continue;
+      inChoiceBlock = false;
+    }
+
     if (/^\d+[.)]\s+/.test(normalized)) continue;
 
     const cleanedLine = stripInlineStateTokens(normalized);

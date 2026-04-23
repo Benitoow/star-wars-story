@@ -8,6 +8,7 @@ export type {
   StoryAttribute,
   StoryChapter,
   StoryChoice,
+  StoryGenerationMode,
   StoryMemoryUpdates,
   StoryNarrative,
   StoryPromptMode,
@@ -18,6 +19,18 @@ export type {
 } from './types';
 
 export { SECTION_TYPES } from './types';
+
+export {
+  assertSupportedStoryProviderConfig,
+  getFrozenStoryEngineSummary,
+  isPlayableStoryChapter,
+  normalizeStoryGenerationMode,
+  sanitizeStoryMessageHistory,
+  validateBackgroundWorldEvent,
+  validateBackgroundWorldGenerationResult,
+  validateStoryChapter,
+  validateStoryTurnGenerationResult
+} from './contracts';
 
 export {
   buildContinuePrompt,

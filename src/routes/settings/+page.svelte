@@ -8,7 +8,6 @@
   import {
     DEFAULT_IMAGE_MODEL_ID,
     DEFAULT_IMAGE_PROVIDER_ID,
-    DEFAULT_OLLAMA_URL,
     DEFAULT_TEXT_MODEL_ID,
     DEFAULT_TEXT_PROVIDER_ID,
     IMAGE_PROVIDER_ALIAS_MAP,
@@ -17,7 +16,7 @@
     TEXT_PROVIDERS
   } from '$lib/config/providers';
   import { AVATARS, CONTENT_MODES, WRITING_STYLES, WRITING_TONES } from '$lib/editor/setupCatalog';
-  import { logger } from '$lib/utils/logger';
+  import { exportDiagnosticsLog, logger, recordDiagnosticEvent } from '$lib/utils/logger';
   import PageHeader from '$lib/components/PageHeader.svelte';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 
@@ -73,12 +72,7 @@
       /openai\/gpt-5\.4/i,
       /openai\/gpt-5/i,
       /google\/gemini-2\.5-pro/i,
-    ],
-    openai: [/^gpt-5\.4/i, /^gpt-5/i, /^o4/i, /^o3/i, /mini/i, /nano/i],
-    anthropic: [/opus-4-5/i, /sonnet-4-5/i, /3-7-sonnet/i],
-    mistral: [/mistral-large/i, /mistral-medium/i, /mistral-small/i, /codestral/i],
-    grok: [/grok-4\.1-fast/i, /grok-4(?!\.)/i, /grok-3/i, /grok-2/i],
-    ollama: [/^qwen3\.5/i, /^qwen3/i, /^glm4\.7-air/i, /^glm4/i, /^llama/i, /^gemma/i]
+    ]
   };
 
   let dynamicTextModels: Record<string, string[]> = {};
@@ -159,11 +153,6 @@
     });
   }
 
-  function normalizeOllamaUrl(url?: string): string {
-    const source = (url || '').trim() || DEFAULT_OLLAMA_URL;
-    return source.replace(/\/+$/, '');
-  }
-
   function getTextProviderModels(providerId?: string): string[] {
     if (!providerId) return [];
     return dynamicTextModels[providerId] ?? TEXT_PROVIDERS.find(p => p.id === providerId)?.models ?? [];
@@ -221,55 +210,12 @@
     try {
       let models: string[] = [];
 
-      if (providerId === 'ollama') {
-        const ollamaUrl = normalizeOllamaUrl(preferences.ollamaUrl);
-        const response = await fetch(`${ollamaUrl}/api/tags`);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const payload = await response.json() as { models?: Array<{ name?: string }> };
-        models = uniqueSorted((payload.models || []).map(model => String(model?.name || '')).filter(Boolean));
-      } else if (providerId === 'openrouter') {
+      if (providerId === 'openrouter') {
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         const optionalKey = preferences.textApiKey?.trim();
         if (optionalKey) headers.Authorization = `Bearer ${optionalKey}`;
         models = (await fetchModelsFromJsonEndpoint('https://openrouter.ai/api/v1/models', headers))
           .filter(model => !IMAGE_MODEL_PATTERN.test(model));
-      } else if (providerId === 'openai') {
-        const key = requireApiKey(preferences.textApiKey);
-        if (!key) {
-          syncTextMessage = 'Ajoute une clé API OpenAI pour charger les modèles en direct.';
-          return;
-        }
-        models = (await fetchModelsFromJsonEndpoint('https://api.openai.com/v1/models', {
-          Authorization: `Bearer ${key}`
-        })).filter(model => /^(gpt|o\d)/i.test(model));
-      } else if (providerId === 'anthropic') {
-        const key = requireApiKey(preferences.textApiKey);
-        if (!key) {
-          syncTextMessage = 'Ajoute une clé API Anthropic pour charger les modèles en direct.';
-          return;
-        }
-        models = (await fetchModelsFromJsonEndpoint('https://api.anthropic.com/v1/models', {
-          'x-api-key': key,
-          'anthropic-version': '2023-06-01'
-        })).filter(model => /^claude/i.test(model));
-      } else if (providerId === 'mistral') {
-        const key = requireApiKey(preferences.textApiKey);
-        if (!key) {
-          syncTextMessage = 'Ajoute une clé API Mistral pour charger les modèles en direct.';
-          return;
-        }
-        models = (await fetchModelsFromJsonEndpoint('https://api.mistral.ai/v1/models', {
-          Authorization: `Bearer ${key}`
-        })).filter(model => /(mistral|ministral|magistral|mixtral)/i.test(model));
-      } else if (providerId === 'grok') {
-        const key = requireApiKey(preferences.textApiKey);
-        if (!key) {
-          syncTextMessage = 'Ajoute une clé API Grok pour charger les modèles en direct.';
-          return;
-        }
-        models = (await fetchModelsFromJsonEndpoint('https://api.x.ai/v1/models', {
-          Authorization: `Bearer ${key}`
-        })).filter(model => /grok/i.test(model));
       }
 
       if (!models.length) {
@@ -363,8 +309,7 @@
   $: if (preferences) {
     const signature = [
       preferences.textProvider || '',
-      preferences.textApiKey || '',
-      preferences.ollamaUrl || ''
+      preferences.textApiKey || ''
     ].join('|');
 
     if (signature !== lastTextSyncSignature) {
@@ -471,10 +416,6 @@
       syncTextMessage = '';
     }
 
-    if (providerId === 'ollama' && !preferences.ollamaUrl) {
-      preferences.ollamaUrl = DEFAULT_OLLAMA_URL;
-    }
-
     preferences = { ...preferences };
     scheduleAutoTextSync();
   }
@@ -573,6 +514,14 @@
       theme.set(normalized.theme);
       showToast('Paramètres sauvegardés', 'success');
     } catch (e) {
+      recordDiagnosticEvent({
+        level: 'error',
+        category: 'settings',
+        stage: 'save',
+        message: 'Échec de sauvegarde des paramètres.',
+        validation: 'failed',
+        meta: e
+      });
       showToast('Erreur lors de la sauvegarde', 'error');
     }
     saving = false;
@@ -589,8 +538,33 @@
       anchor.click();
       URL.revokeObjectURL(url);
       showToast('Sauvegarde exportée', 'success');
-    } catch {
+    } catch (error) {
+      recordDiagnosticEvent({
+        level: 'error',
+        category: 'settings',
+        stage: 'export-data',
+        message: "Échec d'export des données.",
+        validation: 'failed',
+        meta: error
+      });
       showToast("Impossible d'exporter les données", 'error');
+    }
+  }
+
+  async function handleExportDiagnostics() {
+    try {
+      const payload = exportDiagnosticsLog();
+      const blob = new Blob([payload], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `star-wars-story-diagnostics-${new Date().toISOString().slice(0, 10)}.json`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      showToast('Journal de diagnostics exporté', 'success');
+    } catch (error) {
+      logger.error('settings: export diagnostics failed.', error);
+      showToast("Impossible d'exporter les diagnostics", 'error');
     }
   }
 
@@ -623,7 +597,15 @@
         const counts = await importAllData(payload);
         showToast(`Import : ${counts.stories} histoires, ${counts.folders} dossiers`, 'success');
         window.location.reload();
-      } catch {
+      } catch (error) {
+        recordDiagnosticEvent({
+          level: 'error',
+          category: 'settings',
+          stage: 'import-data',
+          message: "Échec d'import des données.",
+          validation: 'failed',
+          meta: error
+        });
         showToast("Impossible d'importer ce fichier", 'error');
       } finally {
         pendingFile = null;
@@ -637,7 +619,15 @@
       try {
         await emptyTrash();
         showToast('Corbeille vidée', 'success');
-      } catch {
+      } catch (error) {
+        recordDiagnosticEvent({
+          level: 'error',
+          category: 'settings',
+          stage: 'empty-trash',
+          message: 'Échec du vidage de corbeille.',
+          validation: 'failed',
+          meta: error
+        });
         showToast('Impossible de vider la corbeille', 'error');
       }
     }, true);
@@ -771,8 +761,10 @@
             {:else if currentScreen === 'ai_text'}
               <div class="screen-header">
                 <h2>Modèle de texte</h2>
-                <p>OpenRouter est recommandé (mode agentique + modèles récents). Profil, style et contenu se règlent désormais pendant la création.</p>
+                <p>Moteur gelé: un seul provider texte supporté, OpenRouter. Le runtime fonctionne en orchestration à sous-agents, pas en roulette multi-provider.</p>
               </div>
+
+              <div class="field-hint">Les anciens providers texte ont été retirés du scope supporté. Si tu veux de la stabilité, tu arrêtes de collectionner les branches mortes.</div>
 
               <div class="provider-grid">
                 {#each TEXT_PROVIDERS as p}
@@ -846,30 +838,17 @@
                     </div>
                   {/if}
 
-                  {#if preferences.textProvider !== 'ollama'}
-                    <div class="field">
-                      <label for="text-api-key">Clé API</label>
-                      <input
-                        id="text-api-key"
-                        type="password"
-                        class="input"
-                        placeholder="sk-..."
-                        bind:value={preferences.textApiKey}
-                      />
-                      <span class="field-hint">Stockée localement, jamais envoyée à nos serveurs</span>
-                    </div>
-                  {:else}
-                    <div class="field">
-                      <label for="ollama-url">URL Ollama</label>
-                      <input
-                        id="ollama-url"
-                        type="text"
-                        class="input"
-                        placeholder={DEFAULT_OLLAMA_URL}
-                        bind:value={preferences.ollamaUrl}
-                      />
-                    </div>
-                  {/if}
+                  <div class="field">
+                    <label for="text-api-key">Clé API OpenRouter</label>
+                    <input
+                      id="text-api-key"
+                      type="password"
+                      class="input"
+                      placeholder="sk-or-..."
+                      bind:value={preferences.textApiKey}
+                    />
+                    <span class="field-hint">Stockée localement, jamais envoyée à nos serveurs</span>
+                  </div>
 
                   <div class="field provider-tools">
                     {#if syncingTextModels}
@@ -1318,6 +1297,21 @@
                       <line x1="12" y1="3" x2="12" y2="15"/>
                     </svg>
                     Importer
+                  </button>
+                </div>
+
+                <div class="data-card">
+                  <div class="data-card-info">
+                    <span class="data-card-title">Exporter les diagnostics</span>
+                    <span class="data-card-desc">Téléchargez le journal local borné du story engine pour un bug report propre</span>
+                  </div>
+                  <button class="btn btn-secondary" on:click={handleExportDiagnostics}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                      <polyline points="7,10 12,15 17,10"/>
+                      <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    Exporter
                   </button>
                 </div>
 

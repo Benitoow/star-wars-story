@@ -4,7 +4,7 @@
 
 [![Cloudflare Pages](https://img.shields.io/badge/Deployed-Cloudflare%20Pages-orange)](https://cloudflare.com)
 [![SvelteKit](https://img.shields.io/badge/SvelteKit-2.5-FF3E00)](https://kit.svelte.dev)
-[![OpenRouter](https://img.shields.io/badge/OpenRouter-primary%20provider-7C3AED)](https://openrouter.ai)
+[![OpenRouter](https://img.shields.io/badge/OpenRouter-sole%20text%20provider-7C3AED)](https://openrouter.ai)
 
 ---
 
@@ -17,10 +17,10 @@ Star Wars Story Manager est une PWA locale-first qui permet de vivre des histoir
 ### Fonctionnalités principales
 
 **Moteur narratif agentique (v2.0)**
-- L'IA utilise le **tool calling natif** d'OpenRouter pour appeler des fonctions réelles (`set_scene`, `update_world`, `update_npc`, `update_faction`, `offer_choices`) au lieu de générer un JSON monolithique
-- Boucle agentique multi-étapes (jusqu'à 8 steps/tour) — l'IA peut raisonner puis agir
-- Événements galactiques hors-scène : un second agent simule le monde pendant que le joueur joue
-- Fallback JSON structuré automatique pour les providers sans tool calling
+- L'IA texte fonctionne via une **orchestration à sous-agents** (`scribe -> director -> writer -> brain`) sur OpenRouter
+- Boucle agentique multi-étapes gelée et supportable, au lieu d'un faux support multi-provider qui dérive
+- Événements galactiques hors-scène : un second duo (`observer -> adjudicator`) simule le monde pendant que le joueur joue
+- Runtime public gelé : `OpenRouter + none`, diagnostics locaux exportables, validation centrale avant runtime
 
 **Living World State**
 - `PlayerState` : HP (0-100), crédits, lieu, date narrative, blessures actives, inventaire
@@ -51,11 +51,11 @@ Star Wars Story Manager est une PWA locale-first qui permet de vivre des histoir
 - 5 ères galactiques, 9 factions, 20 rôles, 7 trames narratives
 - Styles d'écriture, tons, POV, longueur, intensité du contenu
 
-### OpenRouter — Provider recommandé
+### OpenRouter — Provider supporté
 
-OpenRouter est le provider **par défaut et recommandé** pour plusieurs raisons :
+OpenRouter est le provider texte **par défaut et officiellement supporté** pour plusieurs raisons :
 - Accès à 400+ modèles depuis une seule clé API
-- Tool calling natif (requis pour le mode agentique)
+- Pipeline à sous-agents cohérent sur un seul point d'entrée
 - Modèles gratuits très performants disponibles
 - Modèle par défaut actuel : `google/gemma-4-26b-a4b-it`
 
@@ -81,7 +81,7 @@ npm run dev
 
 Ouvrir [http://localhost:5173](http://localhost:5173)
 
-**Prérequis :** Node.js 18+, une clé API OpenRouter (gratuite sur [openrouter.ai](https://openrouter.ai))
+**Prérequis :** Node.js 18+, une clé API OpenRouter ([openrouter.ai](https://openrouter.ai))
 
 ### Qualité & vérification
 
@@ -100,7 +100,7 @@ Un workflow CI GitHub exécute la même chaîne sur push/pull request.
 |-----------|-------------|
 | Framework | SvelteKit 2.5.0 + Svelte 4.2.20 |
 | Base de données | Dexie.js v4 (IndexedDB) |
-| IA | OpenRouter (tool calling) + fallback JSON |
+| IA | OpenRouter + orchestration à sous-agents |
 | Déploiement | Cloudflare Pages |
 | PWA | Service Worker custom (`static/sw.js`) + Web Manifest |
 | Style | CSS custom (dark theme, design Star Wars) |
@@ -111,7 +111,7 @@ Un workflow CI GitHub exécute la même chaîne sur push/pull request.
 src/
 ├── lib/
 │   ├── ai/
-│   │   └── storyEngine.ts     # Moteur IA : tool calling, prompts GM, world state
+│   │   └── storyEngine.ts     # Moteur IA : orchestration à sous-agents, prompts GM, world state
 │   ├── components/
 │   │   ├── GameHUD.svelte     # HUD monde vivant (HP, crédits, factions…)
 │   │   ├── Header.svelte      # Header avec dropdown langue custom
@@ -146,7 +146,7 @@ src/
 
 ### Overview
 
-Star Wars Story Manager is a local-first PWA for interactive Star Wars storytelling powered by an agentic AI Game Master. The AI manages a living world — player state, NPCs with memory, factions, chronology, injuries, resources — using native tool calling on OpenRouter.
+Star Wars Story Manager is a local-first PWA for interactive Star Wars storytelling powered by an orchestrated AI Game Master. The AI manages a living world — player state, NPCs with memory, factions, chronology, injuries, resources — through a frozen OpenRouter-based sub-agent pipeline.
 
 ### Quick Start
 
@@ -158,7 +158,7 @@ Star Wars Story Manager is a local-first PWA for interactive Star Wars storytell
 
 ### Key Features
 
-- **Agentic AI GM** with native tool calling (OpenRouter)
+- **Agentic AI GM** with sub-agent orchestration (OpenRouter)
 - **Living world** tracked in real time: HP, credits, NPCs, factions, injuries, inventory
 - **Smart narrative pacing** — automatically avoids non-stop action
 - **Background world simulation** — galactic events happen off-screen

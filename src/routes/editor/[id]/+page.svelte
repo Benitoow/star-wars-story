@@ -50,8 +50,9 @@
     applyBackgroundWorldEventToRuntime,
     archiveOldTurnsIfNeeded,
     appendMemoryFromChapter,
-    buildAssistantTranscript,
+    buildStoredAssistantContent,
     buildCanonicalIdentityFacts,
+    describeStoryOrchestration,
     ensureCanonicalIdentityMemory,
     getVisibleBackgroundEvents,
     INTENSE_SECTION_TYPES,
@@ -79,7 +80,6 @@
     generateStoryTurn,
     normalizeProviderId,
     summarizeChapterForPrompt,
-    supportsAgenticToolCalling,
     type BackgroundWorldEvent,
     type ChatMessage,
     type StoryChapter,
@@ -118,6 +118,7 @@
   let campaignArchive: string[] = [];
   let customAction = '';
   let hudCollapsed = false;
+  let storyRuntimeMode: string | null = 'agentic-subagents';
 
   let worldState: WorldState = {
     player: { hp: 100, credits: 1000, location: 'Secteur frontalier', date: '', injuries: [], inventory: [] },
@@ -164,9 +165,12 @@
 
   let providerConfig: StoryProviderConfig | null = null;
   let providerStatus = 'Aucun provider texte configuré.';
+  let storyOrchestration = describeStoryOrchestration(storyRuntimeMode);
 
 
   $: providerMissing = !providerConfig;
+  $: storyOrchestration = describeStoryOrchestration(storyRuntimeMode);
+  $: providerStatus = providerSummary(providerConfig, storyRuntimeMode);
   $: dialogueDisplay = currentChapter
     ? planDialogueDisplay(currentChapter)
     : { actionParagraphs: [], dialogueParagraphs: [] };
@@ -177,9 +181,10 @@
 
   function saveInteractiveSession(): void {
     const payload: InteractiveSessionPayload = {
-      version: 1,
+      version: 2,
       turnNumber,
       selectedTrame,
+      storyRuntimeMode,
       currentChapter,
       chapterHistory,
       actionHistory,
@@ -287,15 +292,14 @@
     const preferences = await getPreferences();
     applySetupDefaultsFromPreferences(preferences);
     providerConfig = buildProviderConfigFromPreferences(preferences);
-    providerStatus = providerSummary(providerConfig);
 
     return preferences;
   }
 
-  function providerSummary(config: StoryProviderConfig | null): string {
+  function providerSummary(config: StoryProviderConfig | null, runtimeMode: string | null): string {
     if (!config) return 'Aucun provider texte configuré.';
     const modelLabel = config.model || 'modèle auto';
-    const modeLabel = ' · pipeline';
+    const modeLabel = ` · ${describeStoryOrchestration(runtimeMode).summaryLabel}`;
     return `${config.providerId} · ${modelLabel}${modeLabel}`;
   }
 
@@ -394,10 +398,9 @@
     ]);
 
     const generation = await generateStoryTurn(requestMessages, providerConfig, turn);
+    storyRuntimeMode = generation.mode;
     const chapter = sanitizeChapterForDisplay(enforceTransitionChoiceQuality(generation.chapter, worldState)) as StoryChapter;
-    const assistantContent = generation.mode === 'pipeline'
-      ? buildAssistantTranscript(chapter)
-      : (generation.rawResponse || JSON.stringify(chapter));
+    const assistantContent = buildStoredAssistantContent(chapter, generation.mode, generation.rawResponse);
 
     aiMessages = trimMessages([
       ...requestMessages,
@@ -569,6 +572,7 @@
     actionHistory = [];
     aiMessages = [];
     memoryLog = [];
+    storyRuntimeMode = 'agentic-subagents';
     backgroundEvents = [];
     campaignArchive = [];
     customAction = '';
@@ -595,6 +599,7 @@
       if (session) {
         turnNumber = session.turnNumber;
         selectedTrame = session.selectedTrame;
+        storyRuntimeMode = session.storyRuntimeMode || 'agentic-subagents';
         currentChapter = session.currentChapter
           ? sanitizeChapterForDisplay(session.currentChapter)
           : null;
@@ -727,18 +732,16 @@
 
             <!-- Model chip -->
             {#if providerConfig}
-              <div class="model-chip" title={providerStatus}>
-                {#if supportsAgenticToolCalling(providerConfig.providerId, providerConfig.model)}
-                  <span class="model-chip-dot agentic"></span>
+              <div class="model-chip" title={`${providerStatus} · ${storyOrchestration.chipTitle}`}>
+                {#if storyOrchestration.isSubagentOrchestration}
+                  <span class="model-chip-dot orchestrated"></span>
                 {:else}
                   <span class="model-chip-dot"></span>
                 {/if}
                 <span class="model-chip-name">
                   {(providerConfig.model || 'auto').split('/').pop()?.split(':')[0] ?? 'auto'}
                 </span>
-                {#if supportsAgenticToolCalling(providerConfig.providerId, providerConfig.model)}
-                  <span class="model-chip-tag">⚡</span>
-                {/if}
+                <span class="model-chip-tag">{storyOrchestration.chipTag}</span>
               </div>
             {/if}
 
@@ -1233,7 +1236,7 @@
     background: var(--color-text-muted);
   }
 
-  .model-chip-dot.agentic {
+  .model-chip-dot.orchestrated {
     background: #4ade80;
     box-shadow: 0 0 5px rgba(74,222,128,0.6);
   }

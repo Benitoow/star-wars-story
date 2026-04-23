@@ -23,6 +23,7 @@ const NARRATIVE_CHOICE_MARKERS: RegExp[] = [
   /^(?:que faites-vous|what do you do|choices?|choix|options?|vos choix)\b[:!?]?\s*$/i,
   /^(?:comment réagissez-vous|how do you respond|next actions?)\b[:!?]?\s*$/i
 ];
+const NARRATIVE_CHOICE_ITEM_REGEX = /^(?:[-*•]\s+|[A-Da-d]\s*[)\].:-]\s+|\d{1,2}\s*[)\].:-]\s+)/;
 
 const STRUCTURED_PAYLOAD_HINT_REGEX = /(^|\s)json\s*\{|"chapter_title"\s*:|"chapter_number"\s*:|"narrative"\s*:|"choices"\s*:/i;
 
@@ -49,6 +50,13 @@ function tryExtractNarrativeActionFromPayload(rawText: string): string | null {
       .replace(/\\\\/g, '\\');
     return cleanText(fallback, 5500) || null;
   }
+}
+
+function normalizeChoiceMarkerText(value: string): string {
+  return String(value || '')
+    .replace(/\s+([:!?])/g, '$1')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
 }
 
 export function sanitizeNarrativeText(value: unknown, maxLength = 2200): string {
@@ -99,6 +107,7 @@ export function sanitizeNarrativeText(value: unknown, maxLength = 2200): string 
       .replace(/^[_`*]+|[_`*]+$/g, '')
       .replace(/^\[[^\]]+\]\s*/, '')
       .trim();
+    const choiceMarkerCandidate = normalizeChoiceMarkerText(normalized);
 
     if (!normalized) continue;
     if (/^(?:\*{3,}|-{3,}|_{3,})$/.test(normalized)) {
@@ -106,13 +115,17 @@ export function sanitizeNarrativeText(value: unknown, maxLength = 2200): string 
       continue;
     }
 
-    if (NARRATIVE_CHOICE_MARKERS.some(pattern => pattern.test(normalized))) {
+    if (NARRATIVE_CHOICE_MARKERS.some(pattern => pattern.test(choiceMarkerCandidate))) {
       flush();
       inChoiceBlock = true;
       continue;
     }
 
-    if (inChoiceBlock) continue;
+    if (inChoiceBlock) {
+      if (NARRATIVE_CHOICE_ITEM_REGEX.test(normalized)) continue;
+      inChoiceBlock = false;
+    }
+
     if (/^\d+[.)]\s+/.test(normalized)) continue;
 
     buffer.push(normalized.replace(/\s{2,}/g, ' '));
@@ -616,6 +629,10 @@ export function coerceStateUpdate(source: unknown): StateUpdate | undefined {
         if (typeof n.last_seen === 'string') entry.last_seen = cleanText(n.last_seen, 60);
         if (typeof n.alive === 'boolean') entry.alive = n.alive;
         if (typeof n.note === 'string') entry.note = cleanText(n.note, 120);
+        if (entry.status === 'dead' || entry.alive === false) {
+          entry.status = 'dead';
+          entry.alive = false;
+        }
         return entry;
       })
       .filter((n): n is Partial<NpcRelation> & { name: string } => n !== null);

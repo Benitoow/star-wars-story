@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { StoryChapter, WorldState } from '$lib/ai/storyEngine';
+import { coerceStateUpdate, sanitizeNarrativeText } from '$lib/ai/storyEngine/parsing';
 import {
   enforceTransitionChoiceQuality,
   planDialogueDisplay,
@@ -36,6 +37,58 @@ describe('sanitizeNarrativeTextForDisplay', () => {
       kind: 'dialogue',
       text: '— Grisk : Ils arrivent par la passerelle nord.'
     });
+  });
+
+  it('keeps prose that appears after a block of choices', () => {
+    const input = `La passerelle vibre sous les bottes.
+
+Choix :
+1. Forcer la porte du sas.
+2. Appeler Vex sur le comlink.
+
+La cloison explose soudain et la fumée envahit le couloir.`;
+
+    const sanitized = sanitizeNarrativeTextForDisplay(input);
+
+    expect(sanitized).toContain('La passerelle vibre sous les bottes.');
+    expect(sanitized).toContain('La cloison explose soudain et la fumée envahit le couloir.');
+    expect(sanitized).not.toContain('Forcer la porte du sas');
+    expect(sanitized).not.toContain('Appeler Vex sur le comlink');
+  });
+});
+
+describe('sanitizeNarrativeText', () => {
+  it('keeps prose that resumes after enumerated choices', () => {
+    const input = `Les alarmes se déclenchent.
+
+Que faites-vous ?
+A. Pirater la porte blindée.
+B. Courir vers le hangar.
+
+Une silhouette encapuchonnée apparaît ensuite dans la fumée.`;
+
+    const sanitized = sanitizeNarrativeText(input, 600);
+
+    expect(sanitized).toContain('Les alarmes se déclenchent.');
+    expect(sanitized).toContain('Une silhouette encapuchonnée apparaît ensuite dans la fumée.');
+    expect(sanitized).not.toContain('Pirater la porte blindée');
+    expect(sanitized).not.toContain('Courir vers le hangar');
+  });
+});
+
+describe('coerceStateUpdate', () => {
+  it('synchronizes dead status and alive flag in npc updates', () => {
+    const update = coerceStateUpdate({
+      npcs: [
+        { name: 'Lira Voss', status: 'dead', alive: true },
+        { name: 'Grisk', status: 'ally', alive: false }
+      ]
+    });
+
+    expect(update?.npcs).toEqual([
+      { name: 'Lira Voss', status: 'dead', alive: false },
+      { name: 'Grisk', status: 'dead', alive: false }
+    ]);
   });
 });
 

@@ -1,4 +1,4 @@
-import { logger } from '$lib/utils/logger';
+import { logger, recordDiagnosticEvent } from '$lib/utils/logger';
 import { splitNarrativeParagraphs } from '$lib/editor/narrativeGuardrails';
 import type {
   BackgroundWorldEvent,
@@ -10,6 +10,12 @@ import type {
   StoryTurnGenerationResult,
   StoryChapter
 } from './types';
+import {
+  assertSupportedStoryProviderConfig,
+  sanitizeStoryMessageHistory,
+  validateBackgroundWorldGenerationResult,
+  validateStoryTurnGenerationResult
+} from './contracts';
 import {
   callOpenAiCompatibleRaw,
   callTextModel,
@@ -25,23 +31,42 @@ import {
 } from './parsing';
 import {
   STORY_PIPELINE_BRAIN_SYSTEM_PROMPT,
+  STORY_PIPELINE_DIRECTOR_SYSTEM_PROMPT,
   STORY_PIPELINE_SCRIBE_SYSTEM_PROMPT,
   STORY_PIPELINE_WRITER_SYSTEM_PROMPT,
   buildPipelineBrainUserPrompt,
+  buildPipelineDirectorUserPrompt,
   buildPipelineScribeUserPrompt,
-  buildPipelineWriterUserPrompt
+  buildPipelineWriterUserPromptWithDirector
 } from './prompts';
 
-type StoryPipelineStep = 'scribe' | 'writer' | 'brain';
+type StoryPipelineStep = 'scribe' | 'director' | 'writer' | 'brain' | 'world-observer' | 'world-adjudicator';
+
+type StoryDirectorBrief = {
+  player_action: string;
+  scene_goal: string;
+  tension: string;
+  must_include: string[];
+  required_world_signals: string[];
+  section_type?: string;
+  atmosphere?: string;
+};
 
 export type StoryTurnPipelineConfigOverrides = {
   scribe?: StoryProviderConfig;
+  director?: StoryProviderConfig;
   writer?: StoryProviderConfig;
   brain?: StoryProviderConfig;
 };
 
-const OPENAI_COMPATIBLE_PROVIDER_IDS = new Set<string>(['openrouter', 'openai', 'mistral', 'grok']);
+const OPENAI_COMPATIBLE_PROVIDER_IDS = new Set<string>(['openrouter']);
 const DEFAULT_SCENE_DESCRIPTION = 'Cinematic Star Wars scene with dramatic lighting and dynamic action';
+const CANONICAL_PLAYER_ACTION_PATTERNS = [
+  /ACTION JOUEUR CANONIQUE:\s*([^\n]+)/i,
+  /ACTION JOUEUR EN COURS:\s*([^\n]+)/i,
+  /\bTour\s+\d+\.\s+Action:\s*"([^"]+)"/i,
+  /\bAction:\s*"([^"]+)"/i
+] as const;
 
 function cleanText(value: unknown, maxLength = 2200): string {
   if (value === null || value === undefined) return '';
@@ -61,9 +86,10 @@ function isObjectRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function normalizeProviderConfig(config: StoryProviderConfig): StoryProviderConfig {
-  const providerId = normalizeProviderId(config.providerId);
-  if (providerId === config.providerId) return config;
-  return { ...config, providerId };
+  const supported = assertSupportedStoryProviderConfig(config);
+  const providerId = normalizeProviderId(supported.providerId);
+  if (providerId === supported.providerId) return supported;
+  return { ...supported, providerId };
 }
 
 function resolveStepConfig(baseConfig: StoryProviderConfig, override?: StoryProviderConfig): StoryProviderConfig {
@@ -73,13 +99,19 @@ function resolveStepConfig(baseConfig: StoryProviderConfig, override?: StoryProv
 function getStepTokenBudget(stepConfig: StoryProviderConfig, step: StoryPipelineStep): number {
   const caps = detectModelCapabilities(stepConfig);
   if (step === 'scribe') return clamp(Math.round(caps.maxOutputTokens * 0.2), 240, 560);
+  if (step === 'director') return clamp(Math.round(caps.maxOutputTokens * 0.24), 320, 720);
   if (step === 'writer') return clamp(Math.round(caps.maxOutputTokens * 0.72), 900, 2600);
+  if (step === 'world-observer') return clamp(Math.round(caps.maxOutputTokens * 0.18), 220, 520);
+  if (step === 'world-adjudicator') return clamp(Math.round(caps.maxOutputTokens * 0.26), 320, 760);
   return clamp(Math.round(caps.maxOutputTokens * 0.58), 900, 2200);
 }
 
 function getStepTemperature(step: StoryPipelineStep): number {
   if (step === 'writer') return 0.95;
+  if (step === 'director') return 0.45;
+  if (step === 'world-observer') return 0.45;
   if (step === 'brain') return 0.2;
+  if (step === 'world-adjudicator') return 0.2;
   return 0.35;
 }
 
@@ -93,9 +125,31 @@ function defaultMemoryUpdates(): StoryMemoryUpdates {
   };
 }
 
+function extractCanonicalPlayerAction(rawContent: string): string {
+  const content = cleanText(rawContent, 2200);
+  if (!content) return '';
+
+  for (const pattern of CANONICAL_PLAYER_ACTION_PATTERNS) {
+    const match = content.match(pattern);
+    const captured = cleanText(match?.[1], 280);
+    if (captured) return captured;
+  }
+
+  return cleanText(content, 280);
+}
+
 function getLatestUserAction(messages: ChatMessage[]): string {
   const latestUser = [...messages].reverse().find(message => message.role === 'user');
-  return cleanText(latestUser?.content, 360);
+  return extractCanonicalPlayerAction(latestUser?.content || '');
+}
+
+function toSubAgentHistoryLine(message: ChatMessage): string {
+  if (message.role === 'assistant') {
+    return `Narrateur: ${cleanText(message.content, 420)}`;
+  }
+
+  const action = extractCanonicalPlayerAction(message.content);
+  return `Joueur: ${cleanText(action || message.content, 280)}`;
 }
 
 function fallbackScribeSummary(messages: ChatMessage[], turnNumber: number): string {
@@ -120,6 +174,23 @@ function fallbackBrainPayload(): Record<string, unknown> {
     state_update: {},
     memory_updates: defaultMemoryUpdates(),
     choices: []
+  };
+}
+
+function fallbackDirectorBrief(messages: ChatMessage[], scribeSummary: string): StoryDirectorBrief {
+  const latestAction = getLatestUserAction(messages) || 'agir immédiatement sous pression';
+  return {
+    player_action: latestAction,
+    scene_goal: `Mettre en jeu immédiatement l'action suivante: ${latestAction}.`,
+    tension: cleanText(scribeSummary, 180) || 'La pression monte et la situation se referme.',
+    must_include: [
+      'Une conséquence immédiate de l’action du joueur',
+      'Un lieu concret exploitable',
+      'Au moins un signal relationnel ou politique'
+    ],
+    required_world_signals: ['location', 'npc'],
+    section_type: 'action',
+    atmosphere: 'tense'
   };
 }
 
@@ -191,19 +262,65 @@ function splitWriterScene(writerScene: string): { action: string; dialogue: stri
   return { action, dialogue };
 }
 
+function enforceDirectorSceneGoal(sceneGoal: unknown, canonicalPlayerAction: string, fallbackSceneGoal: string): string {
+  const candidate = cleanText(sceneGoal, 220);
+  if (!candidate) return fallbackSceneGoal;
+
+  const normalizedGoal = candidate
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+  const normalizedAction = canonicalPlayerAction
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+  if (normalizedAction && normalizedGoal.includes(normalizedAction)) {
+    return candidate;
+  }
+
+  return cleanText(`${candidate} Conséquence directe à traiter: ${canonicalPlayerAction}.`, 220);
+}
+
+function coerceDirectorBrief(source: unknown, fallback: StoryDirectorBrief): StoryDirectorBrief {
+  if (!isObjectRecord(source)) return fallback;
+
+  const mustInclude = Array.isArray(source.must_include)
+    ? source.must_include.map(item => cleanText(item, 120)).filter(Boolean).slice(0, 4)
+    : [];
+  const requiredWorldSignals = Array.isArray(source.required_world_signals)
+    ? source.required_world_signals.map(item => cleanText(item, 40)).filter(Boolean).slice(0, 4)
+    : [];
+  const canonicalPlayerAction = cleanText(fallback.player_action, 220) || 'agir immédiatement sous pression';
+
+  return {
+    player_action: canonicalPlayerAction,
+    scene_goal: enforceDirectorSceneGoal(source.scene_goal, canonicalPlayerAction, fallback.scene_goal),
+    tension: cleanText(source.tension, 220) || fallback.tension,
+    must_include: mustInclude.length ? mustInclude : fallback.must_include,
+    required_world_signals: requiredWorldSignals.length ? requiredWorldSignals : fallback.required_world_signals,
+    section_type: cleanText(source.section_type, 40) || fallback.section_type,
+    atmosphere: cleanText(source.atmosphere, 40) || fallback.atmosphere
+  };
+}
+
 function formatPipelineRawResponse(
   scribeSummary: string,
+  directorBrief: StoryDirectorBrief,
   writerScene: string,
   brainPayload: Record<string, unknown>
 ): string {
   return [
-    '[PIPELINE:SCRIBE]',
+    '[AGENT:SCRIBE]',
     cleanText(scribeSummary, 4000),
     '',
-    '[PIPELINE:WRITER]',
+    '[AGENT:DIRECTOR]',
+    JSON.stringify(directorBrief, null, 2),
+    '',
+    '[AGENT:WRITER]',
     cleanText(writerScene, 12000),
     '',
-    '[PIPELINE:BRAIN]',
+    '[AGENT:BRAIN]',
     JSON.stringify(brainPayload, null, 2)
   ].join('\n');
 }
@@ -211,14 +328,15 @@ function formatPipelineRawResponse(
 function buildPipelineStoryPayload(
   turnNumber: number,
   writerScene: string,
+  directorBrief: StoryDirectorBrief,
   brainPayload: Record<string, unknown>
 ): Record<string, unknown> {
   const rawChapterTitle = cleanText(brainPayload.chapter_title, 90);
   const chapterTitle = rawChapterTitle && !isGenericChapterTitle(rawChapterTitle)
     ? rawChapterTitle
     : deriveFallbackChapterTitleFromScene(writerScene, turnNumber);
-  const sectionType = cleanText(brainPayload.section_type, 40) || 'action';
-  const atmosphere = cleanText(brainPayload.atmosphere, 80) || 'tense';
+  const sectionType = cleanText(brainPayload.section_type, 40) || cleanText(directorBrief.section_type, 40) || 'action';
+  const atmosphere = cleanText(brainPayload.atmosphere, 80) || cleanText(directorBrief.atmosphere, 80) || 'tense';
   const userEditsApplied = cleanText(brainPayload.user_edits_applied, 180) || null;
   const sceneDescription = cleanText(brainPayload.scene_description, 180) || DEFAULT_SCENE_DESCRIPTION;
 
@@ -308,26 +426,56 @@ async function callPipelineStep(
 
   const raw = await callTextModel(
     [{ role: 'system', content: systemPrompt }, { role: 'user', content: strictUserPrompt }],
-    normalizedConfig
+    normalizedConfig,
+    {
+      maxTokens,
+      temperature,
+      skipReasoning: step !== 'writer'
+    }
   );
 
   return cleanText(raw, 16000);
 }
 
 async function runScribeStep(messages: ChatMessage[], config: StoryProviderConfig, turnNumber: number): Promise<string> {
-  const userPrompt = buildPipelineScribeUserPrompt(messages, turnNumber);
+  const normalizedMessages = messages.map(message => (
+    message.role === 'user'
+      ? { ...message, content: toSubAgentHistoryLine(message).replace(/^Joueur:\s*/, '') }
+      : { ...message, content: cleanText(message.content, 5000) }
+  ));
+  const userPrompt = buildPipelineScribeUserPrompt(normalizedMessages, turnNumber);
   const raw = await callPipelineStep('scribe', STORY_PIPELINE_SCRIBE_SYSTEM_PROMPT, userPrompt, config, false);
   return cleanText(raw, 650);
 }
 
-async function runWriterStep(scribeSummary: string, config: StoryProviderConfig): Promise<string> {
-  const userPrompt = buildPipelineWriterUserPrompt(scribeSummary);
+async function runDirectorStep(
+  messages: ChatMessage[],
+  scribeSummary: string,
+  config: StoryProviderConfig,
+  turnNumber: number
+): Promise<StoryDirectorBrief> {
+  const fallback = fallbackDirectorBrief(messages, scribeSummary);
+  const userPrompt = buildPipelineDirectorUserPrompt(scribeSummary, fallback.player_action, turnNumber);
+  const raw = await callPipelineStep('director', STORY_PIPELINE_DIRECTOR_SYSTEM_PROMPT, userPrompt, config, true);
+  return coerceDirectorBrief(parseJsonSafely(raw), fallback);
+}
+
+async function runWriterStep(
+  scribeSummary: string,
+  directorBrief: StoryDirectorBrief,
+  config: StoryProviderConfig
+): Promise<string> {
+  const userPrompt = buildPipelineWriterUserPromptWithDirector(scribeSummary, directorBrief);
   const raw = await callPipelineStep('writer', STORY_PIPELINE_WRITER_SYSTEM_PROMPT, userPrompt, config, false);
   return sanitizeNarrativeText(raw, 5500);
 }
 
-async function runBrainStep(writerScene: string, config: StoryProviderConfig): Promise<Record<string, unknown>> {
-  const userPrompt = buildPipelineBrainUserPrompt(writerScene);
+async function runBrainStep(
+  writerScene: string,
+  directorBrief: StoryDirectorBrief,
+  config: StoryProviderConfig
+): Promise<Record<string, unknown>> {
+  const userPrompt = buildPipelineBrainUserPrompt(writerScene, directorBrief);
   const raw = await callPipelineStep('brain', STORY_PIPELINE_BRAIN_SYSTEM_PROMPT, userPrompt, config, true);
   const parsed = parseJsonSafely(raw);
   if (parsed) return parsed;
@@ -340,73 +488,142 @@ export async function generateStoryTurn(
   turnNumber: number,
   providerOverrides: StoryTurnPipelineConfigOverrides = {}
 ): Promise<StoryTurnGenerationResult> {
+  const safeMessages = sanitizeStoryMessageHistory(messages);
   const baseConfig = normalizeProviderConfig(config);
   const scribeConfig = resolveStepConfig(baseConfig, providerOverrides.scribe);
+  const directorConfig = resolveStepConfig(baseConfig, providerOverrides.director);
   const writerConfig = resolveStepConfig(baseConfig, providerOverrides.writer);
   const brainConfig = resolveStepConfig(baseConfig, providerOverrides.brain);
 
   let completedSteps = 0;
 
-  let scribeSummary = fallbackScribeSummary(messages, turnNumber);
+  let scribeSummary = fallbackScribeSummary(safeMessages, turnNumber);
   try {
-    const result = await runScribeStep(messages, scribeConfig, turnNumber);
+    const result = await runScribeStep(safeMessages, scribeConfig, turnNumber);
     if (result) {
       scribeSummary = result;
       completedSteps = 1;
     }
   } catch (error) {
     logger.warn('storyEngine: étape 1 (scribe) indisponible, fallback local.', error);
+    recordDiagnosticEvent({
+      level: 'warn',
+      category: 'story-turn-step',
+      stage: 'scribe',
+      message: 'Fallback local sur le scribe.',
+      providerId: scribeConfig.providerId,
+      model: scribeConfig.model,
+      runtimeMode: 'agentic-subagents',
+      validation: 'repaired',
+      meta: error
+    });
   }
 
-  let writerScene = fallbackWriterScene(scribeSummary, messages, turnNumber);
+  let directorBrief = fallbackDirectorBrief(safeMessages, scribeSummary);
   try {
-    const result = await runWriterStep(scribeSummary, writerConfig);
+    directorBrief = await runDirectorStep(safeMessages, scribeSummary, directorConfig, turnNumber);
+    completedSteps = Math.max(completedSteps, 2);
+  } catch (error) {
+    logger.warn('storyEngine: étape 2 (directeur) indisponible, fallback local.', error);
+    recordDiagnosticEvent({
+      level: 'warn',
+      category: 'story-turn-step',
+      stage: 'director',
+      message: 'Fallback local sur le directeur.',
+      providerId: directorConfig.providerId,
+      model: directorConfig.model,
+      runtimeMode: 'agentic-subagents',
+      validation: 'repaired',
+      meta: error
+    });
+  }
+
+  let writerScene = fallbackWriterScene(scribeSummary, safeMessages, turnNumber);
+  try {
+    const result = await runWriterStep(scribeSummary, directorBrief, writerConfig);
     if (result) {
       writerScene = result;
-      completedSteps = Math.max(completedSteps, 2);
+      completedSteps = Math.max(completedSteps, 3);
     }
   } catch (error) {
-    logger.warn('storyEngine: étape 2 (écrivain) indisponible, fallback local.', error);
+    logger.warn('storyEngine: étape 3 (écrivain) indisponible, fallback local.', error);
+    recordDiagnosticEvent({
+      level: 'warn',
+      category: 'story-turn-step',
+      stage: 'writer',
+      message: 'Fallback local sur l’écrivain.',
+      providerId: writerConfig.providerId,
+      model: writerConfig.model,
+      runtimeMode: 'agentic-subagents',
+      validation: 'repaired',
+      meta: error
+    });
   }
 
   let brainPayload = fallbackBrainPayload();
   try {
-    brainPayload = await runBrainStep(writerScene, brainConfig);
-    completedSteps = 3;
+    brainPayload = await runBrainStep(writerScene, directorBrief, brainConfig);
+    completedSteps = 4;
   } catch (error) {
-    logger.warn('storyEngine: étape 3 (cerveau) indisponible, fallback mécanique local.', error);
+    logger.warn('storyEngine: étape 4 (cerveau) indisponible, fallback mécanique local.', error);
+    recordDiagnosticEvent({
+      level: 'warn',
+      category: 'story-turn-step',
+      stage: 'brain',
+      message: 'Fallback mécanique sur le cerveau.',
+      providerId: brainConfig.providerId,
+      model: brainConfig.model,
+      runtimeMode: 'agentic-subagents',
+      validation: 'repaired',
+      meta: error
+    });
   }
 
-  const payload = buildPipelineStoryPayload(turnNumber, writerScene, brainPayload);
+  const payload = buildPipelineStoryPayload(turnNumber, writerScene, directorBrief, brainPayload);
   const payloadRaw = JSON.stringify(payload);
-  const rawResponse = formatPipelineRawResponse(scribeSummary, writerScene, brainPayload);
+  const rawResponse = formatPipelineRawResponse(scribeSummary, directorBrief, writerScene, brainPayload);
   const chapter = parseStoryResponse(payloadRaw, turnNumber);
 
   if (!hasPlayableChapterContent(chapter)) {
-    const emergencyWriterScene = fallbackWriterScene(scribeSummary, messages, turnNumber);
+    const emergencyWriterScene = fallbackWriterScene(scribeSummary, safeMessages, turnNumber);
     const emergencyBrainPayload = fallbackBrainPayload();
-    const emergencyPayload = buildPipelineStoryPayload(turnNumber, emergencyWriterScene, emergencyBrainPayload);
+    const emergencyPayload = buildPipelineStoryPayload(turnNumber, emergencyWriterScene, directorBrief, emergencyBrainPayload);
     const emergencyRaw = formatPipelineRawResponse(
       scribeSummary,
+      directorBrief,
       emergencyWriterScene,
       emergencyBrainPayload
     );
-    return {
+    recordDiagnosticEvent({
+      level: 'warn',
+      category: 'story-turn-validation',
+      stage: 'story-turn',
+      message: 'Le chapitre généré était inexploitable, fallback d’urgence appliqué.',
+      providerId: baseConfig.providerId,
+      model: baseConfig.model,
+      runtimeMode: 'agentic-subagents',
+      validation: 'repaired',
+      meta: {
+        turnNumber,
+        completedSteps
+      }
+    });
+    return validateStoryTurnGenerationResult({
       chapter: parseStoryResponse(JSON.stringify(emergencyPayload), turnNumber),
       rawResponse: emergencyRaw,
-      mode: 'pipeline',
+      mode: 'agentic-subagents',
       steps: Math.max(1, completedSteps),
       toolCalls: 0
-    };
+    }, turnNumber);
   }
 
-  return {
+  return validateStoryTurnGenerationResult({
     chapter,
     rawResponse,
-    mode: 'pipeline',
+    mode: 'agentic-subagents',
     steps: Math.max(1, completedSteps),
     toolCalls: 0
-  };
+  }, turnNumber);
 }
 
 function coerceBackgroundWorldEvent(source: unknown): BackgroundWorldEvent | null {
@@ -469,6 +686,20 @@ function hasBackgroundEventImpact(event: BackgroundWorldEvent | null): boolean {
   );
 }
 
+const BACKGROUND_WORLD_OBSERVER_SYSTEM_PROMPT = `Tu es l'OBSERVATEUR hors-écran d'une campagne Star Wars.
+Tu détectes le mouvement invisible de la galaxie entre deux tours.
+Règles absolues:
+- Résume en 120 mots maximum.
+- Donne seulement ce qui change réellement hors champ.
+- Pas de JSON, pas de markdown, pas de listes.`;
+
+const BACKGROUND_WORLD_ADJUDICATOR_SYSTEM_PROMPT = `Tu es l'ADJUDICATEUR hors-écran d'une campagne Star Wars.
+Tu convertis un mouvement galactique en conséquences mécaniques propres.
+Règles absolues:
+- Réponds uniquement en JSON valide.
+- Pas de prose hors JSON.
+- Si rien d'utile ne bouge, renvoie un JSON quasiment vide mais valide.`;
+
 function buildBackgroundWorldSystemPrompt(input: BackgroundWorldInput): string {
   const setup = input.setup;
   const protagonist = [setup.protagonistFirstName || '', setup.protagonistLastName || ''].join(' ').trim() || 'Le protagoniste';
@@ -505,22 +736,27 @@ Tu résous uniquement les dynamiques de fond entre les tours du joueur.
 SETUP:
 - Protagoniste: ${protagonist}
 - Ère: ${setup.era} | Faction: ${setup.faction} | Rôle: ${setup.role}
-- Prémisse: ${setup.premise || 'Libre'}${worldBlock}${recentBlock}${memoryBlock}
+- Prémisse: ${setup.premise || 'Libre'}${worldBlock}${recentBlock}${memoryBlock}`;
+}
 
-Réponds UNIQUEMENT en JSON valide:
+function buildBackgroundWorldObserverPrompt(turnNumber: number): string {
+  return `Tour ${turnNumber}. Décris le mouvement galactique hors-écran le plus pertinent pour la continuité immédiate du joueur.`;
+}
+
+function buildBackgroundWorldAdjudicatorPrompt(observerSummary: string, turnNumber: number): string {
+  return `Tour ${turnNumber}. Mouvement hors-écran observé:
+${cleanText(observerSummary, 1200)}
+
+Réponds UNIQUEMENT en JSON valide avec ce contrat:
 {
   "title": "Titre court",
-  "summary_public": "Message bref",
+  "summary_public": "Message bref éventuellement montrable au joueur",
   "summary_private": "Contexte MJ optionnel",
   "inject_now": false,
-  "prompt_hook": "Consigne courte",
+  "prompt_hook": "Consigne courte pour le prochain tour",
   "memory_updates": { "relations": [], "places": [], "injuries": [], "resources": [], "notes": [] },
   "state_update": {}
 }`;
-}
-
-function buildBackgroundWorldTickPrompt(turnNumber: number): string {
-  return `Résous le tick hors-écran après le tour ${turnNumber}.`;
 }
 
 export async function generateBackgroundWorldEvent(
@@ -528,31 +764,62 @@ export async function generateBackgroundWorldEvent(
   config: StoryProviderConfig
 ): Promise<BackgroundWorldGenerationResult> {
   const normalizedConfig = normalizeProviderConfig(config);
-  const messages: ChatMessage[] = [
-    { role: 'system', content: buildBackgroundWorldSystemPrompt(input) },
-    { role: 'user', content: buildBackgroundWorldTickPrompt(input.turnNumber) }
-  ];
+  const contextPrompt = buildBackgroundWorldSystemPrompt(input);
 
   try {
-    const rawResponse = await callTextModel(messages, normalizedConfig);
+    const observerSummary = cleanText(
+      await callPipelineStep(
+        'world-observer',
+        `${BACKGROUND_WORLD_OBSERVER_SYSTEM_PROMPT}\n\n${contextPrompt}`,
+        buildBackgroundWorldObserverPrompt(input.turnNumber),
+        normalizedConfig,
+        false
+      ),
+      1200
+    );
+
+    const rawResponse = await callPipelineStep(
+      'world-adjudicator',
+      `${BACKGROUND_WORLD_ADJUDICATOR_SYSTEM_PROMPT}\n\n${contextPrompt}`,
+      buildBackgroundWorldAdjudicatorPrompt(observerSummary, input.turnNumber),
+      normalizedConfig,
+      true
+    );
     const parsed = parseJsonSafely(rawResponse);
     const event = coerceBackgroundWorldEvent(parsed);
 
-    return {
+    return validateBackgroundWorldGenerationResult({
       event: hasBackgroundEventImpact(event) ? event : null,
-      rawResponse,
-      mode: 'structured-json',
-      steps: 1,
+      rawResponse: [
+        '[AGENT:WORLD-OBSERVER]',
+        observerSummary,
+        '',
+        '[AGENT:WORLD-ADJUDICATOR]',
+        rawResponse
+      ].join('\n'),
+      mode: 'agentic-subagents',
+      steps: observerSummary ? 2 : 1,
       toolCalls: 0
-    };
+    });
   } catch (error) {
     logger.warn('storyEngine: génération hors-écran indisponible.', error);
-    return {
+    recordDiagnosticEvent({
+      level: 'warn',
+      category: 'background-world',
+      stage: 'world-observer/world-adjudicator',
+      message: 'La génération hors-écran a échoué.',
+      providerId: normalizedConfig.providerId,
+      model: normalizedConfig.model,
+      runtimeMode: 'agentic-subagents',
+      validation: 'failed',
+      meta: error
+    });
+    return validateBackgroundWorldGenerationResult({
       event: null,
       rawResponse: '',
-      mode: 'structured-json',
+      mode: 'agentic-subagents',
       steps: 0,
       toolCalls: 0
-    };
+    });
   }
 }

@@ -415,6 +415,27 @@ describe('provider validation', () => {
       { providerId: 'openrouter', model: 'openai/gpt-5.4-mini', apiKey: 'test-key' }
     )).rejects.toThrow('réponse vide ou incomplète du provider');
   });
+
+  it('fails explicitly when an OpenAI-compatible provider returns reasoning only with no content or tool call', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{
+          message: {
+            role: 'assistant',
+            reasoning: 'Je réfléchis.',
+            reasoning_details: [{ type: 'summary', text: 'analyse' }]
+          }
+        }]
+      })
+    } as Response);
+    vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
+
+    await expect(() => callOpenAiCompatibleRaw(
+      [{ role: 'user', content: 'test' }],
+      { providerId: 'openrouter', model: 'openai/gpt-5.4-mini', apiKey: 'test-key' }
+    )).rejects.toThrow('réponse vide ou incomplète du provider');
+  });
 });
 
 describe('pipeline story generation', () => {
@@ -425,6 +446,25 @@ describe('pipeline story generation', () => {
         ok: true,
         json: async () => ({
           choices: [{ message: { role: 'assistant', content: 'Tour 7. Lira mène l’échange pendant que la pression monte.' } }]
+        })
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          choices: [{
+            message: {
+              role: 'assistant',
+              content: JSON.stringify({
+                player_action: 'Parler à Lira avant de partir.',
+                scene_goal: 'Clarifier immédiatement le plan de fuite avec Lira.',
+                tension: 'Les patrouilles peuvent arriver à tout instant.',
+                must_include: ['Un échange tendu entre Lira et le protagoniste', 'Un rappel du danger immédiat'],
+                required_world_signals: ['npc', 'location'],
+                section_type: 'dialogue',
+                atmosphere: 'tense'
+              })
+            }
+          }]
         })
       } as Response)
       .mockResolvedValueOnce({
@@ -463,12 +503,86 @@ describe('pipeline story generation', () => {
       7
     );
 
-    expect(generation.mode).toBe('pipeline');
+    expect(generation.mode).toBe('agentic-subagents');
     expect(generation.chapter.chapter_title).toBe('Accord sous tension');
     expect(generation.chapter.narrative.dialogue).toContain('Lira');
     expect(generation.chapter.narrative.dialogue).toContain('J’active la rampe.');
     expect(generation.chapter.narrative.action).toBe('');
-    expect(generation.rawResponse).toContain('[PIPELINE:WRITER]');
+    expect(generation.rawResponse).toContain('[AGENT:DIRECTOR]');
+    expect(generation.rawResponse).toContain('[AGENT:WRITER]');
     expect(generation.rawResponse).toContain('— Lira : On bouge maintenant.');
+  });
+
+  it('keeps the canonical selected action even when director output drifts', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { role: 'assistant', content: 'Tour 8. Les accès restent verrouillés dans le hangar.' } }]
+        })
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          choices: [{
+            message: {
+              role: 'assistant',
+              content: JSON.stringify({
+                player_action: 'Observer en silence derrière une caisse.',
+                scene_goal: 'Gagner du temps pour évaluer les gardes.',
+                tension: 'Le verrouillage du hangar se renforce.',
+                must_include: ['Un obstacle technique', 'Une fenêtre de tir courte'],
+                required_world_signals: ['location', 'npc'],
+                section_type: 'action',
+                atmosphere: 'tense'
+              })
+            }
+          }]
+        })
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { role: 'assistant', content: 'Tu sabotes le terminal de verrouillage. Les portes tremblent et les alarmes hurlent.' } }]
+        })
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          choices: [{
+            message: {
+              role: 'assistant',
+              content: JSON.stringify({
+                chapter_title: 'Verrou cassé',
+                section_type: 'action',
+                atmosphere: 'tense',
+                choices: [{ text: 'Exploiter la brèche tout de suite', attribute: 'combat', difficulty: 3 }],
+                memory_updates: { notes: ['Le terminal de verrouillage est neutralisé.'] },
+                state_update: { location: 'Hangar verrouillé', credits: -50 }
+              })
+            }
+          }]
+        })
+      } as Response);
+
+    vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
+
+    const generation = await generateStoryTurn(
+      [
+        { role: 'system', content: 'test' },
+        {
+          role: 'user',
+          content: 'ACTION JOUEUR CANONIQUE: Saboter le terminal de verrouillage.\n\nTour 8. Action: "Saboter le terminal de verrouillage."'
+        }
+      ],
+      { providerId: 'openrouter', model: 'openai/gpt-5.4-mini', apiKey: 'test-key' },
+      8
+    );
+
+    expect(generation.mode).toBe('agentic-subagents');
+    expect(generation.rawResponse).toContain('"player_action": "Saboter le terminal de verrouillage."');
+    expect(generation.rawResponse).not.toContain('"player_action": "Observer en silence derrière une caisse."');
+    expect(generation.chapter.chapter_title).toBe('Verrou cassé');
   });
 });

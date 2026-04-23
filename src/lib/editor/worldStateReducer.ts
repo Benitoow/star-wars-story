@@ -243,6 +243,20 @@ import { FACTION_CREDITS, ERA_START_DATES } from '$lib/editor/setupCatalog';
     return status;
   }
 
+  export function synchronizeNpcLifeState(
+    status: NpcRelation['status'] | undefined,
+    alive: boolean | undefined
+  ): Pick<NpcRelation, 'status' | 'alive'> {
+    if (status === 'dead' || alive === false) {
+      return { status: 'dead', alive: false };
+    }
+
+    return {
+      status: normalizeNpcStatus(status),
+      alive: alive !== undefined ? alive : true
+    };
+  }
+
   export function deriveInitialLocation(setup: StorySetup): string {
     const factionSeed: Record<string, string> = {
       empire: 'Coruscant — Secteur Impérial',
@@ -319,33 +333,20 @@ import { FACTION_CREDITS, ERA_START_DATES } from '$lib/editor/setupCatalog';
       rumors: []
     };
   }
-
-
-  export function normalizeHpDelta(rawHp: number, currentHp: number): number {
-    // Négatif = dégâts (delta clair)
-    if (rawHp < 0) return rawHp;
-    // Positif > 50 : probablement une valeur absolue envoyée par erreur → convertir en delta
-    if (rawHp > 50) return rawHp - currentHp;
-    // Petit positif (1–50) : soin delta
-    return rawHp;
+  export function normalizeHpDelta(rawHp: number): number {
+    return Math.max(-100, Math.min(100, Math.round(rawHp)));
   }
 
-  export function normalizeCreditsDelta(rawCredits: number, currentCredits: number): number {
-    // Négatif = dépense (delta clair)
-    if (rawCredits < 0) return rawCredits;
-    // Très grand positif proche du solde actuel → probablement un snapshot absolu → delta
-    const ratio = currentCredits > 0 ? rawCredits / currentCredits : 2;
-    if (ratio >= 0.5 && ratio <= 1.8 && rawCredits > 200) return rawCredits - currentCredits;
-    // Sinon : traiter comme delta de gain
-    return rawCredits;
+  export function normalizeCreditsDelta(rawCredits: number): number {
+    return Number.isFinite(rawCredits) ? Math.round(rawCredits) : 0;
   }
 
   export function applyStateUpdateToWorldState(sourceState: WorldState, chapter: StoryChapter): WorldState {
     const upd = chapter.state_update;
     const p = sourceState.player;
 
-    const hpDelta = typeof upd?.hp === 'number' ? normalizeHpDelta(upd.hp, p.hp) : undefined;
-    const creditsDelta = typeof upd?.credits === 'number' ? normalizeCreditsDelta(upd.credits, p.credits) : undefined;
+    const hpDelta = typeof upd?.hp === 'number' ? normalizeHpDelta(upd.hp) : undefined;
+    const creditsDelta = typeof upd?.credits === 'number' ? normalizeCreditsDelta(upd.credits) : undefined;
 
     const inferredLocation = inferLocationFromChapter(chapter);
     const requestedLocationRaw = String(upd?.location || '').trim();
@@ -396,12 +397,16 @@ import { FACTION_CREDITS, ERA_START_DATES } from '$lib/editor/setupCatalog';
     for (const npcUpd of upd?.npcs ?? []) {
       const idx = npcs.findIndex(n => n.name.toLowerCase() === npcUpd.name.toLowerCase());
       if (idx >= 0) {
+        const lifeState = synchronizeNpcLifeState(
+          (npcUpd.status as NpcRelation['status'] | undefined) ?? npcs[idx].status,
+          npcUpd.alive ?? npcs[idx].alive
+        );
         // Normal update
         npcs[idx] = {
           ...npcs[idx],
           ...npcUpd,
-          status: normalizeNpcStatus((npcUpd.status as NpcRelation['status'] | undefined) ?? npcs[idx].status),
-          alive: npcUpd.alive ?? npcs[idx].alive
+          status: lifeState.status,
+          alive: lifeState.alive
         } as NpcRelation;
       } else {
         // Check if this is a "name reveal" of an existing generic/anonymous NPC
@@ -411,21 +416,29 @@ import { FACTION_CREDITS, ERA_START_DATES } from '$lib/editor/setupCatalog';
           Math.abs((n.affinity ?? 0) - newAff) <= 30
         );
         if (genericIdx >= 0) {
+          const lifeState = synchronizeNpcLifeState(
+            (npcUpd.status as NpcRelation['status'] | undefined) ?? npcs[genericIdx].status,
+            npcUpd.alive ?? npcs[genericIdx].alive
+          );
           // Merge: rename the generic NPC entry instead of creating a duplicate
           npcs[genericIdx] = {
             ...npcs[genericIdx],
             ...npcUpd,
-            status: normalizeNpcStatus((npcUpd.status as NpcRelation['status'] | undefined) ?? npcs[genericIdx].status),
-            alive: npcUpd.alive ?? npcs[genericIdx].alive
+            status: lifeState.status,
+            alive: lifeState.alive
           } as NpcRelation;
         } else {
+          const lifeState = synchronizeNpcLifeState(
+            npcUpd.status as NpcRelation['status'] | undefined,
+            npcUpd.alive
+          );
           npcs.push({
             name: npcUpd.name,
             affinity: npcUpd.affinity ?? 0,
-            status: normalizeNpcStatus(npcUpd.status as NpcRelation['status'] | undefined),
+            status: lifeState.status,
             faction: npcUpd.faction,
             last_seen: npcUpd.last_seen,
-            alive: npcUpd.alive !== false,
+            alive: lifeState.alive,
             note: npcUpd.note
           });
         }
@@ -487,9 +500,13 @@ import { FACTION_CREDITS, ERA_START_DATES } from '$lib/editor/setupCatalog';
         }
       }
 
-      if (typeof npc.affinity === 'number') {
+      if (typeof npc.affinity === 'number' && npc.alive !== false) {
         npc.status = deriveStatusFromAffinity(npc.affinity, npc.status);
       }
+
+      const lifeState = synchronizeNpcLifeState(npc.status, npc.alive);
+      npc.status = lifeState.status;
+      npc.alive = lifeState.alive;
     }
 
     // Factions: apply deltas, clamp -100..100
@@ -520,7 +537,7 @@ import { FACTION_CREDITS, ERA_START_DATES } from '$lib/editor/setupCatalog';
     const truncatedRumors = [...new Set(rumors)].slice(0, 5);
 
     const environment_status = upd?.environment_status !== undefined ? upd.environment_status : sourceState.environment_status;
-    const director_instruction = upd?.director_instruction !== undefined ? upd.director_instruction : undefined;
+    const director_instruction = upd?.director_instruction !== undefined ? upd.director_instruction : sourceState.director_instruction;
 
     // Chronology entry
     const chronology = [
@@ -545,13 +562,82 @@ import { FACTION_CREDITS, ERA_START_DATES } from '$lib/editor/setupCatalog';
       director_instruction
     };
   }
+  function isFiniteNumber(value: unknown): value is number {
+    return typeof value === 'number' && Number.isFinite(value);
+  }
 
+  function isPlainRecord(value: unknown): value is Record<string, unknown> {
+    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  function isValidInjuryEntry(value: unknown): boolean {
+    if (!isPlainRecord(value)) return false;
+    return typeof value.description === 'string'
+      && value.description.trim().length > 0
+      && ['light', 'moderate', 'severe'].includes(String(value.severity || '').toLowerCase());
+  }
+
+  function isValidInventoryEntry(value: unknown): boolean {
+    if (!isPlainRecord(value)) return false;
+    return typeof value.name === 'string'
+      && value.name.trim().length > 0
+      && isFiniteNumber(value.qty);
+  }
+
+  function isValidNpcEntry(value: unknown): boolean {
+    if (!isPlainRecord(value)) return false;
+    return typeof value.name === 'string'
+      && value.name.trim().length > 0
+      && isFiniteNumber(value.affinity)
+      && typeof value.alive === 'boolean'
+      && ['ally', 'neutral', 'hostile', 'dead', 'unknown'].includes(String(value.status || '').toLowerCase());
+  }
+
+  function isValidChronologyEntry(value: unknown): boolean {
+    if (!isPlainRecord(value)) return false;
+    return isFiniteNumber(value.chapter)
+      && typeof value.date === 'string'
+      && value.date.trim().length > 0
+      && typeof value.location === 'string'
+      && value.location.trim().length > 0
+      && typeof value.summary === 'string'
+      && value.summary.trim().length > 0;
+  }
+
+  function isValidNumericRecord(value: unknown): boolean {
+    if (!isPlainRecord(value)) return false;
+    return Object.values(value).every(entry => isFiniteNumber(entry));
+  }
+
+  function isValidClocksRecord(value: unknown): boolean {
+    if (!isPlainRecord(value)) return false;
+    return Object.values(value).every(entry =>
+      isPlainRecord(entry)
+      && isFiniteNumber(entry.current)
+      && isFiniteNumber(entry.max)
+    );
+  }
 
   export function worldStateNeedsRepair(candidate: WorldState | null | undefined): boolean {
     if (!candidate) return true;
-    if (isUnknownLocationValue(candidate.player?.location)) return true;
-    if (!candidate.npcs?.length) return true;
-    if (!candidate.chronology?.length) return true;
+    if (!isPlainRecord(candidate.player)) return true;
+
+    const player = candidate.player;
+    if (!isFiniteNumber(player.hp) || !isFiniteNumber(player.credits)) return true;
+    if (typeof player.location !== 'string' || !player.location.trim()) return true;
+    if (typeof player.date !== 'string' || !player.date.trim()) return true;
+    if (!Array.isArray(player.injuries) || !player.injuries.every(isValidInjuryEntry)) return true;
+    if (!Array.isArray(player.inventory) || !player.inventory.every(isValidInventoryEntry)) return true;
+
+    if (!Array.isArray(candidate.npcs) || !candidate.npcs.every(isValidNpcEntry)) return true;
+    if (!isValidNumericRecord(candidate.factions)) return true;
+    if (!Array.isArray(candidate.chronology) || !candidate.chronology.every(isValidChronologyEntry)) return true;
+    if (candidate.clocks !== undefined && !isValidClocksRecord(candidate.clocks)) return true;
+    if (candidate.sector_influence !== undefined && !isValidNumericRecord(candidate.sector_influence)) return true;
+    if (candidate.rumors !== undefined && (!Array.isArray(candidate.rumors) || !candidate.rumors.every(item => typeof item === 'string'))) return true;
+    if (candidate.environment_status !== undefined && typeof candidate.environment_status !== 'string') return true;
+    if (candidate.director_instruction !== undefined && typeof candidate.director_instruction !== 'string') return true;
+
     return false;
   }
 

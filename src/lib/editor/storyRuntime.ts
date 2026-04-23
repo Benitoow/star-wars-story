@@ -4,7 +4,7 @@ import type {
   StoryChapter,
   WorldState
 } from '$lib/ai/storyEngine';
-import { summarizeChapterForPrompt } from '$lib/ai/storyEngine';
+import { normalizeStoryGenerationMode, summarizeChapterForPrompt } from '$lib/ai/storyEngine';
 import type { StorySetup } from '$lib/stores/editor';
 import type { LoggedBackgroundEvent } from './interactiveSession';
 import { planDialogueDisplay, sanitizeNarrativeTextForDisplay } from './narrativeGuardrails';
@@ -23,6 +23,7 @@ export const ARCHIVE_TRIGGER_TURN = 30;
 export const KEEP_RAW_TURNS = 20;
 export const MAX_BACKGROUND_EVENTS = 24;
 export const INTENSE_SECTION_TYPES = new Set(['action', 'confrontation']);
+const STRUCTURED_JSON_MODE = 'structured-json';
 
 function cleanText(value: unknown, maxLength = 240): string {
   if (value === null || value === undefined) return '';
@@ -320,4 +321,39 @@ export function buildAssistantTranscript(chapter: StoryChapter): string {
     narrative,
     choices ? `Choix:\n${choices}` : ''
   ].filter(Boolean).join('\n\n');
+}
+
+export function buildStoredAssistantContent(
+  chapter: StoryChapter,
+  runtimeMode: string | null | undefined,
+  rawResponse?: string | null
+): string {
+  if (normalizeStoryGenerationMode(runtimeMode) === STRUCTURED_JSON_MODE) {
+    return cleanText(rawResponse, 24000) || JSON.stringify(chapter);
+  }
+
+  return buildAssistantTranscript(chapter);
+}
+
+export function describeStoryOrchestration(runtimeMode: string | null | undefined): {
+  isSubagentOrchestration: boolean;
+  summaryLabel: string;
+  chipTag: string;
+  chipTitle: string;
+} {
+  if (normalizeStoryGenerationMode(runtimeMode) === STRUCTURED_JSON_MODE) {
+    return {
+      isSubagentOrchestration: false,
+      summaryLabel: 'sortie JSON directe',
+      chipTag: 'JSON',
+      chipTitle: 'Dernier tour généré en sortie JSON directe'
+    };
+  }
+
+  return {
+    isSubagentOrchestration: true,
+    summaryLabel: 'orchestration à sous-agents',
+    chipTag: '4A',
+    chipTitle: 'Dernier tour généré via orchestration à quatre sous-agents'
+  };
 }

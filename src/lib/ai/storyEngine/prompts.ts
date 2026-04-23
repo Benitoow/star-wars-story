@@ -28,6 +28,24 @@ const ERA_CONTEXT: Record<string, string> = {
 };
 
 const ACTION_HEAVY: SectionType[] = ['action', 'confrontation'];
+const CANONICAL_PLAYER_ACTION_PATTERNS = [
+  /ACTION JOUEUR CANONIQUE:\s*([^\n]+)/i,
+  /\bTour\s+\d+\.\s+Action:\s*"([^"]+)"/i,
+  /\bAction:\s*"([^"]+)"/i
+] as const;
+
+function extractCanonicalPlayerAction(content: string): string {
+  const cleaned = cleanText(content, 1200);
+  if (!cleaned) return '';
+
+  for (const pattern of CANONICAL_PLAYER_ACTION_PATTERNS) {
+    const match = cleaned.match(pattern);
+    const captured = cleanText(match?.[1], 240);
+    if (captured) return captured;
+  }
+
+  return cleanText(cleaned, 240);
+}
 
 export const STORY_PIPELINE_SCRIBE_SYSTEM_PROMPT = `Tu es le SCRIBE de continuité d'une campagne Star Wars.
 Ta mission est la synthèse factuelle, pas la narration.
@@ -36,6 +54,15 @@ Règles absolues:
 - Conserve uniquement: situation actuelle, personnages présents, tension immédiate.
 - Ne pas inventer de faits.
 - Pas de JSON, pas de markdown, pas de liste, texte brut uniquement.`;
+
+export const STORY_PIPELINE_DIRECTOR_SYSTEM_PROMPT = `Tu es le DIRECTEUR de scène d'une campagne Star Wars.
+Tu répartis le travail pour les autres agents.
+Règles absolues:
+- Réponds uniquement avec un objet JSON valide.
+- Pas de prose hors JSON.
+- Tu transformes l'action du joueur en brief de scène exécutable, concret et court.
+- Tu imposes au moins 1 signal monde à produire dans le tour.
+- Tu n'inventes ni résolution complète ni choix joueur finaux.`;
 
 export const STORY_PIPELINE_WRITER_SYSTEM_PROMPT = `Tu es l'ÉCRIVAIN narratif d'une campagne Star Wars.
 Tu écris une prose cinématique, claire et immersive.
@@ -63,7 +90,10 @@ function formatPipelineMessageHistory(messages: ChatMessage[], limit = 14): stri
     .slice(-limit)
     .map(message => {
       const label = message.role === 'assistant' ? 'Narrateur' : 'Joueur';
-      return `${label}: ${cleanText(message.content, 420)}`;
+      const content = message.role === 'assistant'
+        ? cleanText(message.content, 420)
+        : extractCanonicalPlayerAction(message.content);
+      return `${label}: ${content}`;
     })
     .filter(Boolean);
 
@@ -77,7 +107,7 @@ export function buildPipelineScribeUserPrompt(messages: ChatMessage[], turnNumbe
   ) || '(contexte système indisponible)';
   const historyBlock = formatPipelineMessageHistory(messages, 16);
   const latestUserAction = cleanText(
-    [...messages].reverse().find(message => message.role === 'user')?.content,
+    extractCanonicalPlayerAction([...messages].reverse().find(message => message.role === 'user')?.content || ''),
     320
   ) || '(action joueur indisponible)';
 
@@ -102,13 +132,112 @@ ${cleanText(scribeSummary, 1500)}
 Écris la suite immédiate de la scène en 2 à 3 paragraphes, avec une prose Star Wars forte (action, ambiance, dialogue).`;
 }
 
-export function buildPipelineBrainUserPrompt(writerScene: string): string {
+export function buildPipelineDirectorUserPrompt(
+  scribeSummary: string,
+  playerAction: string,
+  turnNumber: number
+): string {
+  return `Tour ${turnNumber}. Résumé validé de la situation:
+${cleanText(scribeSummary, 1200)}
+
+ACTION JOUEUR CANONIQUE:
+${cleanText(playerAction, 240)}
+
+Réponds EXCLUSIVEMENT en JSON strict avec ce contrat:
+{
+  "player_action": "reformulation courte et fidèle",
+  "scene_goal": "but dramatique immédiat de la scène",
+  "tension": "pression ou menace immédiate",
+  "must_include": ["2 à 4 éléments concrets à montrer"],
+  "required_world_signals": ["location|npc|factions|hp|credits|injury|inventory"],
+  "section_type": "action|dialogue|exploration|tension|revelation|repos|interlude|confrontation",
+  "atmosphere": "tense|calm|mysterious|eerie|heroic"
+}
+
+Contraintes:
+- "player_action" doit rester très proche de l'action du joueur.
+- "must_include" = détails visuels/comportementaux, pas des abstractions creuses.
+- "required_world_signals" doit contenir au moins un signal monde réellement exploitable.`;
+}
+
+export function buildPipelineWriterUserPromptWithDirector(
+  scribeSummary: string,
+  directorBrief: {
+    player_action: string;
+    scene_goal: string;
+    tension: string;
+    must_include: string[];
+    required_world_signals: string[];
+    section_type?: string;
+    atmosphere?: string;
+  }
+): string {
+  const mustInclude = directorBrief.must_include.length
+    ? directorBrief.must_include.map(item => `- ${cleanText(item, 100)}`).join('\n')
+    : '- Montrer une conséquence immédiate de l’action du joueur';
+
+  const worldSignals = directorBrief.required_world_signals.length
+    ? directorBrief.required_world_signals.map(item => `- ${cleanText(item, 40)}`).join('\n')
+    : '- location';
+
+  return `Résumé validé de la situation:
+${cleanText(scribeSummary, 1200)}
+
+BRIEF DU DIRECTEUR:
+- Action joueur: ${cleanText(directorBrief.player_action, 200)}
+- But de scène: ${cleanText(directorBrief.scene_goal, 200)}
+- Tension: ${cleanText(directorBrief.tension, 200)}
+- Section visée: ${cleanText(directorBrief.section_type, 40) || 'action'}
+- Atmosphère: ${cleanText(directorBrief.atmosphere, 40) || 'tense'}
+
+Éléments obligatoires:
+${mustInclude}
+
+Signaux monde à rendre exploitables:
+${worldSignals}
+
+ACTION À RENDRE (NON NÉGOCIABLE):
+${cleanText(directorBrief.player_action, 240)}
+
+Écris la scène maintenant.
+Contraintes:
+- 2 à 3 paragraphes maximum.
+- La première impulsion de la scène doit montrer la conséquence directe de l'action joueur.
+- Si l'action est impossible, traite-la comme tentative crédible et montre un résultat concret (coût, échec partiel, opportunité, blessure, dette, révélation).
+- Action et narration dans la prose.
+- Les dialogues vont dans des répliques séparées au format "Nom : réplique".
+- Pas de choix, pas de JSON, pas de markdown.`;
+}
+
+export function buildPipelineBrainUserPrompt(
+  writerScene: string,
+  directorBrief?: {
+    player_action?: string;
+    required_world_signals?: string[];
+    section_type?: string;
+    atmosphere?: string;
+  }
+): string {
+  const expectedPlayerAction = cleanText(directorBrief?.player_action, 240);
+  const playerActionBlock = expectedPlayerAction
+    ? `\nACTION JOUEUR APPLIQUÉE (référence canonique):\n${expectedPlayerAction}`
+    : '';
+  const requiredSignals = directorBrief?.required_world_signals?.length
+    ? `\nSIGNAUX MONDE ATTENDUS:\n${directorBrief.required_world_signals.map(item => `- ${cleanText(item, 40)}`).join('\n')}`
+    : '';
+
+  const expectedSectionType = cleanText(directorBrief?.section_type, 40);
+  const expectedAtmosphere = cleanText(directorBrief?.atmosphere, 40);
+
   return `Voici la scène qui vient de se dérouler:
-${cleanText(writerScene, 2800)}
+${cleanText(writerScene, 2800)}${playerActionBlock}${requiredSignals}
 
 Déduis-en les conséquences mécaniques et propose 3 choix pour la suite.
 Réponds EXCLUSIVEMENT en JSON strict (sans markdown) avec ce contrat:
 {
+  "chapter_title": "",
+  "section_type": "${expectedSectionType || 'action'}",
+  "atmosphere": "${expectedAtmosphere || 'tense'}",
   "state_update": {
     "hp": 0,
     "credits": 0,
@@ -136,6 +265,8 @@ Réponds EXCLUSIVEMENT en JSON strict (sans markdown) avec ce contrat:
 Contraintes:
 - 3 ou 4 choices concrets, distincts, sans doublons de texte.
 - Évite que tous les choices aient le même attribute.
+- Les choices doivent découler de la conséquence directe de l'action joueur ci-dessus.
+- "section_type" et "atmosphere" doivent coller à la scène réellement écrite.
 - Les champs non pertinents peuvent être omis.`;
 }
 
@@ -271,6 +402,8 @@ export function buildStartPrompt(
 
   return `Lance une histoire interactive Star Wars avec un prologue immédiatement jouable.
 
+ACTION JOUEUR CANONIQUE: Entrer dans la scène d'ouverture et survivre aux premières secondes.
+
 CADRE D'OUVERTURE:
 - Protagoniste: ${displayName}
 - Ère: ${setup.era || 'inconnue'} — ${eraContext}
@@ -335,7 +468,10 @@ export function buildContinuePrompt(
 
   const anchorBlock = sceneAnchor ? `${sceneAnchor}\n\n` : '';
 
-  return `${anchorBlock}Tour ${turnNumber}. Action: "${cleanText(actionText, 280)}".${history}${recentChoicesBlock}${pacingDirective}
+  return `${anchorBlock}ACTION JOUEUR CANONIQUE: ${cleanText(actionText, 280)}
+OBLIGATION: la scène suivante doit traiter cette action comme cause immédiate (ou tentative avec conséquence concrète).
+
+Tour ${turnNumber}. Action: "${cleanText(actionText, 280)}".${history}${recentChoicesBlock}${pacingDirective}
 
 Écris une scène forte et précise — conséquences réelles, PNJs avec mémoire et intention propre.
 Ne mets aucun markdown, aucun titre interne et aucun bloc de choix dans le récit.

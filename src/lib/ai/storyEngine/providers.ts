@@ -1,15 +1,14 @@
-import { logger } from '$lib/utils/logger';
+import { recordDiagnosticEvent } from '$lib/utils/logger';
 import {
   AGENTIC_TOOL_CALLING_PROVIDER_IDS,
-  DEFAULT_OLLAMA_URL,
   DEFAULT_TEXT_MODELS,
   DEFAULT_TEXT_PROVIDER_ID,
   OPENAI_COMPATIBLE_BASE_URLS,
   getProviderDisplayName as getProviderDisplayNameFromConfig,
   normalizeTextProviderId
 } from '$lib/config/providers';
+import { assertSupportedStoryProviderConfig } from './contracts';
 import type { ChatMessage, StoryProviderConfig } from './types';
-import { parseJsonSafely } from './parsing';
 
 function cleanText(value: unknown, maxLength = 2200): string {
   if (value === null || value === undefined) return '';
@@ -253,6 +252,12 @@ type OpenAiMessage = {
   reasoning_details?: OpenAiReasoningDetail[];
 };
 
+export interface TextGenerationOptions {
+  maxTokens?: number;
+  temperature?: number;
+  skipReasoning?: boolean;
+}
+
 function toOpenAiMessageList(messages: ChatMessage[]): OpenAiMessage[] {
   return messages.map(message => ({ role: message.role, content: message.content }));
 }
@@ -275,25 +280,26 @@ export async function callOpenAiCompatibleRaw(
     responseFormat?: OpenAiResponseFormat;
   } = {}
 ): Promise<OpenAiMessage> {
-  const baseUrl = OPENAI_COMPATIBLE_BASE_URLS[config.providerId];
-  if (!baseUrl) throw new Error(`Provider non supporté: ${config.providerId}`);
+  const normalizedConfig = assertSupportedStoryProviderConfig(config);
+  const baseUrl = OPENAI_COMPATIBLE_BASE_URLS[normalizedConfig.providerId];
+  if (!baseUrl) throw new Error(`Provider non supporté: ${normalizedConfig.providerId}`);
 
-  ensureApiKey(config.providerId, config.apiKey);
+  ensureApiKey(normalizedConfig.providerId, normalizedConfig.apiKey);
 
   const headers: Record<string, string> = {
-    Authorization: `Bearer ${String(config.apiKey || '').trim()}`,
+    Authorization: `Bearer ${String(normalizedConfig.apiKey || '').trim()}`,
     'Content-Type': 'application/json'
   };
 
-  if (config.providerId === 'openrouter') {
-    const referer = typeof window !== 'undefined' ? window.location.href : 'https://localhost';
+  if (normalizedConfig.providerId === 'openrouter') {
+    const referer = typeof window !== 'undefined' ? window.location.origin : 'https://localhost';
     headers['HTTP-Referer'] = referer;
     headers['X-OpenRouter-Title'] = 'Star Wars Story Manager';
     headers['X-Title'] = 'Star Wars Story Manager';
   }
 
-  const caps = detectModelCapabilities(config);
-  const modelId = resolveModel(config);
+  const caps = detectModelCapabilities(normalizedConfig);
+  const modelId = resolveModel(normalizedConfig);
   const timeoutMs = getOpenAiCompatibleTimeoutMs(caps);
   const body: Record<string, unknown> = {
     model: modelId,
@@ -302,12 +308,12 @@ export async function callOpenAiCompatibleRaw(
     temperature: options.temperature ?? caps.idealTemperature
   };
 
-  if (config.providerId === 'openrouter') {
+  if (normalizedConfig.providerId === 'openrouter') {
     const providerPreferences = getOpenRouterProviderPreferences(modelId);
     if (providerPreferences) body.provider = providerPreferences;
   }
 
-  const reasoningPayload = buildReasoningPayload(caps, config.providerId, modelId, options.skipReasoning === true);
+  const reasoningPayload = buildReasoningPayload(caps, normalizedConfig.providerId, modelId, options.skipReasoning === true);
   if (reasoningPayload) {
     body.reasoning = reasoningPayload;
   }
@@ -324,6 +330,23 @@ export async function callOpenAiCompatibleRaw(
   const { controller, cancel } = withTimeoutSignal(timeoutMs);
 
   try {
+    recordDiagnosticEvent({
+      level: 'info',
+      category: 'provider-request',
+      stage: 'openrouter-chat-completions',
+      message: 'Appel provider texte.',
+      providerId: normalizedConfig.providerId,
+      model: modelId,
+      validation: 'passed',
+      meta: {
+        messageCount: messages.length,
+        maxTokens: body.max_tokens,
+        temperature: body.temperature,
+        reasoning: body.reasoning,
+        hasTools: Array.isArray(options.tools) && options.tools.length > 0
+      }
+    });
+
     const response = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers,
@@ -333,117 +356,94 @@ export async function callOpenAiCompatibleRaw(
 
     if (!response.ok) {
       const message = await parseErrorMessage(response);
-      throw new Error(`${getProviderDisplayName(config.providerId)}: ${message}`);
+      recordDiagnosticEvent({
+        level: 'error',
+        category: 'provider-response',
+        stage: 'openrouter-chat-completions',
+        message: 'Le provider texte a répondu en erreur.',
+        providerId: normalizedConfig.providerId,
+        model: modelId,
+        validation: 'failed',
+        meta: {
+          status: response.status,
+          providerMessage: message
+        }
+      });
+      throw new Error(`${getProviderDisplayName(normalizedConfig.providerId)}: ${message}`);
     }
 
     const data = await response.json() as { choices?: Array<{ message?: OpenAiMessage }> };
     const message = data.choices?.[0]?.message;
     const hasContent = Boolean(cleanText(message?.content, 16000));
     const hasToolCalls = Array.isArray(message?.tool_calls) && message.tool_calls.length > 0;
-    const hasReasoning = Boolean(
-      cleanText(message?.reasoning, 2000) ||
-      cleanText(message?.reasoning_content, 2000) ||
-      (Array.isArray(message?.reasoning_details) && message.reasoning_details.length)
-    );
-
-    if (!message || (!hasContent && !hasToolCalls && !hasReasoning)) {
-      throw new Error(`${getProviderDisplayName(config.providerId)}: réponse vide ou incomplète du provider.`);
+    if (!message || (!hasContent && !hasToolCalls)) {
+      recordDiagnosticEvent({
+        level: 'error',
+        category: 'provider-response',
+        stage: 'openrouter-chat-completions',
+        message: 'Réponse provider vide ou incomplète.',
+        providerId: normalizedConfig.providerId,
+        model: modelId,
+        validation: 'failed',
+        meta: data
+      });
+      throw new Error(`${getProviderDisplayName(normalizedConfig.providerId)}: réponse vide ou incomplète du provider.`);
     }
 
-    return message;
+    recordDiagnosticEvent({
+      level: 'info',
+      category: 'provider-response',
+      stage: 'openrouter-chat-completions',
+      message: 'Réponse provider validée.',
+      providerId: normalizedConfig.providerId,
+      model: modelId,
+      validation: 'passed',
+      meta: {
+        hasContent,
+        toolCalls: message.tool_calls?.length || 0,
+        content: message.content || ''
+      }
+    });
+
+    return {
+      ...message,
+      content: cleanText(message.content, 16000) || undefined
+    };
+  } catch (error) {
+    if (isAbortError(error)) {
+      recordDiagnosticEvent({
+        level: 'error',
+        category: 'provider-timeout',
+        stage: 'openrouter-chat-completions',
+        message: 'Le provider texte a dépassé le délai.',
+        providerId: normalizedConfig.providerId,
+        model: modelId,
+        validation: 'failed',
+        meta: { timeoutMs }
+      });
+    }
+    throw error;
   } finally {
     cancel();
   }
 }
 
-async function callOpenAiCompatible(messages: ChatMessage[], config: StoryProviderConfig): Promise<string> {
-  const message = await callOpenAiCompatibleRaw(toOpenAiMessageList(messages), config);
+async function callOpenAiCompatible(
+  messages: ChatMessage[],
+  config: StoryProviderConfig,
+  options: TextGenerationOptions = {}
+): Promise<string> {
+  const message = await callOpenAiCompatibleRaw(toOpenAiMessageList(messages), config, options);
   return cleanText(message.content, 12000);
 }
 
-async function callAnthropic(messages: ChatMessage[], config: StoryProviderConfig): Promise<string> {
-  ensureApiKey(config.providerId, config.apiKey);
-
-  const systemMessage = messages.find(message => message.role === 'system');
-  const conversation = messages.filter(message => message.role !== 'system').map(message => ({ role: message.role, content: message.content }));
-  const caps = detectModelCapabilities(config);
-  const body: Record<string, unknown> = { model: resolveModel(config), max_tokens: caps.maxOutputTokens, messages: conversation };
-
-  if (caps.reasoningStyle === 'anthropic-thinking') {
-    const thinkingBudget = caps.tier === 'large' ? 8000 : 5000;
-    body.thinking = { type: 'enabled', budget_tokens: thinkingBudget };
-    body.temperature = 1;
-  } else {
-    body.temperature = caps.idealTemperature;
-  }
-
-  if (systemMessage?.content) body.system = systemMessage.content;
-
-  const { controller, cancel } = withTimeoutSignal(50000);
-  try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': String(config.apiKey || '').trim(),
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(body),
-      signal: controller.signal
-    });
-
-    if (!response.ok) {
-      const message = await parseErrorMessage(response);
-      throw new Error(`Anthropic: ${message}`);
-    }
-
-    const data = await response.json() as { content?: Array<{ type?: string; text?: string }> };
-    const textBlock = data.content?.find(b => b.type === 'text');
-    return textBlock?.text || data.content?.[0]?.text || '';
-  } finally {
-    cancel();
-  }
-}
-
-async function callOllama(messages: ChatMessage[], config: StoryProviderConfig): Promise<string> {
-  const baseUrl = cleanText(config.ollamaUrl, 200) || DEFAULT_OLLAMA_URL;
-  const normalizedBaseUrl = baseUrl.replace(/\/+$/, '');
-
-  const body = { model: resolveModel(config), messages, stream: false, options: { temperature: 0.9 } };
-  const { controller, cancel } = withTimeoutSignal(50000);
-
-  try {
-    const response = await fetch(`${normalizedBaseUrl}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: controller.signal
-    });
-
-    if (!response.ok) {
-      const message = await parseErrorMessage(response);
-      throw new Error(`Ollama: ${message}`);
-    }
-
-    const data = await response.json() as { message?: { content?: string }; response?: string };
-    return data.message?.content || data.response || '';
-  } finally {
-    cancel();
-  }
-}
-
-export async function callTextModel(messages: ChatMessage[], config: StoryProviderConfig): Promise<string> {
-  const providerId = normalizeProviderId(config.providerId);
-  const normalizedConfig = providerId === config.providerId ? config : { ...config, providerId };
-
-  if (!providerId || providerId === 'none') {
-    throw new Error('Aucun provider texte sélectionné.');
-  }
-
-  if (providerId === 'anthropic') return callAnthropic(messages, normalizedConfig);
-  if (providerId === 'ollama') return callOllama(messages, normalizedConfig);
-  return callOpenAiCompatible(messages, normalizedConfig);
+export async function callTextModel(
+  messages: ChatMessage[],
+  config: StoryProviderConfig,
+  options: TextGenerationOptions = {}
+): Promise<string> {
+  const normalizedConfig = assertSupportedStoryProviderConfig(config);
+  return callOpenAiCompatible(messages, normalizedConfig, options);
 }
 
 export function supportsAgenticToolCalling(providerId: string | undefined, model?: string): boolean {

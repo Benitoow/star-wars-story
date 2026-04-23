@@ -4,8 +4,14 @@ import type {
   StoryChapter,
   WorldState
 } from '$lib/ai/storyEngine';
+import {
+  normalizeStoryGenerationMode,
+  validateStoryChapter
+} from '$lib/ai/storyEngine';
+import { recordDiagnosticEvent } from '$lib/utils/logger';
 
 const INTERACTIVE_SESSION_PREFIX = 'sw_svelte_interactive_story_';
+export const INTERACTIVE_SESSION_VERSION = 2;
 
 export interface LoggedBackgroundEvent {
   id: string;
@@ -18,9 +24,10 @@ export interface LoggedBackgroundEvent {
 }
 
 export interface InteractiveSessionPayload {
-  version: 1;
+  version: 2;
   turnNumber: number;
   selectedTrame: string | null;
+  storyRuntimeMode?: string | null;
   currentChapter: StoryChapter | null;
   chapterHistory: StoryChapter[];
   actionHistory: string[];
@@ -36,9 +43,184 @@ function storySessionKey(id: string): string {
   return `${INTERACTIVE_SESSION_PREFIX}${id}`;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function sanitizeStringArray(values: unknown): string[] {
+  if (!Array.isArray(values)) return [];
+  return values.filter((value): value is string => typeof value === 'string');
+}
+
+function sanitizeNumericRecord(values: unknown): Record<string, number> {
+  if (!isRecord(values)) return {};
+
+  const entries = Object.entries(values).filter(
+    (entry): entry is [string, number] => typeof entry[0] === 'string' && typeof entry[1] === 'number' && Number.isFinite(entry[1])
+  );
+
+  return Object.fromEntries(entries);
+}
+
+function sanitizeClocks(values: unknown): NonNullable<WorldState['clocks']> {
+  if (!isRecord(values)) return {};
+
+  const entries = Object.entries(values).flatMap(([key, clock]) => {
+    if (!isRecord(clock)) return [];
+    const current = typeof clock.current === 'number' && Number.isFinite(clock.current) ? clock.current : null;
+    const max = typeof clock.max === 'number' && Number.isFinite(clock.max) ? clock.max : null;
+    if (current === null || max === null) return [];
+    return [[key, { current, max }] as const];
+  });
+
+  return Object.fromEntries(entries);
+}
+
+function sanitizeChronology(values: unknown): WorldState['chronology'] {
+  if (!Array.isArray(values)) return [];
+
+  return values.flatMap(value => {
+    if (!isRecord(value)) return [];
+    const chapter = typeof value.chapter === 'number' && Number.isFinite(value.chapter) ? value.chapter : null;
+    const date = typeof value.date === 'string' ? value.date : '';
+    const location = typeof value.location === 'string' ? value.location : '';
+    const summary = typeof value.summary === 'string' ? value.summary : '';
+
+    if (chapter === null || !date || !location || !summary) return [];
+
+    return [{ chapter, date, location, summary }];
+  });
+}
+
+function sanitizeBackgroundEvents(values: unknown): LoggedBackgroundEvent[] {
+  if (!Array.isArray(values)) return [];
+
+  return values.flatMap(value => {
+    if (!isRecord(value)) return [];
+
+    const title = typeof value.title === 'string' ? value.title : '';
+    const summary = typeof value.summary === 'string' ? value.summary : '';
+    if (!title && !summary) return [];
+
+    return [{
+      id: typeof value.id === 'string' && value.id ? value.id : `legacy-bg-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      turn: typeof value.turn === 'number' && Number.isFinite(value.turn) ? value.turn : 0,
+      title,
+      summary,
+      promptHook: typeof value.promptHook === 'string' ? value.promptHook : undefined,
+      privateSummary: typeof value.privateSummary === 'string' ? value.privateSummary : undefined,
+      visibleNow: typeof value.visibleNow === 'boolean' ? value.visibleNow : true
+    }];
+  });
+}
+
+function sanitizeChatMessages(values: unknown): ChatMessage[] {
+  if (!Array.isArray(values)) return [];
+
+  return values.flatMap(value => {
+    if (!isRecord(value)) return [];
+    if (value.role !== 'system' && value.role !== 'user' && value.role !== 'assistant') return [];
+    if (typeof value.content !== 'string') return [];
+    return [{ role: value.role, content: value.content }];
+  });
+}
+
+function sanitizeSetupSnapshot(value: unknown, fallbackSetup: StorySetup): StorySetup {
+  if (!isRecord(value)) return fallbackSetup;
+
+  const setup = {
+    ...fallbackSetup,
+    era: typeof value.era === 'string' && value.era ? value.era : fallbackSetup.era,
+    faction: typeof value.faction === 'string' && value.faction ? value.faction : fallbackSetup.faction,
+    role: typeof value.role === 'string' && value.role ? value.role : fallbackSetup.role,
+    premise: typeof value.premise === 'string' && value.premise ? value.premise : fallbackSetup.premise,
+    protagonistFirstName: typeof value.protagonistFirstName === 'string' ? value.protagonistFirstName : fallbackSetup.protagonistFirstName,
+    protagonistLastName: typeof value.protagonistLastName === 'string' ? value.protagonistLastName : fallbackSetup.protagonistLastName,
+    protagonistAvatar: typeof value.protagonistAvatar === 'string' ? value.protagonistAvatar : fallbackSetup.protagonistAvatar,
+    writingStyle: typeof value.writingStyle === 'string' ? value.writingStyle : fallbackSetup.writingStyle,
+    writingTone: typeof value.writingTone === 'string' ? value.writingTone : fallbackSetup.writingTone,
+    writingPov: typeof value.writingPov === 'string' ? value.writingPov : fallbackSetup.writingPov,
+    writingLength: typeof value.writingLength === 'string' ? value.writingLength : fallbackSetup.writingLength,
+    contentMode: typeof value.contentMode === 'string' ? value.contentMode : fallbackSetup.contentMode
+  };
+
+  return setup;
+}
+
+function sanitizeStoryChapterValue(value: unknown): StoryChapter | null {
+  try {
+    return validateStoryChapter(value as StoryChapter);
+  } catch {
+    return null;
+  }
+}
+
+function sanitizeStoryChapterArray(values: unknown): StoryChapter[] {
+  if (!Array.isArray(values)) return [];
+  return values.flatMap(value => {
+    const chapter = sanitizeStoryChapterValue(value);
+    return chapter ? [chapter] : [];
+  });
+}
+
+function sanitizeWorldState(value: unknown): WorldState | undefined {
+  if (!isRecord(value) || !isRecord(value.player)) return undefined;
+
+  const playerCandidate = value.player;
+  const hp = typeof playerCandidate.hp === 'number' && Number.isFinite(playerCandidate.hp) ? playerCandidate.hp : null;
+  const credits = typeof playerCandidate.credits === 'number' && Number.isFinite(playerCandidate.credits) ? playerCandidate.credits : null;
+  const location = typeof playerCandidate.location === 'string' ? playerCandidate.location.trim() : '';
+
+  if (hp === null || credits === null || !location) return undefined;
+
+  return {
+    player: {
+      hp,
+      credits,
+      location,
+      date: typeof playerCandidate.date === 'string' ? playerCandidate.date : '',
+      injuries: Array.isArray(playerCandidate.injuries)
+        ? (playerCandidate.injuries as WorldState['player']['injuries'])
+        : [],
+      inventory: Array.isArray(playerCandidate.inventory)
+        ? (playerCandidate.inventory as WorldState['player']['inventory'])
+        : []
+    },
+    npcs: Array.isArray(value.npcs) ? (value.npcs as WorldState['npcs']) : [],
+    factions: sanitizeNumericRecord(value.factions) as WorldState['factions'],
+    chronology: sanitizeChronology(value.chronology),
+    clocks: sanitizeClocks(value.clocks),
+    sector_influence: sanitizeNumericRecord(value.sector_influence) as WorldState['sector_influence'],
+    rumors: sanitizeStringArray(value.rumors),
+    environment_status: typeof value.environment_status === 'string' ? value.environment_status : undefined,
+    director_instruction: typeof value.director_instruction === 'string' ? value.director_instruction : undefined
+  };
+}
+
 export function saveInteractiveSessionPayload(storyId: string | null, payload: InteractiveSessionPayload): void {
   if (!storyId || typeof localStorage === 'undefined') return;
-  localStorage.setItem(storySessionKey(storyId), JSON.stringify(payload));
+  const normalizedPayload: InteractiveSessionPayload = {
+    ...payload,
+    version: INTERACTIVE_SESSION_VERSION,
+    storyRuntimeMode: payload.storyRuntimeMode ? normalizeStoryGenerationMode(payload.storyRuntimeMode) : null,
+    chapterHistory: sanitizeStoryChapterArray(payload.chapterHistory),
+    currentChapter: payload.currentChapter ? sanitizeStoryChapterValue(payload.currentChapter) : null
+  };
+  localStorage.setItem(storySessionKey(storyId), JSON.stringify(normalizedPayload));
+  recordDiagnosticEvent({
+    level: 'info',
+    category: 'interactive-session',
+    stage: 'save',
+    message: 'Session interactive sauvegardée.',
+    sessionId: storyId,
+    runtimeMode: normalizedPayload.storyRuntimeMode || undefined,
+    validation: 'passed',
+    meta: {
+      turnNumber: normalizedPayload.turnNumber,
+      chapterHistory: normalizedPayload.chapterHistory.length,
+      hasWorldState: Boolean(normalizedPayload.worldState)
+    }
+  });
 }
 
 export function loadInteractiveSessionPayload(id: string, fallbackSetup: StorySetup): InteractiveSessionPayload | null {
@@ -49,32 +231,84 @@ export function loadInteractiveSessionPayload(id: string, fallbackSetup: StorySe
 
   try {
     const parsed = JSON.parse(raw) as Partial<InteractiveSessionPayload>;
-    const chapterHistory = Array.isArray(parsed.chapterHistory) ? parsed.chapterHistory : [];
-    const currentChapter = parsed.currentChapter ?? chapterHistory[chapterHistory.length - 1] ?? null;
-    const backgroundEvents = Array.isArray(parsed.backgroundEvents)
-      ? parsed.backgroundEvents.map(event => ({
-          ...event,
-          visibleNow: typeof event?.visibleNow === 'boolean' ? event.visibleNow : true
-        }))
-      : [];
+    const parsedVersion = typeof parsed.version === 'number' ? parsed.version : 1;
+    if (parsedVersion > INTERACTIVE_SESSION_VERSION) {
+      recordDiagnosticEvent({
+        level: 'warn',
+        category: 'interactive-session',
+        stage: 'load',
+        message: 'Version de session trop récente, chargement refusé.',
+        sessionId: id,
+        validation: 'failed',
+        meta: { version: parsedVersion }
+      });
+      return null;
+    }
 
-    return {
-      version: 1,
-      turnNumber: Number(parsed.turnNumber || chapterHistory.length || 0),
+    const chapterHistory = sanitizeStoryChapterArray(parsed.chapterHistory);
+    const currentChapter = sanitizeStoryChapterValue(parsed.currentChapter) ?? chapterHistory[chapterHistory.length - 1] ?? null;
+    const backgroundEvents = sanitizeBackgroundEvents(parsed.backgroundEvents);
+    const storedTurnNumber = typeof parsed.turnNumber === 'number' && Number.isFinite(parsed.turnNumber) && parsed.turnNumber >= 0
+      ? parsed.turnNumber
+      : chapterHistory.length;
+    const worldState = sanitizeWorldState(parsed.worldState);
+    const runtimeMode = parsed.storyRuntimeMode
+      ? normalizeStoryGenerationMode(parsed.storyRuntimeMode)
+      : null;
+
+    if (parsed.worldState && !worldState) {
+      recordDiagnosticEvent({
+        level: 'warn',
+        category: 'interactive-session',
+        stage: 'load',
+        message: 'World state de session rejeté car invalide.',
+        sessionId: id,
+        runtimeMode: runtimeMode || undefined,
+        validation: 'repaired',
+        meta: parsed.worldState
+      });
+    }
+
+    const payload: InteractiveSessionPayload = {
+      version: INTERACTIVE_SESSION_VERSION,
+      turnNumber: storedTurnNumber,
       selectedTrame: typeof parsed.selectedTrame === 'string' ? parsed.selectedTrame : null,
+      storyRuntimeMode: runtimeMode,
       currentChapter,
       chapterHistory,
       actionHistory: Array.isArray(parsed.actionHistory) ? parsed.actionHistory : [],
-      aiMessages: Array.isArray(parsed.aiMessages) ? parsed.aiMessages : [],
-      memoryLog: Array.isArray(parsed.memoryLog) ? parsed.memoryLog : [],
+      aiMessages: sanitizeChatMessages(parsed.aiMessages),
+      memoryLog: sanitizeStringArray(parsed.memoryLog),
       backgroundEvents,
-      setupSnapshot: (parsed.setupSnapshot as StorySetup) || fallbackSetup,
-      worldState: parsed.worldState as WorldState | undefined,
-      campaignArchive: Array.isArray(parsed.campaignArchive)
-        ? parsed.campaignArchive.filter((item): item is string => typeof item === 'string')
-        : []
+      setupSnapshot: sanitizeSetupSnapshot(parsed.setupSnapshot, fallbackSetup),
+      worldState,
+      campaignArchive: sanitizeStringArray(parsed.campaignArchive)
     };
+    recordDiagnosticEvent({
+      level: 'info',
+      category: 'interactive-session',
+      stage: 'load',
+      message: 'Session interactive restaurée.',
+      sessionId: id,
+      runtimeMode: runtimeMode || undefined,
+      validation: 'passed',
+      meta: {
+        version: parsedVersion,
+        turnNumber: payload.turnNumber,
+        chapterHistory: payload.chapterHistory.length,
+        hasWorldState: Boolean(payload.worldState)
+      }
+    });
+    return payload;
   } catch {
+    recordDiagnosticEvent({
+      level: 'error',
+      category: 'interactive-session',
+      stage: 'load',
+      message: 'Session interactive illisible.',
+      sessionId: id,
+      validation: 'failed'
+    });
     return null;
   }
 }
