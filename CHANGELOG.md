@@ -1,5 +1,36 @@
 # Changelog
 
+## v2.6.0 — 2026-04-23
+
+### 📋 Story Engine contracts & validation layer
+
+- Contrats TypeScript (`contracts.ts`) avec validations centralisées :
+  - `normalizeStoryGenerationMode()` — normalisation des modes structuré/agentique
+  - `isPlayableStoryChapter()` — validation des chapitres avec contenu narratif jouable (action/dialogue minimum)
+  - `assertSupportedStoryProviderConfig()` — assertion de configuration provider supportée avec fallback
+  - `sanitizeStoryMessageHistory()` — nettoyage sécurisé de l'historique des messages (rôles + limites de taille)
+  - `validateStoryChapter()` — validation structurelle complète des chapitres générés
+
+### 🧪 Soak tests & e2e smoke tests
+
+- **Soak tests** (`storyEngine.soak.test.ts`) — 200 tours simulés sans régression d'état :
+  - Validation de la persistance et restauration des sessions (localStorage)
+  - Détection de divergences entre l'état sauvegardé et l'état rejouable
+  - Gestion des corruptions de sessions et recovery narratif
+  - Résilience du reducer `worldStateReducer` sur longue durée
+- **Smoke tests e2e** (`story-engine.smoke.spec.ts`) — vérification du workflow complet en navigateur :
+  - Playwright : création de setup, génération de tour, validation du HUD joueur
+  - Tests de l'interface GameHUD sous charge (faction standings, blessures, chronologie)
+- **Tests unitaires contrats** (`storyEngine.contracts.test.ts`) — couverture des normalizations et assertions
+
+### 🔧 Infrastructure & fixtures de test
+
+- Configuration Playwright pour les tests e2e (`playwright.config.ts`)
+- Configuration Vitest dédiée aux soak tests (`vitest.soak.config.ts`)
+- Fixtures de test : réponses provider, scénarios de corruption, replay scenarios
+- Amélioration de la couverture de `interactiveSession`, `narrativeGuardrails`, `worldStateReducer`, logger
+- CI/CD : ajout de étapes de soak tests au workflow GitHub Actions
+
 ## v2.5.0 — 2026-04-21
 
 ### 🏗️ Fondations runtime du moteur
