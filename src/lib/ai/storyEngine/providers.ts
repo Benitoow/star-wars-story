@@ -79,7 +79,7 @@ type ReasoningStyle = 'openai-effort' | 'anthropic-thinking' | 'none';
 export interface ModelCapabilities {
   tier: ModelTier;
   reasoningStyle: ReasoningStyle;
-  reasoningEffort: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'adaptive';
+  reasoningEffort: 'low' | 'medium' | 'high' | 'xhigh' | 'minimal' | 'none';
   supportsNativeTools: boolean;
   maxOutputTokens: number;
   idealTemperature: number;
@@ -95,31 +95,31 @@ const DEFAULT_CAPS: ModelCapabilities = {
 };
 
 const MODEL_CAPS_PATTERNS: Array<[RegExp, Partial<ModelCapabilities>]> = [
-  [/gemini-3-flash-preview/, { tier: 'medium', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3000, idealTemperature: 0.9 }],
-  [/gemini-2\.5-flash-lite/, { tier: 'small', reasoningStyle: 'none', reasoningEffort: 'low', supportsNativeTools: true, maxOutputTokens: 2600, idealTemperature: 0.85 }],
-  [/gpt-oss-120b/, { tier: 'large', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3400, idealTemperature: 0.9 }],
-  [/deepseek-v3\.2/, { tier: 'large', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3400, idealTemperature: 0.9 }],
-  [/deepseek-v4-flash/, { tier: 'medium', reasoningStyle: 'openai-effort', reasoningEffort: 'xhigh', supportsNativeTools: true, maxOutputTokens: 3200, idealTemperature: 0.9 }],
-  [/kimi-k2\.6/, { tier: 'large', reasoningStyle: 'openai-effort', reasoningEffort: 'high', supportsNativeTools: true, maxOutputTokens: 3500, idealTemperature: 0.9 }],
-  [/mimo-v2-omni/, { tier: 'large', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3400, idealTemperature: 0.9 }],
-  [/mimo-v2-flash/, { tier: 'medium', reasoningStyle: 'openai-effort', reasoningEffort: 'low', supportsNativeTools: true, maxOutputTokens: 3200, idealTemperature: 0.9 }],
-  [/minimax-m2\.7/, { tier: 'large', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3400, idealTemperature: 0.9 }],
-  [/qwen(3\.5|3\.6|.*plus)/, { tier: 'large', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3400, idealTemperature: 0.9 }],
-  [/grok-4\.20/, { tier: 'large', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3600, idealTemperature: 0.9 }],
-  [/grok-4\.1-fast/, { tier: 'large', reasoningStyle: 'openai-effort', reasoningEffort: 'low', supportsNativeTools: true, maxOutputTokens: 3600, idealTemperature: 0.9 }],
-  [/gemma-4-31b-it/, { tier: 'medium', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3000, idealTemperature: 0.95 }],
-  [/gemma-4-26b-a4b-it/, { tier: 'small', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 2800, idealTemperature: 0.95 }],
-  [/gemma-3-27b-it:free|gemma-3-27b-it/i, { tier: 'large', reasoningStyle: 'none', reasoningEffort: 'low', supportsNativeTools: true, maxOutputTokens: 2400, idealTemperature: 0.9 }],
-  [/gemma-4/, { tier: 'small', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 2500, idealTemperature: 1.0 }],
-  [/gpt-5\.4-mini/, { tier: 'small', reasoningStyle: 'openai-effort', reasoningEffort: 'xhigh', supportsNativeTools: true, maxOutputTokens: 2400, idealTemperature: 1.0 }],
-  [/gpt-5\.4/, { tier: 'medium', reasoningStyle: 'openai-effort', reasoningEffort: 'max', supportsNativeTools: true, maxOutputTokens: 3500, idealTemperature: 1.0 }],
-  [/claude-opus-4/, { tier: 'large', reasoningStyle: 'anthropic-thinking', reasoningEffort: 'adaptive', supportsNativeTools: true, maxOutputTokens: 4500, idealTemperature: 1.0 }],
-  [/claude-sonnet-4/, { tier: 'medium', reasoningStyle: 'anthropic-thinking', reasoningEffort: 'adaptive', supportsNativeTools: true, maxOutputTokens: 3000, idealTemperature: 1.0 }],
-  [/\/o[1-9][-/]|\/o4-mini/, { tier: 'large', reasoningStyle: 'openai-effort', reasoningEffort: 'max', supportsNativeTools: true, maxOutputTokens: 4000, idealTemperature: 1.0 }],
-  [/grok-3-mini/, { tier: 'small', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 2400, idealTemperature: 1.0 }],
-  [/grok-3/, { tier: 'medium', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3000, idealTemperature: 1.0 }],
-  [/mistral-(medium|large)/, { tier: 'medium', reasoningStyle: 'none', reasoningEffort: 'low', supportsNativeTools: true, maxOutputTokens: 2400, idealTemperature: 0.85 }],
-  [/deepseek-r|qwen.*think/, { tier: 'medium', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 2800, idealTemperature: 1.0 }]
+  [/gemini-3-flash-preview/, { tier: 'medium', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 3000, idealTemperature: 0.9 }],
+  [/gemini-2\.5-flash-lite/, { tier: 'small', reasoningStyle: 'none', supportsNativeTools: true, maxOutputTokens: 2600, idealTemperature: 0.85 }],
+  [/gpt-oss-120b/, { tier: 'large', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 3400, idealTemperature: 0.9 }],
+  [/deepseek-v3\.2/, { tier: 'large', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 3400, idealTemperature: 0.9 }],
+  [/deepseek-v4-flash/, { tier: 'medium', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 3200, idealTemperature: 0.9 }],
+  [/kimi-k2\.6/, { tier: 'large', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 3500, idealTemperature: 0.9 }],
+  [/mimo-v2-omni/, { tier: 'large', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 3400, idealTemperature: 0.9 }],
+  [/mimo-v2-flash/, { tier: 'medium', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 3200, idealTemperature: 0.9 }],
+  [/minimax-m2\.7/, { tier: 'large', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 3400, idealTemperature: 0.9 }],
+  [/qwen(3\.5|3\.6|.*plus)/, { tier: 'large', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 3400, idealTemperature: 0.9 }],
+  [/grok-4\.20/, { tier: 'large', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 3600, idealTemperature: 0.9 }],
+  [/grok-4\.1-fast/, { tier: 'large', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 3600, idealTemperature: 0.9 }],
+  [/gemma-4-31b-it/, { tier: 'medium', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 3000, idealTemperature: 0.95 }],
+  [/gemma-4-26b-a4b-it/, { tier: 'small', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 2800, idealTemperature: 0.95 }],
+  [/gemma-3-27b-it:free|gemma-3-27b-it/i, { tier: 'large', reasoningStyle: 'none', supportsNativeTools: true, maxOutputTokens: 2400, idealTemperature: 0.9 }],
+  [/gemma-4/, { tier: 'small', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 2500, idealTemperature: 1.0 }],
+  [/gpt-5\.4-mini/, { tier: 'small', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 2400, idealTemperature: 1.0 }],
+  [/gpt-5\.4/, { tier: 'medium', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 3500, idealTemperature: 1.0 }],
+  [/claude-opus-4/, { tier: 'large', reasoningStyle: 'anthropic-thinking', supportsNativeTools: true, maxOutputTokens: 4500, idealTemperature: 1.0 }],
+  [/claude-sonnet-4/, { tier: 'medium', reasoningStyle: 'anthropic-thinking', supportsNativeTools: true, maxOutputTokens: 3000, idealTemperature: 1.0 }],
+  [/\/o[1-9][-/]|\/o4-mini/, { tier: 'large', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 4000, idealTemperature: 1.0 }],
+  [/grok-3-mini/, { tier: 'small', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 2400, idealTemperature: 1.0 }],
+  [/grok-3/, { tier: 'medium', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 3000, idealTemperature: 1.0 }],
+  [/mistral-(medium|large)/, { tier: 'medium', reasoningStyle: 'none', supportsNativeTools: true, maxOutputTokens: 2400, idealTemperature: 0.85 }],
+  [/deepseek-r|qwen.*think/, { tier: 'medium', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 2800, idealTemperature: 1.0 }]
 ];
 
 export function detectModelCapabilities(config: StoryProviderConfig): ModelCapabilities {
@@ -211,7 +211,7 @@ function buildReasoningPayload(
 ): Record<string, unknown> | undefined {
   if (caps.reasoningStyle !== 'openai-effort') return undefined;
 
-  if (skipReasoning) {
+  if (skipReasoning || effortOverride === 'none') {
     if (providerId === 'openrouter') return { enabled: false };
     return { effort: 'none' };
   }
@@ -220,32 +220,13 @@ function buildReasoningPayload(
     return { enabled: true };
   }
 
-  const effort = effortOverride
-    ?? (providerId === 'openrouter' && isOpenRouterGrokFastModel(modelId) ? 'low' : caps.reasoningEffort);
+  const effort = effortOverride ?? caps.reasoningEffort;
 
   if (providerId === 'openrouter') {
     return { enabled: true, effort };
   }
 
   return { effort };
-}
-
-export interface ModelReasoningInfo {
-  style: 'openai-effort' | 'anthropic-thinking' | 'none';
-  defaultEffort: string;
-  availableEfforts: string[];
-}
-
-export function getModelReasoningInfo(modelId: string): ModelReasoningInfo {
-  const config: import('./types').StoryProviderConfig = { providerId: 'openrouter', model: modelId };
-  const caps = detectModelCapabilities(config);
-  if (caps.reasoningStyle === 'none') {
-    return { style: 'none', defaultEffort: 'low', availableEfforts: [] };
-  }
-  const availableEfforts = caps.reasoningStyle === 'anthropic-thinking'
-    ? ['low', 'medium', 'high', 'adaptive']
-    : ['low', 'medium', 'high', 'xhigh', 'max'];
-  return { style: caps.reasoningStyle, defaultEffort: caps.reasoningEffort, availableEfforts };
 }
 
 type OpenAiToolDefinition = {

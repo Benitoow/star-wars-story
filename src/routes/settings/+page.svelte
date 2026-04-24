@@ -15,7 +15,7 @@
     TEXT_PROVIDER_ALIAS_MAP,
     TEXT_PROVIDERS
   } from '$lib/config/providers';
-  import { getModelReasoningInfo } from '$lib/ai/storyEngine';
+  const REASONING_EFFORTS = ['xhigh', 'high', 'medium', 'low', 'minimal', 'none'] as const;
   import { AVATARS, CONTENT_MODES, WRITING_STYLES, WRITING_TONES } from '$lib/editor/setupCatalog';
   import { exportDiagnosticsLog, logger, recordDiagnosticEvent } from '$lib/utils/logger';
   import PageHeader from '$lib/components/PageHeader.svelte';
@@ -78,6 +78,7 @@
 
   let dynamicTextModels: Record<string, string[]> = {};
   let dynamicImageModels: Record<string, string[]> = {};
+  let reasoningCapableModels: Set<string> = new Set();
   let syncingTextModels = false;
   let syncingImageModels = false;
   let syncTextMessage = '';
@@ -122,9 +123,8 @@
     ? textProviderModels.filter(model => model.toLowerCase().includes(normalizedTextSearch))
     : textProviderModels;
 
-  $: activeModelReasoningInfo = preferences?.textModel
-    ? getModelReasoningInfo(preferences.textModel)
-    : null;
+  $: activeModelSupportsReasoning = reasoningCapableModels.size > 0
+    && reasoningCapableModels.has(preferences?.textModel ?? '');
 
   $: filteredImageModels = normalizedImageSearch
     ? imageProviderModels.filter(model => model.toLowerCase().includes(normalizedImageSearch))
@@ -219,7 +219,16 @@
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         const optionalKey = preferences.textApiKey?.trim();
         if (optionalKey) headers.Authorization = `Bearer ${optionalKey}`;
-        models = (await fetchModelsFromJsonEndpoint('https://openrouter.ai/api/v1/models', headers))
+        const response = await fetch('https://openrouter.ai/api/v1/models', { headers });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json() as { data?: Array<{ id?: string; supported_parameters?: string[] }> };
+        const entries = payload.data || [];
+        const capable = new Set<string>();
+        for (const entry of entries) {
+          if (entry.id && entry.supported_parameters?.includes('reasoning')) capable.add(entry.id);
+        }
+        reasoningCapableModels = capable;
+        models = uniqueSorted(entries.map(e => String(e?.id || '')).filter(Boolean))
           .filter(model => !IMAGE_MODEL_PATTERN.test(model));
       }
 
@@ -843,17 +852,15 @@
                     </div>
                   {/if}
 
-                  {#if activeModelReasoningInfo && activeModelReasoningInfo.style !== 'none'}
+                  {#if activeModelSupportsReasoning}
                     <div class="field">
-                      <label>Mode de raisonnement</label>
+                      <label>Effort de raisonnement</label>
                       <div class="reasoning-effort-row">
-                        {#each activeModelReasoningInfo.availableEfforts as effort}
+                        {#each REASONING_EFFORTS as effort}
                           <button
                             type="button"
                             class="reasoning-effort-btn"
-                            class:selected={
-                              (preferences?.textReasoningEffort ?? activeModelReasoningInfo.defaultEffort) === effort
-                            }
+                            class:selected={preferences?.textReasoningEffort === effort}
                             on:click={() => {
                               if (!preferences) return;
                               preferences.textReasoningEffort = effort;
@@ -862,17 +869,16 @@
                           >{effort}</button>
                         {/each}
                       </div>
-                      {#if !preferences?.textReasoningEffort || preferences.textReasoningEffort === activeModelReasoningInfo.defaultEffort}
-                        <span class="field-hint">Recommandé pour ce modèle : <strong>{activeModelReasoningInfo.defaultEffort}</strong></span>
-                      {:else}
+                      {#if preferences?.textReasoningEffort}
                         <span class="field-hint">
-                          Par défaut : {activeModelReasoningInfo.defaultEffort} —
                           <button type="button" class="reset-btn" on:click={() => {
                             if (!preferences) return;
                             preferences.textReasoningEffort = undefined;
                             preferences = { ...preferences };
-                          }}>Réinitialiser</button>
+                          }}>Laisser le modèle décider</button>
                         </span>
+                      {:else}
+                        <span class="field-hint">Laissé au modèle — sélectionne un niveau pour forcer</span>
                       {/if}
                     </div>
                   {/if}

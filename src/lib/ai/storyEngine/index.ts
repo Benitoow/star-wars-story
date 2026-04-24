@@ -43,12 +43,9 @@ export {
   callOpenAiCompatibleRaw,
   callTextModel,
   detectModelCapabilities,
-  getModelReasoningInfo,
   normalizeProviderId,
   supportsAgenticToolCalling
 } from './providers';
-
-export type { ModelReasoningInfo } from './providers';
 
 export {
   coerceMemoryUpdates,
