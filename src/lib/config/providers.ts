@@ -76,6 +76,8 @@ export const TEXT_PROVIDERS: ProviderCatalog[] = [
       'x-ai/grok-4.20',
       'minimax/minimax-m2.7',
       'deepseek/deepseek-v3.2',
+      'deepseek/deepseek-v4-flash',
+      'moonshotai/kimi-k2.6',
       'openai/gpt-oss-120b',
       'google/gemini-2.5-flash-lite',
       'google/gemini-3-flash-preview',

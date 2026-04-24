@@ -79,7 +79,7 @@ type ReasoningStyle = 'openai-effort' | 'anthropic-thinking' | 'none';
 export interface ModelCapabilities {
   tier: ModelTier;
   reasoningStyle: ReasoningStyle;
-  reasoningEffort: 'low' | 'medium' | 'high';
+  reasoningEffort: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'adaptive';
   supportsNativeTools: boolean;
   maxOutputTokens: number;
   idealTemperature: number;
@@ -99,6 +99,8 @@ const MODEL_CAPS_PATTERNS: Array<[RegExp, Partial<ModelCapabilities>]> = [
   [/gemini-2\.5-flash-lite/, { tier: 'small', reasoningStyle: 'none', reasoningEffort: 'low', supportsNativeTools: true, maxOutputTokens: 2600, idealTemperature: 0.85 }],
   [/gpt-oss-120b/, { tier: 'large', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3400, idealTemperature: 0.9 }],
   [/deepseek-v3\.2/, { tier: 'large', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3400, idealTemperature: 0.9 }],
+  [/deepseek-v4-flash/, { tier: 'medium', reasoningStyle: 'openai-effort', reasoningEffort: 'high', supportsNativeTools: true, maxOutputTokens: 3200, idealTemperature: 0.9 }],
+  [/kimi-k2\.6/, { tier: 'large', reasoningStyle: 'openai-effort', reasoningEffort: 'high', supportsNativeTools: true, maxOutputTokens: 3500, idealTemperature: 0.9 }],
   [/mimo-v2-omni/, { tier: 'large', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3400, idealTemperature: 0.9 }],
   [/mimo-v2-flash/, { tier: 'medium', reasoningStyle: 'openai-effort', reasoningEffort: 'low', supportsNativeTools: true, maxOutputTokens: 3200, idealTemperature: 0.9 }],
   [/minimax-m2\.7/, { tier: 'large', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3400, idealTemperature: 0.9 }],
@@ -109,11 +111,11 @@ const MODEL_CAPS_PATTERNS: Array<[RegExp, Partial<ModelCapabilities>]> = [
   [/gemma-4-26b-a4b-it/, { tier: 'small', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 2800, idealTemperature: 0.95 }],
   [/gemma-3-27b-it:free|gemma-3-27b-it/i, { tier: 'large', reasoningStyle: 'none', reasoningEffort: 'low', supportsNativeTools: true, maxOutputTokens: 2400, idealTemperature: 0.9 }],
   [/gemma-4/, { tier: 'small', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 2500, idealTemperature: 1.0 }],
-  [/gpt-5\.4-mini/, { tier: 'small', reasoningStyle: 'openai-effort', reasoningEffort: 'low', supportsNativeTools: true, maxOutputTokens: 2400, idealTemperature: 1.0 }],
-  [/gpt-5\.4/, { tier: 'medium', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3500, idealTemperature: 1.0 }],
-  [/claude-opus-4/, { tier: 'large', reasoningStyle: 'anthropic-thinking', reasoningEffort: 'high', supportsNativeTools: true, maxOutputTokens: 4500, idealTemperature: 1.0 }],
-  [/claude-sonnet-4/, { tier: 'medium', reasoningStyle: 'anthropic-thinking', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3000, idealTemperature: 1.0 }],
-  [/\/o[1-9][-/]|\/o4-mini/, { tier: 'large', reasoningStyle: 'openai-effort', reasoningEffort: 'high', supportsNativeTools: true, maxOutputTokens: 4000, idealTemperature: 1.0 }],
+  [/gpt-5\.4-mini/, { tier: 'small', reasoningStyle: 'openai-effort', reasoningEffort: 'xhigh', supportsNativeTools: true, maxOutputTokens: 2400, idealTemperature: 1.0 }],
+  [/gpt-5\.4/, { tier: 'medium', reasoningStyle: 'openai-effort', reasoningEffort: 'max', supportsNativeTools: true, maxOutputTokens: 3500, idealTemperature: 1.0 }],
+  [/claude-opus-4/, { tier: 'large', reasoningStyle: 'anthropic-thinking', reasoningEffort: 'adaptive', supportsNativeTools: true, maxOutputTokens: 4500, idealTemperature: 1.0 }],
+  [/claude-sonnet-4/, { tier: 'medium', reasoningStyle: 'anthropic-thinking', reasoningEffort: 'adaptive', supportsNativeTools: true, maxOutputTokens: 3000, idealTemperature: 1.0 }],
+  [/\/o[1-9][-/]|\/o4-mini/, { tier: 'large', reasoningStyle: 'openai-effort', reasoningEffort: 'max', supportsNativeTools: true, maxOutputTokens: 4000, idealTemperature: 1.0 }],
   [/grok-3-mini/, { tier: 'small', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 2400, idealTemperature: 1.0 }],
   [/grok-3/, { tier: 'medium', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3000, idealTemperature: 1.0 }],
   [/mistral-(medium|large)/, { tier: 'medium', reasoningStyle: 'none', reasoningEffort: 'low', supportsNativeTools: true, maxOutputTokens: 2400, idealTemperature: 0.85 }],
@@ -144,6 +146,12 @@ function getOpenRouterProviderPreferences(modelId: string): Record<string, unkno
   }
   if (/deepseek\/deepseek-v3\.2/.test(normalized)) {
     return { require_parameters: true, sort: 'throughput', preferred_max_latency: { p90: 3 }, preferred_min_throughput: { p90: 20 }, max_price: { prompt: 0.45, completion: 1.8 }, allow_fallbacks: true };
+  }
+  if (/deepseek\/deepseek-v4-flash/.test(normalized)) {
+    return { require_parameters: true, sort: 'throughput', preferred_max_latency: { p90: 2 }, preferred_min_throughput: { p90: 60 }, max_price: { prompt: 0.14, completion: 0.28 }, allow_fallbacks: true };
+  }
+  if (/moonshotai\/kimi-k2\.6/.test(normalized)) {
+    return { require_parameters: true, sort: 'latency', preferred_max_latency: { p90: 2 }, preferred_min_throughput: { p90: 25 }, max_price: { prompt: 0.6, completion: 2.4 }, allow_fallbacks: true };
   }
   if (/xiaomi\/mimo-v2-omni/.test(normalized)) {
     return { require_parameters: true, sort: 'throughput', preferred_max_latency: { p90: 3 }, preferred_min_throughput: { p90: 45 }, allow_fallbacks: true };
