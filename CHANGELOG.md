@@ -1,5 +1,22 @@
 # Changelog
 
+## v2.6.1 — 2026-04-24
+
+### 🤖 Sélecteur d'effort de raisonnement
+
+- Nouveau champ `textReasoningEffort` dans les préférences utilisateur (persisté en IndexedDB)
+- Lors de la synchronisation des modèles OpenRouter, capture des `supported_parameters` par modèle : seuls les modèles déclarant `"reasoning"` affichent le sélecteur — zéro hardcodage
+- Sélecteur d'effort exposé dans les Settings (écran IA Texte) avec les 6 niveaux réels OpenRouter : `xhigh · high · medium · low · minimal · none`
+- Par défaut : aucun niveau forcé, OpenRouter gère automatiquement selon le modèle
+- `StoryProviderConfig` enrichi d'un `reasoningEffortOverride` transmis au payload API ; `buildReasoningPayload` utilise l'override si fourni, `none` désactive explicitement le reasoning
+
+### 🗂️ Catalogue de modèles
+
+- Ajout de `deepseek/deepseek-v4-flash` (MoE 284B/13B actifs, contexte 1M tokens)
+- Ajout de `moonshotai/kimi-k2.6` (reasoning fort, 91.1% GPQA Diamond)
+- Nettoyage de `MODEL_CAPS_PATTERNS` : suppression des `reasoningEffort` hardcodés par modèle, désormais pilotés par le choix utilisateur
+- Type `reasoningEffort` aligné sur les vrais niveaux OpenRouter (`xhigh | high | medium | low | minimal | none`), `adaptive` et `max` retirés
+
 ## v2.6.0 — 2026-04-23
 
 ### 📋 Story Engine contracts & validation layer
