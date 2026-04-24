@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.6.2 — 2026-04-24
+
+### 🏗️ Story engine consolidation — v10/10
+
+- **Refactor complet des utilitaires dupliques** : `cleanText`, `clamp`, `isObjectRecord`, `CANONICAL_PLAYER_ACTION_PATTERNS` et `extractCanonicalPlayerAction` (7 copies) centralises dans un seul module `src/lib/ai/storyEngine/utils/shared.ts`
+- **Correction de regex incoherentes** : les versions `cleanText` de `prompts.ts` et `worldStateFallbacks.ts` ne gerent pas `\r\n` correctement — corrigees par l'import du shared
+- **34 nouveaux tests chaotiques** (`storyEngine.chaos.test.ts`) couvrant les cas limites des reponses LLM : JSON dans markdown, JSON prefixe `json {`, texte de diagnostic inutile, tableau en retour, valeurs extremes, donnees corrompues, bruit memoire
+- **Suite de tests passee de 94 a 128 tests**, 11 fichiers de tests
+
 ## v2.6.1 — 2026-04-24
 
 ### 🤖 Sélecteur d'effort de raisonnement

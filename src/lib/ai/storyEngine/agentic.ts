@@ -16,6 +16,7 @@ import {
   validateBackgroundWorldGenerationResult,
   validateStoryTurnGenerationResult
 } from './contracts';
+import { cleanText, clamp, isObjectRecord, extractCanonicalPlayerAction } from './utils/shared';
 import {
   callOpenAiCompatibleRaw,
   callTextModel,
@@ -61,30 +62,6 @@ export type StoryTurnPipelineConfigOverrides = {
 
 const OPENAI_COMPATIBLE_PROVIDER_IDS = new Set<string>(['openrouter']);
 const DEFAULT_SCENE_DESCRIPTION = 'Cinematic Star Wars scene with dramatic lighting and dynamic action';
-const CANONICAL_PLAYER_ACTION_PATTERNS = [
-  /ACTION JOUEUR CANONIQUE:\s*([^\n]+)/i,
-  /ACTION JOUEUR EN COURS:\s*([^\n]+)/i,
-  /\bTour\s+\d+\.\s+Action:\s*"([^"]+)"/i,
-  /\bAction:\s*"([^"]+)"/i
-] as const;
-
-function cleanText(value: unknown, maxLength = 2200): string {
-  if (value === null || value === undefined) return '';
-  return String(value)
-    .replace(/\r\n?/g, '\n')
-    .replace(/[ \t]{2,}/g, ' ')
-    .trim()
-    .slice(0, maxLength);
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
-
-function isObjectRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
 function normalizeProviderConfig(config: StoryProviderConfig): StoryProviderConfig {
   const supported = assertSupportedStoryProviderConfig(config);
   const providerId = normalizeProviderId(supported.providerId);
@@ -123,19 +100,6 @@ function defaultMemoryUpdates(): StoryMemoryUpdates {
     resources: [],
     notes: []
   };
-}
-
-function extractCanonicalPlayerAction(rawContent: string): string {
-  const content = cleanText(rawContent, 2200);
-  if (!content) return '';
-
-  for (const pattern of CANONICAL_PLAYER_ACTION_PATTERNS) {
-    const match = content.match(pattern);
-    const captured = cleanText(match?.[1], 280);
-    if (captured) return captured;
-  }
-
-  return cleanText(content, 280);
 }
 
 function getLatestUserAction(messages: ChatMessage[]): string {

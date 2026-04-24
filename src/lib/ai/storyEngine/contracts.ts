@@ -13,21 +13,9 @@ import type {
   StoryProviderConfig,
   StoryTurnGenerationResult
 } from './types';
+import { cleanText, isObjectRecord } from './utils/shared';
 
 export const PUBLIC_STORY_GENERATION_MODES = ['structured-json', 'agentic-subagents'] as const;
-
-function cleanText(value: unknown, maxLength = 4000): string {
-  if (value === null || value === undefined) return '';
-  return String(value)
-    .replace(/\r\n?/g, '\n')
-    .replace(/[ \t]{2,}/g, ' ')
-    .trim()
-    .slice(0, maxLength);
-}
-
-function isObjectRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
 
 export function normalizeStoryGenerationMode(mode: unknown): StoryGenerationMode {
   const normalized = cleanText(mode, 60).toLowerCase();

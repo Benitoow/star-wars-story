@@ -1,4 +1,5 @@
 import type { StateUpdate, StoryMemoryUpdates, StoryNarrative } from './types';
+import { cleanText } from './utils/shared';
 
 const UNKNOWN_LOCATION_PATTERNS = [
   /^inconnu$/i,
@@ -35,15 +36,6 @@ const NON_NPC_ENTITY_PATTERNS: RegExp[] = [
 ];
 
 const ALLOWED_DROID_NAME_PATTERN = /^(?:r2|c-?3|bb|ig|hk|k2|bd|chopper|ch0pper)\b/i;
-
-function cleanText(value: unknown, maxLength = 2200): string {
-  if (value === null || value === undefined) return '';
-  return String(value)
-    .replace(/\r/g, '\n')
-    .replace(/[ \t]{2,}/g, ' ')
-    .trim()
-    .slice(0, maxLength);
-}
 
 export function isUnknownLocation(value: unknown): boolean {
   const text = cleanText(value, 120).toLowerCase();

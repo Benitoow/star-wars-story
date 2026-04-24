@@ -9,15 +9,7 @@ import {
 } from '$lib/config/providers';
 import { assertSupportedStoryProviderConfig } from './contracts';
 import type { ChatMessage, StoryProviderConfig } from './types';
-
-function cleanText(value: unknown, maxLength = 2200): string {
-  if (value === null || value === undefined) return '';
-  return String(value)
-    .replace(/\r\n?/g, '\n')
-    .replace(/[ \t]{2,}/g, ' ')
-    .trim()
-    .slice(0, maxLength);
-}
+import { cleanText } from './utils/shared';
 
 function getProviderDisplayName(providerId: string): string {
   return getProviderDisplayNameFromConfig(providerId);

@@ -34,6 +34,7 @@
     "vitest": "^3.2.4"
   },
   "dependencies": {
+    "@rollup/rollup-linux-x64-gnu": "^4.60.2",
     "dexie": "^4.0.1"
   }
 }

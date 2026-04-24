@@ -7,15 +7,7 @@ import type {
   WorldState
 } from './types';
 import { sanitizeNarrativeText } from './parsing';
-
-function cleanText(value: unknown, maxLength = 2200): string {
-  if (value === null || value === undefined) return '';
-  const text = String(value)
-    .replace(/\r/g, '\n')
-    .replace(/[ \t]{2,}/g, ' ')
-    .trim();
-  return text.slice(0, maxLength);
-}
+import { cleanText, extractCanonicalPlayerAction } from './utils/shared';
 
 const ERA_CONTEXT: Record<string, string> = {
   old_republic: 'Ancienne République — guerres mandaloriennes, Jedi au zénith, Sith encore tapis dans l\'ombre.',
@@ -28,24 +20,6 @@ const ERA_CONTEXT: Record<string, string> = {
 };
 
 const ACTION_HEAVY: SectionType[] = ['action', 'confrontation'];
-const CANONICAL_PLAYER_ACTION_PATTERNS = [
-  /ACTION JOUEUR CANONIQUE:\s*([^\n]+)/i,
-  /\bTour\s+\d+\.\s+Action:\s*"([^"]+)"/i,
-  /\bAction:\s*"([^"]+)"/i
-] as const;
-
-function extractCanonicalPlayerAction(content: string): string {
-  const cleaned = cleanText(content, 1200);
-  if (!cleaned) return '';
-
-  for (const pattern of CANONICAL_PLAYER_ACTION_PATTERNS) {
-    const match = cleaned.match(pattern);
-    const captured = cleanText(match?.[1], 240);
-    if (captured) return captured;
-  }
-
-  return cleanText(cleaned, 240);
-}
 
 export const STORY_PIPELINE_SCRIBE_SYSTEM_PROMPT = `Tu es le SCRIBE de continuité d'une campagne Star Wars.
 Ta mission est la synthèse factuelle, pas la narration.

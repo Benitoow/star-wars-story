@@ -9,15 +9,7 @@ import type {
   NpcRelation
 } from './types';
 import { ensureWorldStateFallbacks, isUnknownLocation } from './worldStateFallbacks';
-
-function cleanText(value: unknown, maxLength = 2200): string {
-  if (value === null || value === undefined) return '';
-  const text = String(value)
-    .replace(/\r\n?/g, '\n')
-    .replace(/[ \t]{2,}/g, ' ')
-    .trim();
-  return text.slice(0, maxLength);
-}
+import { cleanText } from './utils/shared';
 
 const NARRATIVE_CHOICE_MARKERS: RegExp[] = [
   /^(?:que faites-vous|what do you do|choices?|choix|options?|vos choix)\b[:!?]?\s*$/i,
