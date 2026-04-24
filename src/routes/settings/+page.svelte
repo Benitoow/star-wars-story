@@ -15,6 +15,7 @@
     TEXT_PROVIDER_ALIAS_MAP,
     TEXT_PROVIDERS
   } from '$lib/config/providers';
+  import { getModelReasoningInfo } from '$lib/ai/storyEngine';
   import { AVATARS, CONTENT_MODES, WRITING_STYLES, WRITING_TONES } from '$lib/editor/setupCatalog';
   import { exportDiagnosticsLog, logger, recordDiagnosticEvent } from '$lib/utils/logger';
   import PageHeader from '$lib/components/PageHeader.svelte';
@@ -120,6 +121,10 @@
   $: filteredTextModels = normalizedTextSearch
     ? textProviderModels.filter(model => model.toLowerCase().includes(normalizedTextSearch))
     : textProviderModels;
+
+  $: activeModelReasoningInfo = preferences?.textModel
+    ? getModelReasoningInfo(preferences.textModel)
+    : null;
 
   $: filteredImageModels = normalizedImageSearch
     ? imageProviderModels.filter(model => model.toLowerCase().includes(normalizedImageSearch))
@@ -835,6 +840,40 @@
                           <div class="model-empty">Aucun modèle ne correspond à « {textModelSearch} ».</div>
                         {/if}
                       </div>
+                    </div>
+                  {/if}
+
+                  {#if activeModelReasoningInfo && activeModelReasoningInfo.style !== 'none'}
+                    <div class="field">
+                      <label>Mode de raisonnement</label>
+                      <div class="reasoning-effort-row">
+                        {#each activeModelReasoningInfo.availableEfforts as effort}
+                          <button
+                            type="button"
+                            class="reasoning-effort-btn"
+                            class:selected={
+                              (preferences?.textReasoningEffort ?? activeModelReasoningInfo.defaultEffort) === effort
+                            }
+                            on:click={() => {
+                              if (!preferences) return;
+                              preferences.textReasoningEffort = effort;
+                              preferences = { ...preferences };
+                            }}
+                          >{effort}</button>
+                        {/each}
+                      </div>
+                      {#if !preferences?.textReasoningEffort || preferences.textReasoningEffort === activeModelReasoningInfo.defaultEffort}
+                        <span class="field-hint">Recommandé pour ce modèle : <strong>{activeModelReasoningInfo.defaultEffort}</strong></span>
+                      {:else}
+                        <span class="field-hint">
+                          Par défaut : {activeModelReasoningInfo.defaultEffort} —
+                          <button type="button" class="reset-btn" on:click={() => {
+                            if (!preferences) return;
+                            preferences.textReasoningEffort = undefined;
+                            preferences = { ...preferences };
+                          }}>Réinitialiser</button>
+                        </span>
+                      {/if}
                     </div>
                   {/if}
 
@@ -1718,6 +1757,47 @@
     padding: var(--space-sm);
     color: var(--color-text-muted);
     font-size: 0.8rem;
+  }
+
+  .reasoning-effort-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    margin-top: var(--space-xs);
+  }
+
+  .reasoning-effort-btn {
+    padding: 0.3rem 0.75rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-secondary);
+    color: var(--color-text-primary);
+    font-size: 0.78rem;
+    font-family: var(--font-mono);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  .reasoning-effort-btn:hover {
+    border-color: var(--color-accent);
+    background: var(--color-bg-hover, var(--color-bg-secondary));
+  }
+
+  .reasoning-effort-btn.selected {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: var(--color-on-accent, #fff);
+    font-weight: 600;
+  }
+
+  .reset-btn {
+    background: none;
+    border: none;
+    color: var(--color-accent);
+    cursor: pointer;
+    font-size: inherit;
+    padding: 0;
+    text-decoration: underline;
   }
 
   /* ── Option grid (style/tone) ────────────── */

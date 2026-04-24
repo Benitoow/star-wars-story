@@ -286,7 +286,8 @@
       providerId,
       model,
       apiKey: (preferences.textApiKey || '').trim(),
-      ollamaUrl: (preferences.ollamaUrl || '').trim()
+      ollamaUrl: (preferences.ollamaUrl || '').trim(),
+      reasoningEffortOverride: preferences.textReasoningEffort || undefined
     };
   }
 

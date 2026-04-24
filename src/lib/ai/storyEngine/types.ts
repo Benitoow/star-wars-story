@@ -108,6 +108,7 @@ export interface StoryProviderConfig {
   model: string;
   apiKey?: string;
   ollamaUrl?: string;
+  reasoningEffortOverride?: string;
 }
 
 export type StoryPromptMode = 'json';

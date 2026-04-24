@@ -92,6 +92,7 @@ export interface UserPreferences {
   textProvider?: string;
   textModel?: string;
   textApiKey?: string;
+  textReasoningEffort?: string;
   ollamaUrl?: string;
   // AI Image
   imageProvider?: string;

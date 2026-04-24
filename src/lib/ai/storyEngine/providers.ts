@@ -99,7 +99,7 @@ const MODEL_CAPS_PATTERNS: Array<[RegExp, Partial<ModelCapabilities>]> = [
   [/gemini-2\.5-flash-lite/, { tier: 'small', reasoningStyle: 'none', reasoningEffort: 'low', supportsNativeTools: true, maxOutputTokens: 2600, idealTemperature: 0.85 }],
   [/gpt-oss-120b/, { tier: 'large', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3400, idealTemperature: 0.9 }],
   [/deepseek-v3\.2/, { tier: 'large', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3400, idealTemperature: 0.9 }],
-  [/deepseek-v4-flash/, { tier: 'medium', reasoningStyle: 'openai-effort', reasoningEffort: 'high', supportsNativeTools: true, maxOutputTokens: 3200, idealTemperature: 0.9 }],
+  [/deepseek-v4-flash/, { tier: 'medium', reasoningStyle: 'openai-effort', reasoningEffort: 'xhigh', supportsNativeTools: true, maxOutputTokens: 3200, idealTemperature: 0.9 }],
   [/kimi-k2\.6/, { tier: 'large', reasoningStyle: 'openai-effort', reasoningEffort: 'high', supportsNativeTools: true, maxOutputTokens: 3500, idealTemperature: 0.9 }],
   [/mimo-v2-omni/, { tier: 'large', reasoningStyle: 'openai-effort', reasoningEffort: 'medium', supportsNativeTools: true, maxOutputTokens: 3400, idealTemperature: 0.9 }],
   [/mimo-v2-flash/, { tier: 'medium', reasoningStyle: 'openai-effort', reasoningEffort: 'low', supportsNativeTools: true, maxOutputTokens: 3200, idealTemperature: 0.9 }],
@@ -206,7 +206,8 @@ function buildReasoningPayload(
   caps: ModelCapabilities,
   providerId: string,
   modelId: string,
-  skipReasoning = false
+  skipReasoning = false,
+  effortOverride?: string
 ): Record<string, unknown> | undefined {
   if (caps.reasoningStyle !== 'openai-effort') return undefined;
 
@@ -219,15 +220,32 @@ function buildReasoningPayload(
     return { enabled: true };
   }
 
-  const effort = providerId === 'openrouter' && isOpenRouterGrokFastModel(modelId)
-    ? 'low'
-    : caps.reasoningEffort;
+  const effort = effortOverride
+    ?? (providerId === 'openrouter' && isOpenRouterGrokFastModel(modelId) ? 'low' : caps.reasoningEffort);
 
   if (providerId === 'openrouter') {
     return { enabled: true, effort };
   }
 
   return { effort };
+}
+
+export interface ModelReasoningInfo {
+  style: 'openai-effort' | 'anthropic-thinking' | 'none';
+  defaultEffort: string;
+  availableEfforts: string[];
+}
+
+export function getModelReasoningInfo(modelId: string): ModelReasoningInfo {
+  const config: import('./types').StoryProviderConfig = { providerId: 'openrouter', model: modelId };
+  const caps = detectModelCapabilities(config);
+  if (caps.reasoningStyle === 'none') {
+    return { style: 'none', defaultEffort: 'low', availableEfforts: [] };
+  }
+  const availableEfforts = caps.reasoningStyle === 'anthropic-thinking'
+    ? ['low', 'medium', 'high', 'adaptive']
+    : ['low', 'medium', 'high', 'xhigh', 'max'];
+  return { style: caps.reasoningStyle, defaultEffort: caps.reasoningEffort, availableEfforts };
 }
 
 type OpenAiToolDefinition = {
@@ -321,7 +339,7 @@ export async function callOpenAiCompatibleRaw(
     if (providerPreferences) body.provider = providerPreferences;
   }
 
-  const reasoningPayload = buildReasoningPayload(caps, normalizedConfig.providerId, modelId, options.skipReasoning === true);
+  const reasoningPayload = buildReasoningPayload(caps, normalizedConfig.providerId, modelId, options.skipReasoning === true, normalizedConfig.reasoningEffortOverride);
   if (reasoningPayload) {
     body.reasoning = reasoningPayload;
   }
