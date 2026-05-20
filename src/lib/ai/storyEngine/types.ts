@@ -32,6 +32,7 @@ export interface PlayerState {
   date: string;       // narrative in-universe date
   injuries: { description: string; severity: 'light' | 'moderate' | 'severe' }[];
   inventory: { name: string; qty: number }[];
+  condition?: 'active' | 'critical';  // 'critical' = downed at 0 HP, next scene must be survival/rescue
 }
 
 export interface NpcRelation {

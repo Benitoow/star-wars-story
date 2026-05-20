@@ -366,6 +366,10 @@
     const validTextProviderIds = new Set(TEXT_PROVIDERS.map(provider => provider.id));
     if (!next.textProvider || !validTextProviderIds.has(next.textProvider)) next.textProvider = DEFAULT_TEXT_PROVIDER_ID;
 
+    if (next.textRuntimeMode !== 'structured-json' && next.textRuntimeMode !== 'agentic-subagents') {
+      next.textRuntimeMode = 'agentic-subagents';
+    }
+
     const textProvider = TEXT_PROVIDERS.find(p => p.id === next.textProvider);
     if (!next.textModel) {
       next.textModel = textProvider?.models[0] ?? DEFAULT_TEXT_MODEL_ID;
@@ -854,7 +858,7 @@
 
                   {#if activeModelSupportsReasoning}
                     <div class="field">
-                      <label>Effort de raisonnement</label>
+                      <span class="field-label">Effort de raisonnement</span>
                       <div class="reasoning-effort-row">
                         {#each REASONING_EFFORTS as effort}
                           <button
@@ -882,6 +886,35 @@
                       {/if}
                     </div>
                   {/if}
+
+                  <div class="field">
+                    <span class="field-label">Mode de génération</span>
+                    <div class="reasoning-effort-row">
+                      <button
+                        type="button"
+                        class="reasoning-effort-btn"
+                        class:selected={(preferences?.textRuntimeMode ?? 'agentic-subagents') === 'agentic-subagents'}
+                        on:click={() => {
+                          if (!preferences) return;
+                          preferences.textRuntimeMode = 'agentic-subagents';
+                          preferences = { ...preferences };
+                        }}
+                      >Qualité (4 agents)</button>
+                      <button
+                        type="button"
+                        class="reasoning-effort-btn"
+                        class:selected={preferences?.textRuntimeMode === 'structured-json'}
+                        on:click={() => {
+                          if (!preferences) return;
+                          preferences.textRuntimeMode = 'structured-json';
+                          preferences = { ...preferences };
+                        }}
+                      >Rapide (1 appel)</button>
+                    </div>
+                    <span class="field-hint">
+                      « Rapide » génère chaque tour en un seul appel (moins cher, plus rapide) ; « Qualité » orchestre quatre sous-agents.
+                    </span>
+                  </div>
 
                   <div class="field">
                     <label for="text-api-key">Clé API OpenRouter</label>

@@ -1,6 +1,28 @@
 import { describe, expect, it } from 'vitest';
 import type { StoryChapter } from '$lib/ai/storyEngine';
-import { applyStateUpdateToWorldState, initWorldState, rebuildWorldStateFromHistory, worldStateNeedsRepair } from './worldStateReducer';
+import {
+  applyStateUpdateToWorldState,
+  FR_WORLD_HEURISTICS,
+  getWorldHeuristics,
+  initWorldState,
+  rebuildWorldStateFromHistory,
+  worldStateNeedsRepair
+} from './worldStateReducer';
+
+function buildMinimalChapter(overrides: Partial<StoryChapter> = {}): StoryChapter {
+  return {
+    chapter_title: 'Scène',
+    chapter_number: 2,
+    section_type: 'action',
+    narrative: { context: '', action: '', dialogue: '', reflection: '', atmosphere: 'tense' },
+    choices: [],
+    memory_updates: { relations: [], places: [], injuries: [], resources: [], notes: [] },
+    scene_description: 'test',
+    user_edits_applied: null,
+    state_update: {},
+    ...overrides
+  };
+}
 
 const setup = {
   era: 'imperial',
@@ -143,5 +165,139 @@ describe('worldStateReducer', () => {
     };
 
     expect(worldStateNeedsRepair(malformed as never)).toBe(true);
+  });
+
+  it('seeds the player condition as active', () => {
+    expect(initWorldState(setup).player.condition).toBe('active');
+  });
+
+  it('flips the player condition to critical when HP reaches 0', () => {
+    const initial = initWorldState(setup);
+    initial.player.hp = 10;
+    const chapter = buildChapter();
+    chapter.state_update = { hp: -25 };
+
+    const next = applyStateUpdateToWorldState(initial, chapter);
+
+    expect(next.player.hp).toBe(0);
+    expect(next.player.condition).toBe('critical');
+  });
+
+  it('restores the active condition when HP climbs back above 0', () => {
+    const downed = initWorldState(setup);
+    downed.player.hp = 0;
+    downed.player.condition = 'critical';
+    const chapter = buildChapter();
+    chapter.state_update = { hp: 30 };
+
+    const next = applyStateUpdateToWorldState(downed, chapter);
+
+    expect(next.player.hp).toBe(30);
+    expect(next.player.condition).toBe('active');
+  });
+
+  it('rejects an invalid player condition during repair checks', () => {
+    const broken = {
+      ...initWorldState(setup),
+      player: { ...initWorldState(setup).player, condition: 'doomed' }
+    };
+
+    expect(worldStateNeedsRepair(broken as never)).toBe(true);
+  });
+});
+
+describe('world state reliability (#4)', () => {
+  it('lets an explicit affinity signal win over hostile regex inference', () => {
+    const initial = initWorldState(setup);
+    const chapter = buildMinimalChapter({
+      narrative: {
+        context: '',
+        action: 'Dash Rendar te trahit et t’attaque sans prévenir.',
+        dialogue: 'Dash Rendar : « Reste avec nous. »',
+        reflection: '',
+        atmosphere: 'tense'
+      },
+      state_update: { npcs: [{ name: 'Dash Rendar', affinity: 60, status: 'ally', alive: true }] }
+    });
+
+    const next = applyStateUpdateToWorldState(initial, chapter);
+    const dash = next.npcs.find(npc => npc.name === 'Dash Rendar');
+
+    expect(dash?.affinity).toBe(60);
+    expect(dash?.status).toBe('ally');
+  });
+
+  it('infers affinity from relation keywords only when no explicit signal is given', () => {
+    const initial = initWorldState(setup);
+    const chapter = buildMinimalChapter({
+      narrative: {
+        context: '',
+        action: 'Mara Jade te sauve, te protège et te couvre pendant la fuite.',
+        dialogue: 'Mara Jade : « Par ici, vite ! »',
+        reflection: '',
+        atmosphere: 'tense'
+      },
+      state_update: { npcs: [{ name: 'Mara Jade' }] }
+    });
+
+    const next = applyStateUpdateToWorldState(initial, chapter);
+    const mara = next.npcs.find(npc => npc.name === 'Mara Jade');
+
+    expect(mara).toBeDefined();
+    expect((mara?.affinity ?? 0)).toBeGreaterThan(0);
+  });
+
+  it('refuses a faction label as a location (leak guard)', () => {
+    const initial = initWorldState(setup);
+    const startLocation = initial.player.location;
+    const chapter = buildMinimalChapter({
+      narrative: { context: '', action: 'La salle tremble sous les détonations.', dialogue: '', reflection: '', atmosphere: 'tense' },
+      state_update: { location: 'Empire' }
+    });
+
+    const next = applyStateUpdateToWorldState(initial, chapter);
+
+    expect(next.player.location).not.toBe('Empire');
+    expect(next.player.location).toBe(startLocation);
+  });
+
+  it('does not turn an atmospheric/object speaker into an NPC', () => {
+    const initial = initWorldState(setup);
+    const chapter = buildMinimalChapter({
+      narrative: {
+        context: '',
+        action: 'Un grésillement emplit la cabine.',
+        dialogue: 'Voix distordue de l’émetteur : « Rendez-vous. »',
+        reflection: '',
+        atmosphere: 'eerie'
+      }
+    });
+
+    const next = applyStateUpdateToWorldState(initial, chapter);
+
+    expect(next.npcs).toHaveLength(0);
+  });
+
+  it('does not turn a place name into an NPC speaker', () => {
+    const initial = initWorldState(setup);
+    const chapter = buildMinimalChapter({
+      narrative: {
+        context: '',
+        action: 'Les annonces résonnent dans le hall.',
+        dialogue: 'Coruscant : « Bienvenue, voyageur. »',
+        reflection: '',
+        atmosphere: 'calm'
+      }
+    });
+
+    const next = applyStateUpdateToWorldState(initial, chapter);
+
+    expect(next.npcs.some(npc => npc.name.toLowerCase() === 'coruscant')).toBe(false);
+  });
+
+  it('resolves the French heuristics pack and falls back for unknown languages', () => {
+    expect(getWorldHeuristics('fr')).toBe(FR_WORLD_HEURISTICS);
+    expect(getWorldHeuristics('en')).toBe(FR_WORLD_HEURISTICS);
+    expect(getWorldHeuristics()).toBe(FR_WORLD_HEURISTICS);
   });
 });

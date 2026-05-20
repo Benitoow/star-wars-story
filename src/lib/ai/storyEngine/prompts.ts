@@ -280,6 +280,9 @@ export function buildSystemPrompt(
       .map(([id, score]) => `  • ${id}: ${score > 0 ? '+' : ''}${score}`)
       .join('\n') || '  (neutre partout)';
 
+    const criticalStr = p.condition === 'critical'
+      ? `\n\nÉTAT CRITIQUE (OBLIGATOIRE): le protagoniste est tombé à 0 PV — hors-combat, mourant ou capturé. Ce tour est une tentative de survie/sauvetage: PAS de mort définitive. Montre le danger immédiat et une porte de sortie crédible (secours, soin, reddition, fuite). Si le joueur survit/est soigné, hp doit redevenir > 0.`
+      : '';
     const envStr = worldState.environment_status ? `\nCondition Environnementale:\n  • ${worldState.environment_status}` : '';
     const clocksStr = Object.keys(worldState.clocks || {}).length ? `\nHorloges de Tension:\n${Object.entries(worldState.clocks || {}).map(([id, c]) => `  • ${id} [${c.current}/${c.max}]`).join('\n')}` : '';
     const rumorsStr = (worldState.rumors || []).length ? `\nRumeurs locales:\n${(worldState.rumors || []).map(r => `  • ${r}`).join('\n')}` : '';
@@ -298,7 +301,7 @@ ${inventoryLines}
 PNJs connus:
 ${npcLines}${deadLines}
 Réputation par faction:
-${factionLines}${envStr}${clocksStr}${sectorsStr}${rumorsStr}${directorStr}`;
+${factionLines}${envStr}${clocksStr}${sectorsStr}${rumorsStr}${directorStr}${criticalStr}`;
   }
 
   // ── Memory block ──────────────────────────────
@@ -413,7 +416,8 @@ export function buildContinuePrompt(
   _promptMode: StoryPromptMode = 'json',
   recentSectionTypes: string[] = [],
   recentChoiceTexts: string[] = [],
-  sceneAnchor: string = ''
+  sceneAnchor: string = '',
+  outcomeDirective: string = ''
 ): string {
   const history = recentSummary.length
     ? `\nRésumé récent:\n${recentSummary.map(item => `- ${item}`).join('\n')}`
@@ -441,9 +445,10 @@ export function buildContinuePrompt(
     : '';
 
   const anchorBlock = sceneAnchor ? `${sceneAnchor}\n\n` : '';
+  const outcomeBlock = outcomeDirective ? `${outcomeDirective}\n` : '';
 
   return `${anchorBlock}ACTION JOUEUR CANONIQUE: ${cleanText(actionText, 280)}
-OBLIGATION: la scène suivante doit traiter cette action comme cause immédiate (ou tentative avec conséquence concrète).
+${outcomeBlock}OBLIGATION: la scène suivante doit traiter cette action comme cause immédiate (ou tentative avec conséquence concrète).
 
 Tour ${turnNumber}. Action: "${cleanText(actionText, 280)}".${history}${recentChoicesBlock}${pacingDirective}
 

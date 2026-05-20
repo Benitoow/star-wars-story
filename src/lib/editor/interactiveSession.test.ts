@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   loadInteractiveSessionPayload,
   saveInteractiveSessionPayload,
-  type InteractiveSessionPayload
+  type InteractiveSessionPayload,
+  type SessionStore
 } from './interactiveSession';
 import { SESSION_CORRUPTION_FIXTURES } from '../../test/fixtures/sessionCorruptionFixtures';
 
@@ -26,13 +27,30 @@ function createLocalStorageMock() {
   };
 }
 
+// In-memory SessionStore so the persistence logic is testable without a real IndexedDB.
+function createMemoryStore(): SessionStore & { data: Map<string, unknown> } {
+  const data = new Map<string, unknown>();
+  return {
+    data,
+    async get(id) {
+      return data.get(id);
+    },
+    async put(id, payload) {
+      data.set(id, payload);
+    },
+    async delete(id) {
+      data.delete(id);
+    }
+  };
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
 describe('interactiveSession', () => {
-  it('restores setup-only sessions with no chapter history', () => {
-    vi.stubGlobal('localStorage', createLocalStorageMock());
+  it('round-trips a session through the IndexedDB-backed store', async () => {
+    const store = createMemoryStore();
 
     const payload: InteractiveSessionPayload = {
       version: 2,
@@ -49,8 +67,8 @@ describe('interactiveSession', () => {
       campaignArchive: []
     };
 
-    saveInteractiveSessionPayload('story-setup-only', payload);
-    const loaded = loadInteractiveSessionPayload('story-setup-only', fallbackSetup);
+    await saveInteractiveSessionPayload('story-setup-only', payload, store);
+    const loaded = await loadInteractiveSessionPayload('story-setup-only', fallbackSetup, store);
 
     expect(loaded).not.toBeNull();
     expect(loaded?.currentChapter).toBeNull();
@@ -60,7 +78,67 @@ describe('interactiveSession', () => {
     expect(loaded?.setupSnapshot).toEqual(fallbackSetup);
   });
 
-  it('backfills legacy background events as visible by default', () => {
+  it('prefers an IndexedDB record over a legacy localStorage entry', async () => {
+    const store = createMemoryStore();
+    const localStorage = createLocalStorageMock();
+    vi.stubGlobal('localStorage', localStorage);
+
+    // A stale localStorage entry that must be ignored once a db record exists.
+    localStorage.setItem(
+      'sw_svelte_interactive_story_story-precedence',
+      JSON.stringify({ version: 2, turnNumber: 99, chapterHistory: [], setupSnapshot: fallbackSetup })
+    );
+
+    const payload: InteractiveSessionPayload = {
+      version: 2,
+      turnNumber: 3,
+      selectedTrame: null,
+      storyRuntimeMode: 'structured-json',
+      currentChapter: null,
+      chapterHistory: [],
+      actionHistory: [],
+      aiMessages: [],
+      memoryLog: [],
+      backgroundEvents: [],
+      setupSnapshot: fallbackSetup,
+      campaignArchive: []
+    };
+    await saveInteractiveSessionPayload('story-precedence', payload, store);
+
+    const loaded = await loadInteractiveSessionPayload('story-precedence', fallbackSetup, store);
+
+    expect(loaded?.turnNumber).toBe(3);
+    expect(loaded?.storyRuntimeMode).toBe('structured-json');
+  });
+
+  it('migrates a legacy localStorage session into the store and drops the old key', async () => {
+    const store = createMemoryStore();
+    const localStorage = createLocalStorageMock();
+    vi.stubGlobal('localStorage', localStorage);
+
+    const key = 'sw_svelte_interactive_story_story-migrate';
+    localStorage.setItem(
+      key,
+      JSON.stringify({
+        version: 2,
+        turnNumber: 4,
+        chapterHistory: [],
+        actionHistory: [],
+        aiMessages: [{ role: 'assistant', content: 'ok' }],
+        memoryLog: ['fait'],
+        setupSnapshot: fallbackSetup
+      })
+    );
+
+    const loaded = await loadInteractiveSessionPayload('story-migrate', fallbackSetup, store);
+
+    expect(loaded?.turnNumber).toBe(4);
+    expect(store.data.has('story-migrate')).toBe(true);
+    expect(localStorage.getItem(key)).toBeNull();
+  });
+
+  it('backfills legacy background events as visible by default', async () => {
+    const store = createMemoryStore();
     const localStorage = createLocalStorageMock();
     vi.stubGlobal('localStorage', localStorage);
 
@@ -78,12 +156,13 @@ describe('interactiveSession', () => {
       })
     );
 
-    const loaded = loadInteractiveSessionPayload('story-legacy', fallbackSetup);
+    const loaded = await loadInteractiveSessionPayload('story-legacy', fallbackSetup, store);
 
     expect(loaded?.backgroundEvents?.[0]?.visibleNow).toBe(true);
   });
 
-  it('drops malformed world state payloads instead of restoring unusable runtime data', () => {
+  it('drops malformed world state payloads instead of restoring unusable runtime data', async () => {
+    const store = createMemoryStore();
     const localStorage = createLocalStorageMock();
     vi.stubGlobal('localStorage', localStorage);
 
@@ -108,7 +187,7 @@ describe('interactiveSession', () => {
       })
     );
 
-    const loaded = loadInteractiveSessionPayload('story-bad-world', fallbackSetup);
+    const loaded = await loadInteractiveSessionPayload('story-bad-world', fallbackSetup, store);
 
     expect(loaded).not.toBeNull();
     expect(loaded?.worldState).toBeUndefined();
@@ -116,7 +195,8 @@ describe('interactiveSession', () => {
     expect(loaded?.memoryLog).toEqual(['fait']);
   });
 
-  it.each(SESSION_CORRUPTION_FIXTURES)('survives corrupted session fixture: $name', ({ payload }) => {
+  it.each(SESSION_CORRUPTION_FIXTURES)('survives corrupted session fixture: $name', async ({ payload }) => {
+    const store = createMemoryStore();
     const localStorage = createLocalStorageMock();
     vi.stubGlobal('localStorage', localStorage);
 
@@ -125,7 +205,7 @@ describe('interactiveSession', () => {
       JSON.stringify(payload)
     );
 
-    const loaded = loadInteractiveSessionPayload('story-corrupted', fallbackSetup);
+    const loaded = await loadInteractiveSessionPayload('story-corrupted', fallbackSetup, store);
 
     if ((payload.version as number | undefined) === 99) {
       expect(loaded).toBeNull();

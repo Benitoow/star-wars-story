@@ -5,6 +5,7 @@ import {
   coerceMemoryUpdates,
   detectModelCapabilities,
   generateStoryTurn,
+  generateStoryTurnStructured,
   parseStoryResponse,
   supportsAgenticToolCalling
 } from './storyEngine';
@@ -584,5 +585,68 @@ describe('pipeline story generation', () => {
     expect(generation.rawResponse).toContain('"player_action": "Saboter le terminal de verrouillage."');
     expect(generation.rawResponse).not.toContain('"player_action": "Observer en silence derrière une caisse."');
     expect(generation.chapter.chapter_title).toBe('Verrou cassé');
+  });
+});
+
+describe('generateStoryTurnStructured', () => {
+  it('produces a playable chapter from a single structured call', async () => {
+    const chapterJson = JSON.stringify({
+      chapter_title: 'Fuite du spatioport',
+      chapter_number: 5,
+      section_type: 'action',
+      narrative: {
+        action: 'Tu cours vers la rampe pendant que les moteurs rugissent.',
+        dialogue: 'Lira : « Vite, ils arrivent ! »',
+        reflection: '',
+        atmosphere: 'tense'
+      },
+      choices: [
+        { text: 'Bondir dans le cockpit', attribute: 'combat', difficulty: 3, faction_impact: {} },
+        { text: 'Couvrir Lira', attribute: 'diplomacy', difficulty: 2, faction_impact: {} }
+      ],
+      state_update: { location: 'Spatioport de Nar Shaddaa', hp: -5 }
+    });
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { role: 'assistant', content: chapterJson } }] })
+    } as Response);
+    vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
+
+    const generation = await generateStoryTurnStructured(
+      [
+        { role: 'system', content: 'test' },
+        { role: 'user', content: 'Foncer vers le vaisseau.' }
+      ],
+      { providerId: 'openrouter', model: 'openai/gpt-5.4-mini', apiKey: 'test-key' },
+      5
+    );
+
+    expect(generation.mode).toBe('structured-json');
+    expect(generation.steps).toBe(1);
+    expect(generation.chapter.chapter_title).toBe('Fuite du spatioport');
+    expect(generation.chapter.narrative.action).toContain('rampe');
+    expect(generation.chapter.choices.length).toBeGreaterThanOrEqual(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to a playable emergency chapter when the model returns junk', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { role: 'assistant', content: 'pas du tout du json' } }] })
+    } as Response);
+    vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
+
+    const generation = await generateStoryTurnStructured(
+      [
+        { role: 'system', content: 'test' },
+        { role: 'user', content: 'Avancer prudemment.' }
+      ],
+      { providerId: 'openrouter', model: 'openai/gpt-5.4-mini', apiKey: 'test-key' },
+      2
+    );
+
+    expect(generation.mode).toBe('structured-json');
+    expect(Boolean(generation.chapter.narrative.action || generation.chapter.narrative.dialogue)).toBe(true);
   });
 });

@@ -9,6 +9,7 @@ import {
   validateStoryChapter
 } from '$lib/ai/storyEngine';
 import { recordDiagnosticEvent } from '$lib/utils/logger';
+import { db } from '$lib/db';
 
 const INTERACTIVE_SESSION_PREFIX = 'sw_svelte_interactive_story_';
 export const INTERACTIVE_SESSION_VERSION = 2;
@@ -184,7 +185,10 @@ function sanitizeWorldState(value: unknown): WorldState | undefined {
         : [],
       inventory: Array.isArray(playerCandidate.inventory)
         ? (playerCandidate.inventory as WorldState['player']['inventory'])
-        : []
+        : [],
+      condition: playerCandidate.condition === 'critical' || playerCandidate.condition === 'active'
+        ? playerCandidate.condition
+        : undefined
     },
     npcs: Array.isArray(value.npcs) ? (value.npcs as WorldState['npcs']) : [],
     factions: sanitizeNumericRecord(value.factions) as WorldState['factions'],
@@ -197,8 +201,108 @@ function sanitizeWorldState(value: unknown): WorldState | undefined {
   };
 }
 
-export function saveInteractiveSessionPayload(storyId: string | null, payload: InteractiveSessionPayload): void {
-  if (!storyId || typeof localStorage === 'undefined') return;
+export interface SessionStore {
+  get(id: string): Promise<unknown>;
+  put(id: string, payload: InteractiveSessionPayload): Promise<void>;
+  delete(id: string): Promise<void>;
+}
+
+// Default backend: IndexedDB via Dexie. Injectable so logic can be unit-tested without IndexedDB.
+const dexieSessionStore: SessionStore = {
+  async get(id) {
+    return (await db.sessions.get(id))?.payload;
+  },
+  async put(id, payload) {
+    await db.sessions.put({ id, payload });
+  },
+  async delete(id) {
+    await db.sessions.delete(id);
+  }
+};
+
+// Shared validation/normalization for a parsed session object (from IndexedDB or legacy localStorage).
+function sanitizeSessionObject(
+  parsed: Partial<InteractiveSessionPayload>,
+  id: string,
+  fallbackSetup: StorySetup
+): InteractiveSessionPayload | null {
+  const parsedVersion = typeof parsed.version === 'number' ? parsed.version : 1;
+  if (parsedVersion > INTERACTIVE_SESSION_VERSION) {
+    recordDiagnosticEvent({
+      level: 'warn',
+      category: 'interactive-session',
+      stage: 'load',
+      message: 'Version de session trop récente, chargement refusé.',
+      sessionId: id,
+      validation: 'failed',
+      meta: { version: parsedVersion }
+    });
+    return null;
+  }
+
+  const chapterHistory = sanitizeStoryChapterArray(parsed.chapterHistory);
+  const currentChapter = sanitizeStoryChapterValue(parsed.currentChapter) ?? chapterHistory[chapterHistory.length - 1] ?? null;
+  const backgroundEvents = sanitizeBackgroundEvents(parsed.backgroundEvents);
+  const storedTurnNumber = typeof parsed.turnNumber === 'number' && Number.isFinite(parsed.turnNumber) && parsed.turnNumber >= 0
+    ? parsed.turnNumber
+    : chapterHistory.length;
+  const worldState = sanitizeWorldState(parsed.worldState);
+  const runtimeMode = parsed.storyRuntimeMode
+    ? normalizeStoryGenerationMode(parsed.storyRuntimeMode)
+    : null;
+
+  if (parsed.worldState && !worldState) {
+    recordDiagnosticEvent({
+      level: 'warn',
+      category: 'interactive-session',
+      stage: 'load',
+      message: 'World state de session rejeté car invalide.',
+      sessionId: id,
+      runtimeMode: runtimeMode || undefined,
+      validation: 'repaired',
+      meta: parsed.worldState
+    });
+  }
+
+  const payload: InteractiveSessionPayload = {
+    version: INTERACTIVE_SESSION_VERSION,
+    turnNumber: storedTurnNumber,
+    selectedTrame: typeof parsed.selectedTrame === 'string' ? parsed.selectedTrame : null,
+    storyRuntimeMode: runtimeMode,
+    currentChapter,
+    chapterHistory,
+    actionHistory: Array.isArray(parsed.actionHistory) ? parsed.actionHistory : [],
+    aiMessages: sanitizeChatMessages(parsed.aiMessages),
+    memoryLog: sanitizeStringArray(parsed.memoryLog),
+    backgroundEvents,
+    setupSnapshot: sanitizeSetupSnapshot(parsed.setupSnapshot, fallbackSetup),
+    worldState,
+    campaignArchive: sanitizeStringArray(parsed.campaignArchive)
+  };
+  recordDiagnosticEvent({
+    level: 'info',
+    category: 'interactive-session',
+    stage: 'load',
+    message: 'Session interactive restaurée.',
+    sessionId: id,
+    runtimeMode: runtimeMode || undefined,
+    validation: 'passed',
+    meta: {
+      version: parsedVersion,
+      turnNumber: payload.turnNumber,
+      chapterHistory: payload.chapterHistory.length,
+      hasWorldState: Boolean(payload.worldState)
+    }
+  });
+  return payload;
+}
+
+export async function saveInteractiveSessionPayload(
+  storyId: string | null,
+  payload: InteractiveSessionPayload,
+  store: SessionStore = dexieSessionStore
+): Promise<void> {
+  if (!storyId) return;
   const normalizedPayload: InteractiveSessionPayload = {
     ...payload,
     version: INTERACTIVE_SESSION_VERSION,
@@ -206,100 +310,69 @@ export function saveInteractiveSessionPayload(storyId: string | null, payload: I
     chapterHistory: sanitizeStoryChapterArray(payload.chapterHistory),
     currentChapter: payload.currentChapter ? sanitizeStoryChapterValue(payload.currentChapter) : null
   };
-  localStorage.setItem(storySessionKey(storyId), JSON.stringify(normalizedPayload));
-  recordDiagnosticEvent({
-    level: 'info',
-    category: 'interactive-session',
-    stage: 'save',
-    message: 'Session interactive sauvegardée.',
-    sessionId: storyId,
-    runtimeMode: normalizedPayload.storyRuntimeMode || undefined,
-    validation: 'passed',
-    meta: {
-      turnNumber: normalizedPayload.turnNumber,
-      chapterHistory: normalizedPayload.chapterHistory.length,
-      hasWorldState: Boolean(normalizedPayload.worldState)
-    }
-  });
+
+  try {
+    await store.put(storyId, normalizedPayload);
+    recordDiagnosticEvent({
+      level: 'info',
+      category: 'interactive-session',
+      stage: 'save',
+      message: 'Session interactive sauvegardée.',
+      sessionId: storyId,
+      runtimeMode: normalizedPayload.storyRuntimeMode || undefined,
+      validation: 'passed',
+      meta: {
+        turnNumber: normalizedPayload.turnNumber,
+        chapterHistory: normalizedPayload.chapterHistory.length,
+        hasWorldState: Boolean(normalizedPayload.worldState)
+      }
+    });
+  } catch (error) {
+    recordDiagnosticEvent({
+      level: 'error',
+      category: 'interactive-session',
+      stage: 'save',
+      message: 'Sauvegarde de session échouée.',
+      sessionId: storyId,
+      validation: 'failed',
+      meta: error
+    });
+  }
 }
 
-export function loadInteractiveSessionPayload(id: string, fallbackSetup: StorySetup): InteractiveSessionPayload | null {
+export async function loadInteractiveSessionPayload(
+  id: string,
+  fallbackSetup: StorySetup,
+  store: SessionStore = dexieSessionStore
+): Promise<InteractiveSessionPayload | null> {
+  // 1. Primary backend: IndexedDB.
+  try {
+    const dbRecord = await store.get(id);
+    if (dbRecord && typeof dbRecord === 'object') {
+      const sanitized = sanitizeSessionObject(dbRecord as Partial<InteractiveSessionPayload>, id, fallbackSetup);
+      if (sanitized) return sanitized;
+    }
+  } catch (error) {
+    recordDiagnosticEvent({
+      level: 'warn',
+      category: 'interactive-session',
+      stage: 'load',
+      message: 'Lecture IndexedDB de session échouée, tentative de migration localStorage.',
+      sessionId: id,
+      validation: 'repaired',
+      meta: error
+    });
+  }
+
+  // 2. Legacy fallback + migration: localStorage.
   if (typeof localStorage === 'undefined') return null;
 
   const raw = localStorage.getItem(storySessionKey(id));
   if (!raw) return null;
 
+  let parsed: Partial<InteractiveSessionPayload>;
   try {
-    const parsed = JSON.parse(raw) as Partial<InteractiveSessionPayload>;
-    const parsedVersion = typeof parsed.version === 'number' ? parsed.version : 1;
-    if (parsedVersion > INTERACTIVE_SESSION_VERSION) {
-      recordDiagnosticEvent({
-        level: 'warn',
-        category: 'interactive-session',
-        stage: 'load',
-        message: 'Version de session trop récente, chargement refusé.',
-        sessionId: id,
-        validation: 'failed',
-        meta: { version: parsedVersion }
-      });
-      return null;
-    }
-
-    const chapterHistory = sanitizeStoryChapterArray(parsed.chapterHistory);
-    const currentChapter = sanitizeStoryChapterValue(parsed.currentChapter) ?? chapterHistory[chapterHistory.length - 1] ?? null;
-    const backgroundEvents = sanitizeBackgroundEvents(parsed.backgroundEvents);
-    const storedTurnNumber = typeof parsed.turnNumber === 'number' && Number.isFinite(parsed.turnNumber) && parsed.turnNumber >= 0
-      ? parsed.turnNumber
-      : chapterHistory.length;
-    const worldState = sanitizeWorldState(parsed.worldState);
-    const runtimeMode = parsed.storyRuntimeMode
-      ? normalizeStoryGenerationMode(parsed.storyRuntimeMode)
-      : null;
-
-    if (parsed.worldState && !worldState) {
-      recordDiagnosticEvent({
-        level: 'warn',
-        category: 'interactive-session',
-        stage: 'load',
-        message: 'World state de session rejeté car invalide.',
-        sessionId: id,
-        runtimeMode: runtimeMode || undefined,
-        validation: 'repaired',
-        meta: parsed.worldState
-      });
-    }
-
-    const payload: InteractiveSessionPayload = {
-      version: INTERACTIVE_SESSION_VERSION,
-      turnNumber: storedTurnNumber,
-      selectedTrame: typeof parsed.selectedTrame === 'string' ? parsed.selectedTrame : null,
-      storyRuntimeMode: runtimeMode,
-      currentChapter,
-      chapterHistory,
-      actionHistory: Array.isArray(parsed.actionHistory) ? parsed.actionHistory : [],
-      aiMessages: sanitizeChatMessages(parsed.aiMessages),
-      memoryLog: sanitizeStringArray(parsed.memoryLog),
-      backgroundEvents,
-      setupSnapshot: sanitizeSetupSnapshot(parsed.setupSnapshot, fallbackSetup),
-      worldState,
-      campaignArchive: sanitizeStringArray(parsed.campaignArchive)
-    };
-    recordDiagnosticEvent({
-      level: 'info',
-      category: 'interactive-session',
-      stage: 'load',
-      message: 'Session interactive restaurée.',
-      sessionId: id,
-      runtimeMode: runtimeMode || undefined,
-      validation: 'passed',
-      meta: {
-        version: parsedVersion,
-        turnNumber: payload.turnNumber,
-        chapterHistory: payload.chapterHistory.length,
-        hasWorldState: Boolean(payload.worldState)
-      }
-    });
-    return payload;
+    parsed = JSON.parse(raw) as Partial<InteractiveSessionPayload>;
   } catch {
     recordDiagnosticEvent({
       level: 'error',
@@ -311,9 +384,57 @@ export function loadInteractiveSessionPayload(id: string, fallbackSetup: StorySe
     });
     return null;
   }
+
+  const sanitized = sanitizeSessionObject(parsed, id, fallbackSetup);
+  if (!sanitized) return null;
+
+  // Migrate to IndexedDB then drop the legacy key (best-effort).
+  try {
+    await store.put(id, sanitized);
+    localStorage.removeItem(storySessionKey(id));
+    recordDiagnosticEvent({
+      level: 'info',
+      category: 'interactive-session',
+      stage: 'migrate',
+      message: 'Session migrée de localStorage vers IndexedDB.',
+      sessionId: id,
+      runtimeMode: sanitized.storyRuntimeMode || undefined,
+      validation: 'passed'
+    });
+  } catch (error) {
+    recordDiagnosticEvent({
+      level: 'warn',
+      category: 'interactive-session',
+      stage: 'migrate',
+      message: 'Migration de session vers IndexedDB échouée (non bloquant).',
+      sessionId: id,
+      validation: 'repaired',
+      meta: error
+    });
+  }
+
+  return sanitized;
 }
 
-export function clearInteractiveSessionPayload(id: string): void {
-  if (typeof localStorage === 'undefined') return;
-  localStorage.removeItem(storySessionKey(id));
+export async function clearInteractiveSessionPayload(
+  id: string,
+  store: SessionStore = dexieSessionStore
+): Promise<void> {
+  try {
+    await store.delete(id);
+  } catch (error) {
+    recordDiagnosticEvent({
+      level: 'warn',
+      category: 'interactive-session',
+      stage: 'save',
+      message: 'Suppression de session échouée.',
+      sessionId: id,
+      validation: 'repaired',
+      meta: error
+    });
+  }
+
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem(storySessionKey(id));
+  }
 }

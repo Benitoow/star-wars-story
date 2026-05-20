@@ -70,17 +70,44 @@ import { FACTION_CREDITS, ERA_START_DATES } from '$lib/editor/setupCatalog';
   // Atmospheric/object nouns that can appear as dialogue speakers but are not characters
   const ATMOSPHERIC_PREFIX_RE = /^(?:voix|presence|signal|transmission|son\b|bruit|ombre|echo|echos?|silhouette|figure|entite|etre\b|forme\b|lueur|vision|apparition|souvenir|memoire|pensee|emetteur|systeme|terminal|hologramme|holo|droid|droide|machine|ordinateur|unite|capitaine\s+(?:de\s+)|commandant\s+(?:de\s+))/i;
 
-  export function isLikelyNpcName(value: unknown): boolean {
+  // ── Language-coupled NPC/relation heuristics ──────────────
+  // The state extraction heuristics below are language-specific. They are bundled
+  // here so a non-French language pack can be added in getWorldHeuristics() without
+  // touching the reducer logic. MVP: only 'fr' is wired; other languages fall back to it.
+  export interface WorldHeuristics {
+    stopwords: Set<string>;
+    nonNpcExact: Set<string>;
+    nonNpcEntityRe: RegExp;
+    atmosphericPrefixRe: RegExp;
+    hostileRelationRe: RegExp;
+    allyRelationRe: RegExp;
+  }
+
+  export const FR_WORLD_HEURISTICS: WorldHeuristics = {
+    stopwords: DIALOGUE_SPEAKER_STOPWORDS,
+    nonNpcExact: NON_NPC_EXACT,
+    nonNpcEntityRe: NON_NPC_ENTITY_RE,
+    atmosphericPrefixRe: ATMOSPHERIC_PREFIX_RE,
+    hostileRelationRe: HOSTILE_RELATION_RE,
+    allyRelationRe: ALLY_RELATION_RE
+  };
+
+  export function getWorldHeuristics(_lang: string = 'fr'): WorldHeuristics {
+    // TODO: add an 'en' pack here; for now every language resolves to French.
+    return FR_WORLD_HEURISTICS;
+  }
+
+  export function isLikelyNpcName(value: unknown, h: WorldHeuristics = FR_WORLD_HEURISTICS): boolean {
     const raw = String(value || '').trim();
     if (!raw) return false;
 
     const normalized = normalizeSearchText(raw);
     if (!normalized || isUnknownLocationValue(normalized)) return false;
-    if (DIALOGUE_SPEAKER_STOPWORDS.has(normalized)) return false;
-    if (NON_NPC_EXACT.has(normalized)) return false;
+    if (h.stopwords.has(normalized)) return false;
+    if (h.nonNpcExact.has(normalized)) return false;
     if (/^(?:le|la|les|un|une|des|du|de)\s+/.test(normalized)) return false;
-    if (NON_NPC_ENTITY_RE.test(normalized)) return false;
-    if (ATMOSPHERIC_PREFIX_RE.test(normalized)) return false;
+    if (h.nonNpcEntityRe.test(normalized)) return false;
+    if (h.atmosphericPrefixRe.test(normalized)) return false;
     // Rejects "Voix distordue de l'émetteur" style — preposition chain mid-name = object, not person
     if (/\s+(?:de\s+l[''`]|de\s+la\s+|du\s+|des\s+)/.test(normalized)) return false;
     if (normalized.split(/\s+/).length > 3) return false;
@@ -104,7 +131,7 @@ import { FACTION_CREDITS, ERA_START_DATES } from '$lib/editor/setupCatalog';
     return 'neutral';
   }
 
-  export function inferNpcAffinityDelta(chapter: StoryChapter, npcName: string): number {
+  export function inferNpcAffinityDelta(chapter: StoryChapter, npcName: string, h: WorldHeuristics = FR_WORLD_HEURISTICS): number {
     const normalizedName = normalizeSearchText(npcName);
     if (!normalizedName) return 0;
 
@@ -125,8 +152,8 @@ import { FACTION_CREDITS, ERA_START_DATES } from '$lib/editor/setupCatalog';
       const end = Math.min(corpus.length, match.index + normalizedName.length + 90);
       const window = corpus.slice(start, end);
 
-      if (ALLY_RELATION_RE.test(window)) score += 12;
-      if (HOSTILE_RELATION_RE.test(window)) score -= 12;
+      if (h.allyRelationRe.test(window)) score += 12;
+      if (h.hostileRelationRe.test(window)) score -= 12;
     }
 
     return Math.max(-20, Math.min(20, score));
@@ -230,15 +257,15 @@ import { FACTION_CREDITS, ERA_START_DATES } from '$lib/editor/setupCatalog';
     );
   }
 
-  export function extractNpcSeedsFromDialogue(dialogue: string, excludeNormalized?: Set<string>): string[] {
+  export function extractNpcSeedsFromDialogue(dialogue: string, excludeNormalized?: Set<string>, h: WorldHeuristics = FR_WORLD_HEURISTICS): string[] {
     const names = new Set<string>();
     for (const match of String(dialogue || '').matchAll(DIALOGUE_SPEAKER_RE)) {
       const candidate = String(match[1] || '').trim();
       if (!candidate) continue;
 
       const normalized = normalizeSearchText(candidate);
-      if (DIALOGUE_SPEAKER_STOPWORDS.has(normalized)) continue;
-      if (!isLikelyNpcName(candidate)) continue;
+      if (h.stopwords.has(normalized)) continue;
+      if (!isLikelyNpcName(candidate, h)) continue;
       if (excludeNormalized?.has(normalized)) continue;
       names.add(candidate);
     }
@@ -298,7 +325,8 @@ import { FACTION_CREDITS, ERA_START_DATES } from '$lib/editor/setupCatalog';
         location: source.player.location,
         date: source.player.date,
         injuries: source.player.injuries.map(injury => ({ ...injury })),
-        inventory: source.player.inventory.map(item => ({ ...item }))
+        inventory: source.player.inventory.map(item => ({ ...item })),
+        condition: source.player.condition
       },
       npcs: source.npcs.map(npc => ({ ...npc })),
       factions: { ...source.factions },
@@ -330,7 +358,8 @@ import { FACTION_CREDITS, ERA_START_DATES } from '$lib/editor/setupCatalog';
         location: deriveInitialLocation(setup),
         date: ERA_START_DATES[setup.era] ?? 'Ère inconnue, Jour 1',
         injuries: [],
-        inventory: []
+        inventory: [],
+        condition: 'active'
       },
       npcs: [],
       factions,
@@ -351,8 +380,10 @@ import { FACTION_CREDITS, ERA_START_DATES } from '$lib/editor/setupCatalog';
   export function applyStateUpdateToWorldState(
     sourceState: WorldState,
     chapter: StoryChapter,
-    protagonistNames?: string[]
+    protagonistNames?: string[],
+    lang: string = 'fr'
   ): WorldState {
+    const h = getWorldHeuristics(lang);
     const excludedNormalized = new Set<string>(
       (protagonistNames ?? []).flatMap(n =>
         [n, ...n.trim().split(/\s+/)].map(s => normalizeSearchText(s)).filter(Boolean)
@@ -385,6 +416,7 @@ import { FACTION_CREDITS, ERA_START_DATES } from '$lib/editor/setupCatalog';
     const newHp = hpDelta !== undefined ? Math.max(0, Math.min(100, p.hp + hpDelta)) : p.hp;
     const newCredits = creditsDelta !== undefined ? Math.max(0, p.credits + creditsDelta) : p.credits;
     const newDate = normalizeNarrativeDate(p.date, upd?.date_advance);
+    const newCondition: NonNullable<WorldState['player']['condition']> = newHp <= 0 ? 'critical' : 'active';
 
     // Injuries: resolve then add new
     const resolvedKeywords = upd?.injuries_resolved ?? [];
@@ -411,7 +443,7 @@ import { FACTION_CREDITS, ERA_START_DATES } from '$lib/editor/setupCatalog';
     let npcs = sourceState.npcs.map(npc => ({ ...npc, status: normalizeNpcStatus(npc.status) }));
 
     for (const npcUpd of upd?.npcs ?? []) {
-      if (!isLikelyNpcName(npcUpd.name)) continue;
+      if (!isLikelyNpcName(npcUpd.name, h)) continue;
       if (excludedNormalized.size && excludedNormalized.has(normalizeSearchText(npcUpd.name))) continue;
       const idx = npcs.findIndex(n => n.name.toLowerCase() === npcUpd.name.toLowerCase());
       if (idx >= 0) {
@@ -464,12 +496,12 @@ import { FACTION_CREDITS, ERA_START_DATES } from '$lib/editor/setupCatalog';
     }
 
     // Fallback NPC seeds from dialogue when model omitted update_npc
-    const speakerSeeds = extractNpcSeedsFromDialogue(chapter.narrative.dialogue, excludedNormalized.size ? excludedNormalized : undefined);
+    const speakerSeeds = extractNpcSeedsFromDialogue(chapter.narrative.dialogue, excludedNormalized.size ? excludedNormalized : undefined, h);
     const existingNames = new Set(npcs.map(npc => npc.name.toLowerCase()));
     for (const name of speakerSeeds) {
       const key = name.toLowerCase();
       if (existingNames.has(key)) continue;
-      if (!isLikelyNpcName(name)) continue;
+      if (!isLikelyNpcName(name, h)) continue;
       npcs.push({
         name,
         affinity: 0,
@@ -487,7 +519,7 @@ import { FACTION_CREDITS, ERA_START_DATES } from '$lib/editor/setupCatalog';
     );
 
     for (const npc of npcs) {
-      if (!isLikelyNpcName(npc.name)) continue;
+      if (!isLikelyNpcName(npc.name, h)) continue;
 
       const normalizedName = normalizeSearchText(npc.name);
       const chapterCorpus = normalizeSearchText([
@@ -512,7 +544,7 @@ import { FACTION_CREDITS, ERA_START_DATES } from '$lib/editor/setupCatalog';
       );
 
       if (!hasExplicitRelationSignal) {
-        const delta = inferNpcAffinityDelta(chapter, npc.name);
+        const delta = inferNpcAffinityDelta(chapter, npc.name, h);
         if (delta !== 0) {
           npc.affinity = clampAffinity((npc.affinity ?? 0) + delta);
         }
@@ -569,7 +601,7 @@ import { FACTION_CREDITS, ERA_START_DATES } from '$lib/editor/setupCatalog';
     ].slice(-40);
 
     return {
-      player: { hp: newHp, credits: newCredits, location: newLocation, date: newDate, injuries: newInjuries, inventory },
+      player: { hp: newHp, credits: newCredits, location: newLocation, date: newDate, injuries: newInjuries, inventory, condition: newCondition },
       npcs,
       factions,
       chronology,
@@ -646,6 +678,7 @@ import { FACTION_CREDITS, ERA_START_DATES } from '$lib/editor/setupCatalog';
     if (typeof player.date !== 'string' || !player.date.trim()) return true;
     if (!Array.isArray(player.injuries) || !player.injuries.every(isValidInjuryEntry)) return true;
     if (!Array.isArray(player.inventory) || !player.inventory.every(isValidInventoryEntry)) return true;
+    if (player.condition !== undefined && player.condition !== 'active' && player.condition !== 'critical') return true;
 
     if (!Array.isArray(candidate.npcs) || !candidate.npcs.every(isValidNpcEntry)) return true;
     if (!isValidNumericRecord(candidate.factions)) return true;

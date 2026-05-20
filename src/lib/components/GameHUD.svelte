@@ -11,6 +11,7 @@
   export let protagonistLastName = '';
 
   $: p = worldState.player;
+  $: downed = p.condition === 'critical' || p.hp <= 0;
   $: hpColor = p.hp >= 70 ? '#4ade80' : p.hp >= 35 ? '#facc15' : '#f87171';
   $: hpPct = Math.max(0, Math.min(100, p.hp));
   $: activeInjuries = p.injuries.filter(i => i.severity !== 'light');
@@ -173,6 +174,14 @@
       <!-- Turn number -->
       {#if turnNumber > 0}
         <div class="hud-turn-capsule">Tour {turnNumber}</div>
+      {/if}
+
+      <!-- Downed / critical condition -->
+      {#if downed}
+        <div class="hud-downed" role="status">
+          <span class="hud-downed-icon">☠️</span>
+          <span class="hud-downed-text">Hors-combat — survie</span>
+        </div>
       {/if}
 
       <!-- HP -->
@@ -543,6 +552,25 @@
     border-color: #f87171;
     box-shadow: 0 0 5px rgba(248, 113, 113, 0.5);
   }
+
+  /* Downed / critical banner */
+  .hud-downed {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 9px;
+    border-radius: 8px;
+    background: rgba(248, 113, 113, 0.14);
+    border: 1px solid rgba(248, 113, 113, 0.5);
+    color: #fca5a5;
+    font-weight: 700;
+    font-size: 0.72rem;
+    letter-spacing: 0.03em;
+    animation: pulseCritical 1.2s ease-in-out infinite;
+  }
+
+  .hud-downed-icon { flex-shrink: 0; }
+  .hud-downed-text { flex: 1; }
 
   /* Turn capsule */
   .hud-turn-capsule {

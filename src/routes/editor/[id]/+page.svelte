@@ -78,12 +78,15 @@
     buildSystemPrompt,
     generateBackgroundWorldEvent,
     generateStoryTurn,
+    generateStoryTurnStructured,
     normalizeProviderId,
+    normalizeStoryGenerationMode,
     summarizeChapterForPrompt,
     type BackgroundWorldEvent,
     type ChatMessage,
     type StoryChapter,
     type StoryChoice,
+    type StoryGenerationMode,
     type StoryProviderConfig,
     type WorldState
   } from '$lib/ai/storyEngine';
@@ -93,6 +96,11 @@
     rebuildWorldStateFromHistory,
     worldStateNeedsRepair
   } from '$lib/editor/worldStateReducer';
+  import {
+    buildOutcomeDirective,
+    resolveChoiceOutcome,
+    situationalDifficultyPenalty
+  } from '$lib/editor/choiceResolution';
 
   let loading = true;
   let saving = false;
@@ -119,6 +127,8 @@
   let customAction = '';
   let hudCollapsed = false;
   let storyRuntimeMode: string | null = 'agentic-subagents';
+  let preferredTextRuntimeMode: StoryGenerationMode = 'agentic-subagents';
+  const BACKGROUND_WORLD_EVERY = 3;
 
   let worldState: WorldState = {
     player: { hp: 100, credits: 1000, location: 'Secteur frontalier', date: '', injuries: [], inventory: [] },
@@ -139,19 +149,17 @@
   // Mechanical consequences: returns display modifiers for a choice
   function choiceConsequences(choice: StoryChoice): { warning: string; diffBonus: number; disabled: boolean } {
     let warning = '';
-    let diffBonus = 0;
     let disabled = false;
 
     const critical = worldState.player.hp < 20;
     const heavyInjury = worldState.player.injuries.some(i => i.severity === 'severe');
     const broke = worldState.player.credits <= 0;
+    const diffBonus = situationalDifficultyPenalty(choice, worldState.player);
 
     if (critical && (choice.attribute === 'combat' || choice.attribute === 'force')) {
       warning = '⚠ État critique';
-      diffBonus = 2;
     } else if (heavyInjury && (choice.attribute === 'combat' || choice.attribute === 'stealth')) {
       warning = '⚠ Blessure grave';
-      diffBonus = 1;
     }
 
     if (broke) {
@@ -181,7 +189,7 @@
   $: currentRoleLabel = ROLES.find(role => role.id === $currentSetup.role)?.name || $currentSetup.role || '';
   $: currentFactionLabel = FACTIONS.find(faction => faction.id === $currentSetup.faction)?.name || $currentSetup.faction || '';
 
-  function saveInteractiveSession(): void {
+  function saveInteractiveSession(): Promise<void> {
     const payload: InteractiveSessionPayload = {
       version: 2,
       turnNumber,
@@ -198,14 +206,14 @@
       campaignArchive
     };
 
-    saveInteractiveSessionPayload(storyId, payload);
+    return saveInteractiveSessionPayload(storyId, payload);
   }
 
   function flushInteractiveState(): void {
     const setup = ensureSetupDefaults();
     updateTitle(buildStoryTitle(setup));
     updateContent(buildJournalContent(chapterHistory));
-    saveInteractiveSession();
+    void saveInteractiveSession();
 
     if (storyId) {
       void saveStory().catch(error => {
@@ -214,12 +222,12 @@
     }
   }
 
-  function loadInteractiveSession(id: string): InteractiveSessionPayload | null {
+  function loadInteractiveSession(id: string): Promise<InteractiveSessionPayload | null> {
     return loadInteractiveSessionPayload(id, get(currentSetup));
   }
 
   function clearInteractiveSession(id: string): void {
-    clearInteractiveSessionPayload(id);
+    void clearInteractiveSessionPayload(id);
   }
 
   function setSetupField<K extends keyof StorySetup>(field: K, value: StorySetup[K]): void {
@@ -295,6 +303,7 @@
     const preferences = await getPreferences();
     applySetupDefaultsFromPreferences(preferences);
     providerConfig = buildProviderConfigFromPreferences(preferences);
+    preferredTextRuntimeMode = normalizeStoryGenerationMode(preferences.textRuntimeMode);
 
     return preferences;
   }
@@ -318,6 +327,10 @@
 
   async function runBackgroundWorldTick(setup: StorySetup, turn: number, recentSectionTypes: string[] = []): Promise<void> {
     if (!providerConfig) return;
+
+    // Throttle: the off-screen simulation is expensive (2 extra LLM calls). Only run it
+    // periodically instead of every turn.
+    if (turn % BACKGROUND_WORLD_EVERY !== 0) return;
 
     const sectionWindow = recentSectionTypes.length
       ? recentSectionTypes.slice(-2)
@@ -346,6 +359,10 @@
       if (!event) return;
       if (isNearDuplicateBackgroundEvent(event, backgroundEvents)) return;
 
+      // The tick runs non-blocking: drop its result if the player already advanced to a
+      // newer turn (or one is in flight), to avoid clobbering fresher world state.
+      if (generating || turnNumber !== turn) return;
+
       const applied = applyBackgroundWorldEventToRuntime(worldState, memoryLog, backgroundEvents, event, turn);
       worldState = applied.worldState;
       memoryLog = applied.memoryLog;
@@ -354,6 +371,8 @@
       if (applied.loggedEvent.visibleNow && applied.loggedEvent.summary) {
         showToast(`Événement galactique: ${applied.loggedEvent.summary}`, 'warning');
       }
+
+      void saveInteractiveSession();
     } catch (error) {
       logger.warn('editor: tick hors-écran ignoré.', error);
     }
@@ -362,7 +381,7 @@
   async function persistInteractiveState(setup: StorySetup): Promise<void> {
     updateTitle(buildStoryTitle(setup));
     updateContent(buildJournalContent(chapterHistory));
-    saveInteractiveSession();
+    await saveInteractiveSession();
 
     if (storyId) {
       await saveStory();
@@ -400,7 +419,9 @@
       { role: 'user', content: prompt }
     ]);
 
-    const generation = await generateStoryTurn(requestMessages, providerConfig, turn);
+    const generation = preferredTextRuntimeMode === 'structured-json'
+      ? await generateStoryTurnStructured(requestMessages, providerConfig, turn)
+      : await generateStoryTurn(requestMessages, providerConfig, turn);
     storyRuntimeMode = generation.mode;
     const chapter = sanitizeChapterForDisplay(enforceTransitionChoiceQuality(generation.chapter, worldState)) as StoryChapter;
     const assistantContent = buildStoredAssistantContent(chapter, generation.mode, generation.rawResponse);
@@ -466,13 +487,22 @@
     }
   }
 
-  async function continueAdventure(actionText: string): Promise<void> {
+  async function continueAdventure(actionText: string, choice?: StoryChoice): Promise<void> {
     const action = actionText.trim();
     if (!action || generating) return;
 
     const setup = ensureSetupDefaults();
     generationError = '';
     generating = true;
+
+    const outcomeDirective = choice
+      ? buildOutcomeDirective(
+          resolveChoiceOutcome(choice, {
+            role: setup.role,
+            situationPenalty: situationalDifficultyPenalty(choice, worldState.player)
+          }).verdict
+        )
+      : '';
 
     try {
       await ensureStoryExists(setup);
@@ -494,7 +524,8 @@
         resolvePromptMode(),
         recentSectionTypes,
         recentChoiceTexts,
-        sceneAnchor
+        sceneAnchor,
+        outcomeDirective
       );
 
       const chapter = await requestStoryChapter(prompt, setup, nextTurn);
@@ -508,7 +539,6 @@
       memoryLog = appendMemoryFromChapter(memoryLog, chapter);
       ({ aiMessages, campaignArchive } = archiveOldTurnsIfNeeded(chapterHistory, aiMessages, campaignArchive));
 
-      await runBackgroundWorldTick(setup, nextTurn, recentSectionTypes);
       await persistInteractiveState(setup);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erreur inconnue';
@@ -517,10 +547,17 @@
     } finally {
       generating = false;
     }
+
+    // Off-screen world simulation runs after the lock is released so choices unlock
+    // immediately; it is throttled and self-guards against stale application.
+    // Section types are re-derived inside the tick from chapterHistory.
+    if (!generationError) {
+      void runBackgroundWorldTick(setup, turnNumber);
+    }
   }
 
   function handleChoice(choice: StoryChoice): void {
-    void continueAdventure(choice.text);
+    void continueAdventure(choice.text, choice);
   }
 
   function handleCustomActionSubmit(): void {
@@ -598,7 +635,7 @@
     const preferences = await refreshRuntimePreferences();
 
     if (storyId) {
-      const session = loadInteractiveSession(storyId);
+      const session = await loadInteractiveSession(storyId);
       if (session) {
         turnNumber = session.turnNumber;
         selectedTrame = session.selectedTrame;
@@ -631,7 +668,7 @@
         memoryLog = ensureCanonicalIdentityMemory(memoryLog, setupForRepair);
         if (worldStateNeedsRepair(session.worldState)) {
           worldState = rebuildWorldStateFromHistory(setupForRepair, chapterHistory, session.worldState);
-          saveInteractiveSession();
+          void saveInteractiveSession();
         } else if (session.worldState) {
           worldState = session.worldState;
         } else {

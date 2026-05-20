@@ -4,7 +4,8 @@ import { STORY_REPLAY_SCENARIOS } from '../../test/fixtures/storyReplayScenarios
 import {
   loadInteractiveSessionPayload,
   saveInteractiveSessionPayload,
-  type InteractiveSessionPayload
+  type InteractiveSessionPayload,
+  type SessionStore
 } from './interactiveSession';
 import { initWorldState, applyStateUpdateToWorldState, rebuildWorldStateFromHistory } from './worldStateReducer';
 
@@ -24,6 +25,21 @@ function createLocalStorageMock() {
     },
     removeItem: (key: string) => {
       store.delete(key);
+    }
+  };
+}
+
+function createMemoryStore(): SessionStore {
+  const data = new Map<string, unknown>();
+  return {
+    async get(id) {
+      return data.get(id);
+    },
+    async put(id, payload) {
+      data.set(id, payload);
+    },
+    async delete(id) {
+      data.delete(id);
     }
   };
 }
@@ -76,6 +92,7 @@ describe('story engine replay corpus', () => {
     const actionHistory: string[] = [];
     const memoryLog: string[] = [];
     const storyId = 'story-replay-corpus';
+    const sessionStore = createMemoryStore();
 
     for (const scenario of STORY_REPLAY_SCENARIOS) {
       aiMessages = [...aiMessages, { role: 'user', content: `ACTION JOUEUR CANONIQUE: ${scenario.userAction}` }];
@@ -106,8 +123,8 @@ describe('story engine replay corpus', () => {
         campaignArchive: []
       };
 
-      saveInteractiveSessionPayload(storyId, payload);
-      const loaded = loadInteractiveSessionPayload(storyId, setup);
+      await saveInteractiveSessionPayload(storyId, payload, sessionStore);
+      const loaded = await loadInteractiveSessionPayload(storyId, setup, sessionStore);
 
       expect(loaded?.turnNumber).toBe(scenario.turnNumber);
       expect(loaded?.chapterHistory).toHaveLength(scenario.turnNumber);

@@ -590,6 +590,103 @@ export async function generateStoryTurn(
   }, turnNumber);
 }
 
+// Single-call structured generation: cheaper/faster alternative to the 4-agent pipeline.
+// Reuses the JSON contract already embedded in the system prompt (buildSystemPrompt) and the
+// shared parser, so one model round-trip yields a full chapter instead of four.
+export async function generateStoryTurnStructured(
+  messages: ChatMessage[],
+  config: StoryProviderConfig,
+  turnNumber: number
+): Promise<StoryTurnGenerationResult> {
+  const safeMessages = sanitizeStoryMessageHistory(messages);
+  const normalizedConfig = normalizeProviderConfig(config);
+  const providerId = normalizedConfig.providerId;
+  const caps = detectModelCapabilities(normalizedConfig);
+  const maxTokens = clamp(Math.round(caps.maxOutputTokens * 0.82), 1200, 3200);
+  const temperature = 0.85;
+
+  let raw = '';
+  try {
+    if (OPENAI_COMPATIBLE_PROVIDER_IDS.has(providerId)) {
+      try {
+        const response = await callOpenAiCompatibleRaw(safeMessages as any, normalizedConfig, {
+          maxTokens,
+          temperature,
+          skipReasoning: true,
+          responseFormat: { type: 'json_object' }
+        });
+        raw = cleanText(response.content, 24000);
+      } catch (error) {
+        logger.warn('storyEngine: structured json_object indisponible, fallback prompt strict.', error);
+      }
+
+      if (!raw) {
+        const retry = await callOpenAiCompatibleRaw(safeMessages as any, normalizedConfig, {
+          maxTokens,
+          temperature,
+          skipReasoning: false
+        });
+        raw = cleanText(retry.content, 24000);
+      }
+    } else {
+      raw = cleanText(
+        await callTextModel(safeMessages, normalizedConfig, { maxTokens, temperature, skipReasoning: false }),
+        24000
+      );
+    }
+  } catch (error) {
+    logger.warn('storyEngine: génération structurée (1 appel) indisponible, fallback local.', error);
+    recordDiagnosticEvent({
+      level: 'warn',
+      category: 'story-turn-step',
+      stage: 'brain',
+      message: 'Fallback local sur la génération structurée (1 appel).',
+      providerId: normalizedConfig.providerId,
+      model: normalizedConfig.model,
+      runtimeMode: 'structured-json',
+      validation: 'repaired',
+      meta: error
+    });
+    raw = '';
+  }
+
+  const chapter = parseStoryResponse(raw, turnNumber);
+
+  if (!hasPlayableChapterContent(chapter)) {
+    const scribeSummary = fallbackScribeSummary(safeMessages, turnNumber);
+    const directorBrief = fallbackDirectorBrief(safeMessages, scribeSummary);
+    const emergencyWriterScene = fallbackWriterScene(scribeSummary, safeMessages, turnNumber);
+    const emergencyBrainPayload = fallbackBrainPayload();
+    const emergencyPayload = buildPipelineStoryPayload(turnNumber, emergencyWriterScene, directorBrief, emergencyBrainPayload);
+    recordDiagnosticEvent({
+      level: 'warn',
+      category: 'story-turn-validation',
+      stage: 'story-turn',
+      message: 'Chapitre structuré (1 appel) inexploitable, fallback d’urgence appliqué.',
+      providerId: normalizedConfig.providerId,
+      model: normalizedConfig.model,
+      runtimeMode: 'structured-json',
+      validation: 'repaired',
+      meta: { turnNumber }
+    });
+    return validateStoryTurnGenerationResult({
+      chapter: parseStoryResponse(JSON.stringify(emergencyPayload), turnNumber),
+      rawResponse: formatPipelineRawResponse(scribeSummary, directorBrief, emergencyWriterScene, emergencyBrainPayload),
+      mode: 'structured-json',
+      steps: 1,
+      toolCalls: 0
+    }, turnNumber);
+  }
+
+  return validateStoryTurnGenerationResult({
+    chapter,
+    rawResponse: raw,
+    mode: 'structured-json',
+    steps: 1,
+    toolCalls: 0
+  }, turnNumber);
+}
+
 function coerceBackgroundWorldEvent(source: unknown): BackgroundWorldEvent | null {
   if (!isObjectRecord(source)) return null;
 

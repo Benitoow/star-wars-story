@@ -1,7 +1,22 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { generateStoryTurn, type ChatMessage } from './storyEngine';
 import { applyStateUpdateToWorldState, initWorldState, rebuildWorldStateFromHistory } from '$lib/editor/worldStateReducer';
-import { loadInteractiveSessionPayload, saveInteractiveSessionPayload, type InteractiveSessionPayload } from '$lib/editor/interactiveSession';
+import { loadInteractiveSessionPayload, saveInteractiveSessionPayload, type InteractiveSessionPayload, type SessionStore } from '$lib/editor/interactiveSession';
+
+function createMemoryStore(): SessionStore {
+  const data = new Map<string, unknown>();
+  return {
+    async get(id) {
+      return data.get(id);
+    },
+    async put(id, payload) {
+      data.set(id, payload);
+    },
+    async delete(id) {
+      data.delete(id);
+    }
+  };
+}
 
 const setup = {
   era: 'imperial',
@@ -122,6 +137,7 @@ describe('story engine soak', () => {
     const chapterHistory = [];
     const actionHistory: string[] = [];
     const storyId = 'story-engine-soak';
+    const sessionStore = createMemoryStore();
 
     for (let turnNumber = 1; turnNumber <= 200; turnNumber += 1) {
       const userAction = `ACTION JOUEUR CANONIQUE: Je prends le contrôle du tour ${turnNumber}.`;
@@ -152,8 +168,8 @@ describe('story engine soak', () => {
           campaignArchive: []
         };
 
-        saveInteractiveSessionPayload(storyId, payload);
-        const restored = loadInteractiveSessionPayload(storyId, setup);
+        await saveInteractiveSessionPayload(storyId, payload, sessionStore);
+        const restored = await loadInteractiveSessionPayload(storyId, setup, sessionStore);
         expect(restored?.turnNumber).toBe(turnNumber);
         expect(restored?.chapterHistory).toHaveLength(turnNumber);
         expect(restored?.worldState?.player.location).toBe(worldState.player.location);

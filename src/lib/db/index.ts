@@ -93,6 +93,7 @@ export interface UserPreferences {
   textModel?: string;
   textApiKey?: string;
   textReasoningEffort?: string;
+  textRuntimeMode?: 'agentic-subagents' | 'structured-json';
   ollamaUrl?: string;
   // AI Image
   imageProvider?: string;
@@ -165,12 +166,18 @@ export interface WeeklyStat {
   favoriteRole?: string;
 }
 
+export interface StoredInteractiveSession {
+  id: string;       // storyId
+  payload: unknown; // sanitized InteractiveSessionPayload (kept opaque to avoid coupling)
+}
+
 export class StarWarsDB extends Dexie {
   stories!: Table<Story, string>;
   folders!: Table<Folder, string>;
   storyVersions!: Table<StoryVersion, string>;
   preferences!: Table<UserPreferences, string>;
   appState!: Table<AppState, string>;
+  sessions!: Table<StoredInteractiveSession, string>;
 
   constructor() {
     super('StarWarsStoryDB');
@@ -182,6 +189,16 @@ export class StarWarsDB extends Dexie {
       storyVersions: 'id, storyId, version',
       preferences: 'id',
       appState: 'id'
+    });
+
+    // v5: interactive play sessions move from localStorage to IndexedDB (no ~5MB cap)
+    this.version(5).stores({
+      stories: 'id, title, folderId, *tags, isArchived, isDeleted',
+      folders: 'id, parentId, name',
+      storyVersions: 'id, storyId, version',
+      preferences: 'id',
+      appState: 'id',
+      sessions: 'id'
     });
   }
 }
@@ -199,6 +216,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   textProvider: DEFAULT_TEXT_PROVIDER_ID,
   textModel: DEFAULT_TEXT_MODEL_ID,
   textApiKey: '',
+  textRuntimeMode: 'agentic-subagents',
   ollamaUrl: DEFAULT_OLLAMA_URL,
   imageProvider: DEFAULT_IMAGE_PROVIDER_ID,
   imageModel: DEFAULT_IMAGE_MODEL_ID,

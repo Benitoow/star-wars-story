@@ -4,6 +4,7 @@ export type {
   BackgroundWorldInput,
   ChatMessage,
   NpcRelation,
+  PlayerState,
   StateUpdate,
   StoryAttribute,
   StoryChapter,
@@ -58,5 +59,6 @@ export {
 
 export {
   generateBackgroundWorldEvent,
-  generateStoryTurn
+  generateStoryTurn,
+  generateStoryTurnStructured
 } from './agentic';
