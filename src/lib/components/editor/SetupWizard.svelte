@@ -324,7 +324,7 @@
               placeholder="Décris le point de rupture initial, le problème, la promesse, le poison."
               value={$currentSetup.premise}
               on:input={handlePremiseInput}
-            />
+            ></textarea>
           </div>
         {:else if activeSetupStep.id === 'style'}
           <div class="style-stack">
