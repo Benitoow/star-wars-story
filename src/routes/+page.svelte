@@ -1,45 +1,39 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { stories, filteredStories } from '$lib/stores/stories';
-  import { viewMode, uiLanguage, resetFilters, searchQuery, sortBy, sortDirection, filters } from '$lib/stores/ui';
+  import { uiLanguage, resetFilters, searchQuery, filters } from '$lib/stores/ui';
   import { resolveUiLanguage } from '$lib/config/languages';
   import { ERAS } from '$lib/editor/setupCatalog';
   import StoryCard from '$lib/components/StoryCard.svelte';
 
   let loading = true;
 
-  const DASHBOARD_COPY = {
+  const COPY = {
     fr: {
-      title: 'Mes Histoires',
-      loading: 'Chargement...',
-      noStories: 'Aucune histoire',
-      emptyText: 'Votre Holocron personnel est vide. Créez votre première aventure Star Wars.',
-      create: 'Créer une histoire',
-      countSingle: 'histoire',
-      countPlural: 'histoires',
-      searchPlaceholder: 'Rechercher dans vos histoires…',
-      sortLabel: 'Trier par',
-      sortUpdated: 'Dernière modification',
-      sortCreated: 'Date de création',
-      sortTitle: 'Titre',
-      sortPlayed: 'Dernière lecture',
-      allEras: 'Toutes les époques'
+      heroTitle: 'Ta saga commence ici',
+      heroSub: 'Des aventures Star Wars interactives écrites par l’IA, où chaque choix t’appartient.',
+      cta: 'Nouvelle aventure',
+      section: 'Tes aventures',
+      loading: 'Chargement…',
+      noStories: 'Aucune aventure pour l’instant',
+      emptyText: 'Lance ta première histoire et écris ta légende dans la galaxie.',
+      searchPlaceholder: 'Rechercher une aventure…',
+      allEras: 'Toutes les époques',
+      countSingle: 'aventure',
+      countPlural: 'aventures'
     },
     en: {
-      title: 'My Stories',
-      loading: 'Loading...',
-      noStories: 'No stories yet',
-      emptyText: 'Your personal Holocron is empty. Create your first Star Wars adventure.',
-      create: 'Create a story',
-      countSingle: 'story',
-      countPlural: 'stories',
-      searchPlaceholder: 'Search your stories…',
-      sortLabel: 'Sort by',
-      sortUpdated: 'Last modified',
-      sortCreated: 'Date created',
-      sortTitle: 'Title',
-      sortPlayed: 'Last played',
-      allEras: 'All eras'
+      heroTitle: 'Your saga starts here',
+      heroSub: 'AI-driven interactive Star Wars adventures where every choice is yours.',
+      cta: 'New adventure',
+      section: 'Your adventures',
+      loading: 'Loading…',
+      noStories: 'No adventures yet',
+      emptyText: 'Start your first story and write your legend across the galaxy.',
+      searchPlaceholder: 'Search an adventure…',
+      allEras: 'All eras',
+      countSingle: 'adventure',
+      countPlural: 'adventures'
     }
   } as const;
 
@@ -49,193 +43,217 @@
     loading = false;
   });
 
-  $: currentLang = resolveUiLanguage($uiLanguage);
-  $: copy = DASHBOARD_COPY[currentLang === 'fr' ? 'fr' : 'en'];
+  $: copy = resolveUiLanguage($uiLanguage) === 'fr' ? COPY.fr : COPY.en;
 
   let searchInput = '';
   $: searchQuery.set(searchInput);
 
   function setEraFilter(eraId: string | null) {
-    filters.update(f => ({ ...f, era: eraId || undefined }));
+    filters.update((f) => ({ ...f, era: eraId || undefined }));
   }
-
-  function setSort(sort: 'updatedAt' | 'createdAt' | 'title' | 'lastPlayedAt') {
-    sortBy.set(sort);
-  }
-
-  function toggleSortDir() {
-    sortDirection.update(d => d === 'asc' ? 'desc' : 'asc');
-  }
-
-  $: currentSortLabel = {
-    updatedAt: copy.sortUpdated,
-    createdAt: copy.sortCreated,
-    title: copy.sortTitle,
-    lastPlayedAt: copy.sortPlayed
-  }[$sortBy];
 
   $: activeEra = $filters.era;
 </script>
 
 <svelte:head>
-  <title>Mes Histoires — Star Wars Story</title>
+  <title>Star Wars Story — {copy.section}</title>
 </svelte:head>
 
-<div class="dashboard">
-  <!-- Header bar -->
-  <div class="dashboard-bar">
-    <div class="bar-title">
-      <h2>{copy.title}</h2>
-      {#if !loading}
-        <span class="story-count">{$filteredStories.length} {$filteredStories.length !== 1 ? copy.countPlural : copy.countSingle}</span>
-      {/if}
-    </div>
-
-    <!-- Search -->
-    <div class="search-wrap">
-      <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-      </svg>
-      <input
-        class="search-input"
-        type="text"
-        bind:value={searchInput}
-        placeholder={copy.searchPlaceholder}
-        aria-label={copy.searchPlaceholder}
-      />
-      {#if searchInput}
-        <button class="search-clear" on:click={() => searchInput = ''} aria-label="Effacer">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
-      {/if}
-    </div>
-
-    <!-- Sort -->
-    <div class="sort-wrap">
-      <span class="sort-label">{copy.sortLabel}:</span>
-      <button class="sort-btn" on:click={toggleSortDir} title="Inverser l'ordre">
-        {currentSortLabel}
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="12" height="12">
-          {#if $sortDirection === 'desc'}
-            <polyline points="6 9 12 15 18 9"/>
-          {:else}
-            <polyline points="18 15 12 9 6 15"/>
-          {/if}
+<div class="home">
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-scrim"></div>
+    <div class="hero-content">
+      <p class="hero-eyebrow">Star Wars · Interactive Fiction</p>
+      <h1 class="hero-title">{copy.heroTitle}</h1>
+      <p class="hero-sub">{copy.heroSub}</p>
+      <a class="btn btn-primary hero-cta" href="/stories/new">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="17" height="17" aria-hidden="true">
+          <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
         </svg>
-      </button>
-    </div>
-  </div>
-
-  <!-- Era filter chips -->
-  {#if !loading && $filteredStories.length > 0 || true}
-    <div class="era-chips" role="group" aria-label="Filtrer par époque">
-      <button
-        class="era-chip"
-        class:active={!activeEra}
-        on:click={() => setEraFilter(null)}
-      >{copy.allEras}</button>
-      {#each ERAS as era}
-        <button
-          class="era-chip"
-          class:active={activeEra === era.id}
-          on:click={() => setEraFilter(era.id)}
-        >{era.name}</button>
-      {/each}
-    </div>
-  {/if}
-
-  <!-- Stories Grid -->
-  {#if loading}
-    <div class="loading-state">
-      <div class="loading-spinner"></div>
-      <p>{copy.loading}</p>
-    </div>
-  {:else if $filteredStories.length === 0}
-    <div class="empty-state">
-      <div class="empty-holo">
-        <div class="holo-ring"></div>
-        <div class="holo-core">✨</div>
-      </div>
-      <h3>{copy.noStories}</h3>
-      <p>{copy.emptyText}</p>
-      <a href="/stories/new" class="btn btn-primary btn-lg">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-        </svg>
-        {copy.create}
+        {copy.cta}
       </a>
     </div>
-  {:else}
-    <div class="stories-grid" class:list-view={$viewMode === 'list'}>
-      {#each $filteredStories as story (story.id)}
-        <StoryCard {story} />
+  </section>
+
+  <!-- Library -->
+  <section class="library">
+    <div class="library-head">
+      <h2 class="library-title">
+        {copy.section}
+        {#if !loading}<span class="count">{$filteredStories.length} {$filteredStories.length !== 1 ? copy.countPlural : copy.countSingle}</span>{/if}
+      </h2>
+      <div class="search-wrap">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+        </svg>
+        <input class="search-input" type="text" bind:value={searchInput} placeholder={copy.searchPlaceholder} aria-label={copy.searchPlaceholder} />
+      </div>
+    </div>
+
+    <div class="era-chips" role="group" aria-label={copy.allEras}>
+      <button class="era-chip" class:active={!activeEra} on:click={() => setEraFilter(null)}>{copy.allEras}</button>
+      {#each ERAS as era}
+        <button class="era-chip" class:active={activeEra === era.id} on:click={() => setEraFilter(era.id)}>{era.name}</button>
       {/each}
     </div>
-  {/if}
+
+    {#if loading}
+      <div class="state">
+        <div class="spinner"></div>
+        <p>{copy.loading}</p>
+      </div>
+    {:else if $filteredStories.length === 0}
+      <div class="state empty">
+        <div class="empty-holo"><div class="holo-ring"></div><span>✦</span></div>
+        <h3>{copy.noStories}</h3>
+        <p>{copy.emptyText}</p>
+        <a href="/stories/new" class="btn btn-primary">{copy.cta}</a>
+      </div>
+    {:else}
+      <div class="tiles">
+        {#each $filteredStories as story (story.id)}
+          <StoryCard {story} />
+        {/each}
+      </div>
+    {/if}
+  </section>
 </div>
 
 <style>
-  .dashboard {
+  .home {
     max-width: 1200px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: var(--space-lg);
-    padding-bottom: var(--space-2xl);
+    gap: var(--space-2xl);
   }
 
-  /* Bar */
-  .dashboard-bar {
+  /* ── Hero ─────────────────────────────────── */
+  .hero {
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--border-subtle);
+    min-height: 300px;
     display: flex;
     align-items: center;
+  }
+
+  .hero-bg {
+    position: absolute;
+    inset: 0;
+    background: url('/backdrops/hyperspace.webp') center / cover no-repeat;
+    transform: scale(1.05);
+  }
+
+  .hero-scrim {
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(90deg, rgba(4, 5, 9, 0.92) 0%, rgba(4, 5, 9, 0.72) 45%, rgba(4, 5, 9, 0.35) 100%),
+      radial-gradient(120% 120% at 0% 50%, transparent 40%, rgba(4, 5, 9, 0.6) 100%);
+  }
+
+  .hero-content {
+    position: relative;
+    z-index: 1;
+    padding: clamp(var(--space-lg), 4vw, var(--space-2xl));
+    max-width: 600px;
+  }
+
+  .hero-eyebrow {
+    margin: 0 0 var(--space-sm);
+    font-family: var(--font-display);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--color-gold);
+  }
+
+  .hero-title {
+    margin: 0 0 var(--space-sm);
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 1.5rem + 2.5vw, 3.2rem);
+    font-weight: 700;
+    line-height: 1.08;
+    color: #fff;
+    text-shadow: 0 2px 30px rgba(0, 0, 0, 0.7);
+  }
+
+  .hero-sub {
+    margin: 0 0 var(--space-lg);
+    font-family: var(--font-narrative);
+    font-size: clamp(1rem, 0.95rem + 0.4vw, 1.2rem);
+    line-height: 1.6;
+    color: var(--color-text-secondary);
+    max-width: 46ch;
+  }
+
+  .hero-cta {
+    text-decoration: none;
+    padding: 11px 22px;
+    font-size: 0.95rem;
+  }
+
+  /* ── Library ──────────────────────────────── */
+  .library {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+
+  .library-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     gap: var(--space-md);
     flex-wrap: wrap;
   }
 
-  .bar-title {
+  .library-title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--color-text-primary);
     display: flex;
     align-items: baseline;
     gap: var(--space-sm);
-    flex-shrink: 0;
   }
 
-  .bar-title h2 {
-    font-size: 1.25rem;
-    color: var(--color-text-primary);
-  }
-
-  .story-count {
+  .count {
     font-size: 0.8rem;
+    font-weight: 400;
     color: var(--color-text-muted);
+    font-family: var(--font-body);
   }
 
-  /* Search */
   .search-wrap {
-    flex: 1;
-    min-width: 180px;
-    max-width: 360px;
     position: relative;
     display: flex;
     align-items: center;
+    flex: 1;
+    min-width: 200px;
+    max-width: 340px;
   }
 
   .search-icon {
     position: absolute;
-    left: 10px;
-    width: 15px;
-    height: 15px;
+    left: 12px;
+    width: 16px;
+    height: 16px;
     color: var(--color-text-muted);
     pointer-events: none;
-    flex-shrink: 0;
   }
 
   .search-input {
     width: 100%;
-    padding: 8px 34px 8px 32px;
-    background: var(--color-bg-tertiary);
-    border: 1px solid var(--color-border);
+    padding: 9px 14px 9px 36px;
+    background: var(--surface-glass);
+    border: 1px solid var(--border-subtle);
     border-radius: 999px;
     color: var(--color-text-primary);
     font-size: 0.875rem;
@@ -246,63 +264,10 @@
   .search-input:focus {
     outline: none;
     border-color: var(--color-gold);
-    background: var(--color-bg-secondary);
   }
 
   .search-input::placeholder { color: var(--color-text-muted); }
 
-  .search-clear {
-    position: absolute;
-    right: 10px;
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: var(--color-text-muted);
-    padding: 2px;
-    display: flex;
-    align-items: center;
-    border-radius: 50%;
-    transition: color var(--transition-fast);
-  }
-
-  .search-clear:hover { color: var(--color-text-primary); }
-
-  /* Sort */
-  .sort-wrap {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-shrink: 0;
-  }
-
-  .sort-label {
-    font-size: 0.78rem;
-    color: var(--color-text-muted);
-    white-space: nowrap;
-  }
-
-  .sort-btn {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 5px 10px;
-    background: var(--color-bg-tertiary);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    color: var(--color-text-secondary);
-    font-size: 0.8rem;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: all var(--transition-fast);
-    font-family: var(--font-body);
-  }
-
-  .sort-btn:hover {
-    border-color: var(--color-gold);
-    color: var(--color-gold);
-  }
-
-  /* Era chips */
   .era-chips {
     display: flex;
     flex-wrap: wrap;
@@ -310,9 +275,9 @@
   }
 
   .era-chip {
-    padding: 4px 12px;
-    background: var(--color-bg-tertiary);
-    border: 1px solid var(--color-border);
+    padding: 5px 14px;
+    background: transparent;
+    border: 1px solid var(--border-subtle);
     border-radius: 999px;
     font-size: 0.78rem;
     color: var(--color-text-secondary);
@@ -322,10 +287,7 @@
     white-space: nowrap;
   }
 
-  .era-chip:hover {
-    border-color: var(--color-gold);
-    color: var(--color-gold);
-  }
+  .era-chip:hover { border-color: var(--color-gold); color: var(--color-gold); }
 
   .era-chip.active {
     background: rgba(255, 232, 31, 0.12);
@@ -333,57 +295,43 @@
     color: var(--color-gold);
   }
 
-  /* Stories grid */
-  .stories-grid {
+  /* ── Tiles grid ───────────────────────────── */
+  .tiles {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: var(--space-lg);
   }
 
-  .stories-grid.list-view {
-    grid-template-columns: 1fr;
-  }
-
-  /* Loading */
-  .loading-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-md);
-    padding: var(--space-2xl);
-    color: var(--color-text-muted);
-  }
-
-  .loading-spinner {
-    width: 40px;
-    height: 40px;
-    border: 3px solid var(--color-border);
-    border-top-color: var(--color-gold);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-  }
-
-  /* Empty state */
-  .empty-state {
+  /* ── States ───────────────────────────────── */
+  .state {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: var(--space-md);
     padding: var(--space-2xl) var(--space-lg);
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-xl);
+    color: var(--color-text-muted);
     text-align: center;
-    margin-top: var(--space-md);
   }
+
+  .state.empty {
+    border: 1px dashed var(--border-subtle);
+    border-radius: var(--radius-xl);
+    background: var(--surface-glass);
+  }
+
+  .state.empty h3 { color: var(--color-text-primary); font-size: 1.2rem; margin: 0; }
+  .state.empty p { margin: 0; max-width: 380px; }
+  .state.empty .btn { text-decoration: none; margin-top: var(--space-xs); }
 
   .empty-holo {
     position: relative;
-    width: 80px;
-    height: 80px;
+    width: 72px;
+    height: 72px;
     display: flex;
     align-items: center;
     justify-content: center;
+    color: var(--color-gold);
+    font-size: 1.8rem;
   }
 
   .holo-ring {
@@ -394,57 +342,25 @@
     animation: holo-pulse 2s ease-in-out infinite;
   }
 
-  .holo-ring::after {
-    content: '';
-    position: absolute;
-    inset: 8px;
-    border: 1px solid rgba(255, 232, 31, 0.2);
-    border-radius: 50%;
-    animation: holo-pulse 2s ease-in-out infinite 0.4s;
-  }
-
-  .holo-core {
-    font-size: 2rem;
-    z-index: 1;
-  }
-
   @keyframes holo-pulse {
-    0%, 100% { opacity: 0.5; transform: scale(1); }
-    50% { opacity: 1; transform: scale(1.05); }
+    0%, 100% { opacity: 0.4; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.06); }
   }
 
-  .empty-state h3 {
-    font-size: 1.2rem;
-    color: var(--color-text-primary);
+  .spinner {
+    width: 38px;
+    height: 38px;
+    border: 3px solid var(--color-border);
+    border-top-color: var(--color-gold);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
   }
 
-  .empty-state p {
-    color: var(--color-text-muted);
-    max-width: 380px;
-    margin: 0;
-  }
+  @keyframes spin { to { transform: rotate(360deg); } }
 
-  .btn-lg {
-    padding: 10px 20px;
-    font-size: 0.95rem;
-  }
-
-  .empty-state .btn svg {
-    flex-shrink: 0;
-  }
-
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
-
-  @media (max-width: 768px) {
-    .dashboard-bar {
-      flex-direction: column;
-      align-items: stretch;
-    }
-    .search-wrap { max-width: 100%; }
-    .bar-title { justify-content: center; }
-    .sort-wrap { justify-content: center; }
-    .stories-grid { grid-template-columns: 1fr; }
+  @media (max-width: 600px) {
+    .tiles { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--space-md); }
+    .library-head { flex-direction: column; align-items: stretch; }
+    .search-wrap { max-width: none; }
   }
 </style>

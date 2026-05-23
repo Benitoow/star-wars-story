@@ -3,12 +3,11 @@
   import { browser, dev } from '$app/environment';
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { showToast, theme, uiLanguage, sidebarOpen, searchOpen, toggleSidebar } from '$lib/stores/ui';
+  import { showToast, theme, uiLanguage } from '$lib/stores/ui';
   import { initializeDB, cleanupOldTrash } from '$lib/db';
   import { logger } from '$lib/utils/logger';
   import Toast from '$lib/components/Toast.svelte';
-  import Sidebar from '$lib/components/Sidebar.svelte';
-  import Header from '$lib/components/Header.svelte';
+  import TopNav from '$lib/components/TopNav.svelte';
 
   let initialized = false;
 
@@ -124,10 +123,6 @@
       cleanupOldTrash(30).catch((error: unknown) => {
         logger.warn('layout: nettoyage corbeille échoué.', error);
       });
-
-      if (window.innerWidth >= 769) {
-        sidebarOpen.set(true);
-      }
     })();
 
     return () => {
@@ -145,14 +140,6 @@
         e.preventDefault();
         goto('/stories/new');
         break;
-      case 'f':
-        e.preventDefault();
-        searchOpen.set(true);
-        break;
-      case 'b':
-        e.preventDefault();
-        toggleSidebar();
-        break;
       case ',':
         e.preventDefault();
         goto('/settings');
@@ -163,11 +150,9 @@
 
 <svelte:window on:keydown={handleKeydown} />
 
-<div class="app" class:sidebar-open={$sidebarOpen}>
-  <Sidebar />
-  
+<div class="app">
+  <TopNav />
   <main class="main-content">
-    <Header />
     <div class="page-content">
       {#if initialized}
         <slot />
@@ -186,6 +171,7 @@
 <style>
   .app {
     display: flex;
+    flex-direction: column;
     min-height: 100vh;
     background: var(--color-bg-primary);
   }
@@ -195,27 +181,14 @@
     display: flex;
     flex-direction: column;
     min-width: 0;
-    margin-left: 0;
-    transition: margin-left var(--transition-normal);
-  }
-
-  /* push content when sidebar is open on desktop */
-  @media (min-width: 769px) {
-    .app.sidebar-open .main-content {
-      margin-left: var(--sidebar-width);
-    }
+    min-height: 0;
   }
 
   .page-content {
     flex: 1;
-    padding: var(--space-xl) var(--space-xl);
+    min-height: 0;
     overflow-y: auto;
-  }
-
-  @media (max-width: 768px) {
-    .page-content {
-      padding: var(--space-md);
-    }
+    padding: var(--space-lg) clamp(var(--space-md), 4vw, var(--space-2xl));
   }
 
   .loading-screen {
@@ -223,7 +196,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    height: 100%;
+    flex: 1;
     gap: var(--space-md);
     color: var(--color-text-muted);
   }

@@ -31,6 +31,11 @@
         {/if}
       </div>
       <span class="toast-message">{toast.message}</span>
+      {#if toast.action}
+        <button class="toast-action" on:click={() => { toast.action?.onClick(); toasts.remove(toast.id); }}>
+          {toast.action.label}
+        </button>
+      {/if}
       <button class="toast-close" aria-label="Fermer la notification" on:click={() => toasts.remove(toast.id)}>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <line x1="18" y1="6" x2="6" y2="18"/>
@@ -112,6 +117,25 @@
     flex: 1;
     font-size: 0.875rem;
     color: var(--color-text-primary);
+  }
+
+  .toast-action {
+    flex-shrink: 0;
+    padding: 4px 12px;
+    background: rgba(255, 232, 31, 0.12);
+    border: 1px solid var(--color-gold);
+    border-radius: var(--radius-sm);
+    color: var(--color-gold);
+    font-family: var(--font-display);
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: background var(--transition-fast);
+  }
+
+  .toast-action:hover {
+    background: rgba(255, 232, 31, 0.22);
   }
 
   .toast-close {

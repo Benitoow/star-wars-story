@@ -133,6 +133,7 @@ export interface Toast {
   type: 'success' | 'error' | 'info' | 'warning';
   message: string;
   duration?: number;
+  action?: { label: string; onClick: () => void };
 }
 
 function createToastStore() {
