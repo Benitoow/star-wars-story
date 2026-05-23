@@ -57,6 +57,23 @@
   /* Layout */
   --sidebar-width: 260px;
   --header-height: 64px;
+
+  /* ─── Cinematic / reading system (redesign) ─── */
+  /* Serif reserved for long-form narrative prose — gives the "reading a story" feel.
+     UI chrome stays on the display/body sans fonts. */
+  --font-narrative: 'Spectral', Georgia, 'Times New Roman', serif;
+  --reading-measure: 62ch;            /* comfortable line length for prose */
+  --narrative-size: clamp(1.08rem, 1.02rem + 0.4vw, 1.22rem);
+  --narrative-leading: 1.9;
+  /* Neutral (non-gold) borders for the sober cinematic surfaces */
+  --border-subtle: rgba(255, 255, 255, 0.09);
+  --border-subtle-hover: rgba(255, 255, 255, 0.2);
+  /* Glass surfaces that float over the scene backdrop */
+  --surface-glass: rgba(12, 14, 20, 0.66);
+  --surface-glass-strong: rgba(8, 9, 14, 0.9);
+  /* Dark scrims so text stays legible over any backdrop image */
+  --scrim-read: linear-gradient(90deg, rgba(4,5,9,0.96) 0%, rgba(4,5,9,0.86) 36%, rgba(4,5,9,0.5) 72%, rgba(4,5,9,0.22) 100%);
+  --scrim-read-bottom: linear-gradient(0deg, rgba(4,5,9,0.97) 0%, rgba(4,5,9,0.72) 32%, rgba(4,5,9,0.32) 64%, rgba(4,5,9,0.1) 100%);
 }
 
 /* ─── Light Theme ───────────────────────────── */

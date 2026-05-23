@@ -25,6 +25,7 @@
   import SvgIcon from '$lib/components/SvgIcon.svelte';
   import PageHeader from '$lib/components/PageHeader.svelte';
   import GameHUD from '$lib/components/GameHUD.svelte';
+  import SceneBackdrop from '$lib/components/SceneBackdrop.svelte';
   import {
     defaultRoleForFaction,
     AVATARS,
@@ -762,6 +763,7 @@
         />
       {:else}
         <div class="play-shell" class:hud-open={!hudCollapsed}>
+          <SceneBackdrop sectionType={currentChapter?.section_type} era={$currentSetup.era} />
 
           <!-- ── Topbar ──────────────────────────────────── -->
           <div class="play-topbar">
@@ -1078,33 +1080,49 @@
   .play-shell {
     --hud-width: 228px;
     --hud-gap: 18px;
+    position: relative;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
-    gap: var(--space-xl);
-    max-width: 740px;
-    margin: 0 auto;
+    gap: var(--space-lg);
     width: 100%;
-    padding-bottom: calc(var(--space-xl) * 2);
+    max-width: 1120px;
+    margin: 0 auto;
+    min-height: calc(100vh - 160px);
+    padding: var(--space-2xl) clamp(var(--space-lg), 4vw, var(--space-2xl)) calc(var(--space-2xl) + var(--space-lg));
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-xl);
+    background: var(--color-bg-primary);
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* Reading column floats left over the cinematic backdrop */
+  .play-topbar,
+  .play-scroll-area,
+  .play-action-zone {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 720px;
+    margin-right: auto;
   }
 
   @media (min-width: 1160px) {
     .play-shell.hud-open {
-      max-width: calc(740px + var(--hud-width) + var(--hud-gap));
-      padding-right: calc(var(--hud-width) + var(--hud-gap));
+      padding-right: calc(var(--hud-width) + var(--hud-gap) + var(--space-lg));
     }
   }
 
-  /* Scroll / action zone wrappers — desktop: regular flex columns */
   .play-scroll-area {
     display: flex;
     flex-direction: column;
-    gap: var(--space-xl);
+    gap: var(--space-lg);
   }
 
   .play-action-zone {
     display: flex;
     flex-direction: column;
-    gap: var(--space-xl);
+    gap: var(--space-lg);
   }
 
   /* Header icon-label buttons */
@@ -1114,9 +1132,22 @@
     gap: 6px;
   }
 
+  .error-banner {
+    padding: var(--space-sm) var(--space-md);
+    border: 1px solid rgba(248, 113, 113, 0.5);
+    border-radius: var(--radius-md);
+    background: rgba(248, 113, 113, 0.14);
+    color: #fca5a5;
+    font-size: 0.85rem;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
   .world-events-panel {
-    border: 1px solid color-mix(in srgb, var(--color-gold) 25%, var(--color-border));
-    background: color-mix(in srgb, var(--color-gold) 4%, var(--color-bg-secondary));
+    border: 1px solid color-mix(in srgb, var(--color-gold) 22%, var(--border-subtle));
+    background: color-mix(in srgb, var(--color-gold) 5%, var(--surface-glass-strong));
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     border-radius: var(--radius-lg);
     padding: var(--space-sm) var(--space-md);
     display: flex;
@@ -1369,153 +1400,124 @@
   }
 
   /* ═══════════════════════════════════════════
-     CHAPTER CARD
+     CHAPTER — cinematic reading column
   ═══════════════════════════════════════════ */
   .chapter-card {
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-xl);
-    overflow: hidden;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    overflow: visible;
   }
 
-  /* Header */
   .chapter-header {
-    padding: var(--space-xl) var(--space-xl) var(--space-lg);
-    border-bottom: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+    padding: 0 0 var(--space-md);
+    border-bottom: none;
   }
 
   .chapter-eyebrow {
     display: flex;
     align-items: center;
-    gap: 6px;
-    margin-bottom: 8px;
+    gap: 8px;
+    margin-bottom: 10px;
   }
 
   .chapter-num {
-    font-size: 0.65rem;
-    font-weight: 800;
-    letter-spacing: 2px;
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 2.5px;
     text-transform: uppercase;
     color: var(--color-gold);
   }
 
   .chapter-sep {
     color: var(--color-text-muted);
-    opacity: 0.4;
+    opacity: 0.5;
   }
 
   .chapter-type {
-    font-size: 0.65rem;
+    font-size: 0.66rem;
     font-weight: 600;
-    letter-spacing: 1.5px;
+    letter-spacing: 2px;
     text-transform: uppercase;
     color: var(--color-text-muted);
   }
 
   .chapter-title {
     margin: 0;
-    font-size: clamp(1.72rem, 1.56rem + 0.45vw, 1.95rem);
-    font-weight: 800;
-    color: var(--color-text-primary);
-    line-height: 1.2;
-    letter-spacing: -0.025em;
+    font-family: var(--font-display);
+    font-size: clamp(1.9rem, 1.55rem + 1.2vw, 2.6rem);
+    font-weight: 700;
+    color: var(--color-gold);
+    line-height: 1.12;
+    letter-spacing: -0.01em;
+    text-shadow: 0 2px 26px rgba(0, 0, 0, 0.7);
   }
 
-  /* ── Narrative flow ─────────────────────── */
+  /* ── Narrative prose — serif reading column ── */
   .narrative {
-    padding: 0 var(--space-xl) var(--space-md);
-    max-width: 680px;
-    margin: 0 auto;
+    padding: 0;
+    max-width: var(--reading-measure);
+    margin: 0 auto 0 0;
+    font-family: var(--font-narrative);
   }
 
   .n-block {
-    padding: calc(var(--space-md) + 4px) 0;
+    padding: 0;
     position: relative;
   }
 
-  .n-block + .n-block {
-    border-top: 1px solid rgba(255, 232, 31, 0.12);
-    margin-top: var(--space-sm);
-  }
+  .n-block + .n-block { border-top: none; margin-top: 1.25em; }
 
-  .n-tag {
-    display: block;
-    font-size: 0.65rem;
-    font-weight: 900;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    color: var(--color-gold);
-    margin-bottom: 10px;
-    opacity: 0.9;
-  }
-
-  .n-tag--action     { color: #c8960f; }
-  .n-tag--dialogue   { color: #5aaed4; }
-  .n-tag--reflection { color: #8e7ab8; }
+  .n-tag { display: none; }
 
   /* Prose shared */
   .n-block p {
     margin: 0;
-    line-height: 1.9;
-    font-size: clamp(1rem, 0.97rem + 0.2vw, 1.07rem);
+    font-family: var(--font-narrative);
+    line-height: var(--narrative-leading);
+    font-size: var(--narrative-size);
+    color: color-mix(in srgb, var(--color-text-primary) 92%, white 8%);
     text-wrap: pretty;
     text-align: left;
+    text-shadow: 0 1px 16px rgba(0, 0, 0, 0.6);
   }
 
-  .n-block p + p { margin-top: 1.1em; }
+  .n-block p + p { margin-top: 1.05em; }
 
-  .n-paragraph {
-    padding-left: 0;
-  }
+  .n-paragraph { padding-left: 0; }
 
-  .n-paragraph--dialogue {
-    margin-left: 0.5rem;
-    padding: 0.4rem 0 0.4rem 1rem;
-    border-left: 3px solid #4FC3F7;
-    background: rgba(79, 195, 247, 0.1);
-    color: #b8e4f4;
-    font-style: italic;
-    border-radius: 0 4px 4px 0;
-    font-size: 1.02em;
-  }
-
-  /* Context */
-  .n-context p { color: color-mix(in srgb, var(--color-text-primary) 90%, white 10%); }
-
-  /* Action — slightly more weight */
-  .n-action p {
-    color: var(--color-text-primary);
-    font-size: clamp(1.02rem, 1rem + 0.2vw, 1.1rem);
-    font-weight: 500;
-  }
-
-  /* Dialogue — screenplay style */
-  .n-dialogue {
-    padding: var(--space-sm) var(--space-md);
-    border-left: 3px solid color-mix(in srgb, #5aaed4 45%, transparent);
-    background: color-mix(in srgb, #5aaed4 8%, transparent);
-    border-radius: var(--radius-md);
-  }
-
+  /* Dialogue lines — subtle italic, a quiet accent rule, no heavy box */
+  .n-paragraph--dialogue,
   .n-dialogue p {
-    color: color-mix(in srgb, #5aaed4 90%, white 10%);
     font-style: italic;
+    color: #cfe4f2;
   }
 
-  /* Reflection — tinted box */
+  .n-action p { font-weight: 500; }
+
+  .n-dialogue {
+    padding: 0 0 0 var(--space-md);
+    border: none;
+    border-left: 2px solid rgba(120, 180, 220, 0.45);
+    background: none;
+    border-radius: 0;
+    margin-top: 1.25em;
+  }
+
+  /* Reflection — quiet inner voice, set off by a hairline */
   .n-reflection {
-    background: color-mix(in srgb, #8e7ab8 10%, var(--color-bg-tertiary));
-    border-radius: var(--radius-md);
-    padding: var(--space-sm) var(--space-md);
-    border-top: none !important;
+    background: none;
+    border: none;
+    border-top: 1px solid var(--border-subtle) !important;
+    border-radius: 0;
+    padding: var(--space-md) 0 0;
     margin-top: var(--space-lg);
-    border: 1px solid color-mix(in srgb, #8e7ab8 25%, var(--color-border));
   }
 
   .n-reflection p {
-    color: color-mix(in srgb, var(--color-text-secondary) 88%, white 12%);
-    font-style: normal;
-    font-size: clamp(0.98rem, 0.95rem + 0.15vw, 1.02rem);
+    font-style: italic;
+    color: color-mix(in srgb, var(--color-text-secondary) 84%, white 16%);
+    font-size: calc(var(--narrative-size) * 0.95);
   }
 
   /* ═══════════════════════════════════════════
@@ -1525,9 +1527,9 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-sm);
-    margin-top: var(--space-lg);
-    padding-top: var(--space-md);
-    border-top: 1px solid rgba(255, 232, 31, 0.2);
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
   }
 
   .choices-heading {
@@ -1560,9 +1562,11 @@
   .choice-btn {
     display: flex;
     align-items: stretch;
-    border: 1px solid var(--color-border);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--radius-lg);
-    background: var(--color-bg-secondary);
+    background: var(--surface-glass);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     cursor: pointer;
     text-align: left;
     overflow: hidden;
@@ -1704,8 +1708,10 @@
 
   .custom-input {
     flex: 1;
-    border: 1px solid var(--color-border);
-    background: color-mix(in srgb, var(--color-bg-secondary) 50%, var(--color-bg-tertiary));
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-glass);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     color: var(--color-text-primary);
     border-radius: var(--radius-lg);
     padding: 12px var(--space-md);
@@ -1749,17 +1755,19 @@
      MEMORY PANEL
   ═══════════════════════════════════════════ */
   .memory-panel {
-    border: 1px dashed color-mix(in srgb, var(--color-border) 60%, transparent);
+    border: 1px dashed var(--border-subtle);
     border-radius: var(--radius-lg);
-    background: color-mix(in srgb, var(--color-bg-secondary) 40%, transparent);
+    background: color-mix(in srgb, var(--surface-glass) 70%, transparent);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     overflow: hidden;
     transition: background var(--transition-fast), border-color var(--transition-fast);
   }
 
   .memory-panel[open], .memory-panel:hover {
     border-style: solid;
-    border-color: var(--color-border);
-    background: var(--color-bg-secondary);
+    border-color: var(--border-subtle-hover);
+    background: var(--surface-glass-strong);
   }
 
   .memory-panel summary {
@@ -1859,6 +1867,9 @@
       padding-bottom: 0;
       max-width: 100%;
       margin: 0;
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
     }
 
     /* Topbar: compact strip */

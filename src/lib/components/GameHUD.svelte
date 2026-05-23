@@ -349,10 +349,10 @@
     right: clamp(10px, 1.3vw, 24px);
     width: var(--hud-width, 228px);
     max-height: calc(100vh - 108px);
-    background: rgba(12, 12, 16, 0.88);
-    border: 1px solid rgba(255, 232, 31, 0.18);
+    background: rgba(9, 10, 14, 0.92);
+    border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.09));
     border-radius: 12px;
-    backdrop-filter: blur(10px);
+    backdrop-filter: blur(14px);
     z-index: 150;
     font-size: 0.75rem;
     color: var(--color-text-secondary);
