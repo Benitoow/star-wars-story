@@ -38,8 +38,23 @@
   };
   const DEFAULT_TONE: EraTone = { top: '#0c0f17', bottom: '#040509' };
 
+  // Royalty-free backdrop photos keyed to the scene's mood. The procedural
+  // gradient below stays as the fallback if a file is missing.
+  const BACKDROPS: Record<string, string> = {
+    action: '/backdrops/hyperspace.webp',
+    confrontation: '/backdrops/lava.webp',
+    exploration: '/backdrops/desert.webp',
+    dialogue: '/backdrops/city-night.webp',
+    repos: '/backdrops/city-night.webp',
+    interlude: '/backdrops/city-night.webp',
+    tension: '/backdrops/city-dusk.webp',
+    revelation: '/backdrops/city-dusk.webp'
+  };
+  const DEFAULT_BACKDROP = '/backdrops/city-night.webp';
+
   $: mood = (sectionType && MOODS[sectionType]) || DEFAULT_MOOD;
   $: tone = (era && ERA_TONES[era]) || DEFAULT_TONE;
+  $: resolvedImage = image ?? (sectionType && BACKDROPS[sectionType]) ?? DEFAULT_BACKDROP;
 
   // Stable starfield — seeded once so stars never jump between scenes; only the
   // nebula colour transitions as the story moves.
@@ -86,8 +101,8 @@
     {/each}
   </div>
 
-  {#if image}
-    <div class="bd-image" style="background-image:url('{image}');"></div>
+  {#if resolvedImage}
+    <div class="bd-image" style="background-image:url('{resolvedImage}');"></div>
   {/if}
 
   <div class="bd-vignette"></div>
@@ -151,8 +166,8 @@
   .bd-image {
     background-size: cover;
     background-position: center;
-    opacity: 0.5;
-    mix-blend-mode: screen;
+    opacity: 0.6;
+    transition: opacity 0.8s ease;
   }
 
   /* Darken the edges for cinematic focus */
