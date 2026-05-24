@@ -7,8 +7,17 @@
 - **Lieu de Départ Dynamique (IA)** : Remplacement de l'initialisation rigide et pré-déterminée par faction (`worldStateReducer.ts`) par un placeholder `"À déterminer par l'introduction"`. L'IA choisit désormais en toute liberté le lieu de départ le plus pertinent avec le rôle et la prémisse (ex: évite de faire démarrer un *Padawan banni* dans une enclave Jedi sacrée sous l'Empire, le plaçant plutôt dans une cantina crasseuse ou un vaisseau cargo en fuite).
 - **Introduction Cinématique du Personnage** : Refonte de l'exigence du premier tour dans le prompt initial (`buildStartPrompt`). L'IA n'ouvre plus de manière abrupte sans contexte (*in medias res*), mais compose une véritable scène d'ouverture introduisant l'identité du protagoniste, son rôle, sa situation présente et la menace immédiate qui pèse sur lui.
 
-### 🎨 Portrait IA de Protagoniste & Génération d'Images
+### 🎨 Portrait IA de Protagoniste & Décors Spatiaux Premium (v2.7.1)
 
+- **Décors Cosmiques Ultra-Premium (Unsplash)** : Intégration de 10 sublimes photographies d'art spatial en haute résolution (provenant d'artistes Unsplash comme Jake Weirick) à la place des anciens fonds légers et répétitifs.
+- **Ambiances Dynamiques par Mood (SceneBackdrop)** : Association automatique des décors à la tension et au type de scène en cours :
+  * `action` -> Supernova et explosions cosmiques d'étoiles
+  * `confrontation` -> Nébuleuse rouge sombre écarlate très contrastée (Jake Weirick)
+  * `exploration` -> Gaz galactique vert émeraude et mystérieux
+  * `dialogue` -> Fond étoilé lointain et discret pour optimiser la lecture
+  * `repos` -> Nébuleuse d'un bleu profond apaisant
+  * `tension` -> Tempête de poussière spatiale aux lueurs ambrées/dorées
+  * `revelation` -> Anomalie gravitationnelle et distorsions violettes/noires
 - **Génération Intégrée de Portraits** : Ajout d'une section dédiée à la génération de portrait de protagoniste par IA dans l'assistant de configuration (`SetupWizard.svelte`), créant des illustrations uniques synchronisées avec l'allégeance, le rôle et la chronologie de départ.
 - **Saisie de Détails Physiques (Overrides)** : Implémentation d'un champ de texte facultatif permettant de spécifier des détails physiques ou styles graphiques précis (ex: "Twi'lek bleu, bure de Jedi marron..."), s'insérant dynamiquement au prompt de l'image.
 - **Intégration du Portrait en Jeu (GameHUD)** : Remplacement de l'affichage textuel classique d'identité par une véritable **carte d'identité graphique** avec affichage circulaire premium de l'avatar/portrait IA (38px, contour néon doré Star Wars) dans le HUD latéral.

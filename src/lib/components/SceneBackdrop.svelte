@@ -41,16 +41,16 @@
   // Royalty-free backdrop photos keyed to the scene's mood. The procedural
   // gradient below stays as the fallback if a file is missing.
   const BACKDROPS: Record<string, string> = {
-    action: '/backdrops/hyperspace.webp',
-    confrontation: '/backdrops/lava.webp',
-    exploration: '/backdrops/desert.webp',
-    dialogue: '/backdrops/city-night.webp',
-    repos: '/backdrops/city-night.webp',
-    interlude: '/backdrops/city-night.webp',
-    tension: '/backdrops/city-dusk.webp',
-    revelation: '/backdrops/city-dusk.webp'
+    action: '/backdrops/space-supernova.jpg',
+    confrontation: '/backdrops/nebula-red.jpg',
+    exploration: '/backdrops/nebula-green.jpg',
+    dialogue: '/backdrops/space-stars.jpg',
+    repos: '/backdrops/nebula-blue.jpg',
+    interlude: '/backdrops/nebula-purple.jpg',
+    tension: '/backdrops/nebula-gold.jpg',
+    revelation: '/backdrops/space-anomaly.jpg'
   };
-  const DEFAULT_BACKDROP = '/backdrops/city-night.webp';
+  const DEFAULT_BACKDROP = '/backdrops/space-deep.jpg';
 
   $: mood = (sectionType && MOODS[sectionType]) || DEFAULT_MOOD;
   $: tone = (era && ERA_TONES[era]) || DEFAULT_TONE;
