@@ -242,8 +242,7 @@ Réponds EXCLUSIVEMENT en JSON strict (sans markdown) avec ce contrat:
   ]
 }
 
-- "chapter_title": Doit être un titre de scène extrêmement soigné, évocateur, captivant et entièrement rédigé en FRANÇAIS (ou la langue de la scène). Évite absolument les redondances ou de simplement copier la première phrase.
-- Les choices doivent découler de la conséquence directe de l'action joueur ci-dessus.
+- "choices": Chaque choix doit être une action physique, verbale ou tactique concrète, immédiate et unique à cette scène exacte. Il est STRICTEMENT INTERDIT de proposer des choix génériques et répétitifs (ex: "Observer les alentours", "Utiliser la Force pour ressentir le danger", "Négocier avec le marchand", "Préparer un plan"). Relie chaque choix aux détails précis (objets, PNJs, menaces) de la scène qui vient de se dérouler.
 - "section_type" et "atmosphere" doivent coller à la scène réellement écrite.
 - Les champs non pertinents peuvent être omis.`;
 }
@@ -379,11 +378,13 @@ RÈGLES MJ:
 ${prologueRule}
 14. PROSE UNIQUEMENT dans "narrative.action": pas de markdown, pas de titres H1/H2, pas de listes numérotées, pas de bloc "Que faites-vous ?", pas de répétition des choix. Les choix vivent uniquement dans le tableau "choices".
 15. DIALOGUES: chaque réplique doit être sur son propre paragraphe, au format "Nom : réplique" (préfixe "—" optionnel), et placée dans "narrative.dialogue". Ne colle jamais une réplique au milieu d'un paragraphe d'action.
-16. DIALOGUES OBLIGATOIREMENT DANS narrative.dialogue: chaque échange verbal doit être placé dans le champ "dialogue", jamais dans "action". "action" = narration pure et actions, "dialogue" = tous les échanges verbaux. Si un personnage parle, utilise ce champ dédié.;`
+16. DIALOGUES OBLIGATOIREMENT DANS narrative.dialogue: chaque échange verbal doit être placé dans le champ "dialogue", jamais dans "action". "action" = narration pure et actions, "dialogue" = tous les échanges verbaux. Si un personnage parle, utilise ce champ dédié.
+17. CHOIX ULTRA-PERTINENTS (CRITIQUE): Chaque choix dans le tableau "choices" doit être une action physique, verbale ou tactique concrète, immédiate et unique à cette scène exacte. Il est STRICTEMENT INTERDIT de proposer des choix génériques et répétitifs (ex: "Observer les alentours", "Utiliser la Force pour ressentir le danger", "Négocier avec le marchand", "Préparer un plan"). Relie chaque choix aux détails précis (objets, PNJs, menaces) de la scène.;`
     : `
 13. PROSE UNIQUEMENT dans "narrative.action": pas de markdown, pas de titres H1/H2, pas de listes numérotées, pas de bloc "Que faites-vous ?", pas de répétition des choix. Les choix vivent uniquement dans le tableau "choices".
 14. DIALOGUES: chaque réplique doit être sur son propre paragraphe, au format "Nom : réplique" (préfixe "—" optionnel), et placée dans "narrative.dialogue". Ne colle jamais une réplique au milieu d'un paragraphe d'action.
-15. DIALOGUES OBLIGATOIREMENT DANS narrative.dialogue: chaque échange verbal doit être placé dans le champ "dialogue", jamais dans "action". "action" = narration pure et actions, "dialogue" = tous les échanges verbaux. Si un personnage parle, utilise ce champ dédié.;`;
+15. DIALOGUES OBLIGATOIREMENT DANS narrative.dialogue: chaque échange verbal doit être placé dans le champ "dialogue", jamais dans "action". "action" = narration pure et actions, "dialogue" = tous les échanges verbaux. Si un personnage parle, utilise ce champ dédié.
+16. CHOIX ULTRA-PERTINENTS (CRITIQUE): Chaque choix dans le tableau "choices" doit être une action physique, verbale ou tactique concrète, immédiate et unique à cette scène exacte. Il est STRICTEMENT INTERDIT de proposer des choix génériques et répétitifs (ex: "Observer les alentours", "Utiliser la Force pour ressentir le danger", "Négocier avec le marchand", "Préparer un plan"). Relie chaque choix aux détails précis (objets, PNJs, menaces) de la scène.;`;
 
   const jsonContract = `Réponds UNIQUEMENT en JSON valide, sans markdown ni texte autour. TOUT le texte des champs est rédigé ENTIÈREMENT EN ${langName} (jamais dans une autre langue). Priorité absolue: prose narrative riche dans "action" (2-4 paragraphes). Remplis state_update avec toutes les conséquences.
 
@@ -398,7 +399,7 @@ ${prologueRule}
     "atmosphere": "tense|calm|mysterious|eerie|heroic"
   },
   "choices": [
-    { "text": "Action précise et directe, réalisable ici et maintenant dans cette scène", "attribute": "combat|diplomacy|stealth|tech|force|survival", "difficulty": 3, "faction_impact": {} }
+    { "text": "Action physique, verbale ou tactique extrêmement spécifique et ancrée, réalisable immédiatement ici et maintenant (PAS d'abstraction générique comme 'Explorer le lieu' ou 'Méditer')", "attribute": "combat|diplomacy|stealth|tech|force|survival", "difficulty": 3, "faction_impact": {} }
   ],
   "state_update": {
     "hp": -15,
@@ -513,7 +514,7 @@ Tour ${turnNumber}. Action: "${cleanText(actionText, 280)}".${history}${recentCh
 Écris une scène forte et précise en ${langName} — conséquences réelles, PNJs avec mémoire et intention propre.
 Ne mets aucun markdown, aucun titre interne et aucun bloc de choix dans le récit.
 Chaque réplique doit être sur une ligne distincte, au format "Nom : réplique" (préfixe — optionnel), et jamais noyée dans un paragraphe d'action.
-Propose 3-4 choix distincts, concrets, rédigés en ${langName}, ancrés dans cette scène précise (pas génériques).
+Propose 3-4 choix physiques, verbaux ou tactiques extrêmement précis et ancrés dans cette scène exacte (INTERDICTION ABSOLUE de choix génériques comme "Observer les alentours", "Méditer", "Négocier avec le marchand" ou "Préparer un plan").
 Fournis assez d'éléments concrets pour extraire au moins un signal monde (location ou PNJ nommé) à ce tour.
 Respecte le rôle canonique du protagoniste défini dans le contexte système (ne pas promouvoir/rétrograder sans validation explicite du joueur).
 chapter_number = ${turnNumber}.

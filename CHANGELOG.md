@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.7.5 — 2026-05-24
+
+### ⚔️ Hardening des Choix Narratifs & Pertinence Extrême des Options
+
+- **Élimination des Choix Génériques (prompts.ts)** :
+  * Refonte en profondeur des contrats de choix dans le prompt système monolithique (`buildSystemPrompt`), le prompt de reprise narrative (`buildContinuePrompt`) et le prompt de l'agent cérébral du pipeline (`buildPipelineBrainUserPrompt`).
+  * Enforcement d'une interdiction absolue sur les choix d'options génériques, répétitifs et abstraits (ex: "Observer les alentours", "Utiliser la Force pour ressentir le danger", "Négocier avec le marchand", "Préparer un plan").
+  * Obligation stricte de lier chaque choix de manière organique et logique à des actions physiques, verbales ou tactiques extrêmement spécifiques, immédiates et uniques, ancrées dans la scène précise qui vient de se dérouler.
+- **Stabilité Post-Intégration** :
+  * Type-safety absolue certifiée par `svelte-check` avec **0 erreur et 0 avertissement**.
+  * Intégration validée sur la suite complète de **160 tests unitaires 100% au vert**.
+
 ## v2.7.4 — 2026-05-24
 
 ### 💾 Correction de Persistance des Paramètres & Libération Narratives des Modèles
