@@ -80,7 +80,7 @@ export async function callImageModel(prompt: string, config: ImageGenerationConf
 
     // ─── 1. OpenRouter Images ──────────────────────────
     if (providerId === 'openrouter_img') {
-      const res = await fetch('https://openrouter.ai/api/v1/images/generations', {
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
@@ -90,9 +90,13 @@ export async function callImageModel(prompt: string, config: ImageGenerationConf
         },
         body: JSON.stringify({
           model,
-          prompt,
-          n: 1,
-          size: '1024x1024'
+          messages: [
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          modalities: ['image']
         }),
         signal: controller.signal
       });
@@ -104,7 +108,7 @@ export async function callImageModel(prompt: string, config: ImageGenerationConf
 
       const data = await res.json() as any;
 
-      // Parsing très robuste du format OpenRouter
+      // Parsing très robuste du format OpenRouter (supportant à la fois le completions et l'images/generations)
       const directUrl = data?.data?.[0]?.url || data?.data?.[0]?.image_url?.url || null;
       if (directUrl) {
         resultUrl = directUrl;
