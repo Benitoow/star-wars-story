@@ -196,19 +196,16 @@ import { FACTION_CREDITS, ERA_START_DATES } from '$lib/editor/setupCatalog';
 
     if (!advance) return base;
 
-    const baseDayMatch = base.match(/\bjour\s*(\d+)\b/i);
-    const absoluteDayMatch = advance.match(/^jour\s*(\d+)$/i);
-
-    if (baseDayMatch && absoluteDayMatch) {
-      const baseDay = Number(baseDayMatch[1]);
-      const nextDay = Number(absoluteDayMatch[1]);
-
-      if (Number.isFinite(baseDay) && Number.isFinite(nextDay)) {
-        if (nextDay === baseDay) return base;
-        return base.replace(/\bjour\s*\d+\b/i, `Jour ${Math.max(1, nextDay)}`);
-      }
+    // Règle 1 : Si la date d'avancement contient un marqueur d'ère absolu (AVBY, APBY, BBY, ABY),
+    // on considère que l'IA fournit une date absolue complète. On la retourne directement.
+    const ERA_MARKER_RE = /\b(?:[aApP]?[bB][yY]|[aAvV]?[bB][yY])\b/;
+    if (ERA_MARKER_RE.test(advance)) {
+      return advance;
     }
 
+    const baseDayMatch = base.match(/\bjour\s*(\d+)\b/i);
+
+    // Règle 2 : Décalage de jour relatif (ex: "+1 jour", "2 jours", "-3 jours")
     const relativeDayMatch = advance.match(/^([+-]?\d+)\s*jour(?:s)?$/i);
     if (baseDayMatch && relativeDayMatch) {
       const baseDay = Number(baseDayMatch[1]);
@@ -220,6 +217,21 @@ import { FACTION_CREDITS, ERA_START_DATES } from '$lib/editor/setupCatalog';
       }
     }
 
+    // Règle 3 : Jour absolu (ex: "Jour 2", "jour 5"). On assouplit la regex en cherchant
+    // le motif n'importe où dans la chaîne (avec \b au lieu de ^ et $).
+    const absoluteDayMatch = advance.match(/\bjour\s*(\d+)\b/i);
+    if (baseDayMatch && absoluteDayMatch) {
+      const baseDay = Number(baseDayMatch[1]);
+      const nextDay = Number(absoluteDayMatch[1]);
+
+      if (Number.isFinite(baseDay) && Number.isFinite(nextDay)) {
+        if (nextDay === baseDay) return base;
+        return base.replace(/\bjour\s*\d+\b/i, `Jour ${Math.max(1, nextDay)}`);
+      }
+    }
+
+    // Secours standard : si la date de base contient déjà cette info, on la garde.
+    // Sinon, on concatène pour ne pas perdre l'information de l'IA.
     if (base) {
       const normalizedBase = normalizeSearchText(base);
       const normalizedAdvance = normalizeSearchText(advance);

@@ -270,7 +270,8 @@ export function buildSystemPrompt(
   worldState?: WorldState,
   _promptMode: StoryPromptMode = 'json',
   campaignArchive: string[] = [],
-  languageCode?: string
+  languageCode?: string,
+  turnNumber?: number
 ): string {
   const protagonist = [setup.protagonistFirstName || '', setup.protagonistLastName || ''].join(' ').trim() || 'Le protagoniste';
 
@@ -361,7 +362,19 @@ RÈGLES MJ:
     - Sous la Guerre des Clones ("clone_wars"): L'Empire galactique n'existe PAS encore. Il n'y a AUCUN Stormtrooper ni de soldat impérial. Les forces armées sont uniquement les Soldats Clones (Clone Troopers) de la République ou les Droïdes de Combat Séparatistes (CIS).
     - Sous l'Ère Impériale ("imperial" ou "empire"): L'Empire gouverne la galaxie, l'Ordre Jedi est détruit (pas d'enclave active) et les soldats réguliers sont des Stormtroopers (Soldats Impériaux).
     - Sous l'Ancienne République ("old_republic"): Ni Clones, ni Stormtroopers impériaux. Les forces sont celles de la République classique ou de l'Empire Sith de l'époque.`;
-  const narrativeProseRule = `
+
+  const isTurn1 = turnNumber === 1 || (!worldState || !worldState.chronology || worldState.chronology.length === 0);
+  const prologueRule = isTurn1
+    ? `\n13. PROLOGUE ET DÉBUT DE L'AVENTURE (OBLIGATOIRE - TOUR 1) : Puisqu'il s'agit du tout premier tour de l'histoire, tu DOIS commencer par une riche introduction narrative et immersive du protagoniste (${protagonist}). Présente brièvement son apparence, ses origines liées à son rôle (${setup.role}) et à sa faction (${setup.faction}), sa situation actuelle (pourquoi il est là, son background immédiat lié à son rôle) et la tension immédiate qui pèse sur lui. Pose le décor et le lieu de départ choisi (state_update.location) avec soin et ambiance avant d'enclencher de l'action ou de la confrontation.`
+    : '';
+
+  const narrativeProseRule = prologueRule
+    ? `
+${prologueRule}
+14. PROSE UNIQUEMENT dans "narrative.action": pas de markdown, pas de titres H1/H2, pas de listes numérotées, pas de bloc "Que faites-vous ?", pas de répétition des choix. Les choix vivent uniquement dans le tableau "choices".
+15. DIALOGUES: chaque réplique doit être sur son propre paragraphe, au format "Nom : réplique" (préfixe "—" optionnel), et placée dans "narrative.dialogue". Ne colle jamais une réplique au milieu d'un paragraphe d'action.
+16. DIALOGUES OBLIGATOIREMENT DANS narrative.dialogue: chaque échange verbal doit être placé dans le champ "dialogue", jamais dans "action". "action" = narration pure et actions, "dialogue" = tous les échanges verbaux. Si un personnage parle, utilise ce champ dédié.;`
+    : `
 13. PROSE UNIQUEMENT dans "narrative.action": pas de markdown, pas de titres H1/H2, pas de listes numérotées, pas de bloc "Que faites-vous ?", pas de répétition des choix. Les choix vivent uniquement dans le tableau "choices".
 14. DIALOGUES: chaque réplique doit être sur son propre paragraphe, au format "Nom : réplique" (préfixe "—" optionnel), et placée dans "narrative.dialogue". Ne colle jamais une réplique au milieu d'un paragraphe d'action.
 15. DIALOGUES OBLIGATOIREMENT DANS narrative.dialogue: chaque échange verbal doit être placé dans le champ "dialogue", jamais dans "action". "action" = narration pure et actions, "dialogue" = tous les échanges verbaux. Si un personnage parle, utilise ce champ dédié.;`;

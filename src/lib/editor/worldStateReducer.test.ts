@@ -5,6 +5,7 @@ import {
   FR_WORLD_HEURISTICS,
   getWorldHeuristics,
   initWorldState,
+  normalizeNarrativeDate,
   rebuildWorldStateFromHistory,
   worldStateNeedsRepair
 } from './worldStateReducer';
@@ -299,5 +300,35 @@ describe('world state reliability (#4)', () => {
     expect(getWorldHeuristics('fr')).toBe(FR_WORLD_HEURISTICS);
     expect(getWorldHeuristics('en')).toBe(FR_WORLD_HEURISTICS);
     expect(getWorldHeuristics()).toBe(FR_WORLD_HEURISTICS);
+  });
+});
+
+describe('normalizeNarrativeDate', () => {
+  it('returns the base date if no advance date is provided', () => {
+    expect(normalizeNarrativeDate('22 AVBY, Jour 1')).toBe('22 AVBY, Jour 1');
+    expect(normalizeNarrativeDate('22 AVBY, Jour 1', '')).toBe('22 AVBY, Jour 1');
+  });
+
+  it('returns the advance date directly if it contains absolute era markers', () => {
+    expect(normalizeNarrativeDate('22 AVBY, Jour 1', '22 AVBY, Jour 2')).toBe('22 AVBY, Jour 2');
+    expect(normalizeNarrativeDate('19 AVBY, Jour 1', '19 AVBY, Jour 5')).toBe('19 AVBY, Jour 5');
+    expect(normalizeNarrativeDate('3950 AVBY, Jour 2', '3950 AVBY, Jour 3')).toBe('3950 AVBY, Jour 3');
+    expect(normalizeNarrativeDate('4 APBY, Jour 10', '4 APBY, Jour 11')).toBe('4 APBY, Jour 11');
+  });
+
+  it('updates the day relatively if a relative day advance is provided', () => {
+    expect(normalizeNarrativeDate('22 AVBY, Jour 1', '+1 jour')).toBe('22 AVBY, Jour 2');
+    expect(normalizeNarrativeDate('22 AVBY, Jour 2', '2 jours')).toBe('22 AVBY, Jour 4');
+    expect(normalizeNarrativeDate('22 AVBY, Jour 5', '-2 jours')).toBe('22 AVBY, Jour 3');
+  });
+
+  it('updates the day absolutely if an absolute day number is provided', () => {
+    expect(normalizeNarrativeDate('22 AVBY, Jour 1', 'Jour 3')).toBe('22 AVBY, Jour 3');
+    expect(normalizeNarrativeDate('22 AVBY, Jour 1', 'jour 5')).toBe('22 AVBY, Jour 5');
+    expect(normalizeNarrativeDate('19 AVBY, Jour 10', 'Jour 12 (dans la base)')).toBe('19 AVBY, Jour 12');
+  });
+
+  it('concatenates as fallback if no structural day/era match is found', () => {
+    expect(normalizeNarrativeDate('22 AVBY, Jour 1', 'quelques heures plus tard')).toBe('22 AVBY, Jour 1 +quelques heures plus tard');
   });
 });

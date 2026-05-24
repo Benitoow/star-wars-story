@@ -1,5 +1,18 @@
 # Changelog
 
+## v2.7.2 — 2026-05-24
+
+### ⏳ Conformité de la Date Narrative & Prologue Immersif Tour 1
+
+- **Conformité des Dates Narratives (worldStateReducer.ts)** : 
+  * Correction du bug de corruption de chaîne de date narrative. Désormais, si l'IA renvoie une date absolue avec marqueurs d'ère (`AVBY`, `APBY`, `BBY`, `ABY`), celle-ci est retournée directement et proprement au lieu d'être concaténée de façon erronée comme décalage (ex: élimine définitivement les corruptions de format du type `22 AVBY, Jour 1 +22 AVBY, Jour 2`).
+  * Assouplissement du matching de jour absolu (`absoluteDayMatch` regex) en cherchant le motif de mot-clé de jour n'importe où dans la chaîne (`\bjour\s*(\d+)\b`) au lieu de restreindre strictement au début et fin de chaîne (`^`/`$`), évitant ainsi les échecs de parsing de jour lorsque l'IA insère des mots additionnels.
+- **Règles Strictes de Prologue Narratif (prompts.ts & page.svelte)** :
+  * Liaison dynamique du numéro de tour courant au prompt système de tous les agents (`scribe -> director -> writer -> brain`).
+  * Injection automatique d'une **nouvelle directive MJ rigide (Règle 13)** lorsque le jeu commence (Tour 1) : force l'IA à ouvrir l'histoire par une riche et immersive introduction littéraire du protagoniste (apparence, origines, background immédiat lié à son rôle, pourquoi il se trouve là et la tension immédiate), posant proprement l'ambiance et le décor choisi avant d'enclencher des péripéties abruptes.
+- **Validation & Robustesse (Tests Unitaires)** : 
+  * Ajout d'une suite complète de tests unitaires dédiée à la conformité et au parsing des dates narratives (`worldStateReducer.test.ts`), augmentant la suite de tests à **160 tests unitaires 100% au vert**.
+
 ## v2.7.1 — 2026-05-24
 
 ### 🎭 Libération du Lieu d'Ouverture & Introduction Narrative (Choix IA)

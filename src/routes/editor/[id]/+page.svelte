@@ -416,7 +416,7 @@
       ...buildCanonicalIdentityFacts(setup),
       ...memoryLog
     ]));
-    const systemPrompt = buildSystemPrompt(setup, memoryFactsForPrompt, worldState, promptMode, campaignArchive, resolvedLanguage);
+    const systemPrompt = buildSystemPrompt(setup, memoryFactsForPrompt, worldState, promptMode, campaignArchive, resolvedLanguage, turn);
     aiMessages = [{ role: 'system', content: systemPrompt }, ...aiMessages.filter(message => message.role !== 'system')];
 
     const requestMessages = trimMessages([
