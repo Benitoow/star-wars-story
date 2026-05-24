@@ -138,6 +138,48 @@
     return afterSlash.split(':')[0];
   }
 
+  function normalizeModelValue(model: string): string {
+    return model.trim();
+  }
+
+  function setTextModel(model: string) {
+    if (!preferences) return;
+    const customVal = normalizeModelValue(model);
+    if (!customVal) return;
+    preferences.textModel = customVal;
+    preferences = { ...preferences };
+  }
+
+  function setImageModel(model: string) {
+    if (!preferences) return;
+    const customVal = normalizeModelValue(model);
+    if (!customVal) return;
+    preferences.imageModel = customVal;
+    preferences.defaultImageProvider = preferences.imageProvider;
+    preferences.defaultImgModel = customVal;
+    preferences = { ...preferences };
+  }
+
+  function commitTextModelSearch() {
+    setTextModel(textModelSearch);
+  }
+
+  function commitImageModelSearch() {
+    setImageModel(imageModelSearch);
+  }
+
+  function handleTextModelSearchKeydown(event: KeyboardEvent) {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    commitTextModelSearch();
+  }
+
+  function handleImageModelSearchKeydown(event: KeyboardEvent) {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    commitImageModelSearch();
+  }
+
   function uniqueSorted(models: string[]): string[] {
     return Array.from(new Set(models.map(m => m.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b));
   }
@@ -240,7 +282,8 @@
 
       dynamicTextModels = { ...dynamicTextModels, [providerId]: models };
 
-      if (!models.includes(preferences.textModel || '')) {
+      const currentModel = normalizeModelValue(preferences.textModel || '');
+      if (!currentModel && models[0]) {
         preferences.textModel = models[0] || '';
         preferences = { ...preferences };
       }
@@ -307,7 +350,8 @@
 
       dynamicImageModels = { ...dynamicImageModels, [providerId]: models };
 
-      if (!models.includes(preferences.imageModel || '')) {
+      const currentModel = normalizeModelValue(preferences.imageModel || '');
+      if (!currentModel && models[0]) {
         preferences.imageModel = models[0] || '';
         preferences = { ...preferences };
       }
@@ -428,7 +472,7 @@
 
     const availableModels = getTextProviderModels(providerId);
 
-    if (!availableModels.includes(preferences.textModel || '')) {
+    if (!normalizeModelValue(preferences.textModel || '') && availableModels[0]) {
       preferences.textModel = availableModels[0] ?? '';
     }
 
@@ -452,7 +496,7 @@
 
     const availableModels = getImageProviderModels(providerId);
 
-    if (!availableModels.includes(preferences.imageModel || '')) {
+    if (!normalizeModelValue(preferences.imageModel || '') && availableModels[0]) {
       preferences.imageModel = availableModels[0] ?? '';
     }
 
@@ -826,41 +870,56 @@
                 <div class="field-group">
                   <details class="adv-settings">
                     <summary class="adv-summary">Réglages avancés <span class="adv-hint">modèle · raisonnement · mode</span></summary>
-                  {#if textProviderModels.length}
-                    <div class="field model-picker-field">
-                      <div class="model-picker-head">
-                        <label for="text-model-search">Modèle</label>
-                        <span class="model-count">{textProviderModels.length} disponibles</span>
-                      </div>
-                      <input
-                        id="text-model-search"
-                        type="search"
-                        class="input model-search"
-                        placeholder="Rechercher un modèle…"
-                        bind:value={textModelSearch}
-                      />
-                      <div class="model-list" role="listbox" aria-label="Modèles IA texte disponibles">
-                        {#if filteredTextModels.length}
-                          {#each filteredTextModels as m}
-                            <button
-                              type="button"
-                              class="model-option"
-                              class:selected={preferences.textModel === m}
-                              on:click={() => {
-                                if (!preferences) return;
-                                preferences.textModel = m;
-                                preferences = { ...preferences };
-                              }}
-                            >
-                              <span class="model-option-name">{m}</span>
-                            </button>
-                          {/each}
-                        {:else}
-                          <div class="model-empty">Aucun modèle ne correspond à « {textModelSearch} ».</div>
-                        {/if}
-                      </div>
+                  <div class="field model-picker-field">
+                    <div class="model-picker-head">
+                      <label for="text-model-search">Modèle</label>
+                      <span class="model-count">{textProviderModels.length} disponibles</span>
                     </div>
-                  {/if}
+                    <input
+                      id="text-model-search"
+                      type="search"
+                      class="input model-search"
+                      placeholder="Rechercher ou saisir un modèle…"
+                      bind:value={textModelSearch}
+                      on:keydown={handleTextModelSearchKeydown}
+                    />
+                    <span class="field-hint model-search-hint">Tu peux aussi valider un modèle perso avec Entrée.</span>
+                    <div class="model-list" role="listbox" aria-label="Modèles IA texte disponibles">
+                      {#if filteredTextModels.length}
+                        {#each filteredTextModels as m}
+                          <button
+                            type="button"
+                            class="model-option"
+                            class:selected={preferences.textModel === m}
+                            on:click={() => setTextModel(m)}
+                          >
+                            <span class="model-option-name">{m}</span>
+                          </button>
+                        {/each}
+                      {/if}
+
+                      {#if textModelSearch.trim()}
+                        <button
+                          type="button"
+                          class="model-option custom-model-option"
+                          class:selected={preferences.textModel === textModelSearch.trim()}
+                          on:click={commitTextModelSearch}
+                        >
+                          <span class="model-option-name">✨ Utiliser le modèle saisi : <strong>{textModelSearch.trim()}</strong></span>
+                        </button>
+                      {/if}
+
+                      {#if !filteredTextModels.length}
+                        <div class="model-empty">
+                          {#if textModelSearch.trim()}
+                            Aucun modèle du catalogue ne correspond à « {textModelSearch} ».
+                          {:else}
+                            Aucun modèle n’a été chargé automatiquement pour ce provider.
+                          {/if}
+                        </div>
+                      {/if}
+                    </div>
+                  </div>
 
                   {#if activeModelSupportsReasoning}
                     <div class="field">
@@ -987,42 +1046,56 @@
 
               {#if preferences.imageProvider && preferences.imageProvider !== 'none'}
                 <div class="field-group">
-                  {#if imageProviderModels.length}
-                    <div class="field model-picker-field">
-                      <div class="model-picker-head">
-                        <label for="image-model-search">Modèle</label>
-                        <span class="model-count">{imageProviderModels.length} disponibles</span>
-                      </div>
-                      <input
-                        id="image-model-search"
-                        type="search"
-                        class="input model-search"
-                        placeholder="Rechercher un modèle image…"
-                        bind:value={imageModelSearch}
-                      />
-                      <div class="model-list" role="listbox" aria-label="Modèles IA image disponibles">
-                        {#if filteredImageModels.length}
-                          {#each filteredImageModels as m}
-                            <button
-                              type="button"
-                              class="model-option"
-                              class:selected={preferences.imageModel === m}
-                              on:click={() => {
-                                if (!preferences) return;
-                                preferences.imageModel = m;
-                                preferences.defaultImgModel = m;
-                                preferences = { ...preferences };
-                              }}
-                            >
-                              <span class="model-option-name">{m}</span>
-                            </button>
-                          {/each}
-                        {:else}
-                          <div class="model-empty">Aucun modèle ne correspond à « {imageModelSearch} ».</div>
-                        {/if}
-                      </div>
+                  <div class="field model-picker-field">
+                    <div class="model-picker-head">
+                      <label for="image-model-search">Modèle</label>
+                      <span class="model-count">{imageProviderModels.length} disponibles</span>
                     </div>
-                  {/if}
+                    <input
+                      id="image-model-search"
+                      type="search"
+                      class="input model-search"
+                      placeholder="Rechercher ou saisir un modèle image…"
+                      bind:value={imageModelSearch}
+                      on:keydown={handleImageModelSearchKeydown}
+                    />
+                    <span class="field-hint model-search-hint">Tu peux aussi valider un modèle perso avec Entrée.</span>
+                    <div class="model-list" role="listbox" aria-label="Modèles IA image disponibles">
+                      {#if filteredImageModels.length}
+                        {#each filteredImageModels as m}
+                          <button
+                            type="button"
+                            class="model-option"
+                            class:selected={preferences.imageModel === m}
+                            on:click={() => setImageModel(m)}
+                          >
+                            <span class="model-option-name">{m}</span>
+                          </button>
+                        {/each}
+                      {/if}
+
+                      {#if imageModelSearch.trim()}
+                        <button
+                          type="button"
+                          class="model-option custom-model-option"
+                          class:selected={preferences.imageModel === imageModelSearch.trim()}
+                          on:click={commitImageModelSearch}
+                        >
+                          <span class="model-option-name">✨ Utiliser le modèle saisi : <strong>{imageModelSearch.trim()}</strong></span>
+                        </button>
+                      {/if}
+
+                      {#if !filteredImageModels.length}
+                        <div class="model-empty">
+                          {#if imageModelSearch.trim()}
+                            Aucun modèle du catalogue ne correspond à « {imageModelSearch} ».
+                          {:else}
+                            Aucun modèle n’a été chargé automatiquement pour ce provider.
+                          {/if}
+                        </div>
+                      {/if}
+                    </div>
+                  </div>
                   <div class="field">
                     <label for="image-api-key">Clé API</label>
                     <input
@@ -1831,6 +1904,10 @@
     font-size: 0.875rem;
   }
 
+  .model-search-hint {
+    margin-top: calc(var(--space-xs) * -0.25);
+  }
+
   .model-list {
     max-height: 320px;
     overflow-y: auto;
@@ -1865,6 +1942,16 @@
     border-color: var(--color-text-primary);
     background: rgba(255, 255, 255, 0.06);
     color: var(--color-text-primary);
+  }
+
+  .model-option.custom-model-option {
+    border-color: rgba(212, 175, 55, 0.25);
+    background: rgba(212, 175, 55, 0.03);
+  }
+
+  .model-option.custom-model-option:hover {
+    border-color: rgba(212, 175, 55, 0.5);
+    background: rgba(212, 175, 55, 0.06);
   }
 
   .model-option-name {
