@@ -820,6 +820,7 @@
             playerFactionId={$currentSetup.faction}
             protagonistFirstName={$currentSetup.protagonistFirstName ?? ''}
             protagonistLastName={$currentSetup.protagonistLastName ?? ''}
+            protagonistAvatar={$currentSetup.protagonistAvatar ?? ''}
           />
 
           <!-- ── Scrollable narrative zone ──────────────── -->
@@ -996,6 +997,13 @@
               <form class="custom-form" on:submit|preventDefault={handleCustomActionSubmit}>
                 <label class="custom-label" for="custom-action">— ou jouez librement</label>
                 <div class="custom-row">
+                  <div class="custom-avatar-indicator">
+                    {#if $currentSetup.protagonistAvatar && ($currentSetup.protagonistAvatar.startsWith('data:') || $currentSetup.protagonistAvatar.startsWith('http'))}
+                      <img src={$currentSetup.protagonistAvatar} alt="" class="custom-avatar-img" />
+                    {:else}
+                      <span class="custom-avatar-emoji">{$currentSetup.protagonistAvatar || '🧑‍🚀'}</span>
+                    {/if}
+                  </div>
                   <textarea
                     id="custom-action"
                     class="custom-input"
@@ -1752,6 +1760,32 @@
     display: flex;
     gap: 8px;
     align-items: flex-end;
+  }
+
+  .custom-avatar-indicator {
+    flex-shrink: 0;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 1.5px solid rgba(255, 232, 31, 0.3);
+    box-shadow: 0 0 6px rgba(255, 232, 31, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(10, 12, 18, 0.5);
+    margin-bottom: 4px;
+  }
+
+  .custom-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .custom-avatar-emoji {
+    font-size: 0.95rem;
+    line-height: 1;
   }
 
   .custom-input {

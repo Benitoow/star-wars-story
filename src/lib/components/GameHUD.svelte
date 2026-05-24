@@ -9,12 +9,15 @@
   export let playerFactionId = '';
   export let protagonistFirstName = '';
   export let protagonistLastName = '';
+  export let protagonistAvatar = '';
 
   $: p = worldState.player;
   $: downed = p.condition === 'critical' || p.hp <= 0;
   $: hpColor = p.hp >= 70 ? '#4ade80' : p.hp >= 35 ? '#facc15' : '#f87171';
   $: hpPct = Math.max(0, Math.min(100, p.hp));
   $: activeInjuries = p.injuries.filter(i => i.severity !== 'light');
+  $: hasPortraitImage = protagonistAvatar && (protagonistAvatar.startsWith('data:') || protagonistAvatar.startsWith('http'));
+  $: protagonistDisplayName = [protagonistFirstName, protagonistLastName].filter(Boolean).join(' ') || 'Protagoniste';
   $: protagonistExclude = new Set(
     [protagonistFirstName, protagonistLastName]
       .filter(Boolean)
@@ -245,20 +248,26 @@
         {/each}
       {/if}
 
-      {#if playerRoleLabel || playerFactionLabel}
+      {#if playerRoleLabel || playerFactionLabel || protagonistAvatar}
         <div class="hud-section-label">Identité</div>
-        {#if playerRoleLabel}
-          <div class="hud-row">
-            <span class="hud-icon">🎖️</span>
-            <span class="hud-text" title="Rôle / grade narratif">Rôle: {playerRoleLabel}</span>
+        <div class="hud-identity-card">
+          <div class="hud-avatar-wrapper">
+            {#if hasPortraitImage}
+              <img src={protagonistAvatar} alt="Portrait" class="hud-avatar-img" />
+            {:else}
+              <span class="hud-avatar-emoji">{protagonistAvatar || '🧑‍🚀'}</span>
+            {/if}
           </div>
-        {/if}
-        {#if playerFactionLabel}
-          <div class="hud-row">
-            <span class="hud-icon">🛡️</span>
-            <span class="hud-text" title="Camp de départ">Camp: {playerFactionLabel}</span>
+          <div class="hud-identity-info">
+            <span class="hud-identity-name">{protagonistDisplayName}</span>
+            {#if playerRoleLabel}
+              <span class="hud-identity-role">{playerRoleLabel}</span>
+            {/if}
+            {#if playerFactionLabel}
+              <span class="hud-identity-faction">🛡️ {playerFactionLabel}</span>
+            {/if}
           </div>
-        {/if}
+        </div>
       {/if}
 
       <!-- Injuries -->
@@ -418,6 +427,69 @@
     margin-bottom: 4px;
     padding-top: 8px;
     border-top: 1px solid var(--border-subtle);
+  }
+
+  /* Identity card with avatar */
+  .hud-identity-card {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 4px;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .hud-avatar-wrapper {
+    flex-shrink: 0;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 1.5px solid rgba(255, 232, 31, 0.35);
+    box-shadow: 0 0 8px rgba(255, 232, 31, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(10, 12, 18, 0.6);
+  }
+
+  .hud-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .hud-avatar-emoji {
+    font-size: 1.1rem;
+    line-height: 1;
+  }
+
+  .hud-identity-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+  }
+
+  .hud-identity-name {
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .hud-identity-role {
+    font-size: 0.62rem;
+    color: var(--color-gold, #facc15);
+    font-weight: 500;
+    letter-spacing: 0.03em;
+  }
+
+  .hud-identity-faction {
+    font-size: 0.6rem;
+    color: var(--color-text-muted);
   }
 
   .hud-help-text {
