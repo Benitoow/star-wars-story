@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { fly } from 'svelte/transition';
+  import { SvelteSet } from 'svelte/reactivity';
   import { goto } from '$app/navigation';
   import { getPreferences, savePreferences, exportAllData, importAllData, emptyTrash, type UserPreferences } from '$lib/db';
   import { showToast, theme, uiLanguage } from '$lib/stores/ui';
@@ -78,7 +79,7 @@
 
   let dynamicTextModels: Record<string, string[]> = {};
   let dynamicImageModels: Record<string, string[]> = {};
-  let reasoningCapableModels: Set<string> = new Set();
+  let reasoningCapableModels = new SvelteSet<string>();
   let syncingTextModels = false;
   let syncingImageModels = false;
   let syncTextMessage = '';
@@ -265,7 +266,7 @@
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const payload = await response.json() as { data?: Array<{ id?: string; supported_parameters?: string[] }> };
         const entries = payload.data || [];
-        const capable = new Set<string>();
+        const capable = new SvelteSet<string>();
         for (const entry of entries) {
           if (entry.id && entry.supported_parameters?.includes('reasoning')) capable.add(entry.id);
         }

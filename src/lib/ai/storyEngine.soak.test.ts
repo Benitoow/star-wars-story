@@ -39,20 +39,21 @@ function createLocalStorageMock() {
 }
 
 function buildAssistantResponse(content: string) {
-  return {
-    ok: true,
-    status: 200,
-    json: async () => ({
-      choices: [
-        {
-          message: {
-            role: 'assistant',
-            content
-          }
+  return new Response(JSON.stringify({
+    choices: [
+      {
+        message: {
+          role: 'assistant',
+          content
         }
-      ]
-    })
-  } as Response;
+      }
+    ]
+  }), {
+    status: 200,
+    headers: {
+      'content-type': 'application/json'
+    }
+  });
 }
 
 afterEach(() => {

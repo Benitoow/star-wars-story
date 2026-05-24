@@ -57,16 +57,9 @@ const SENSITIVE_META_KEYS = new Set([
   'auth',
   'token',
   'textApiKey',
-  'imageApiKey',
-  'body',
-  'rawBody',
-  'rawResponse',
-  'messages',
-  'prompt',
-  'systemPrompt',
-  'userPrompt',
-  'content'
+  'imageApiKey'
 ]);
+const NARRATIVE_META_MAX_LENGTH = 8000;
 
 let runtimeLogLevel: LogLevel | null = null;
 let runtimeDiagnostics: DiagnosticEntry[] | null = null;
@@ -121,10 +114,13 @@ function simpleHash(value: string): string {
 }
 
 function summarizeString(value: string, sensitive = false): Record<string, unknown> {
-  const preview = clampPreview(value);
-  return sensitive
-    ? { redacted: true, length: value.length, hash: simpleHash(value) }
-    : { preview, length: value.length, hash: simpleHash(value) };
+  if (sensitive) {
+    return { redacted: true, length: value.length, hash: simpleHash(value) };
+  }
+  const full = value.length <= NARRATIVE_META_MAX_LENGTH
+    ? value
+    : value.slice(0, NARRATIVE_META_MAX_LENGTH) + `… [tronqué, ${value.length} chars total]`;
+  return { value: full, length: value.length, hash: simpleHash(value) };
 }
 
 function sanitizeDiagnosticMeta(value: unknown, keyHint = '', depth = 0): unknown {
@@ -134,10 +130,13 @@ function sanitizeDiagnosticMeta(value: unknown, keyHint = '', depth = 0): unknow
   const sensitive = SENSITIVE_META_KEYS.has(normalizedKey);
 
   if (typeof value === 'string') {
-    if (sensitive || value.length > 220 || /\n/.test(value)) {
-      return summarizeString(value, sensitive);
+    if (sensitive) {
+      return summarizeString(value, true);
     }
-    return clampPreview(value, 220);
+    if (value.length > NARRATIVE_META_MAX_LENGTH) {
+      return summarizeString(value, false);
+    }
+    return value;
   }
 
   if (typeof value === 'number' || typeof value === 'boolean') {

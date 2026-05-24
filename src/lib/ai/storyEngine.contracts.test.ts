@@ -13,12 +13,16 @@ afterEach(() => {
 });
 
 function buildResponseFixture(fixture: (typeof PROVIDER_RESPONSE_FIXTURES)[number]): Response {
-  return {
-    ok: fixture.ok,
+  const hasJsonBody = fixture.json !== undefined;
+  const body = fixture.text ?? (hasJsonBody ? JSON.stringify(fixture.json ?? {}) : '');
+  const looksLikeJson = typeof body === 'string' && /^[\s\r\n]*[\[{]/.test(body);
+
+  return new Response(body, {
     status: fixture.status ?? (fixture.ok ? 200 : 500),
-    json: async () => fixture.json,
-    text: async () => fixture.text ?? JSON.stringify(fixture.json ?? {})
-  } as Response;
+    headers: {
+      'content-type': hasJsonBody || looksLikeJson ? 'application/json' : 'text/plain'
+    }
+  });
 }
 
 describe('story engine contracts', () => {
@@ -59,7 +63,7 @@ describe('story engine contracts', () => {
   });
 
   it.each(PROVIDER_RESPONSE_FIXTURES)('validates provider fixture: $name', async (fixture) => {
-    const fetchMock = vi.fn().mockResolvedValue(buildResponseFixture(fixture));
+    const fetchMock = vi.fn().mockImplementation(() => buildResponseFixture(fixture));
     vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
 
     const run = () => callOpenAiCompatibleRaw(

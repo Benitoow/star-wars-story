@@ -59,10 +59,11 @@ describe('logger', () => {
 
     const log = getDiagnosticsLog();
     expect(log).toHaveLength(1);
-    expect(log[0]?.meta).toMatchObject({
-      apiKey: { redacted: true },
-      prompt: { length: 400 }
-    });
+    const meta = log[0]?.meta as Record<string, unknown>;
+    // apiKey must remain redacted (security)
+    expect(meta.apiKey).toMatchObject({ redacted: true });
+    // prompt is now fully preserved for narrative debugging
+    expect(meta.prompt).toBe('A'.repeat(400));
   });
 
   it('exports diagnostics as JSON envelope', () => {

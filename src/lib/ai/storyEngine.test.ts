@@ -15,6 +15,22 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
+  return new Response(JSON.stringify(body), {
+    status: init.status ?? 200,
+    headers: {
+      'content-type': 'application/json',
+      ...(init.headers ?? {})
+    }
+  });
+}
+
+async function readRequestJson(fetchMock: ReturnType<typeof vi.fn>): Promise<Record<string, unknown>> {
+  const request = fetchMock.mock.calls[0]?.[0];
+  expect(request).toBeInstanceOf(Request);
+  return await (request as Request).clone().json();
+}
+
 describe('supportsAgenticToolCalling', () => {
   it('enables native tool-calling for Gemma 4 models on OpenRouter', () => {
     expect(supportsAgenticToolCalling('openrouter', 'google/gemma-4-26b-a4b-it')).toBe(true);
@@ -62,16 +78,13 @@ describe('grok-4.1-fast optimization profile', () => {
   });
 
   it('disables reasoning explicitly when skipReasoning=true', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        choices: [
-          {
-            message: { role: 'assistant', content: 'ok' }
-          }
-        ]
-      })
-    } as Response);
+    const fetchMock = vi.fn().mockImplementation(() => jsonResponse({
+      choices: [
+        {
+          message: { role: 'assistant', content: 'ok' }
+        }
+      ]
+    }));
     vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
 
     await callOpenAiCompatibleRaw(
@@ -81,25 +94,22 @@ describe('grok-4.1-fast optimization profile', () => {
     );
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
-    const body = JSON.parse(String(requestInit.body)) as Record<string, any>;
+    const body = await readRequestJson(fetchMock);
+    const chatRequest = body as Record<string, any>;
 
-    expect(body.reasoning).toEqual({ enabled: false });
-    expect(body.provider?.preferred_max_latency).toEqual({ p90: 4, p99: 8 });
-    expect(body.provider?.preferred_min_throughput).toEqual({ p90: 90, p99: 55 });
+    expect(chatRequest.reasoning).toEqual({ effort: 'none' });
+    expect(chatRequest.provider?.preferred_max_latency).toEqual({ p90: 4, p99: 8 });
+    expect(chatRequest.provider?.preferred_min_throughput).toEqual({ p90: 90, p99: 55 });
   });
 
   it('enables explicit reasoning for normal narrative calls', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        choices: [
-          {
-            message: { role: 'assistant', content: 'ok' }
-          }
-        ]
-      })
-    } as Response);
+    const fetchMock = vi.fn().mockImplementation(() => jsonResponse({
+      choices: [
+        {
+          message: { role: 'assistant', content: 'ok' }
+        }
+      ]
+    }));
     vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
 
     await callOpenAiCompatibleRaw(
@@ -108,10 +118,10 @@ describe('grok-4.1-fast optimization profile', () => {
       { skipReasoning: false, maxTokens: 1200 }
     );
 
-    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
-    const body = JSON.parse(String(requestInit.body)) as Record<string, any>;
+    const body = await readRequestJson(fetchMock);
+    const chatRequest = body as Record<string, any>;
 
-    expect(body.reasoning).toEqual({ enabled: true, effort: 'low' });
+    expect(chatRequest.reasoning).toEqual({ effort: 'low' });
   });
 });
 
@@ -125,16 +135,13 @@ describe('mimo-v2-flash optimization profile', () => {
   });
 
   it('uses boolean reasoning toggle + latency-first provider tuning', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        choices: [
-          {
-            message: { role: 'assistant', content: 'ok' }
-          }
-        ]
-      })
-    } as Response);
+    const fetchMock = vi.fn().mockImplementation(() => jsonResponse({
+      choices: [
+        {
+          message: { role: 'assistant', content: 'ok' }
+        }
+      ]
+    }));
     vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
 
     await callOpenAiCompatibleRaw(
@@ -143,28 +150,24 @@ describe('mimo-v2-flash optimization profile', () => {
       { skipReasoning: false, maxTokens: 900 }
     );
 
-    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
-    const body = JSON.parse(String(requestInit.body)) as Record<string, any>;
+    const body = await readRequestJson(fetchMock);
+    const chatRequest = body as Record<string, any>;
 
-    expect(body.reasoning).toEqual({ enabled: true });
-    expect(body.reasoning?.effort).toBeUndefined();
-    expect(body.provider?.sort).toBe('latency');
-    expect(body.provider?.preferred_max_latency).toEqual({ p90: 2, p99: 4.5 });
-    expect(body.provider?.preferred_min_throughput).toEqual({ p90: 45, p99: 20 });
-    expect(body.provider?.max_price).toEqual({ prompt: 0.12, completion: 0.45 });
+    expect(chatRequest.reasoning).toEqual({ effort: 'low' });
+    expect(chatRequest.provider?.sort).toBe('latency');
+    expect(chatRequest.provider?.preferred_max_latency).toEqual({ p90: 2, p99: 4.5 });
+    expect(chatRequest.provider?.preferred_min_throughput).toEqual({ p90: 45, p99: 20 });
+    expect(chatRequest.provider?.max_price).toEqual({ prompt: '0.12', completion: '0.45' });
   });
 
   it('disables reasoning explicitly when skipReasoning=true', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        choices: [
-          {
-            message: { role: 'assistant', content: 'ok' }
-          }
-        ]
-      })
-    } as Response);
+    const fetchMock = vi.fn().mockImplementation(() => jsonResponse({
+      choices: [
+        {
+          message: { role: 'assistant', content: 'ok' }
+        }
+      ]
+    }));
     vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
 
     await callOpenAiCompatibleRaw(
@@ -173,10 +176,10 @@ describe('mimo-v2-flash optimization profile', () => {
       { skipReasoning: true, maxTokens: 700 }
     );
 
-    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
-    const body = JSON.parse(String(requestInit.body)) as Record<string, any>;
+    const body = await readRequestJson(fetchMock);
+    const chatRequest = body as Record<string, any>;
 
-    expect(body.reasoning).toEqual({ enabled: false });
+    expect(chatRequest.reasoning).toEqual({ effort: 'none' });
   });
 });
 
@@ -403,12 +406,9 @@ describe('parseStoryResponse', () => {
 
 describe('provider validation', () => {
   it('fails explicitly when an OpenAI-compatible provider returns no usable message', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        choices: [{}]
-      })
-    } as Response);
+    const fetchMock = vi.fn().mockImplementation(() => jsonResponse({
+      choices: [{}]
+    }));
     vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
 
     await expect(() => callOpenAiCompatibleRaw(
@@ -418,18 +418,15 @@ describe('provider validation', () => {
   });
 
   it('fails explicitly when an OpenAI-compatible provider returns reasoning only with no content or tool call', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        choices: [{
-          message: {
-            role: 'assistant',
-            reasoning: 'Je réfléchis.',
-            reasoning_details: [{ type: 'summary', text: 'analyse' }]
-          }
-        }]
-      })
-    } as Response);
+    const fetchMock = vi.fn().mockImplementation(() => jsonResponse({
+      choices: [{
+        message: {
+          role: 'assistant',
+          reasoning: 'Je réfléchis.',
+          reasoning_details: [{ type: 'summary', text: 'analyse' }]
+        }
+      }]
+    }));
     vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
 
     await expect(() => callOpenAiCompatibleRaw(
@@ -443,55 +440,43 @@ describe('pipeline story generation', () => {
   it('keeps dialogue-only scenes playable and exposed as dialogue', async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          choices: [{ message: { role: 'assistant', content: 'Tour 7. Lira mène l’échange pendant que la pression monte.' } }]
-        })
-      } as Response)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          choices: [{
-            message: {
-              role: 'assistant',
-              content: JSON.stringify({
-                player_action: 'Parler à Lira avant de partir.',
-                scene_goal: 'Clarifier immédiatement le plan de fuite avec Lira.',
-                tension: 'Les patrouilles peuvent arriver à tout instant.',
-                must_include: ['Un échange tendu entre Lira et le protagoniste', 'Un rappel du danger immédiat'],
-                required_world_signals: ['npc', 'location'],
-                section_type: 'dialogue',
-                atmosphere: 'tense'
-              })
-            }
-          }]
-        })
-      } as Response)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          choices: [{ message: { role: 'assistant', content: '— Lira : On bouge maintenant.\n— Toi : J’active la rampe.' } }]
-        })
-      } as Response)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          choices: [{
-            message: {
-              role: 'assistant',
-              content: JSON.stringify({
-                chapter_title: 'Accord sous tension',
-                section_type: 'dialogue',
-                atmosphere: 'tense',
-                choices: [{ text: 'Suivre Lira sans discuter', attribute: 'diplomacy', difficulty: 2 }],
-                memory_updates: { notes: ['Lira prend la main.'] },
-                state_update: {}
-              })
-            }
-          }]
-        })
-      } as Response);
+      .mockResolvedValueOnce(jsonResponse({
+        choices: [{ message: { role: 'assistant', content: 'Tour 7. Lira mène l’échange pendant que la pression monte.' } }]
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        choices: [{
+          message: {
+            role: 'assistant',
+            content: JSON.stringify({
+              player_action: 'Parler à Lira avant de partir.',
+              scene_goal: 'Clarifier immédiatement le plan de fuite avec Lira.',
+              tension: 'Les patrouilles peuvent arriver à tout instant.',
+              must_include: ['Un échange tendu entre Lira et le protagoniste', 'Un rappel du danger immédiat'],
+              required_world_signals: ['npc', 'location'],
+              section_type: 'dialogue',
+              atmosphere: 'tense'
+            })
+          }
+        }]
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        choices: [{ message: { role: 'assistant', content: '— Lira : On bouge maintenant.\n— Toi : J’active la rampe.' } }]
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        choices: [{
+          message: {
+            role: 'assistant',
+            content: JSON.stringify({
+              chapter_title: 'Accord sous tension',
+              section_type: 'dialogue',
+              atmosphere: 'tense',
+              choices: [{ text: 'Suivre Lira sans discuter', attribute: 'diplomacy', difficulty: 2 }],
+              memory_updates: { notes: ['Lira prend la main.'] },
+              state_update: {}
+            })
+          }
+        }]
+      }));
 
     vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
 
@@ -517,55 +502,43 @@ describe('pipeline story generation', () => {
   it('keeps the canonical selected action even when director output drifts', async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          choices: [{ message: { role: 'assistant', content: 'Tour 8. Les accès restent verrouillés dans le hangar.' } }]
-        })
-      } as Response)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          choices: [{
-            message: {
-              role: 'assistant',
-              content: JSON.stringify({
-                player_action: 'Observer en silence derrière une caisse.',
-                scene_goal: 'Gagner du temps pour évaluer les gardes.',
-                tension: 'Le verrouillage du hangar se renforce.',
-                must_include: ['Un obstacle technique', 'Une fenêtre de tir courte'],
-                required_world_signals: ['location', 'npc'],
-                section_type: 'action',
-                atmosphere: 'tense'
-              })
-            }
-          }]
-        })
-      } as Response)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          choices: [{ message: { role: 'assistant', content: 'Tu sabotes le terminal de verrouillage. Les portes tremblent et les alarmes hurlent.' } }]
-        })
-      } as Response)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          choices: [{
-            message: {
-              role: 'assistant',
-              content: JSON.stringify({
-                chapter_title: 'Verrou cassé',
-                section_type: 'action',
-                atmosphere: 'tense',
-                choices: [{ text: 'Exploiter la brèche tout de suite', attribute: 'combat', difficulty: 3 }],
-                memory_updates: { notes: ['Le terminal de verrouillage est neutralisé.'] },
-                state_update: { location: 'Hangar verrouillé', credits: -50 }
-              })
-            }
-          }]
-        })
-      } as Response);
+      .mockResolvedValueOnce(jsonResponse({
+        choices: [{ message: { role: 'assistant', content: 'Tour 8. Les accès restent verrouillés dans le hangar.' } }]
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        choices: [{
+          message: {
+            role: 'assistant',
+            content: JSON.stringify({
+              player_action: 'Observer en silence derrière une caisse.',
+              scene_goal: 'Gagner du temps pour évaluer les gardes.',
+              tension: 'Le verrouillage du hangar se renforce.',
+              must_include: ['Un obstacle technique', 'Une fenêtre de tir courte'],
+              required_world_signals: ['location', 'npc'],
+              section_type: 'action',
+              atmosphere: 'tense'
+            })
+          }
+        }]
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        choices: [{ message: { role: 'assistant', content: 'Tu sabotes le terminal de verrouillage. Les portes tremblent et les alarmes hurlent.' } }]
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        choices: [{
+          message: {
+            role: 'assistant',
+            content: JSON.stringify({
+              chapter_title: 'Verrou cassé',
+              section_type: 'action',
+              atmosphere: 'tense',
+              choices: [{ text: 'Exploiter la brèche tout de suite', attribute: 'combat', difficulty: 3 }],
+              memory_updates: { notes: ['Le terminal de verrouillage est neutralisé.'] },
+              state_update: { location: 'Hangar verrouillé', credits: -50 }
+            })
+          }
+        }]
+      }));
 
     vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
 
@@ -607,10 +580,7 @@ describe('generateStoryTurnStructured', () => {
       state_update: { location: 'Spatioport de Nar Shaddaa', hp: -5 }
     });
 
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ choices: [{ message: { role: 'assistant', content: chapterJson } }] })
-    } as Response);
+    const fetchMock = vi.fn().mockImplementation(() => jsonResponse({ choices: [{ message: { role: 'assistant', content: chapterJson } }] }));
     vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
 
     const generation = await generateStoryTurnStructured(
@@ -631,10 +601,7 @@ describe('generateStoryTurnStructured', () => {
   });
 
   it('falls back to a playable emergency chapter when the model returns junk', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ choices: [{ message: { role: 'assistant', content: 'pas du tout du json' } }] })
-    } as Response);
+    const fetchMock = vi.fn().mockImplementation(() => jsonResponse({ choices: [{ message: { role: 'assistant', content: 'pas du tout du json' } }] }));
     vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
 
     const generation = await generateStoryTurnStructured(

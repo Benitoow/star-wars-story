@@ -1,5 +1,39 @@
 # Changelog
 
+## v2.7.7 — 2026-05-25
+
+### 🧠 Migration vers le SDK OpenRouter Officiel (`@openrouter/sdk`)
+
+- **Transport Standardisé (`providers.ts`)** :
+  * Remplacement des appels `fetch()` bruts et de la sérialisation manuelle OpenRouter par le SDK officiel `@openrouter/sdk` v0.12.35 (`OpenRouterCore` + `chatSend`).
+  * Client HTTP personnalisé avec capture du body brut pour conserver des diagnostics complets et rétrocompatibles.
+  * Gestion des erreurs typées SDK : `OpenRouterError`, `RequestTimeoutError`, `RequestAbortedError`, `ConnectionError`.
+  * Conservation de la boucle de retries avec backoff exponentiel sur les erreurs 429/5xx et réseau.
+- **Mise à Jour des Tests** :
+  * Tous les mocks `fetch` convertis pour produire de vraies `Response` HTTP compatibles avec le mécanisme de parsing du SDK.
+  * Fixtures de contrat adaptées : les réponses d'erreur incluent désormais le `content-type: application/json` pour passer les validateurs internes du SDK.
+  * Tests de replay et soak migrés vers le même pattern.
+- **Correction Lint Svelte 5 (`+page.svelte`)** :
+  * Remplacement des `new Set()` réactifs par `SvelteSet` dans la page des paramètres pour conformité Svelte 5.
+- **Stabilité** :
+  * 160 tests unitaires 100% au vert.
+  * `svelte-check` : 0 erreur, 0 avertissement.
+  * `eslint` : 0 warning.
+
+## v2.7.6 — 2026-05-25
+
+### 🔬 Transparence Totale des Diagnostics Narratifs (Logger)
+
+- **Fin du Caviardage des Données Narratives (`logger.ts`)** :
+  * Les clés `prompt`, `messages`, `systemPrompt`, `userPrompt`, `content`, `body`, `rawBody` et `rawResponse` ne sont plus masquées dans les logs de diagnostics exportés. Seules les clés d'authentification (`apiKey`, `authorization`, `token`, etc.) restent strictement caviardées.
+  * Seuil de troncature des chaînes rehaussé de 220 à 8 000 caractères pour capturer intégralement les prompts système, les réponses IA et le contenu narratif généré.
+  * Les chaînes non-sensibles sont désormais préservées en texte intégral (au lieu d'un aperçu de 180 caractères), permettant un debug complet de la qualité narrative.
+- **Synchronisation de la Version de l'Application** :
+  * La constante `APP_VERSION`, `package.json`, `package-lock.json`, `static/manifest.json` et `README.md` sont passés de `2.0.0` à `2.7.5`, puis `2.7.6`, pour refléter fidèlement la progression du projet dans les exports de logs.
+- **Stabilité Post-Intégration** :
+  * Type-safety absolue certifiée par `svelte-check` avec **0 erreur et 0 avertissement**.
+  * Intégration validée sur la suite complète de **160 tests unitaires 100% au vert**.
+
 ## v2.7.5 — 2026-05-24
 
 ### ⚔️ Hardening des Choix Narratifs & Pertinence Extrême des Options

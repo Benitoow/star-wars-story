@@ -45,7 +45,7 @@ function createMemoryStore(): SessionStore {
 }
 
 function buildAssistantMessage(content: string) {
-  return {
+  return new Response(JSON.stringify({
     choices: [
       {
         message: {
@@ -54,7 +54,12 @@ function buildAssistantMessage(content: string) {
         }
       }
     ]
-  };
+  }), {
+    status: 200,
+    headers: {
+      'content-type': 'application/json'
+    }
+  });
 }
 
 afterEach(() => {
@@ -73,11 +78,7 @@ describe('story engine replay corpus', () => {
       buildAssistantMessage(JSON.stringify(scenario.brain))
     ]);
 
-    const fetchMock = vi.fn().mockImplementation(async () => ({
-      ok: true,
-      status: 200,
-      json: async () => queuedResponses.shift()
-    } as Response));
+    const fetchMock = vi.fn().mockImplementation(async () => queuedResponses.shift() as Response);
     vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
 
     const providerConfig = {
