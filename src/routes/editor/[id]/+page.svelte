@@ -22,6 +22,7 @@
   import { showToast } from '$lib/stores/ui';
   import { logger } from '$lib/utils/logger';
   import { getPreferences, type UserPreferences } from '$lib/db';
+  import { resolveUiLanguage } from '$lib/config/languages';
   import SvgIcon from '$lib/components/SvgIcon.svelte';
   import PageHeader from '$lib/components/PageHeader.svelte';
   import GameHUD from '$lib/components/GameHUD.svelte';
@@ -129,6 +130,7 @@
   let hudCollapsed = false;
   let storyRuntimeMode: string | null = 'agentic-subagents';
   let preferredTextRuntimeMode: StoryGenerationMode = 'agentic-subagents';
+  let resolvedLanguage = 'fr';
   const BACKGROUND_WORLD_EVERY = 3;
 
   let worldState: WorldState = {
@@ -305,6 +307,7 @@
     applySetupDefaultsFromPreferences(preferences);
     providerConfig = buildProviderConfigFromPreferences(preferences);
     preferredTextRuntimeMode = normalizeStoryGenerationMode(preferences.textRuntimeMode);
+    resolvedLanguage = resolveUiLanguage(preferences.uiLanguage);
 
     return preferences;
   }
@@ -353,7 +356,8 @@
           recentBackgroundEvents,
           turnNumber: turn
         },
-        providerConfig
+        providerConfig,
+        resolvedLanguage
       );
 
       const event = generation.event;
@@ -412,7 +416,7 @@
       ...buildCanonicalIdentityFacts(setup),
       ...memoryLog
     ]));
-    const systemPrompt = buildSystemPrompt(setup, memoryFactsForPrompt, worldState, promptMode, campaignArchive);
+    const systemPrompt = buildSystemPrompt(setup, memoryFactsForPrompt, worldState, promptMode, campaignArchive, resolvedLanguage);
     aiMessages = [{ role: 'system', content: systemPrompt }, ...aiMessages.filter(message => message.role !== 'system')];
 
     const requestMessages = trimMessages([
@@ -421,8 +425,8 @@
     ]);
 
     const generation = preferredTextRuntimeMode === 'structured-json'
-      ? await generateStoryTurnStructured(requestMessages, providerConfig, turn)
-      : await generateStoryTurn(requestMessages, providerConfig, turn);
+      ? await generateStoryTurnStructured(requestMessages, providerConfig, turn, resolvedLanguage)
+      : await generateStoryTurn(requestMessages, providerConfig, turn, {}, resolvedLanguage);
     storyRuntimeMode = generation.mode;
     const chapter = sanitizeChapterForDisplay(enforceTransitionChoiceQuality(generation.chapter, worldState)) as StoryChapter;
     const assistantContent = buildStoredAssistantContent(chapter, generation.mode, generation.rawResponse);
@@ -465,7 +469,7 @@
       memoryLog = ensureCanonicalIdentityMemory(memoryLog, setup);
 
       const trameLabel = TRAMES.find(item => item.id === selectedTrame)?.name || null;
-      const prompt = buildStartPrompt(setup, trameLabel, resolvePromptMode());
+      const prompt = buildStartPrompt(setup, trameLabel, resolvePromptMode(), resolvedLanguage);
       const chapter = await requestStoryChapter(prompt, setup, 1);
 
       currentChapter = chapter;
@@ -526,7 +530,8 @@
         recentSectionTypes,
         recentChoiceTexts,
         sceneAnchor,
-        outcomeDirective
+        outcomeDirective,
+        resolvedLanguage
       );
 
       const chapter = await requestStoryChapter(prompt, setup, nextTurn);

@@ -1,5 +1,27 @@
 # Changelog
 
+## v2.7.0 — 2026-05-24
+
+### ✨ Refonte Visuelle "Musée-Cinéma" (CanariasArt)
+
+- **Esthétique Épurée Ultra-Premium** : Remplacement de l'ancien style "cockpit" surchargé, des lueurs jaunes néon et des ombres portées de science-fiction agressives par une interface minimaliste en verre transparent (`var(--surface-glass)` et `var(--border-subtle)`).
+- **Typographie d'Exposition Fine** : Intégration de la police **Cinzel** (majuscules fines et espacées) pour tous les en-têtes, boutons ghosts et breadcrumbs.
+- **Confort de Lecture Littéraire** : Alignement de la prose narrative sur la police à empattement **Bitter** avec une colonne de lecture rationalisée à une largeur idéale de **64ch**.
+- **HUD Flottant & Graphiques 3px** : Amincissement des barres de progression de statut (points de vie, influence de secteur, standings de factions) à **3px** d'épaisseur maximum pour un rendu minimaliste haut de gamme.
+- **Refonte des Composants Majeurs** : Alignement complet de [SetupWizard.svelte](file:///c:/Users/starx/Documents/CODE/star-wars-story/src/lib/components/editor/SetupWizard.svelte), [GameHUD.svelte](file:///c:/Users/starx/Documents/CODE/star-wars-story/src/lib/components/GameHUD.svelte), [PageHeader.svelte](file:///c:/Users/starx/Documents/CODE/star-wars-story/src/lib/components/PageHeader.svelte), de la page de jeu [+page.svelte (editor)](file:///c:/Users/starx/Documents/CODE/star-wars-story/src/routes/editor/%5Bid%5D/+page.svelte) et de la page des paramètres [+page.svelte (settings)](file:///c:/Users/starx/Documents/CODE/star-wars-story/src/routes/settings/+page.svelte).
+
+### 🌐 Moteur IA Multilingue & Correction des Dérives de Langue
+
+- **Directives de Langue Dynamiques** : Introduction de la fonction `getPromptLanguageInstructions` traduisant le choix de l'utilisateur (`fr`, `en`, `es`, `de`, `it`, `pt`, `ja`, `zh`) en directives strictes à destination de l'IA.
+- **Hardening de la Boucle Agentique** : Injection des contraintes de langue dans **tous les sous-agents** du pipeline (`scribe -> director -> writer -> brain`) et dans le duo de simulation galactique (`observer -> adjudicator`), forçant les modèles à répondre intégralement dans la langue choisie (ex: Français) et éliminant définitivement les dérives en anglais.
+- **Résolution Native de Langue** : Liaison automatique de la langue de l'histoire à la préférence d'interface `uiLanguage` de l'utilisateur ou à la langue de son navigateur en cas de sélection automatique (`auto`).
+
+### 🔧 Améliorations de l'Environnement de Développement
+
+- **Hardening d'ESLint** : Mise à jour de [eslint.config.mjs](file:///c:/Users/starx/Documents/CODE/star-wars-story/eslint.config.mjs) pour ignorer le dossier de travail temporaire `.claude/`, éliminant plus de 8 000 faux-positifs.
+- **Indicateurs de Qualité** : Type-check (`svelte-check`) et tests unitaires du moteur (155 tests) confirmés à 100% au vert.
+- **Nettoyage des Logs** : Suppression des fichiers de logs temporaires et obsolètes de la racine du workspace (`build.log`, `check.log`, `check_out.txt`, `lint.log`, `test.log`, `.log` de déploiement).
+
 ## v2.6.2 — 2026-04-24
 
 ### 🏗️ Story engine consolidation — v10/10

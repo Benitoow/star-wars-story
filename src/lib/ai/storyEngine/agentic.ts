@@ -38,7 +38,8 @@ import {
   buildPipelineBrainUserPrompt,
   buildPipelineDirectorUserPrompt,
   buildPipelineScribeUserPrompt,
-  buildPipelineWriterUserPromptWithDirector
+  buildPipelineWriterUserPromptWithDirector,
+  getPromptLanguageInstructions
 } from './prompts';
 
 type StoryPipelineStep = 'scribe' | 'director' | 'writer' | 'brain' | 'world-observer' | 'world-adjudicator';
@@ -401,14 +402,25 @@ async function callPipelineStep(
   return cleanText(raw, 16000);
 }
 
-async function runScribeStep(messages: ChatMessage[], config: StoryProviderConfig, turnNumber: number): Promise<string> {
+function appendLanguageInstruction(systemPrompt: string, languageCode: string): string {
+  const { instruction } = getPromptLanguageInstructions(languageCode);
+  return `${systemPrompt}\n\n${instruction}`;
+}
+
+async function runScribeStep(
+  messages: ChatMessage[],
+  config: StoryProviderConfig,
+  turnNumber: number,
+  languageCode: string
+): Promise<string> {
   const normalizedMessages = messages.map(message => (
     message.role === 'user'
       ? { ...message, content: toSubAgentHistoryLine(message).replace(/^Joueur:\s*/, '') }
       : { ...message, content: cleanText(message.content, 5000) }
   ));
   const userPrompt = buildPipelineScribeUserPrompt(normalizedMessages, turnNumber);
-  const raw = await callPipelineStep('scribe', STORY_PIPELINE_SCRIBE_SYSTEM_PROMPT, userPrompt, config, false);
+  const scribePrompt = appendLanguageInstruction(STORY_PIPELINE_SCRIBE_SYSTEM_PROMPT, languageCode);
+  const raw = await callPipelineStep('scribe', scribePrompt, userPrompt, config, false);
   return cleanText(raw, 650);
 }
 
@@ -416,31 +428,37 @@ async function runDirectorStep(
   messages: ChatMessage[],
   scribeSummary: string,
   config: StoryProviderConfig,
-  turnNumber: number
+  turnNumber: number,
+  languageCode: string
 ): Promise<StoryDirectorBrief> {
   const fallback = fallbackDirectorBrief(messages, scribeSummary);
   const userPrompt = buildPipelineDirectorUserPrompt(scribeSummary, fallback.player_action, turnNumber);
-  const raw = await callPipelineStep('director', STORY_PIPELINE_DIRECTOR_SYSTEM_PROMPT, userPrompt, config, true);
+  const directorPrompt = appendLanguageInstruction(STORY_PIPELINE_DIRECTOR_SYSTEM_PROMPT, languageCode);
+  const raw = await callPipelineStep('director', directorPrompt, userPrompt, config, true);
   return coerceDirectorBrief(parseJsonSafely(raw), fallback);
 }
 
 async function runWriterStep(
   scribeSummary: string,
   directorBrief: StoryDirectorBrief,
-  config: StoryProviderConfig
+  config: StoryProviderConfig,
+  languageCode: string
 ): Promise<string> {
   const userPrompt = buildPipelineWriterUserPromptWithDirector(scribeSummary, directorBrief);
-  const raw = await callPipelineStep('writer', STORY_PIPELINE_WRITER_SYSTEM_PROMPT, userPrompt, config, false);
+  const writerPrompt = appendLanguageInstruction(STORY_PIPELINE_WRITER_SYSTEM_PROMPT, languageCode);
+  const raw = await callPipelineStep('writer', writerPrompt, userPrompt, config, false);
   return sanitizeNarrativeText(raw, 5500);
 }
 
 async function runBrainStep(
   writerScene: string,
   directorBrief: StoryDirectorBrief,
-  config: StoryProviderConfig
+  config: StoryProviderConfig,
+  languageCode: string
 ): Promise<Record<string, unknown>> {
   const userPrompt = buildPipelineBrainUserPrompt(writerScene, directorBrief);
-  const raw = await callPipelineStep('brain', STORY_PIPELINE_BRAIN_SYSTEM_PROMPT, userPrompt, config, true);
+  const brainPrompt = appendLanguageInstruction(STORY_PIPELINE_BRAIN_SYSTEM_PROMPT, languageCode);
+  const raw = await callPipelineStep('brain', brainPrompt, userPrompt, config, true);
   const parsed = parseJsonSafely(raw);
   if (parsed) return parsed;
   throw new Error('Extraction mécanique invalide: JSON introuvable.');
@@ -450,7 +468,8 @@ export async function generateStoryTurn(
   messages: ChatMessage[],
   config: StoryProviderConfig,
   turnNumber: number,
-  providerOverrides: StoryTurnPipelineConfigOverrides = {}
+  providerOverrides: StoryTurnPipelineConfigOverrides = {},
+  languageCode: string = 'fr'
 ): Promise<StoryTurnGenerationResult> {
   const safeMessages = sanitizeStoryMessageHistory(messages);
   const baseConfig = normalizeProviderConfig(config);
@@ -463,7 +482,7 @@ export async function generateStoryTurn(
 
   let scribeSummary = fallbackScribeSummary(safeMessages, turnNumber);
   try {
-    const result = await runScribeStep(safeMessages, scribeConfig, turnNumber);
+    const result = await runScribeStep(safeMessages, scribeConfig, turnNumber, languageCode);
     if (result) {
       scribeSummary = result;
       completedSteps = 1;
@@ -485,7 +504,7 @@ export async function generateStoryTurn(
 
   let directorBrief = fallbackDirectorBrief(safeMessages, scribeSummary);
   try {
-    directorBrief = await runDirectorStep(safeMessages, scribeSummary, directorConfig, turnNumber);
+    directorBrief = await runDirectorStep(safeMessages, scribeSummary, directorConfig, turnNumber, languageCode);
     completedSteps = Math.max(completedSteps, 2);
   } catch (error) {
     logger.warn('storyEngine: étape 2 (directeur) indisponible, fallback local.', error);
@@ -504,7 +523,7 @@ export async function generateStoryTurn(
 
   let writerScene = fallbackWriterScene(scribeSummary, safeMessages, turnNumber);
   try {
-    const result = await runWriterStep(scribeSummary, directorBrief, writerConfig);
+    const result = await runWriterStep(scribeSummary, directorBrief, writerConfig, languageCode);
     if (result) {
       writerScene = result;
       completedSteps = Math.max(completedSteps, 3);
@@ -526,7 +545,7 @@ export async function generateStoryTurn(
 
   let brainPayload = fallbackBrainPayload();
   try {
-    brainPayload = await runBrainStep(writerScene, directorBrief, brainConfig);
+    brainPayload = await runBrainStep(writerScene, directorBrief, brainConfig, languageCode);
     completedSteps = 4;
   } catch (error) {
     logger.warn('storyEngine: étape 4 (cerveau) indisponible, fallback mécanique local.', error);
@@ -596,7 +615,8 @@ export async function generateStoryTurn(
 export async function generateStoryTurnStructured(
   messages: ChatMessage[],
   config: StoryProviderConfig,
-  turnNumber: number
+  turnNumber: number,
+  languageCode: string = 'fr'
 ): Promise<StoryTurnGenerationResult> {
   const safeMessages = sanitizeStoryMessageHistory(messages);
   const normalizedConfig = normalizeProviderConfig(config);
@@ -824,16 +844,18 @@ Réponds UNIQUEMENT en JSON valide avec ce contrat:
 
 export async function generateBackgroundWorldEvent(
   input: BackgroundWorldInput,
-  config: StoryProviderConfig
+  config: StoryProviderConfig,
+  languageCode: string = 'fr'
 ): Promise<BackgroundWorldGenerationResult> {
   const normalizedConfig = normalizeProviderConfig(config);
   const contextPrompt = buildBackgroundWorldSystemPrompt(input);
 
   try {
+    const observerPrompt = appendLanguageInstruction(BACKGROUND_WORLD_OBSERVER_SYSTEM_PROMPT, languageCode);
     const observerSummary = cleanText(
       await callPipelineStep(
         'world-observer',
-        `${BACKGROUND_WORLD_OBSERVER_SYSTEM_PROMPT}\n\n${contextPrompt}`,
+        `${observerPrompt}\n\n${contextPrompt}`,
         buildBackgroundWorldObserverPrompt(input.turnNumber),
         normalizedConfig,
         false
@@ -841,9 +863,10 @@ export async function generateBackgroundWorldEvent(
       1200
     );
 
+    const adjudicatorPrompt = appendLanguageInstruction(BACKGROUND_WORLD_ADJUDICATOR_SYSTEM_PROMPT, languageCode);
     const rawResponse = await callPipelineStep(
       'world-adjudicator',
-      `${BACKGROUND_WORLD_ADJUDICATOR_SYSTEM_PROMPT}\n\n${contextPrompt}`,
+      `${adjudicatorPrompt}\n\n${contextPrompt}`,
       buildBackgroundWorldAdjudicatorPrompt(observerSummary, input.turnNumber),
       normalizedConfig,
       true

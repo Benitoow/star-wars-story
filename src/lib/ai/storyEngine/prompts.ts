@@ -236,20 +236,40 @@ Réponds EXCLUSIVEMENT en JSON strict (sans markdown) avec ce contrat:
   ]
 }
 
-Contraintes:
-- 3 ou 4 choices concrets, distincts, sans doublons de texte.
-- Évite que tous les choices aient le même attribute.
 - Les choices doivent découler de la conséquence directe de l'action joueur ci-dessus.
 - "section_type" et "atmosphere" doivent coller à la scène réellement écrite.
 - Les champs non pertinents peuvent être omis.`;
 }
 
+export function getPromptLanguageInstructions(languageCode?: string): { name: string; instruction: string } {
+  const code = (languageCode || 'fr').toLowerCase().trim();
+
+  const langNames: Record<string, string> = {
+    fr: 'FRANÇAIS',
+    en: 'ENGLISH',
+    es: 'ESPAÑOL',
+    de: 'DEUTSCH',
+    it: 'ITALIANO',
+    pt: 'PORTUGUÊS',
+    ja: '日本語 (JAPANESE)',
+    zh: '中文 (CHINESE)'
+  };
+
+  const targetLang = langNames[code] || 'FRANÇAIS';
+
+  return {
+    name: targetLang,
+    instruction: `LANGUE OBLIGATOIRE — ${targetLang}: tout le texte que tu génères (chapter_title, narrative.action, narrative.dialogue, narrative.reflection, atmosphere, et chaque choices[].text) doit être rédigé ENTIÈREMENT EN ${targetLang}, quelle que soit la langue de la prémisse, de la mémoire ou de l'action du joueur. Ne change JAMAIS de langue. N'écris pas d'autres langues. Ne réponds jamais en anglais si la langue demandée est différente.`
+  };
+}
+
 export function buildSystemPrompt(
-  setup: StorySetupSnapshot,
+  setup: StorySetupSnapshot & { language?: string },
   memoryFacts: string[],
   worldState?: WorldState,
   _promptMode: StoryPromptMode = 'json',
-  campaignArchive: string[] = []
+  campaignArchive: string[] = [],
+  languageCode?: string
 ): string {
   const protagonist = [setup.protagonistFirstName || '', setup.protagonistLastName || ''].join(' ').trim() || 'Le protagoniste';
 
@@ -313,7 +333,10 @@ ${factionLines}${envStr}${clocksStr}${sectorsStr}${rumorsStr}${directorStr}${cri
     ? `\nRÉSUMÉ DE CAMPAGNE (tours anciens condensés):\n${campaignArchive.map(item => `- ${cleanText(item, 260)}`).join('\n')}`
     : '';
 
-  const basePrompt = `LANGUE OBLIGATOIRE — FRANÇAIS: tout le texte que tu génères (chapter_title, narrative.action, narrative.dialogue, narrative.reflection, atmosphere, et chaque choices[].text) doit être rédigé EN FRANÇAIS, quelle que soit la langue de la prémisse, de la mémoire ou de l'action du joueur. N'écris JAMAIS en anglais.
+  const lang = languageCode || setup.language || 'fr';
+  const { name: langName, instruction: langInstruction } = getPromptLanguageInstructions(lang);
+
+  const basePrompt = `${langInstruction}
 
 Tu es un Maître du Jeu Star Wars d'élite. Tu écris avec précision et cinéma — chaque ligne doit créer tension, émotion ou révélation. Zéro remplissage.
 
@@ -338,7 +361,7 @@ RÈGLES MJ:
 13. DIALOGUES: chaque réplique doit être sur son propre paragraphe, au format "Nom : réplique" (préfixe "—" optionnel), et placée dans "narrative.dialogue". Ne colle jamais une réplique au milieu d'un paragraphe d'action.
 14. DIALOGUES OBLIGATOIREMENT DANS narrative.dialogue: chaque échange verbal doit être placé dans le champ "dialogue", jamais dans "action". "action" = narration pure et actions, "dialogue" = tous les échanges verbaux. Si un personnage parle, utilise ce champ dédié.;`;
 
-  const jsonContract = `Réponds UNIQUEMENT en JSON valide, sans markdown ni texte autour. TOUT le texte des champs est rédigé EN FRANÇAIS (jamais en anglais). Priorité absolue: prose narrative riche dans "action" (2-4 paragraphes). Remplis state_update avec toutes les conséquences.
+  const jsonContract = `Réponds UNIQUEMENT en JSON valide, sans markdown ni texte autour. TOUT le texte des champs est rédigé ENTIÈREMENT EN ${langName} (jamais dans une autre langue). Priorité absolue: prose narrative riche dans "action" (2-4 paragraphes). Remplis state_update avec toutes les conséquences.
 
 {
   "chapter_title": "Titre de scène évocateur — jamais Chapitre N",
@@ -369,15 +392,19 @@ RÈGLES MJ:
 }
 
 export function buildStartPrompt(
-  setup: StorySetupSnapshot,
+  setup: StorySetupSnapshot & { language?: string },
   selectedTrameLabel?: string | null,
-  _promptMode: StoryPromptMode = 'json'
+  _promptMode: StoryPromptMode = 'json',
+  languageCode?: string
 ): string {
   const firstName = cleanText(setup.protagonistFirstName, 60);
   const lastName = cleanText(setup.protagonistLastName, 60);
   const displayName = [firstName, lastName].filter(Boolean).join(' ').trim() || 'le protagoniste';
 
   const eraContext = ERA_CONTEXT[setup.era || ''] || 'Galaxie lointaine, très lointaine — une époque de conflits, de choix lourds et de destins qui basculent.';
+
+  const lang = languageCode || setup.language || 'fr';
+  const { name: langName } = getPromptLanguageInstructions(lang);
 
   return `Lance une histoire interactive Star Wars avec un prologue immédiatement jouable.
 
@@ -397,18 +424,18 @@ CADRE D'OUVERTURE:
 - Contenu: ${setup.contentMode || 'cinematic'}
 
 EXIGENCES DU PREMIER TOUR:
-- Ouvre in medias res, sans préambule explicatif.
-- Donne immédiatement une tension claire, un lieu vivant et un objectif.
+- Ouvre in medias res, sans préambule explicatif, rédigé ENTIÈREMENT EN ${langName} (jamais dans une autre langue).
+- Donne immédiatement une tension claire, un lieu vivant et un objectif en ${langName}.
 - Introduis au moins 1 PNJ mémorable avec un agenda distinct.
 - Fais émerger un enjeu politique, relationnel ou moral dès l'ouverture.
-- Les 3-4 choix doivent être concrets, contrastés et portés par la scène.
+- Les 3-4 choix doivent être concrets, contrastés, rédigés en ${langName} et portés par la scène.
 - Respecte strictement le rôle canonique choisi (${setup.role}). N'invente pas de promotion de rang au lancement.
 - Le lieu de départ doit être explicite et exploitable pour l'état monde.
 - Le texte de scène ne doit contenir ni markdown ni liste de choix.
 - Tout dialogue doit être isolé sur sa propre ligne, au format "Nom : réplique" (préfixe — optionnel), et séparé du reste de l'action par un retour à la ligne.
 - chapter_number = 1
-Les dialogues vont dans le champ "dialogue", jamais dans "action".
-Le tour 1 doit permettre d'extraire state_update.location et au moins un PNJ nommé.`;
+- Les dialogues vont dans le champ "dialogue", jamais dans "action".
+- Le tour 1 doit permettre d'extraire state_update.location et au moins un PNJ nommé.`;
 }
 
 export function buildContinuePrompt(
@@ -419,7 +446,8 @@ export function buildContinuePrompt(
   recentSectionTypes: string[] = [],
   recentChoiceTexts: string[] = [],
   sceneAnchor: string = '',
-  outcomeDirective: string = ''
+  outcomeDirective: string = '',
+  languageCode?: string
 ): string {
   const history = recentSummary.length
     ? `\nRésumé récent:\n${recentSummary.map(item => `- ${item}`).join('\n')}`
@@ -449,15 +477,18 @@ export function buildContinuePrompt(
   const anchorBlock = sceneAnchor ? `${sceneAnchor}\n\n` : '';
   const outcomeBlock = outcomeDirective ? `${outcomeDirective}\n` : '';
 
+  const lang = languageCode || 'fr';
+  const { name: langName } = getPromptLanguageInstructions(lang);
+
   return `${anchorBlock}ACTION JOUEUR CANONIQUE: ${cleanText(actionText, 280)}
-${outcomeBlock}OBLIGATION: la scène suivante doit traiter cette action comme cause immédiate (ou tentative avec conséquence concrète).
+${outcomeBlock}OBLIGATION: la scène suivante doit traiter cette action comme cause immédiate (ou tentative avec conséquence concrète), rédigée ENTIÈREMENT EN ${langName} (jamais dans une autre langue).
 
 Tour ${turnNumber}. Action: "${cleanText(actionText, 280)}".${history}${recentChoicesBlock}${pacingDirective}
 
-Écris une scène forte et précise — conséquences réelles, PNJs avec mémoire et intention propre.
+Écris une scène forte et précise en ${langName} — conséquences réelles, PNJs avec mémoire et intention propre.
 Ne mets aucun markdown, aucun titre interne et aucun bloc de choix dans le récit.
 Chaque réplique doit être sur une ligne distincte, au format "Nom : réplique" (préfixe — optionnel), et jamais noyée dans un paragraphe d'action.
-Propose 3-4 choix distincts, concrets, ancrés dans cette scène précise (pas génériques).
+Propose 3-4 choix distincts, concrets, rédigés en ${langName}, ancrés dans cette scène précise (pas génériques).
 Fournis assez d'éléments concrets pour extraire au moins un signal monde (location ou PNJ nommé) à ce tour.
 Respecte le rôle canonique du protagoniste défini dans le contexte système (ne pas promouvoir/rétrograder sans validation explicite du joueur).
 chapter_number = ${turnNumber}.

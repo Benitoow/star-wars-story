@@ -16,11 +16,12 @@ Star Wars Story Manager est une PWA locale-first qui permet de vivre des histoir
 
 ### Fonctionnalités principales
 
-**Moteur narratif agentique (v2.0)**
-- L'IA texte fonctionne via une **orchestration à sous-agents** (`scribe -> director -> writer -> brain`) sur OpenRouter
-- Boucle agentique multi-étapes gelée et supportable, au lieu d'un faux support multi-provider qui dérive
-- Événements galactiques hors-scène : un second duo (`observer -> adjudicator`) simule le monde pendant que le joueur joue
-- Runtime public gelé : `OpenRouter + none`, diagnostics locaux exportables, validation centrale avant runtime
+**Moteur narratif agentique (v2.7)**
+- L'IA texte fonctionne via une **orchestration à sous-agents** (`scribe -> director -> writer -> brain`) sur OpenRouter.
+- **Contraintes de Langue Renforcées** : Injection dynamique de directives de langue (`fr`, `en`, `es`, `de`, `it`, `pt`, `ja`, `zh`) dans tous les sous-agents et lors de la simulation galactique de fond, forçant une cohérence linguistique parfaite et éliminant définitivement les réponses ou choix en anglais.
+- Boucle agentique multi-étapes robuste et résiliente.
+- Événements galactiques hors-scène : un second duo (`observer -> adjudicator`) simule le monde pendant que le joueur joue.
+- Runtime public gelé : `OpenRouter + none`, diagnostics locaux exportables, validation centrale avant runtime.
 
 **Living World State**
 - `PlayerState` : HP (0-100), crédits, lieu, date narrative, blessures actives, inventaire
@@ -98,12 +99,12 @@ Un workflow CI GitHub exécute la même chaîne sur push/pull request.
 
 | Composant | Technologie |
 |-----------|-------------|
-| Framework | SvelteKit 2.5.0 + Svelte 4.2.20 |
+| Framework | SvelteKit 2 + Svelte 5 |
 | Base de données | Dexie.js v4 (IndexedDB) |
-| IA | OpenRouter + orchestration à sous-agents |
+| IA | OpenRouter + orchestration à sous-agents avec contraintes de langue multilingues |
 | Déploiement | Cloudflare Pages |
 | PWA | Service Worker custom (`static/sw.js`) + Web Manifest |
-| Style | CSS custom (dark theme, design Star Wars) |
+| Style | CSS custom (esthétique épurée "Musée-Cinéma" CanariasArt, polices Cinzel & Bitter) |
 
 ### Architecture
 
