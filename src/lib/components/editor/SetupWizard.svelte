@@ -30,6 +30,7 @@
 
   let generatingPortrait = false;
   let portraitError = '';
+  let customPortraitPrompt = '';
 
   async function generateProtagonistPortrait() {
     portraitError = '';
@@ -58,7 +59,11 @@
       const roleName = ROLES.find(r => r.id === setup.role)?.name || 'Wanderer';
       const eraName = ERAS.find(e => e.id === setup.era)?.name || 'Imperial era';
 
-      const prompt = `Star Wars highly detailed close-up character portrait of ${nameStr}, a ${roleName} associated with the ${factionName} faction during the ${eraName}. Dramatic cinematic lighting, photorealistic, premium digital art, masterpiece.`;
+      let prompt = `Star Wars highly detailed close-up character portrait of ${nameStr}, a ${roleName} associated with the ${factionName} faction during the ${eraName}.`;
+      if (customPortraitPrompt.trim()) {
+        prompt += ` Physical description and style: ${customPortraitPrompt.trim()}.`;
+      }
+      prompt += ` Dramatic cinematic lighting, photorealistic, premium digital art, masterpiece.`;
 
       const dataUrl = await callImageModel(prompt, {
         providerId: prefs.imageProvider,
@@ -499,6 +504,18 @@
               <div class="setup-section-header">
                 <p class="subheading">Portrait IA de Protagoniste</p>
                 <p class="helper-text">Génère un visage unique d'après ton allégeance, ton rôle et ton époque.</p>
+              </div>
+
+              <div class="portrait-custom-prompt">
+                <label for="custom-portrait-input" class="custom-prompt-label">Détails physiques ou style (facultatif)</label>
+                <input
+                  id="custom-portrait-input"
+                  class="portrait-prompt-input"
+                  type="text"
+                  placeholder="Ex: Twi'lek bleu, bure de Jedi marron, cicatrice à l'oeil, style cyberpunk..."
+                  bind:value={customPortraitPrompt}
+                  disabled={generatingPortrait}
+                />
               </div>
               
               <div class="portrait-ai-container">
@@ -1251,6 +1268,44 @@
   border-radius: var(--radius-sm);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
+}
+
+.portrait-custom-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: var(--space-sm);
+}
+
+.custom-prompt-label {
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.portrait-prompt-input {
+  width: 100%;
+  border: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--color-text-primary);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  transition: all var(--transition-fast);
+}
+
+.portrait-prompt-input:focus {
+  outline: none;
+  border-color: var(--color-text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.portrait-prompt-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .portrait-ai-container {

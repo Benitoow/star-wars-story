@@ -10,6 +10,13 @@
 - **HUD Flottant & Graphiques 3px** : Amincissement des barres de progression de statut (points de vie, influence de secteur, standings de factions) à **3px** d'épaisseur maximum pour un rendu minimaliste haut de gamme.
 - **Refonte des Composants Majeurs** : Alignement complet de [SetupWizard.svelte](file:///c:/Users/starx/Documents/CODE/star-wars-story/src/lib/components/editor/SetupWizard.svelte), [GameHUD.svelte](file:///c:/Users/starx/Documents/CODE/star-wars-story/src/lib/components/GameHUD.svelte), [PageHeader.svelte](file:///c:/Users/starx/Documents/CODE/star-wars-story/src/lib/components/PageHeader.svelte), de la page de jeu [+page.svelte (editor)](file:///c:/Users/starx/Documents/CODE/star-wars-story/src/routes/editor/%5Bid%5D/+page.svelte) et de la page des paramètres [+page.svelte (settings)](file:///c:/Users/starx/Documents/CODE/star-wars-story/src/routes/settings/+page.svelte).
 
+### 🎨 Portrait IA de Protagoniste & Génération d'Images
+
+- **Génération Intégrée de Portraits** : Ajout d'une section dédiée à la génération de portrait de protagoniste par IA dans l'assistant de configuration (`SetupWizard.svelte`), créant des illustrations uniques synchronisées avec l'allégeance, le rôle et la chronologie de départ.
+- **Saisie de Détails Physiques (Overrides)** : Implémentation d'un champ de texte facultatif permettant de spécifier des détails physiques ou styles graphiques précis (ex: "Twi'lek bleu, bure de Jedi marron..."), s'insérant dynamiquement au prompt de l'image.
+- **Support Robuste des Fournisseurs d'Images** : Implémentation complète de `src/lib/ai/imageEngine.ts` prenant en charge OpenRouter, fal.ai, DALL-E (OpenAI) et Stability AI, avec conversion Base64 automatique pour la persistance locale IndexedDB (Dexie.js).
+- **Stabilisation du Sélecteur OpenRouter Images** : Correction de la synchronisation dynamique buggy en éliminant les modèles de texte de la liste et en stabilisant le mapping de clé API partagée/décroissante.
+
 ### 🌐 Moteur IA Multilingue & Correction des Dérives de Langue
 
 - **Directives de Langue Dynamiques** : Introduction de la fonction `getPromptLanguageInstructions` traduisant le choix de l'utilisateur (`fr`, `en`, `es`, `de`, `it`, `pt`, `ja`, `zh`) en directives strictes à destination de l'IA.
