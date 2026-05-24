@@ -820,6 +820,8 @@
 
               {#if preferences.textProvider && preferences.textProvider !== 'none'}
                 <div class="field-group">
+                  <details class="adv-settings">
+                    <summary class="adv-summary">Réglages avancés <span class="adv-hint">modèle · raisonnement · mode</span></summary>
                   {#if textProviderModels.length}
                     <div class="field model-picker-field">
                       <div class="model-picker-head">
@@ -915,6 +917,7 @@
                       « Rapide » génère chaque tour en un seul appel (moins cher, plus rapide) ; « Qualité » orchestre quatre sous-agents.
                     </span>
                   </div>
+                  </details>
 
                   <div class="field">
                     <label for="text-api-key">Clé API OpenRouter</label>
@@ -1612,6 +1615,54 @@
 
   .field-hint {
     font-size: 0.75rem;
+    color: var(--color-text-muted);
+  }
+
+  /* ── Advanced disclosure ─────────────────── */
+  .adv-settings {
+    border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.09));
+    border-radius: var(--radius-md);
+    background: rgba(255, 255, 255, 0.02);
+    margin-bottom: var(--space-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    padding: 0;
+  }
+
+  .adv-settings[open] {
+    padding: 0 var(--space-md) var(--space-md);
+  }
+
+  .adv-summary {
+    list-style: none;
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: 10px var(--space-md);
+    font-family: var(--font-display);
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    color: var(--color-text-secondary);
+  }
+
+  .adv-summary::-webkit-details-marker { display: none; }
+
+  .adv-summary::before {
+    content: '▸';
+    color: var(--color-gold);
+    transition: transform var(--transition-fast);
+  }
+
+  .adv-settings[open] .adv-summary::before { transform: rotate(90deg); }
+
+  .adv-hint {
+    font-family: var(--font-body);
+    font-weight: 400;
+    font-size: 0.72rem;
     color: var(--color-text-muted);
   }
 
