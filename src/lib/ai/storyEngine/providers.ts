@@ -159,7 +159,25 @@ function isRetryableSdkError(error: unknown): boolean {
     const statusCode = (error as { statusCode?: unknown }).statusCode;
     if (typeof statusCode === 'number' && isRetryableHttpStatus(statusCode)) return true;
     const message = String((error as { message?: unknown }).message || '');
-    if (/timeout|network|fetch failed|failed to fetch|aborted/i.test(message)) return true;
+    // Only retry on transient server-side / timeout issues — NOT on connection-level failures
+    // like "Failed to fetch" which means the endpoint is unreachable (CORS, network down, DNS)
+    if (/timeout|aborted/i.test(message)) return true;
+    if (/network/i.test(message) && !/failed to fetch/i.test(message)) return true;
+  }
+
+  return false;
+}
+
+function isConnectionLevelFault(error: unknown): boolean {
+  if (error instanceof RequestTimeoutError || error instanceof RequestAbortedError) return false;
+  if (error instanceof ConnectionError) return true;
+
+  if (error && typeof error === 'object') {
+    const message = String((error as { message?: unknown }).message || '');
+    if (/failed to fetch/i.test(message)) return true;
+    const statusCode = (error as { statusCode?: unknown }).statusCode;
+    // Connection-level: no HTTP status code means the request never reached a server
+    if (typeof statusCode !== 'number' && /fetch|network|unreachable/i.test(message)) return true;
   }
 
   return false;
@@ -526,6 +544,7 @@ export async function callOpenAiCompatibleRaw(
   const maxRetries = 3;
   let attempt = 0;
   let lastError: Error | null = null;
+  let connectionFaults = 0;
 
   if (isOpenRouterProvider) {
     ensureApiKey(normalizedConfig.providerId, normalizedConfig.apiKey);
@@ -665,6 +684,26 @@ export async function callOpenAiCompatibleRaw(
           });
 
           if (isRetryableSdkError(sdkError)) {
+            if (isConnectionLevelFault(sdkError)) {
+              connectionFaults += 1;
+              if (connectionFaults > 1) {
+                recordDiagnosticEvent({
+                  level: 'warn',
+                  category: 'provider-network-error',
+                  stage: 'openrouter-chat-completions',
+                  message: 'Connexion réseau impossible après tentative — abandon des retries.',
+                  providerId: normalizedConfig.providerId,
+                  model: modelId,
+                  validation: 'repaired',
+                  meta: {
+                    transport: 'openrouter-sdk',
+                    connectionFaults,
+                    error: sdkDescription
+                  }
+                });
+                break;
+              }
+            }
             attempt += 1;
             continue;
           }
@@ -728,6 +767,26 @@ export async function callOpenAiCompatibleRaw(
           });
 
           if (retryable) {
+            if (isConnectionLevelFault(sdkError)) {
+              connectionFaults += 1;
+              if (connectionFaults > 1) {
+                recordDiagnosticEvent({
+                  level: 'warn',
+                  category: 'provider-network-error',
+                  stage: 'openrouter-chat-completions',
+                  message: 'Connexion réseau impossible après tentative — abandon des retries.',
+                  providerId: normalizedConfig.providerId,
+                  model: modelId,
+                  validation: 'repaired',
+                  meta: {
+                    transport: 'openrouter-sdk',
+                    connectionFaults,
+                    sdkError: sdkDescription
+                  }
+                });
+                break;
+              }
+            }
             attempt += 1;
             continue;
           }

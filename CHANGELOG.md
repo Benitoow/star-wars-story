@@ -1,5 +1,22 @@
 # Changelog
 
+## v2.7.8 — 2026-05-25
+
+### ⚡ Fast-Fail Réseau & Pipeline Intelligent (`providers.ts`, `agentic.ts`)
+
+- **Détection des pannes de connexion (`providers.ts`)** :
+  * Nouvelle fonction `isConnectionLevelFault` : distingue les échecs de connexion purs (`Failed to fetch`, `ConnectionError` — endpoint injoignable, CORS, DNS down) des erreurs serveur transitoires (429, 5xx, timeouts).
+  * Les erreurs de connexion ne sont plus retryées 3 fois : **1 seule tentative de rejeu** (au lieu de 3), puis abandon immédiat avec diagnostic dédié "Connexion réseau impossible après tentative".
+  * Les erreurs serveur (rate-limit 429, indisponibilité 5xx) conservent leurs 3 tentatives avec backoff exponentiel.
+- **Abandon rapide du pipeline agentic (`agentic.ts`)** :
+  * Si l'agent scribe (étape 1/4) échoue avec une panne réseau (`Failed to fetch`), le pipeline s'arrête immédiatement et passe en fallback local d'urgence — sans appeler les 3 autres agents qui échoueraient de toute façon.
+  * Gain : ~12 secondes et 9 appels API inutiles économisés par tour en cas d'indisponibilité réseau.
+- **Diagnostics réseau plus précis (`agentic.ts`)** :
+  * Les logs `"response_format json_object indisponible"` et `"structured json_object indisponible"` ne s'affichent plus quand l'erreur sous-jacente est une panne réseau (`Failed to fetch`). À la place, un message `"réseau indisponible, aucun appel au provider"` est loggé, supprimant la confusion entre erreur de format et panne de connexion.
+- **Stabilité** :
+  * 160 tests unitaires 100% au vert.
+  * `tsc --noEmit` : 0 erreur.
+
 ## v2.7.7 — 2026-05-25
 
 ### 🧠 Migration vers le SDK OpenRouter Officiel (`@openrouter/sdk`)

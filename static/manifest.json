@@ -1,7 +1,7 @@
 {
   "name": "Star Wars Story Manager",
   "short_name": "SW Stories",
-  "version": "2.7.7",
+  "version": "2.7.8",
   "description": "Créez et vivez vos propres histoires interactives Star Wars — propulsé par IA agentique",
   "start_url": "/",
   "scope": "/",

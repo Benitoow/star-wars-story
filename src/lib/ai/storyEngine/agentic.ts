@@ -383,7 +383,12 @@ async function callPipelineStep(
         const content = cleanText(response.content, 16000);
         if (content) return content;
       } catch (error) {
-        logger.warn('storyEngine: response_format json_object indisponible, fallback prompt strict.', error);
+        const isNetworkError = error instanceof Error && /failed to fetch|network|timeout|aborted/i.test(error.message);
+        if (isNetworkError) {
+          logger.warn('storyEngine: réseau indisponible, aucun appel au provider.', error);
+        } else {
+          logger.warn('storyEngine: response_format json_object indisponible, fallback prompt strict.', error);
+        }
       }
     }
 
@@ -543,6 +548,7 @@ export async function generateStoryTurn(
   const brainConfig = resolveStepConfig(baseConfig, providerOverrides.brain);
 
   let completedSteps = 0;
+  let networkFault = false;
 
   let scribeSummary = fallbackScribeSummary(safeMessages, turnNumber);
   try {
@@ -552,6 +558,7 @@ export async function generateStoryTurn(
       completedSteps = 1;
     }
   } catch (error) {
+    networkFault = error instanceof Error && /failed to fetch|fetch|network/i.test(error.message);
     logger.warn('storyEngine: étape 1 (scribe) indisponible, fallback local.', error);
     recordDiagnosticEvent({
       level: 'warn',
@@ -564,6 +571,37 @@ export async function generateStoryTurn(
       validation: 'repaired',
       meta: error
     });
+  }
+
+  // Fast abort: if scribe failed due to network fault, other agents will fail too.
+  // Skip to emergency fallback immediately — save ~12s and 9 useless API retries.
+  if (networkFault && completedSteps === 0) {
+    logger.warn('storyEngine: pipeline aborté après échec réseau du scribe, fallback d’urgence direct.');
+    const emergencyWriterScene = fallbackWriterScene(scribeSummary, safeMessages, turnNumber);
+    const emergencyDirectorBrief = fallbackDirectorBrief(safeMessages, scribeSummary);
+    const emergencyBrainPayload = fallbackBrainPayload();
+    const emergencyPayload = buildPipelineStoryPayload(turnNumber, emergencyWriterScene, emergencyDirectorBrief, emergencyBrainPayload);
+    const emergencyRaw = formatPipelineRawResponse(scribeSummary, emergencyDirectorBrief, emergencyWriterScene, emergencyBrainPayload);
+
+    recordDiagnosticEvent({
+      level: 'warn',
+      category: 'story-turn-step',
+      stage: 'pipeline',
+      message: 'Pipeline aborté: réseau indisponible, fallback local immédiat.',
+      providerId: baseConfig.providerId,
+      model: baseConfig.model,
+      runtimeMode: 'agentic-subagents',
+      validation: 'repaired',
+      meta: { turnNumber, reason: 'network-fault-on-scribe' }
+    });
+
+    return validateStoryTurnGenerationResult({
+      chapter: parseStoryResponse(JSON.stringify(emergencyPayload), turnNumber),
+      rawResponse: emergencyRaw,
+      mode: 'agentic-subagents',
+      steps: 0,
+      toolCalls: 0
+    }, turnNumber);
   }
 
   let directorBrief = fallbackDirectorBrief(safeMessages, scribeSummary);
@@ -701,7 +739,12 @@ export async function generateStoryTurnStructured(
         });
         raw = cleanText(response.content, 24000);
       } catch (error) {
-        logger.warn('storyEngine: structured json_object indisponible, fallback prompt strict.', error);
+        const isNetworkError = error instanceof Error && /failed to fetch|network|timeout|aborted/i.test(error.message);
+        if (isNetworkError) {
+          logger.warn('storyEngine: réseau indisponible en mode structuré, aucun appel.', error);
+        } else {
+          logger.warn('storyEngine: structured json_object indisponible, fallback prompt strict.', error);
+        }
       }
 
       if (!raw) {
