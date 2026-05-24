@@ -356,11 +356,15 @@ RÈGLES MJ:
 8. LIEU: state_update.location doit refléter la scène actuelle. Au tour 1, il est obligatoire même sans déplacement.
 9. PNJs NOMMÉS: si un personnage nommé parle/apparaît, ajoute une entrée dans state_update.npcs.
 10. RÔLE CANONIQUE IMMUTABLE: le protagoniste reste "${setup.role}". Ne le promeus/rétrograde jamais (ex: Padawan ≠ Chevalier/Maître) sans validation explicite du joueur.
-11. Résumé de campagne: s'il est présent, il représente la continuité condensée des tours anciens — prends-le en compte sans le répéter mot à mot.`;
+11. Résumé de campagne: s'il est présent, il représente la continuité condensée des tours anciens — prends-le en compte sans le répéter mot à mot.
+12. COHÉRENCE HISTORIQUE ET CHRONOLOGIE (CRITIQUE): Respecte scrupuleusement l'ère de jeu ("${setup.era}"). Ne confonds JAMAIS les factions ou armées de différentes époques :
+    - Sous la Guerre des Clones ("clone_wars"): L'Empire galactique n'existe PAS encore. Il n'y a AUCUN Stormtrooper ni de soldat impérial. Les forces armées sont uniquement les Soldats Clones (Clone Troopers) de la République ou les Droïdes de Combat Séparatistes (CIS).
+    - Sous l'Ère Impériale ("imperial" ou "empire"): L'Empire gouverne la galaxie, l'Ordre Jedi est détruit (pas d'enclave active) et les soldats réguliers sont des Stormtroopers (Soldats Impériaux).
+    - Sous l'Ancienne République ("old_republic"): Ni Clones, ni Stormtroopers impériaux. Les forces sont celles de la République classique ou de l'Empire Sith de l'époque.`;
   const narrativeProseRule = `
-12. PROSE UNIQUEMENT dans "narrative.action": pas de markdown, pas de titres H1/H2, pas de listes numérotées, pas de bloc "Que faites-vous ?", pas de répétition des choix. Les choix vivent uniquement dans le tableau "choices".
-13. DIALOGUES: chaque réplique doit être sur son propre paragraphe, au format "Nom : réplique" (préfixe "—" optionnel), et placée dans "narrative.dialogue". Ne colle jamais une réplique au milieu d'un paragraphe d'action.
-14. DIALOGUES OBLIGATOIREMENT DANS narrative.dialogue: chaque échange verbal doit être placé dans le champ "dialogue", jamais dans "action". "action" = narration pure et actions, "dialogue" = tous les échanges verbaux. Si un personnage parle, utilise ce champ dédié.;`;
+13. PROSE UNIQUEMENT dans "narrative.action": pas de markdown, pas de titres H1/H2, pas de listes numérotées, pas de bloc "Que faites-vous ?", pas de répétition des choix. Les choix vivent uniquement dans le tableau "choices".
+14. DIALOGUES: chaque réplique doit être sur son propre paragraphe, au format "Nom : réplique" (préfixe "—" optionnel), et placée dans "narrative.dialogue". Ne colle jamais une réplique au milieu d'un paragraphe d'action.
+15. DIALOGUES OBLIGATOIREMENT DANS narrative.dialogue: chaque échange verbal doit être placé dans le champ "dialogue", jamais dans "action". "action" = narration pure et actions, "dialogue" = tous les échanges verbaux. Si un personnage parle, utilise ce champ dédié.;`;
 
   const jsonContract = `Réponds UNIQUEMENT en JSON valide, sans markdown ni texte autour. TOUT le texte des champs est rédigé ENTIÈREMENT EN ${langName} (jamais dans une autre langue). Priorité absolue: prose narrative riche dans "action" (2-4 paragraphes). Remplis state_update avec toutes les conséquences.
 
@@ -426,7 +430,7 @@ CADRE D'OUVERTURE:
 
 EXIGENCES DU PREMIER TOUR:
 - Ouvre la scène par une véritable introduction narrative et cinématique du protagoniste : présente brièvement qui il est, son background immédiat lié à son rôle (${setup.role}) et à sa trame (${selectedTrameLabel || 'Libre'}), sa situation actuelle, pourquoi il se trouve là, et la tension immédiate qui pèse sur lui. Rédige ENTIÈREMENT EN ${langName}.
-- Choisis librement un lieu de départ extrêmement cohérent avec le protagoniste et sa trame (ex: s'il s'agit d'un ${setup.role} banni sous l'ère impériale, évite absolument de le faire commencer dans une enclave Jedi en activité ; place-le plutôt dans une cantina crasseuse de la bordure extérieure, à bord d'un cargo en fuite, ou caché dans des bas-fonds). Renseigne impérativement ce lieu choisi dans "state_update.location".
+- Choisis librement un lieu de départ extrêmement cohérent avec le protagoniste et sa trame (ex: s'il s'agit d'un ${setup.role} banni sous l'ère "${setup.era}", évite absolument de le faire commencer dans un temple officiel ou une enclave en activité si cela contredit sa trame ; place-le plutôt en fuite, dans une cantina crasseuse de la bordure extérieure, ou caché dans des bas-fonds). Renseigne impérativement ce lieu choisi dans "state_update.location".
 - Donne immédiatement une tension claire, un lieu vivant et un objectif en ${langName}.
 - Introduis au moins 1 PNJ mémorable avec un agenda distinct.
 - Fais émerger un enjeu politique, relationnel ou moral dès l'ouverture.
