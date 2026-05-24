@@ -123,8 +123,6 @@
 
 <style>
   .home {
-    max-width: 1200px;
-    margin: 0 auto;
     display: flex;
     flex-direction: column;
     gap: var(--space-2xl);
@@ -134,9 +132,7 @@
   .hero {
     position: relative;
     overflow: hidden;
-    border-radius: var(--radius-xl);
-    border: 1px solid var(--border-subtle);
-    min-height: 300px;
+    min-height: clamp(340px, 46vh, 500px);
     display: flex;
     align-items: center;
   }
@@ -200,6 +196,10 @@
 
   /* ── Library ──────────────────────────────── */
   .library {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 clamp(var(--space-md), 4vw, var(--space-2xl));
     display: flex;
     flex-direction: column;
     gap: var(--space-md);

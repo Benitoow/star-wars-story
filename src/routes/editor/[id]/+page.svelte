@@ -743,7 +743,7 @@
       </div>
     </PageHeader>
 
-    <div class="editor-content">
+    <div class="editor-content" class:play-flush={mode === 'play' && !loading}>
       {#if loading}
         <div class="loading-state">
           <div class="loading-spinner"></div>
@@ -1049,6 +1049,11 @@
     overflow-y: auto;
   }
 
+  /* Immersive: the play stage bleeds to the screen edges */
+  .editor-content.play-flush {
+    padding: 0;
+  }
+
   .loading-state,
   .play-empty {
     display: flex;
@@ -1086,14 +1091,9 @@
     flex-direction: column;
     gap: var(--space-lg);
     width: 100%;
-    max-width: 1120px;
-    margin: 0 auto;
-    min-height: calc(100vh - 160px);
-    padding: var(--space-2xl) clamp(var(--space-lg), 4vw, var(--space-2xl)) calc(var(--space-2xl) + var(--space-lg));
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-xl);
+    min-height: calc(100vh - var(--header-height));
+    padding: var(--space-2xl) clamp(var(--space-lg), 5vw, 72px) calc(var(--space-2xl) + var(--space-lg));
     background: var(--color-bg-primary);
-    box-shadow: var(--shadow-lg);
   }
 
   /* Reading column floats left over the cinematic backdrop */

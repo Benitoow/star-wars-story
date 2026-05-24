@@ -3,6 +3,7 @@
   import { browser, dev } from '$app/environment';
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import { showToast, theme, uiLanguage } from '$lib/stores/ui';
   import { initializeDB, cleanupOldTrash } from '$lib/db';
   import { logger } from '$lib/utils/logger';
@@ -10,6 +11,9 @@
   import TopNav from '$lib/components/TopNav.svelte';
 
   let initialized = false;
+
+  // Full-bleed surfaces (home + play) drop the page padding so backdrops reach the edges.
+  $: flush = $page.url.pathname === '/' || $page.url.pathname.startsWith('/editor/');
 
   function setupConnectivityMonitoring(): () => void {
     if (!browser) return () => {};
@@ -153,7 +157,7 @@
 <div class="app">
   <TopNav />
   <main class="main-content">
-    <div class="page-content">
+    <div class="page-content" class:flush>
       {#if initialized}
         <slot />
       {:else}
@@ -189,6 +193,10 @@
     min-height: 0;
     overflow-y: auto;
     padding: var(--space-lg) clamp(var(--space-md), 4vw, var(--space-2xl));
+  }
+
+  .page-content.flush {
+    padding: 0;
   }
 
   .loading-screen {
