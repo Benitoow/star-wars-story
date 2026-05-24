@@ -113,7 +113,8 @@ export const IMAGE_PROVIDERS: ProviderCatalog[] = [
       'recraft-ai/recraft-v3',
       'ideogram-ai/ideogram-v2',
       'openai/dall-e-3',
-      'stabilityai/stable-diffusion-xl-base-1.0'
+      'stabilityai/stable-diffusion-xl-base-1.0',
+      'x-ai/grok-imagine-image-quality'
     ],
     icon: providerIconSvg('openrouter'),
     badges: ['Modèles d\'images', 'FLUX · Recraft · DALL-E']
