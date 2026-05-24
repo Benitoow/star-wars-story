@@ -66,27 +66,31 @@
     display: flex;
     align-items: center;
     gap: var(--space-xs);
-    padding: var(--space-xs) var(--space-sm);
+    padding: 6px 12px;
     background: none;
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-sm);
     color: var(--color-text-secondary);
-    font-size: 0.875rem;
+    font-family: var(--font-display);
+    font-size: 0.68rem;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
     cursor: pointer;
     transition: all var(--transition-fast);
     white-space: nowrap;
     flex-shrink: 0;
-    font-family: var(--font-body);
   }
 
   .back-btn:hover {
-    border-color: var(--color-gold);
-    color: var(--color-gold);
+    border-color: var(--color-text-primary);
+    color: var(--color-text-primary);
+    background: rgba(255, 255, 255, 0.04);
   }
 
   .back-btn svg {
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
   }
 
   /* Breadcrumb */
@@ -99,7 +103,11 @@
   }
 
   .crumb-link {
-    font-size: 0.82rem;
+    font-family: var(--font-display);
+    font-size: 0.68rem;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
     color: var(--color-text-muted);
     text-decoration: none;
     white-space: nowrap;
@@ -107,19 +115,22 @@
     flex-shrink: 0;
   }
 
-  .crumb-link:hover { color: var(--color-gold); }
+  .crumb-link:hover { color: var(--color-text-primary); }
 
   .crumb-sep {
     color: var(--color-text-muted);
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     flex-shrink: 0;
     opacity: 0.5;
   }
 
   .crumb-current {
-    font-size: 0.82rem;
+    font-family: var(--font-display);
+    font-size: 0.68rem;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
     color: var(--color-text-primary);
-    font-weight: 600;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -127,8 +138,10 @@
 
   .page-title {
     font-family: var(--font-display);
-    font-size: 1.25rem;
+    font-size: 1.15rem;
     font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
     color: var(--color-text-primary);
     margin: 0;
     min-width: 0;

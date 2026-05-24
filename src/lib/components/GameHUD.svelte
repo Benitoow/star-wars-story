@@ -337,7 +337,6 @@
           </div>
         {/each}
       {/if}
-
     </div>
   {/if}
 </aside>
@@ -349,15 +348,15 @@
     right: clamp(10px, 1.3vw, 24px);
     width: var(--hud-width, 228px);
     max-height: calc(100vh - 96px);
-    background: linear-gradient(180deg, rgba(13, 14, 20, 0.94), rgba(8, 9, 13, 0.94));
-    border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.09));
-    border-radius: 14px;
+    background: rgba(10, 12, 18, 0.75);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     z-index: 150;
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     color: var(--color-text-secondary);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+    box-shadow: var(--shadow-md);
     transition: width 0.2s ease, transform 0.2s ease;
     overflow: hidden;
   }
@@ -375,16 +374,23 @@
     padding: 6px 10px;
     background: none;
     border: none;
-    border-bottom: 1px solid rgba(255, 232, 31, 0.1);
-    color: var(--color-gold, #ffe81f);
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--color-text-secondary);
     cursor: pointer;
-    font-size: 0.7rem;
-    letter-spacing: 0.05em;
+    font-family: var(--font-display);
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
     justify-content: flex-end;
+    transition: all var(--transition-fast);
   }
 
-  .hud-toggle:hover { background: rgba(255,232,31,0.05); }
-  .hud-toggle-label { font-weight: 600; }
+  .hud-toggle:hover {
+    color: var(--color-text-primary);
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .hud-toggle-label { font-weight: 500; }
 
   .hud.collapsed .hud-toggle {
     border-bottom: none;
@@ -403,20 +409,20 @@
   .hud-section-label {
     font-family: var(--font-display);
     font-size: 0.6rem;
-    font-weight: 600;
-    letter-spacing: 0.14em;
+    font-weight: 500;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
-    color: var(--color-gold);
-    opacity: 0.72;
+    color: var(--color-text-primary);
+    opacity: 0.8;
     margin-top: 10px;
     margin-bottom: 4px;
     padding-top: 8px;
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    border-top: 1px solid var(--border-subtle);
   }
 
   .hud-help-text {
     font-size: 0.62rem;
-    color: rgba(255,255,255,0.45);
+    color: var(--color-text-muted);
     margin-bottom: 2px;
     line-height: 1.35;
   }
@@ -436,9 +442,9 @@
   }
 
   .hud-val {
-    font-weight: 700;
+    font-weight: 600;
     font-variant-numeric: tabular-nums;
-    font-size: 0.8rem;
+    font-size: 0.78rem;
   }
 
   .hud-text {
@@ -449,34 +455,37 @@
     font-size: 0.72rem;
   }
 
-  .hud-text.dim { color: rgba(255,255,255,0.35); font-size: 0.68rem; }
+  .hud-text.dim {
+    color: var(--color-text-muted);
+    font-size: 0.68rem;
+  }
 
   /* HP */
   .hud-hp .hp-track {
     flex: 1;
-    height: 5px;
-    background: rgba(255,255,255,0.1);
-    border-radius: 3px;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 1px;
     overflow: hidden;
   }
 
   .hp-fill {
     height: 100%;
-    border-radius: 3px;
+    border-radius: 1px;
     transition: width 0.6s ease, background 0.4s ease;
   }
 
   /* NPCs */
   .npc-dot {
-    width: 7px;
-    height: 7px;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
     flex-shrink: 0;
   }
 
   .npc-score {
     font-size: 0.68rem;
-    font-weight: 600;
+    font-weight: 500;
     flex-shrink: 0;
   }
 
@@ -491,9 +500,9 @@
 
   .faction-bar-track {
     width: 50px;
-    height: 4px;
-    background: rgba(255,255,255,0.08);
-    border-radius: 2px;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 1px;
     overflow: hidden;
     flex-shrink: 0;
     position: relative;
@@ -502,7 +511,7 @@
   .faction-bar-fill {
     position: absolute;
     height: 100%;
-    border-radius: 2px;
+    border-radius: 1px;
     transition: width 0.5s ease;
     max-width: 100%;
   }
@@ -516,24 +525,27 @@
   }
 
   .faction-self-chip {
-    font-size: 0.58rem;
-    letter-spacing: 0.03em;
-    color: #0b0b0f;
-    background: #4ade80;
-    border-radius: 999px;
-    padding: 1px 5px;
+    font-family: var(--font-display);
+    font-size: 0.56rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #4ade80;
+    border: 1px solid rgba(74, 222, 128, 0.3);
+    background: transparent;
+    border-radius: var(--radius-sm);
+    padding: 1px 4px;
     flex-shrink: 0;
   }
 
   .faction-status {
     font-size: 0.6rem;
-    color: rgba(255,255,255,0.6);
+    color: var(--color-text-muted);
     flex-shrink: 0;
   }
 
   .faction-score {
     font-size: 0.65rem;
-    font-weight: 600;
+    font-weight: 500;
     flex-shrink: 0;
   }
 
@@ -546,17 +558,16 @@
   }
 
   .clock-tick {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
-    border: 1px solid rgba(255, 232, 31, 0.4);
+    border: 1px solid var(--border-subtle);
     background: transparent;
   }
 
   .clock-tick.filled {
-    background: #f87171;
-    border-color: #f87171;
-    box-shadow: 0 0 5px rgba(248, 113, 113, 0.5);
+    background: var(--color-red);
+    border-color: var(--color-red);
   }
 
   /* Downed / critical banner */
@@ -565,14 +576,13 @@
     align-items: center;
     gap: 6px;
     padding: 5px 9px;
-    border-radius: 8px;
-    background: rgba(248, 113, 113, 0.14);
-    border: 1px solid rgba(248, 113, 113, 0.5);
-    color: #fca5a5;
-    font-weight: 700;
-    font-size: 0.72rem;
+    border-radius: var(--radius-sm);
+    background: rgba(215, 107, 107, 0.06);
+    border: 1px solid rgba(215, 107, 107, 0.3);
+    color: var(--color-red);
+    font-weight: 600;
+    font-size: 0.7rem;
     letter-spacing: 0.03em;
-    animation: pulseCritical 1.2s ease-in-out infinite;
   }
 
   .hud-downed-icon { flex-shrink: 0; }
@@ -582,50 +592,46 @@
   .hud-turn-capsule {
     display: inline-block;
     align-self: flex-start;
+    font-family: var(--font-display);
     font-size: 0.62rem;
-    font-weight: 700;
+    font-weight: 500;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--color-gold, #ffe81f);
-    background: rgba(255, 232, 31, 0.1);
-    border: 1px solid rgba(255, 232, 31, 0.25);
-    border-radius: 20px;
+    color: var(--color-text-primary);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
     padding: 1px 8px;
     margin-bottom: 2px;
   }
 
   /* HP critical */
   .hud-hp.hp-critical .hp-fill {
-    animation: pulseCritical 1.2s ease-in-out infinite;
-  }
-
-  @keyframes pulseCritical {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
+    opacity: 0.8;
   }
 
   /* Injury severity */
   .hud-injury .hud-text {
-    color: #fca5a5;
+    color: var(--color-text-secondary);
   }
 
   .hud-injury-severe .hud-text {
-    color: #f87171;
-    font-weight: 600;
+    color: var(--color-red);
+    font-weight: 500;
   }
 
   .hud-injury-moderate .hud-text {
-    color: #fbbf24;
+    color: var(--color-gold);
   }
 
   .hud-injury-light .hud-text {
-    color: #94a3b8;
+    color: var(--color-text-muted);
   }
 
   /* Inventory qty */
   .hud-qty {
     font-size: 0.65rem;
-    color: var(--color-gold, #ffe81f);
+    color: var(--color-text-muted);
     flex-shrink: 0;
   }
 

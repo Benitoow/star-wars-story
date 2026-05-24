@@ -561,44 +561,48 @@
 .setup-progress {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-xs);
+  gap: var(--space-sm);
 }
 
 .progress-pill {
   display: inline-flex;
   align-items: center;
   gap: var(--space-xs);
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  padding: 6px 12px;
-  background: var(--color-bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 6px 14px;
+  background: var(--surface-glass);
   color: var(--color-text-muted);
   cursor: pointer;
   transition: all var(--transition-fast);
-  font-size: 0.75rem;
+  font-family: var(--font-display);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
 }
 
 .progress-pill.active {
-  border-color: var(--color-gold);
-  color: var(--color-gold);
-  background: rgba(255, 232, 31, 0.1);
+  border-color: var(--color-text-primary);
+  color: var(--color-text-primary);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .progress-pill.done {
-  border-color: color-mix(in srgb, var(--color-gold) 55%, var(--color-border));
+  border-color: var(--color-border-hover);
   color: var(--color-text-secondary);
 }
 
 .pill-index {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--color-bg-tertiary);
-  font-size: 0.65rem;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 0.6rem;
   font-weight: 700;
+  font-family: var(--font-body);
 }
 
 .setup-stage {
@@ -614,21 +618,28 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-lg);
-  padding: var(--space-lg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  background: var(--color-bg-secondary);
+  padding: var(--space-xl);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   overflow-y: auto;
 }
 
 .setup-screen-header h1 {
   margin: 0;
-  font-size: 1.6rem;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--color-text-primary);
 }
 
 .setup-screen-header p {
   margin: var(--space-xs) 0 0;
+  font-family: var(--font-body);
+  font-size: 0.88rem;
   color: var(--color-text-muted);
 }
 
@@ -637,6 +648,9 @@
   justify-content: space-between;
   align-items: center;
   gap: var(--space-md);
+  margin-top: auto;
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border-subtle);
 }
 
 .setup-nav-actions {
@@ -650,24 +664,25 @@
   flex-direction: column;
   gap: var(--space-md);
   padding: var(--space-md);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--color-bg-tertiary) 55%, transparent);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .setup-section-header {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .subheading {
-  margin: 0 0 var(--space-sm);
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.5px;
+  margin: 0 0 var(--space-xs);
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.24em;
   text-transform: uppercase;
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
 }
 
 .era-grid,
@@ -722,9 +737,9 @@
 .tone-chip,
 .toggle-chip,
 .avatar-btn {
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-tertiary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.03);
   color: var(--color-text-primary);
   cursor: pointer;
   transition: all var(--transition-fast);
@@ -748,7 +763,8 @@
 .tone-chip:hover,
 .toggle-chip:hover,
 .avatar-btn:hover {
-  border-color: var(--color-gold);
+  border-color: var(--color-border-hover);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .era-card.selected,
@@ -760,8 +776,8 @@
 .tone-chip.selected,
 .toggle-chip.active,
 .avatar-btn.selected {
-  border-color: var(--color-gold);
-  background: rgba(255, 232, 31, 0.1);
+  border-color: var(--color-text-primary);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .era-card {
@@ -778,21 +794,21 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-gold);
+  color: var(--color-text-primary);
 }
 
 .era-years {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   color: var(--color-text-muted);
 }
 
 .faction-card {
-  border-left-color: var(--faction-color);
+  border-left: 2px solid var(--faction-color) !important;
 }
 
 .faction-card.selected {
-  border-color: var(--faction-color);
-  background: color-mix(in srgb, var(--faction-color) 14%, transparent);
+  border-left-width: 4px !important;
+  background: color-mix(in srgb, var(--faction-color) 12%, rgba(255,255,255,0.06)) !important;
 }
 
 .role-card {
@@ -809,13 +825,20 @@
   gap: 2px;
 }
 
-.role-meta {
+.role-copy strong {
+  font-family: var(--font-display);
   font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.role-meta {
+  font-size: 0.72rem;
   color: var(--color-text-muted);
 }
 
 .role-card.recommended {
-  border-color: color-mix(in srgb, var(--color-gold) 40%, var(--color-border));
+  border-color: var(--border-subtle-hover);
 }
 
 .trame-card {
@@ -832,35 +855,41 @@
 }
 
 .trame-name {
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .premise-label {
-  font-size: 0.8rem;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--color-text-muted);
-  font-weight: 600;
+  letter-spacing: 0.24em;
+  color: var(--color-text-secondary);
+  font-weight: 500;
 }
 
 .premise-input,
 .name-input {
   width: 100%;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-primary);
+  border: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.03);
   color: var(--color-text-primary);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   padding: var(--space-sm) var(--space-md);
   resize: vertical;
-  font: inherit;
+  font-family: var(--font-body);
+  font-size: 0.93rem;
   transition: border-color var(--transition-fast);
 }
 
 .premise-input:focus,
 .name-input:focus {
   outline: none;
-  border-color: var(--color-gold);
+  border-color: var(--color-text-primary);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .style-stack {
@@ -869,14 +898,22 @@
   gap: var(--space-md);
 }
 
-.style-name {
+.style-card .style-name {
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   font-weight: 600;
+  display: block;
+  margin-bottom: 2px;
 }
 
 .style-desc,
 .content-mode-desc {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   color: var(--color-text-muted);
+  font-family: var(--font-body);
+  line-height: 1.4;
 }
 
 .tone-grid,
@@ -888,8 +925,11 @@
 
 .tone-chip,
 .toggle-chip {
-  padding: var(--space-xs) var(--space-sm);
-  font-size: 0.85rem;
+  padding: 6px 14px;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .double-stack {
@@ -904,6 +944,13 @@
   gap: 4px;
 }
 
+.content-mode-card strong {
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .content-mode-icon {
   font-size: 1.25rem;
 }
@@ -916,7 +963,9 @@
 
 .helper-text {
   margin: 0;
+  font-size: 0.75rem;
   color: var(--color-text-muted);
+  font-family: var(--font-body);
 }
 
 .avatar-row {
@@ -926,12 +975,13 @@
 }
 
 .avatar-btn {
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-size: 1.2rem;
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .name-grid {
@@ -948,9 +998,10 @@
 
 .name-field span {
   color: var(--color-text-muted);
-  font-size: 0.78rem;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.16em;
 }
 
 .review-grid {
@@ -960,15 +1011,18 @@
 }
 
 .review-card {
-  background: var(--color-bg-tertiary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  background: var(--surface-glass);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
   padding: var(--space-md);
 }
 
 .review-card h2 {
   margin: 0 0 var(--space-sm);
-  font-size: 1rem;
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .review-card ul {
@@ -977,6 +1031,9 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  color: var(--color-text-secondary);
 }
 
 .feature-list {
@@ -990,28 +1047,35 @@
 
 .provider-status {
   color: var(--color-text-muted);
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .provider-warning {
   margin-top: var(--space-md);
-  padding: var(--space-sm);
-  border: 1px solid rgba(255, 23, 68, 0.45);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid rgba(215, 107, 107, 0.4);
   border-radius: var(--radius-sm);
-  background: rgba(255, 23, 68, 0.08);
+  background: rgba(215, 107, 107, 0.06);
 }
 
 .provider-warning p {
   margin: 0 0 var(--space-sm);
   color: var(--color-red);
+  font-family: var(--font-body);
+  font-size: 0.88rem;
 }
 
 .error-banner {
-  border: 1px solid rgba(255, 23, 68, 0.5);
-  background: rgba(255, 23, 68, 0.1);
-  color: #ff8fa3;
-  border-radius: var(--radius-md);
+  border: 1px solid rgba(215, 107, 107, 0.4);
+  background: rgba(215, 107, 107, 0.06);
+  color: var(--color-red);
+  border-radius: var(--radius-sm);
   padding: var(--space-sm) var(--space-md);
-  font-size: 0.9rem;
+  font-size: 0.88rem;
+  font-family: var(--font-body);
 }
 
 @media (max-width: 920px) {
@@ -1034,7 +1098,7 @@
   }
 
   .progress-pill {
-    font-size: 0.7rem;
+    font-size: 0.6rem;
     padding: 6px 10px;
   }
 
