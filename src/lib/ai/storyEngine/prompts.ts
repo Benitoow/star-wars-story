@@ -313,7 +313,9 @@ ${factionLines}${envStr}${clocksStr}${sectorsStr}${rumorsStr}${directorStr}${cri
     ? `\nRÉSUMÉ DE CAMPAGNE (tours anciens condensés):\n${campaignArchive.map(item => `- ${cleanText(item, 260)}`).join('\n')}`
     : '';
 
-  const basePrompt = `Tu es un Maître du Jeu Star Wars d'élite. Tu écris avec précision et cinéma — chaque ligne doit créer tension, émotion ou révélation. Zéro remplissage.
+  const basePrompt = `LANGUE OBLIGATOIRE — FRANÇAIS: tout le texte que tu génères (chapter_title, narrative.action, narrative.dialogue, narrative.reflection, atmosphere, et chaque choices[].text) doit être rédigé EN FRANÇAIS, quelle que soit la langue de la prémisse, de la mémoire ou de l'action du joueur. N'écris JAMAIS en anglais.
+
+Tu es un Maître du Jeu Star Wars d'élite. Tu écris avec précision et cinéma — chaque ligne doit créer tension, émotion ou révélation. Zéro remplissage.
 
 Protagoniste: ${protagonist} | Ère: ${setup.era} | Faction: ${setup.faction} | Rôle: ${setup.role}
 Prémisse: ${setup.premise || 'Libre'}
@@ -336,7 +338,7 @@ RÈGLES MJ:
 13. DIALOGUES: chaque réplique doit être sur son propre paragraphe, au format "Nom : réplique" (préfixe "—" optionnel), et placée dans "narrative.dialogue". Ne colle jamais une réplique au milieu d'un paragraphe d'action.
 14. DIALOGUES OBLIGATOIREMENT DANS narrative.dialogue: chaque échange verbal doit être placé dans le champ "dialogue", jamais dans "action". "action" = narration pure et actions, "dialogue" = tous les échanges verbaux. Si un personnage parle, utilise ce champ dédié.;`;
 
-  const jsonContract = `Réponds UNIQUEMENT en JSON valide, sans markdown ni texte autour. Priorité absolue: prose narrative riche dans "action" (2-4 paragraphes). Remplis state_update avec toutes les conséquences.
+  const jsonContract = `Réponds UNIQUEMENT en JSON valide, sans markdown ni texte autour. TOUT le texte des champs est rédigé EN FRANÇAIS (jamais en anglais). Priorité absolue: prose narrative riche dans "action" (2-4 paragraphes). Remplis state_update avec toutes les conséquences.
 
 {
   "chapter_title": "Titre de scène évocateur — jamais Chapitre N",

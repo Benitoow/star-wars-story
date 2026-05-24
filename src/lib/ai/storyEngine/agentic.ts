@@ -750,6 +750,7 @@ function hasBackgroundEventImpact(event: BackgroundWorldEvent | null): boolean {
 const BACKGROUND_WORLD_OBSERVER_SYSTEM_PROMPT = `Tu es l'OBSERVATEUR hors-écran d'une campagne Star Wars.
 Tu détectes le mouvement invisible de la galaxie entre deux tours.
 Règles absolues:
+- Écris STRICTEMENT en français.
 - Résume en 120 mots maximum.
 - Donne seulement ce qui change réellement hors champ.
 - Pas de JSON, pas de markdown, pas de listes.`;
@@ -757,6 +758,7 @@ Règles absolues:
 const BACKGROUND_WORLD_ADJUDICATOR_SYSTEM_PROMPT = `Tu es l'ADJUDICATEUR hors-écran d'une campagne Star Wars.
 Tu convertis un mouvement galactique en conséquences mécaniques propres.
 Règles absolues:
+- Tout le texte (title, summary_public, summary_private, notes) est rédigé EN FRANÇAIS.
 - Réponds uniquement en JSON valide.
 - Pas de prose hors JSON.
 - Si rien d'utile ne bouge, renvoie un JSON quasiment vide mais valide.`;
@@ -792,7 +794,7 @@ function buildBackgroundWorldSystemPrompt(input: BackgroundWorldInput): string {
   }
 
   return `Tu es le Simulateur Galactique hors-écran d'une campagne Star Wars.
-Tu résous uniquement les dynamiques de fond entre les tours du joueur.
+Tu résous uniquement les dynamiques de fond entre les tours du joueur. Tu écris toujours en français.
 
 SETUP:
 - Protagoniste: ${protagonist}
