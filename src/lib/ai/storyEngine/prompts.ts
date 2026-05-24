@@ -209,7 +209,7 @@ ${cleanText(writerScene, 2800)}${playerActionBlock}${requiredSignals}
 Déduis-en les conséquences mécaniques et propose 3 choix pour la suite.
 Réponds EXCLUSIVEMENT en JSON strict (sans markdown) avec ce contrat:
 {
-  "chapter_title": "",
+  "chapter_title": "Titre court, évocateur et créatif (ex: 'Ombres du Passé', 'Péril à l'Enclave'). JAMAIS 'Tour N' ou 'Chapitre N'.",
   "section_type": "${expectedSectionType || 'action'}",
   "atmosphere": "${expectedAtmosphere || 'tense'}",
   "state_update": {
@@ -236,6 +236,7 @@ Réponds EXCLUSIVEMENT en JSON strict (sans markdown) avec ce contrat:
   ]
 }
 
+- "chapter_title": Doit être un titre de scène extrêmement soigné, évocateur, captivant et entièrement rédigé en FRANÇAIS (ou la langue de la scène). Évite absolument les redondances ou de simplement copier la première phrase.
 - Les choices doivent découler de la conséquence directe de l'action joueur ci-dessus.
 - "section_type" et "atmosphere" doivent coller à la scène réellement écrite.
 - Les champs non pertinents peuvent être omis.`;

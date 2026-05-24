@@ -14,14 +14,18 @@
 
 - **Génération Intégrée de Portraits** : Ajout d'une section dédiée à la génération de portrait de protagoniste par IA dans l'assistant de configuration (`SetupWizard.svelte`), créant des illustrations uniques synchronisées avec l'allégeance, le rôle et la chronologie de départ.
 - **Saisie de Détails Physiques (Overrides)** : Implémentation d'un champ de texte facultatif permettant de spécifier des détails physiques ou styles graphiques précis (ex: "Twi'lek bleu, bure de Jedi marron..."), s'insérant dynamiquement au prompt de l'image.
+- **Intégration du Portrait en Jeu (GameHUD)** : Remplacement de l'affichage textuel classique d'identité par une véritable **carte d'identité graphique** avec affichage circulaire premium de l'avatar/portrait IA (38px, contour néon doré Star Wars) dans le HUD latéral.
+- **Indicateur d'Action Joueur Immersif** : Ajout d'un petit indicateur d'avatar circulaire (34px) adjacent à la zone de saisie d'action personnalisée (`+page.svelte`), renforçant l'identification visuelle pendant les choix.
 - **Support Robuste des Fournisseurs d'Images** : Implémentation complète de `src/lib/ai/imageEngine.ts` prenant en charge OpenRouter, fal.ai, DALL-E (OpenAI) et Stability AI, avec conversion Base64 automatique pour la persistance locale IndexedDB (Dexie.js).
 - **Stabilisation du Sélecteur OpenRouter Images** : Correction de la synchronisation dynamique buggy en éliminant les modèles de texte de la liste et en stabilisant le mapping de clé API partagée/décroissante.
 
-### 🌐 Moteur IA Multilingue & Correction des Dérives de Langue
+### 🌐 Moteur IA Multilingue & Titrages Évocateurs (Evocative Titles)
 
 - **Directives de Langue Dynamiques** : Introduction de la fonction `getPromptLanguageInstructions` traduisant le choix de l'utilisateur (`fr`, `en`, `es`, `de`, `it`, `pt`, `ja`, `zh`) en directives strictes à destination de l'IA.
 - **Hardening de la Boucle Agentique** : Injection des contraintes de langue dans **tous les sous-agents** du pipeline (`scribe -> director -> writer -> brain`) et dans le duo de simulation galactique (`observer -> adjudicator`), forçant les modèles à répondre intégralement dans la langue choisie (ex: Français) et éliminant définitivement les dérives en anglais.
 - **Résolution Native de Langue** : Liaison automatique de la langue de l'histoire à la préférence d'interface `uiLanguage` de l'utilisateur ou à la langue de son navigateur en cas de sélection automatique (`auto`).
+- **Titrages Évocateurs & Hardening du Brain** : Amélioration du prompt de l'agent `brain` (`buildPipelineBrainUserPrompt`) pour exiger systématiquement des titres de scènes hautement cinématiques et créatifs en Français, évitant les retours vides ou génériques ("Tour N").
+- **Générateur Thématique de Secours** : Refonte complète des algorithmes de titrage programmatiques (`deriveFallbackChapterTitleFromScene` et `deriveChapterTitleFromNarrative`) avec un moteur de correspondance de mots-clés Star Wars (ex: sabre -> "Échos dans la Force", enclave -> "Les Mystères de l'Enclave", etc.) et une extraction de phrase beaucoup plus naturelle et concise (limitée à 5 mots pertinents).
 
 ### 🔧 Améliorations de l'Environnement de Développement
 

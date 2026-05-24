@@ -177,11 +177,20 @@ function isGenericChapterTitle(value: unknown): boolean {
 function deriveFallbackChapterTitleFromScene(scene: string, turnNumber: number): string {
   const normalized = normalizeSearchText(scene);
 
+  // 1. Rich Thematic Keyword Matching
+  if (/(enclave|temple|sanctuaire|ruine jedi)/.test(normalized)) return "Les Mystères de l'Enclave";
+  if (/(sabre\s*laser|kyber|holocron|padawan|force)/.test(normalized)) return "Échos dans la Force";
   if (/(hangar|spatioport|dock|quai d['’]arrimage|baie d['’]arrimage)/.test(normalized)) return 'Tension au spatioport';
   if (/(cantina|bar|taverne|club)/.test(normalized)) return 'Rumeurs de cantina';
   if (/(embuscade|attaque|assaut|chasseur|blaster|duel|fusillade)/.test(normalized)) return 'Sous le feu ennemi';
   if (/(negoci|dialog|parler|accord|tr[eê]ve)/.test(normalized)) return 'Négociation sous pression';
+  if (/(pirat|console|ordinateur|droid|drogue|drogue|hack)/.test(normalized)) return 'Infiltration dans le réseau';
+  if (/(desert|sable|dune|soleil)/.test(normalized)) return 'Les Sables Hostiles';
+  if (/(foret|jungle|marais|vegetation)/.test(normalized)) return 'Exploration Sauvage';
+  if (/(empire|stormtrooper|imperial|inquisiteur)/.test(normalized)) return "L'Ombre de l'Empire";
+  if (/(rebelle|rebellion|alliance)/.test(normalized)) return "Le Souffle de la Révolte";
 
+  // 2. Programmatic Sentence Extraction (refined to 4-5 words max for a cleaner look)
   const firstSentence = cleanText(scene, 320)
     .split(/[.!?\n]/)
     .map(chunk => chunk.trim())
@@ -192,19 +201,19 @@ function deriveFallbackChapterTitleFromScene(scene: string, turnNumber: number):
     .split(/\s+/)
     .map(item => item.trim())
     .filter(Boolean)
-    .filter(item => !/^(?:le|la|les|un|une|des|de|du|dans|sur|a|au|aux|et|mais|ou|donc)$/i.test(item))
-    .slice(0, 6);
+    .filter(item => !/^(?:le|la|les|un|une|des|de|du|dans|sur|a|au|aux|et|mais|ou|donc|son|ses|sa|leurs?|ces|cet?|cette)$/i.test(item))
+    .slice(0, 5);
 
   if (words.length >= 2) {
     return cleanText(
       words
         .map(word => `${word.charAt(0).toUpperCase()}${word.slice(1).toLowerCase()}`)
         .join(' '),
-      90
+      80
     );
   }
 
-  return turnNumber <= 1 ? 'Prologue' : 'Nœud de tension';
+  return turnNumber <= 1 ? "Prologue : L'Éveil" : 'La Croisée des Chemins';
 }
 
 function hasPlayableChapterContent(chapter: StoryChapter): boolean {

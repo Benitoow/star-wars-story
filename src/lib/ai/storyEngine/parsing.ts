@@ -799,19 +799,21 @@ function deriveChapterTitleFromNarrative(narrative: StoryNarrative, turnNumber: 
   ].filter(Boolean).join(' ');
 
   const normalizedCorpus = normalizeTextForPrompt(corpus);
-  if (/(hangar|spatioport|dock|quai d['’]arrimage|baie d['’]arrimage)/.test(normalizedCorpus)) {
-    return 'Tension au spatioport';
-  }
-  if (/(cantina|bar|taverne|club)/.test(normalizedCorpus)) {
-    return 'Rumeurs de cantina';
-  }
-  if (/(embuscade|attaque|assaut|chasseur|blaster|duel|fusillade)/.test(normalizedCorpus)) {
-    return 'Sous le feu ennemi';
-  }
-  if (/(negoci|dialog|parler|accord|tr[eê]ve)/.test(normalizedCorpus)) {
-    return 'Négociation sous pression';
-  }
 
+  // 1. Rich Thematic Keyword Matching
+  if (/(enclave|temple|sanctuaire|ruine jedi)/.test(normalizedCorpus)) return "Les Mystères de l'Enclave";
+  if (/(sabre\s*laser|kyber|holocron|padawan|force)/.test(normalizedCorpus)) return "Échos dans la Force";
+  if (/(hangar|spatioport|dock|quai d['’]arrimage|baie d['’]arrimage)/.test(normalizedCorpus)) return 'Tension au spatioport';
+  if (/(cantina|bar|taverne|club)/.test(normalizedCorpus)) return 'Rumeurs de cantina';
+  if (/(embuscade|attaque|assaut|chasseur|blaster|duel|fusillade)/.test(normalizedCorpus)) return 'Sous le feu ennemi';
+  if (/(negoci|dialog|parler|accord|tr[eê]ve)/.test(normalizedCorpus)) return 'Négociation sous pression';
+  if (/(pirat|console|ordinateur|droid|drogue|drogue|hack)/.test(normalizedCorpus)) return 'Infiltration dans le réseau';
+  if (/(desert|sable|dune|soleil)/.test(normalizedCorpus)) return 'Les Sables Hostiles';
+  if (/(foret|jungle|marais|vegetation)/.test(normalizedCorpus)) return 'Exploration Sauvage';
+  if (/(empire|stormtrooper|imperial|inquisiteur)/.test(normalizedCorpus)) return "L'Ombre de l'Empire";
+  if (/(rebelle|rebellion|alliance)/.test(normalizedCorpus)) return "Le Souffle de la Révolte";
+
+  // 2. Programmatic Sentence Extraction (refined to 4-5 words max for a cleaner look)
   const firstSentence = cleanText(corpus, 320)
     .split(/[.!?\n]/)
     .map(item => item.trim())
@@ -822,14 +824,14 @@ function deriveChapterTitleFromNarrative(narrative: StoryNarrative, turnNumber: 
     .split(/\s+/)
     .map(item => item.trim())
     .filter(Boolean)
-    .filter(item => !/^(?:le|la|les|un|une|des|de|du|dans|sur|a|au|aux|et|mais|ou|donc)$/i.test(item))
-    .slice(0, 6);
+    .filter(item => !/^(?:le|la|les|un|une|des|de|du|dans|sur|a|au|aux|et|mais|ou|donc|son|ses|sa|leurs?|ces|cet?|cette)$/i.test(item))
+    .slice(0, 5);
 
   if (tokens.length >= 2) {
     return cleanText(toTitleCase(tokens), 80);
   }
 
-  return turnNumber <= 1 ? 'Prologue' : 'Nœud de tension';
+  return turnNumber <= 1 ? "Prologue : L'Éveil" : 'La Croisée des Chemins';
 }
 
 export function dedupeChoices(choices: StoryChoice[]): StoryChoice[] {
