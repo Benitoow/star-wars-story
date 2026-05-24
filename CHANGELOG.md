@@ -1,5 +1,20 @@
 # Changelog
 
+## v2.7.3 — 2026-05-24
+
+### 🤖 Résolution de l'Orchestration à 4 Agents & Résilience Réseau
+
+- **Mise à Jour du Pipeline à 4 Agents (agentic.ts)** :
+  * Intégration dynamique et robuste du prompt système pour l'agent `writer` (`buildPipelineWriterSystemPrompt`) au lieu d'utiliser un prompt statique isolé. Les sous-agents héritent désormais de la continuité chronologique complète (ère de jeu, protagoniste, style littéraire, ton, POV, prémisse et la règle 13 du prologue au premier tour).
+  * Création d'une fonction de parsing intelligente de secours (`parseSetupFromSystemPrompt`) capable de reconstituer fidèlement la structure `setup` depuis les messages système existants de l'historique de jeu pour garantir la compatibilité des anciens tests unitaires.
+  * Liaison de la configuration de partie `setup` dans le contrôleur de page (`+page.svelte`) pour transmettre le snapshot au pipeline.
+- **Robustesse Réseau & Gestion des Erreurs (providers.ts)** :
+  * Élimination des erreurs de syntaxe et de structure de blocs suite à l'introduction de la boucle de tentatives avec backoff exponentiel.
+  * Gestion propre et granulaire des erreurs réseau et des délais d'attente (`isAbortError`) par essai unitaire avec enregistrement d'événements de diagnostics distincts.
+- **Stabilité Post-Intégration** :
+  * Garantie de type-safety totale via `svelte-check` avec **0 erreur et 0 avertissement**.
+  * Validation rigoureuse de la suite de tests unitaires avec **160 tests unitaires 100% au vert**.
+
 ## v2.7.2 — 2026-05-24
 
 ### ⏳ Conformité de la Date Narrative & Prologue Immersif Tour 1

@@ -75,8 +75,14 @@ function formatPipelineMessageHistory(messages: ChatMessage[], limit = 14): stri
 }
 
 export function buildPipelineScribeUserPrompt(messages: ChatMessage[], turnNumber: number): string {
+  let systemPrompt = messages.find(message => message.role === 'system')?.content || '';
+  const rulesIndex = systemPrompt.indexOf('RÈGLES MJ:');
+  if (rulesIndex >= 0) {
+    systemPrompt = systemPrompt.slice(0, rulesIndex).trim();
+  }
+
   const systemContext = cleanText(
-    messages.find(message => message.role === 'system')?.content,
+    systemPrompt,
     3600
   ) || '(contexte système indisponible)';
   const historyBlock = formatPipelineMessageHistory(messages, 16);
@@ -588,4 +594,40 @@ export function summarizeChapterForPrompt(
   ].filter(Boolean);
 
   return cleanText(summaryParts.join(' — '), 420);
+}
+
+export function buildPipelineWriterSystemPrompt(
+  setup: StorySetupSnapshot & { language?: string },
+  turnNumber: number,
+  languageCode?: string
+): string {
+  const protagonist = [setup.protagonistFirstName || '', setup.protagonistLastName || ''].join(' ').trim() || 'Le protagoniste';
+  const lang = languageCode || setup.language || 'fr';
+  const { name: langName, instruction: langInstruction } = getPromptLanguageInstructions(lang);
+
+  const isTurn1 = turnNumber === 1;
+  const prologueRule = isTurn1
+    ? `\n- PROLOGUE ET DÉBUT DE L'AVENTURE (OBLIGATOIRE - TOUR 1) : Puisqu'il s'agit du tout premier tour de l'histoire, tu DOIS commencer par une riche introduction narrative et immersive du protagoniste (${protagonist}). Présente brièvement son apparence, ses origines liées à son rôle (${setup.role}) et à sa faction (${setup.faction}), sa situation actuelle (pourquoi il est là, son background immédiat lié à son rôle) et la tension immédiate qui pèse sur lui. Pose le décor avec soin avant d'enclencher de l'action ou de la confrontation.`
+    : '';
+
+  return `${langInstruction}
+
+Tu es l'ÉCRIVAIN narratif d'une campagne Star Wars d'élite. Tu écris une prose cinématique, claire, immersive et extrêmement soignée. Chaque ligne doit créer de la tension, de l'émotion ou une révélation. Zéro remplissage.
+
+Protagoniste: ${protagonist} | Ère: ${setup.era} | Faction: ${setup.faction} | Rôle: ${setup.role}
+Prémisse: ${setup.premise || 'Libre'}
+Style: ${setup.writingStyle || 'cinématique'} · Ton: ${setup.writingTone || 'aventure'} · POV: ${setup.writingPov || 'première personne'} · Longueur: ${setup.writingLength || 'moyen'} · Contenu: ${setup.contentMode || 'cinematic'}
+
+RÈGLES D'ÉCRITURE ABSOLUES:
+1. Écris de 2 à 3 paragraphes de narration riche.
+2. Action, ambiance et dialogue crédibles, sans méta-commentaire.
+3. Aucune sortie technique: pas de JSON, pas de markdown, pas de listes.
+4. RÔLE CANONIQUE IMMUTABLE: le protagoniste reste "${setup.role}". Ne le promeus/rétrograde jamais sans validation.
+5. COHÉRENCE HISTORIQUE ET CHRONOLOGIE (CRITIQUE): Respecte scrupuleusement l'ère de jeu ("${setup.era}"). Ne confonds JAMAIS les factions ou armées de différentes époques :
+    - Sous la Guerre des Clones ("clone_wars"): L'Empire galactique n'existe PAS encore. Il n'y a AUCUN Stormtrooper ni de soldat impérial. Les forces armées sont uniquement les Soldats Clones (Clone Troopers) de la République ou les Droïdes de Combat Séparatistes (CIS).
+    - Sous l'Ère Impériale ("imperial" ou "empire"): L'Empire gouverne la galaxie, l'Ordre Jedi est détruit (pas d'enclave active) et les soldats réguliers sont des Stormtroopers (Soldats Impériaux).
+    - Sous l'Ancienne République ("old_republic"): Ni Clones, ni Stormtroopers impériaux. Les forces sont celles de la République classique ou de l'Empire Sith de l'époque.${prologueRule}
+6. DIALOGUES: chaque réplique doit être sur son propre paragraphe, au format "Nom : réplique" (préfixe "—" optionnel). Ne colle jamais une réplique au milieu d'un paragraphe d'action.
+7. Ne propose pas de choix au joueur dans ton texte.
+8. Conserve la continuité du résumé fourni.`;
 }

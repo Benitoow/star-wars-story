@@ -326,105 +326,161 @@ export async function callOpenAiCompatibleRaw(
     body.tool_choice = options.toolChoice ?? 'auto';
   }
 
-  const { controller, cancel } = withTimeoutSignal(timeoutMs);
+  const maxRetries = 3;
+  let attempt = 0;
+  let response: Response | null = null;
+  let lastError: Error | null = null;
 
-  try {
-    recordDiagnosticEvent({
-      level: 'info',
-      category: 'provider-request',
-      stage: 'openrouter-chat-completions',
-      message: 'Appel provider texte.',
-      providerId: normalizedConfig.providerId,
-      model: modelId,
-      validation: 'passed',
-      meta: {
-        messageCount: messages.length,
-        maxTokens: body.max_tokens,
-        temperature: body.temperature,
-        reasoning: body.reasoning,
-        hasTools: Array.isArray(options.tools) && options.tools.length > 0
-      }
-    });
-
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body),
-      signal: controller.signal
-    });
-
-    if (!response.ok) {
-      const message = await parseErrorMessage(response);
+  while (attempt <= maxRetries) {
+    if (attempt > 0) {
+      const delay = attempt * 500; // 500ms, 1000ms, 1500ms
+      await new Promise(resolve => setTimeout(resolve, delay));
       recordDiagnosticEvent({
-        level: 'error',
-        category: 'provider-response',
+        level: 'warn',
+        category: 'provider-retry',
         stage: 'openrouter-chat-completions',
-        message: 'Le provider texte a répondu en erreur.',
+        message: `Nouvelle tentative d'appel API (essai ${attempt}/${maxRetries}).`,
         providerId: normalizedConfig.providerId,
         model: modelId,
-        validation: 'failed',
+        validation: 'repaired'
+      });
+    }
+
+    const { controller, cancel } = withTimeoutSignal(timeoutMs);
+
+    try {
+      if (attempt === 0) {
+        recordDiagnosticEvent({
+          level: 'info',
+          category: 'provider-request',
+          stage: 'openrouter-chat-completions',
+          message: 'Appel provider texte.',
+          providerId: normalizedConfig.providerId,
+          model: modelId,
+          validation: 'passed',
+          meta: {
+            messageCount: messages.length,
+            maxTokens: body.max_tokens,
+            temperature: body.temperature,
+            reasoning: body.reasoning,
+            hasTools: Array.isArray(options.tools) && options.tools.length > 0
+          }
+        });
+      }
+
+      response = await fetch(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+        signal: controller.signal
+      });
+
+      cancel();
+
+      if (response.ok) {
+        lastError = null;
+        break;
+      }
+
+      const message = await parseErrorMessage(response);
+      lastError = new Error(`${getProviderDisplayName(normalizedConfig.providerId)}: ${message}`);
+
+      recordDiagnosticEvent({
+        level: 'warn',
+        category: 'provider-response-error',
+        stage: 'openrouter-chat-completions',
+        message: `Le provider texte a répondu en erreur (${response.status}).`,
+        providerId: normalizedConfig.providerId,
+        model: modelId,
+        validation: 'repaired',
         meta: {
           status: response.status,
           providerMessage: message
         }
       });
-      throw new Error(`${getProviderDisplayName(normalizedConfig.providerId)}: ${message}`);
+
+      // Retry only on rate limits (429) or server errors (500, 502, 503, 504)
+      if (response.status !== 429 && response.status !== 500 && response.status !== 502 && response.status !== 503 && response.status !== 504) {
+        break;
+      }
+
+    } catch (error) {
+      cancel();
+      const msg = error instanceof Error ? error.message : String(error);
+      const isTimeout = isAbortError(error);
+      lastError = isTimeout
+        ? new Error(`Délai d'attente dépassé après ${timeoutMs}ms`)
+        : new Error(`Échec de la requête réseau: ${msg}`);
+
+      if (isTimeout) {
+        recordDiagnosticEvent({
+          level: 'error',
+          category: 'provider-timeout',
+          stage: 'openrouter-chat-completions',
+          message: 'Le provider texte a dépassé le délai.',
+          providerId: normalizedConfig.providerId,
+          model: modelId,
+          validation: 'failed',
+          meta: { timeoutMs }
+        });
+      } else {
+        recordDiagnosticEvent({
+          level: 'warn',
+          category: 'provider-network-error',
+          stage: 'openrouter-chat-completions',
+          message: `Erreur réseau lors de l'appel API.`,
+          providerId: normalizedConfig.providerId,
+          model: modelId,
+          validation: 'repaired',
+          meta: { error: msg }
+        });
+      }
     }
 
-    const data = await response.json() as { choices?: Array<{ message?: OpenAiMessage }> };
-    const message = data.choices?.[0]?.message;
-    const hasContent = Boolean(cleanText(message?.content, 16000));
-    const hasToolCalls = Array.isArray(message?.tool_calls) && message.tool_calls.length > 0;
-    if (!message || (!hasContent && !hasToolCalls)) {
-      recordDiagnosticEvent({
-        level: 'error',
-        category: 'provider-response',
-        stage: 'openrouter-chat-completions',
-        message: 'Réponse provider vide ou incomplète.',
-        providerId: normalizedConfig.providerId,
-        model: modelId,
-        validation: 'failed',
-        meta: data
-      });
-      throw new Error(`${getProviderDisplayName(normalizedConfig.providerId)}: réponse vide ou incomplète du provider.`);
-    }
+    attempt += 1;
+  }
 
+  if (lastError || !response || !response.ok) {
+    throw lastError || new Error(`Impossible d'obtenir une réponse valide du provider après ${maxRetries} tentatives.`);
+  }
+
+  const data = await response.json() as { choices?: Array<{ message?: OpenAiMessage }> };
+  const message = data.choices?.[0]?.message;
+  const hasContent = Boolean(cleanText(message?.content, 16000));
+  const hasToolCalls = Array.isArray(message?.tool_calls) && message.tool_calls.length > 0;
+  if (!message || (!hasContent && !hasToolCalls)) {
     recordDiagnosticEvent({
-      level: 'info',
+      level: 'error',
       category: 'provider-response',
       stage: 'openrouter-chat-completions',
-      message: 'Réponse provider validée.',
+      message: 'Réponse provider vide ou incomplète.',
       providerId: normalizedConfig.providerId,
       model: modelId,
-      validation: 'passed',
-      meta: {
-        hasContent,
-        toolCalls: message.tool_calls?.length || 0,
-        content: message.content || ''
-      }
+      validation: 'failed',
+      meta: data
     });
-
-    return {
-      ...message,
-      content: cleanText(message.content, 16000) || undefined
-    };
-  } catch (error) {
-    if (isAbortError(error)) {
-      recordDiagnosticEvent({
-        level: 'error',
-        category: 'provider-timeout',
-        stage: 'openrouter-chat-completions',
-        message: 'Le provider texte a dépassé le délai.',
-        providerId: normalizedConfig.providerId,
-        model: modelId,
-        validation: 'failed',
-        meta: { timeoutMs }
-      });
-    }
-    throw error;
-  } finally {
-    cancel();
+    throw new Error(`${getProviderDisplayName(normalizedConfig.providerId)}: réponse vide ou incomplète du provider.`);
   }
+
+  recordDiagnosticEvent({
+    level: 'info',
+    category: 'provider-response',
+    stage: 'openrouter-chat-completions',
+    message: 'Réponse provider validée.',
+    providerId: normalizedConfig.providerId,
+    model: modelId,
+    validation: 'passed',
+    meta: {
+      hasContent,
+      toolCalls: message.tool_calls?.length || 0,
+      content: message.content || ''
+    }
+  });
+
+  return {
+    ...message,
+    content: cleanText(message.content, 16000) || undefined
+  };
 }
 
 async function callOpenAiCompatible(

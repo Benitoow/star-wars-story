@@ -8,7 +8,8 @@ import type {
   StoryMemoryUpdates,
   StoryProviderConfig,
   StoryTurnGenerationResult,
-  StoryChapter
+  StoryChapter,
+  StorySetupSnapshot
 } from './types';
 import {
   assertSupportedStoryProviderConfig,
@@ -39,7 +40,8 @@ import {
   buildPipelineDirectorUserPrompt,
   buildPipelineScribeUserPrompt,
   buildPipelineWriterUserPromptWithDirector,
-  getPromptLanguageInstructions
+  getPromptLanguageInstructions,
+  buildPipelineWriterSystemPrompt
 } from './prompts';
 
 type StoryPipelineStep = 'scribe' | 'director' | 'writer' | 'brain' | 'world-observer' | 'world-adjudicator';
@@ -447,15 +449,65 @@ async function runDirectorStep(
   return coerceDirectorBrief(parseJsonSafely(raw), fallback);
 }
 
+export function parseSetupFromSystemPrompt(systemPrompt: string): StorySetupSnapshot {
+  const setup: StorySetupSnapshot = {
+    era: 'imperial',
+    faction: 'libre',
+    role: 'aventurier',
+    premise: 'Libre'
+  };
+
+  if (!systemPrompt) return setup;
+
+  const mainMatch = systemPrompt.match(/Protagoniste:\s*([^\n|]*?)\s*\|\s*Ère:\s*([^\n|]*?)\s*\|\s*Faction:\s*([^\n|]*?)\s*\|\s*Rôle:\s*([^\n|]*)/);
+  if (mainMatch) {
+    const fullName = mainMatch[1].trim();
+    const parts = fullName.split(/\s+/);
+    if (parts.length > 0) {
+      setup.protagonistFirstName = parts[0];
+      if (parts.length > 1) {
+        setup.protagonistLastName = parts.slice(1).join(' ');
+      }
+    }
+    setup.era = mainMatch[2].trim();
+    setup.faction = mainMatch[3].trim();
+    setup.role = mainMatch[4].trim();
+  }
+
+  const premiseMatch = systemPrompt.match(/Prémisse:\s*([^\n]*)/);
+  if (premiseMatch) {
+    setup.premise = premiseMatch[1].trim();
+  }
+
+  const styleMatch = systemPrompt.match(/Style:\s*([^\n·]*)/);
+  if (styleMatch) setup.writingStyle = styleMatch[1].trim();
+
+  const toneMatch = systemPrompt.match(/Ton:\s*([^\n·]*)/);
+  if (toneMatch) setup.writingTone = toneMatch[1].trim();
+
+  const povMatch = systemPrompt.match(/POV:\s*([^\n·]*)/);
+  if (povMatch) setup.writingPov = povMatch[1].trim();
+
+  const lengthMatch = systemPrompt.match(/Longueur:\s*([^\n·]*)/);
+  if (lengthMatch) setup.writingLength = lengthMatch[1].trim();
+
+  const contentMatch = systemPrompt.match(/Contenu:\s*([^\n·]*)/);
+  if (contentMatch) setup.contentMode = contentMatch[1].trim();
+
+  return setup;
+}
+
 async function runWriterStep(
   scribeSummary: string,
   directorBrief: StoryDirectorBrief,
   config: StoryProviderConfig,
-  languageCode: string
+  languageCode: string,
+  setup: StorySetupSnapshot,
+  turnNumber: number
 ): Promise<string> {
   const userPrompt = buildPipelineWriterUserPromptWithDirector(scribeSummary, directorBrief);
-  const writerPrompt = appendLanguageInstruction(STORY_PIPELINE_WRITER_SYSTEM_PROMPT, languageCode);
-  const raw = await callPipelineStep('writer', writerPrompt, userPrompt, config, false);
+  const baseWriterPrompt = buildPipelineWriterSystemPrompt(setup, turnNumber, languageCode);
+  const raw = await callPipelineStep('writer', baseWriterPrompt, userPrompt, config, false);
   return sanitizeNarrativeText(raw, 5500);
 }
 
@@ -478,9 +530,12 @@ export async function generateStoryTurn(
   config: StoryProviderConfig,
   turnNumber: number,
   providerOverrides: StoryTurnPipelineConfigOverrides = {},
-  languageCode: string = 'fr'
+  languageCode: string = 'fr',
+  setup?: StorySetupSnapshot
 ): Promise<StoryTurnGenerationResult> {
   const safeMessages = sanitizeStoryMessageHistory(messages);
+  const systemPrompt = safeMessages.find(m => m.role === 'system')?.content || '';
+  const resolvedSetup = setup || parseSetupFromSystemPrompt(systemPrompt);
   const baseConfig = normalizeProviderConfig(config);
   const scribeConfig = resolveStepConfig(baseConfig, providerOverrides.scribe);
   const directorConfig = resolveStepConfig(baseConfig, providerOverrides.director);
@@ -532,7 +587,7 @@ export async function generateStoryTurn(
 
   let writerScene = fallbackWriterScene(scribeSummary, safeMessages, turnNumber);
   try {
-    const result = await runWriterStep(scribeSummary, directorBrief, writerConfig, languageCode);
+    const result = await runWriterStep(scribeSummary, directorBrief, writerConfig, languageCode, resolvedSetup, turnNumber);
     if (result) {
       writerScene = result;
       completedSteps = Math.max(completedSteps, 3);

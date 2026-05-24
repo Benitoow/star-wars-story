@@ -426,7 +426,7 @@
 
     const generation = preferredTextRuntimeMode === 'structured-json'
       ? await generateStoryTurnStructured(requestMessages, providerConfig, turn, resolvedLanguage)
-      : await generateStoryTurn(requestMessages, providerConfig, turn, {}, resolvedLanguage);
+      : await generateStoryTurn(requestMessages, providerConfig, turn, {}, resolvedLanguage, setup);
     storyRuntimeMode = generation.mode;
     const chapter = sanitizeChapterForDisplay(enforceTransitionChoiceQuality(generation.chapter, worldState)) as StoryChapter;
     const assistantContent = buildStoredAssistantContent(chapter, generation.mode, generation.rawResponse);
