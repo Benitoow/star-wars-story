@@ -41,16 +41,16 @@
   // Royalty-free backdrop photos keyed to the scene's mood. The procedural
   // gradient below stays as the fallback if a file is missing.
   const BACKDROPS: Record<string, string> = {
-    action: '/backdrops/falcon-hangar.jpg',
-    confrontation: '/backdrops/stormtroopers.jpg',
-    exploration: '/backdrops/misty-outpost.jpg',
-    dialogue: '/backdrops/starry-sky.jpg',
-    repos: '/backdrops/falcon-corridor.jpg',
-    interlude: '/backdrops/falcon-corridor.jpg',
-    tension: '/backdrops/stormtroopers.jpg',
-    revelation: '/backdrops/misty-outpost.jpg'
+    action: '/backdrops/falcon-hangar.webp',
+    confrontation: '/backdrops/stormtroopers.webp',
+    exploration: '/backdrops/misty-outpost.webp',
+    dialogue: '/backdrops/starry-sky.webp',
+    repos: '/backdrops/falcon-corridor.webp',
+    interlude: '/backdrops/cosmic-aurora.webp',
+    tension: '/backdrops/cosmic-darkness.webp',
+    revelation: '/backdrops/cosmic-supernova.webp'
   };
-  const DEFAULT_BACKDROP = '/backdrops/starry-sky.jpg';
+  const DEFAULT_BACKDROP = '/backdrops/starry-sky.webp';
 
   $: mood = (sectionType && MOODS[sectionType]) || DEFAULT_MOOD;
   $: tone = (era && ERA_TONES[era]) || DEFAULT_TONE;
