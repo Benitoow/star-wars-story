@@ -108,7 +108,13 @@ export async function callImageModel(prompt: string, config: ImageGenerationConf
 
       const data = await res.json() as any;
 
-      // Parsing très robuste du format OpenRouter (supportant à la fois le completions et l'images/generations)
+      // Capture de toute erreur renvoyée par l'API OpenRouter
+      if (data?.error) {
+        const errMsg = data.error.message || JSON.stringify(data.error);
+        throw new Error(`[OpenRouter Error] ${errMsg}`);
+      }
+
+      // Parsing très robuste du format OpenRouter (supportant à la fois le completions, l'images/generations, et les structures imbriquées)
       const directUrl = data?.data?.[0]?.url || data?.data?.[0]?.image_url?.url || null;
       if (directUrl) {
         resultUrl = directUrl;
@@ -117,14 +123,24 @@ export async function callImageModel(prompt: string, config: ImageGenerationConf
         if (b64) {
           resultUrl = `data:image/png;base64,${b64}`;
         } else {
+          // Format multimodal chat/completions normalisé OpenRouter
           const msg = data?.choices?.[0]?.message || {};
+          
+          // Vérification de choices[0].message.images[0]
           const imgEntry = Array.isArray(msg.images) ? msg.images[0] : null;
           const url = imgEntry?.image_url?.url || imgEntry?.url || null;
+          
           if (url) {
             resultUrl = url;
           } else if (typeof msg.content === 'string') {
-            const match = msg.content.match(/data:image\/[a-z]+;base64,[A-Za-z0-9+/=]+/);
-            if (match) resultUrl = match[0];
+            // Recherche de chaîne base64 ou URL dans le contenu texte
+            const matchBase64 = msg.content.match(/data:image\/[a-z]+;base64,[A-Za-z0-9+/=]+/);
+            if (matchBase64) {
+              resultUrl = matchBase64[0];
+            } else {
+              const matchUrl = msg.content.match(/https?:\/\/[^\s"'<>]+(?:\.png|\.jpg|\.jpeg|\.webp)(?:\?[^\s"'<>]+)?/i);
+              if (matchUrl) resultUrl = matchUrl[0];
+            }
           }
         }
       }
