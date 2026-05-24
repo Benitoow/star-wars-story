@@ -60,7 +60,7 @@ export async function callImageModel(prompt: string, config: ImageGenerationConf
     throw new Error(`Clé API manquante pour ${providerName}. Veuillez la renseigner dans les Paramètres.`);
   }
 
-  const timeoutMs = 45000; // 45 secondes de délai d'attente
+  const timeoutMs = 90000; // 90 secondes de délai d'attente
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -245,7 +245,7 @@ export async function callImageModel(prompt: string, config: ImageGenerationConf
 
   } catch (error: any) {
     const isAbort = error?.name === 'AbortError' || /timeout|abort/i.test(error?.message || '');
-    const message = isAbort ? "Délai d'attente dépassé (45s)." : (error?.message || 'Erreur inconnue');
+    const message = isAbort ? "Délai d'attente dépassé (90s)." : (error?.message || 'Erreur inconnue');
 
     recordDiagnosticEvent({
       level: 'error',
