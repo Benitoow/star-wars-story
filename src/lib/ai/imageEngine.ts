@@ -114,6 +114,13 @@ export async function callImageModel(prompt: string, config: ImageGenerationConf
         throw new Error(`[OpenRouter Error] ${errMsg}`);
       }
 
+      // Détection des blocages par filtre de contenu / Droits d'auteur (très fréquent sur Star Wars avec Gemini/Google)
+      const choiceFinish = data?.choices?.[0]?.finish_reason || '';
+      const nativeFinish = data?.native_finish_reason || '';
+      if (choiceFinish === 'content_filter' || nativeFinish === 'PROHIBITED_CONTENT' || data?.finish_reason === 'content_filter') {
+        throw new Error("Génération bloquée par le filtre de contenu de l'IA. Google / Gemini bloque souvent l'utilisation directe de termes protégés (comme 'Star Wars', 'Padawan', 'Jedi'). Essaie de simplifier ta description physique sans citer de marques protégées.");
+      }
+
       // Parsing très robuste du format OpenRouter (supportant à la fois le completions, l'images/generations, et les structures imbriquées)
       const directUrl = data?.data?.[0]?.url || data?.data?.[0]?.image_url?.url || null;
       if (directUrl) {
@@ -146,7 +153,10 @@ export async function callImageModel(prompt: string, config: ImageGenerationConf
       }
 
       if (!resultUrl) {
-        throw new Error("Aucune image renvoyée dans la réponse d'OpenRouter Images.");
+        console.warn("[OpenRouter Image Debug] Full Response Data:", data);
+        const keysStr = Object.keys(data || {}).join(', ');
+        const payloadStr = JSON.stringify(data || {});
+        throw new Error(`Aucune image renvoyée dans la réponse d'OpenRouter Images. Clés: [${keysStr}]. Réponse brute: ${payloadStr.slice(0, 240)}...`);
       }
     }
 
