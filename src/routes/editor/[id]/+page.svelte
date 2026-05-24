@@ -712,6 +712,7 @@
 
 <div class="editor-layout">
   <main class="editor-main">
+    {#if mode !== 'play'}
     <PageHeader
       title={mode === 'setup' ? "Création d'histoire IA" : 'Aventure interactive'}
       showBack={true}
@@ -742,6 +743,7 @@
         </button>
       </div>
     </PageHeader>
+    {/if}
 
     <div class="editor-content" class:play-flush={mode === 'play' && !loading}>
       {#if loading}
@@ -767,6 +769,11 @@
 
           <!-- ── Topbar ──────────────────────────────────── -->
           <div class="play-topbar">
+            <a class="topbar-home" href="/" aria-label="Retour à l'accueil" title="Accueil">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true">
+                <path d="M15 18l-6-6 6-6"/>
+              </svg>
+            </a>
             <div class="turn-indicator">
               <span class="turn-dot"></span>
               Tour&nbsp;<strong>{turnNumber || 1}</strong>
@@ -1091,8 +1098,8 @@
     flex-direction: column;
     gap: var(--space-lg);
     width: 100%;
-    min-height: calc(100vh - var(--header-height));
-    padding: var(--space-2xl) clamp(var(--space-lg), 5vw, 72px) calc(var(--space-2xl) + var(--space-lg));
+    min-height: 100vh;
+    padding: var(--space-xl) clamp(var(--space-lg), 5vw, 72px) calc(var(--space-2xl) + var(--space-lg));
     background: var(--color-bg-primary);
   }
 
@@ -1230,6 +1237,26 @@
     align-items: center;
     gap: var(--space-sm);
     flex-wrap: wrap;
+  }
+
+  .topbar-home {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    border-radius: var(--radius-sm);
+    color: var(--color-text-secondary);
+    background: rgba(8, 9, 14, 0.5);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    transition: color var(--transition-fast), background var(--transition-fast);
+  }
+
+  .topbar-home:hover {
+    color: var(--color-gold);
+    background: rgba(8, 9, 14, 0.8);
   }
 
   .turn-indicator {

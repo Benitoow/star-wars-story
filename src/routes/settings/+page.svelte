@@ -1427,7 +1427,9 @@
   .settings-layout {
     display: flex;
     flex-direction: column;
-    height: 100%;
+    width: 100%;
+    max-width: 920px;
+    margin: 0 auto;
   }
 
   .loading-state {
@@ -1454,20 +1456,18 @@
   /* ── Wizard ──────────────────────────────── */
   .wizard {
     display: flex;
-    flex: 1;
-    gap: 0;
-    overflow: hidden;
+    flex-direction: column;
+    gap: var(--space-lg);
+    padding-top: var(--space-lg);
   }
 
   .wizard-nav {
-    width: 180px;
-    flex-shrink: 0;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
     gap: var(--space-xs);
-    padding: var(--space-lg) var(--space-md);
-    background: var(--color-bg-secondary);
-    border-right: 1px solid var(--color-border);
+    padding: 0 0 var(--space-md);
+    border-bottom: 1px solid var(--border-subtle);
   }
 
   .nav-btn {
@@ -1484,7 +1484,7 @@
     text-align: left;
     transition: all var(--transition-fast);
     position: relative;
-    width: 100%;
+    border: 1px solid transparent;
   }
 
   .nav-btn:hover {
@@ -1510,16 +1510,13 @@
   }
 
   .wizard-content {
-    flex: 1;
-    overflow: hidden;
-    position: relative;
+    display: grid;
+    min-width: 0;
   }
 
   .screen {
-    position: absolute;
-    inset: 0;
-    overflow-y: auto;
-    padding: var(--space-xl) var(--space-2xl);
+    grid-area: 1 / 1;
+    padding: var(--space-md) 0 var(--space-2xl);
     display: flex;
     flex-direction: column;
     gap: var(--space-xl);
