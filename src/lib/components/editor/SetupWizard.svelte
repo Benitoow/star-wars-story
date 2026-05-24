@@ -25,6 +25,60 @@
   export let selectedTrame: string | null = null;
   let canContinueStep = false;
 
+  import { callImageModel } from '$lib/ai/imageEngine';
+  import { getPreferences } from '$lib/db';
+
+  let generatingPortrait = false;
+  let portraitError = '';
+
+  async function generateProtagonistPortrait() {
+    portraitError = '';
+    
+    let prefs;
+    try {
+      prefs = await getPreferences();
+    } catch (e) {
+      portraitError = "Impossible de charger vos préférences.";
+      return;
+    }
+
+    if (!prefs || !prefs.imageProvider || prefs.imageProvider === 'none') {
+      portraitError = "Aucun fournisseur d'images configuré. Activez-en un dans les Paramètres.";
+      return;
+    }
+
+    generatingPortrait = true;
+    try {
+      const setup = get(currentSetup);
+      const firstName = (setup.protagonistFirstName || '').trim();
+      const lastName = (setup.protagonistLastName || '').trim();
+      const nameStr = [firstName, lastName].filter(Boolean).join(' ') || 'A Star Wars protagonist';
+
+      const factionName = FACTIONS.find(f => f.id === setup.faction)?.name || 'Independent';
+      const roleName = ROLES.find(r => r.id === setup.role)?.name || 'Wanderer';
+      const eraName = ERAS.find(e => e.id === setup.era)?.name || 'Imperial era';
+
+      const prompt = `Star Wars highly detailed close-up character portrait of ${nameStr}, a ${roleName} associated with the ${factionName} faction during the ${eraName}. Dramatic cinematic lighting, photorealistic, premium digital art, masterpiece.`;
+
+      const dataUrl = await callImageModel(prompt, {
+        providerId: prefs.imageProvider,
+        model: prefs.imageModel || '',
+        apiKey: prefs.imageApiKey,
+        textApiKey: prefs.textApiKey
+      });
+
+      updateSetupField('protagonistAvatar', dataUrl);
+    } catch (err: any) {
+      portraitError = err?.message || "Erreur de génération.";
+    } finally {
+      generatingPortrait = false;
+    }
+  }
+
+  function clearPortrait() {
+    updateSetupField('protagonistAvatar', '🧑‍🚀');
+  }
+
 
   $: activeSetupStep = SETUP_SCREENS[setupScreenIndex];
   $: isLastSetupStep = setupScreenIndex === SETUP_SCREENS.length - 1;
@@ -440,6 +494,48 @@
               </div>
             </div>
 
+            <!-- Panel de Génération de Portrait IA -->
+            <div class="setup-section portrait-ai-section">
+              <div class="setup-section-header">
+                <p class="subheading">Portrait IA de Protagoniste</p>
+                <p class="helper-text">Génère un visage unique d'après ton allégeance, ton rôle et ton époque.</p>
+              </div>
+              
+              <div class="portrait-ai-container">
+                <div class="portrait-preview-wrapper">
+                  {#if $currentSetup.protagonistAvatar && ($currentSetup.protagonistAvatar.startsWith('data:') || $currentSetup.protagonistAvatar.startsWith('http'))}
+                    <div class="portrait-image-wrapper">
+                      <img src={$currentSetup.protagonistAvatar} alt="Portrait IA" class="portrait-image" />
+                      <button type="button" class="btn-clear-portrait" on:click={clearPortrait} title="Supprimer le portrait">
+                        ✕
+                      </button>
+                    </div>
+                  {:else}
+                    <div class="portrait-placeholder">
+                      <span class="placeholder-emoji">{$currentSetup.protagonistAvatar || '🧑‍🚀'}</span>
+                      <span class="placeholder-text">Aucun portrait généré</span>
+                    </div>
+                  {/if}
+                </div>
+
+                <div class="portrait-actions">
+                  {#if generatingPortrait}
+                    <div class="portrait-loader">
+                      <div class="spinner-mini"></div>
+                      <span class="loader-copy">Visualisation par la Force...</span>
+                    </div>
+                  {:else}
+                    <button type="button" class="btn-generate-portrait" on:click={generateProtagonistPortrait}>
+                      ✨ Générer un Portrait IA
+                    </button>
+                    {#if portraitError}
+                      <p class="portrait-error">{portraitError}</p>
+                    {/if}
+                  {/if}
+                </div>
+              </div>
+            </div>
+
             <div class="setup-section">
               <div class="setup-section-header">
                 <p class="subheading">Identité</p>
@@ -492,10 +588,19 @@
               </ul>
             </article>
 
-            <article class="review-card">
+             <article class="review-card">
               <h2>Protagoniste</h2>
-              <ul class="feature-list">
-                <li>{($currentSetup.protagonistAvatar || '🧑‍🚀')} {protagonistDisplayName}</li>
+              <ul class="feature-list review-protagonist-list">
+                <li class="review-avatar-row">
+                  {#if $currentSetup.protagonistAvatar && ($currentSetup.protagonistAvatar.startsWith('data:') || $currentSetup.protagonistAvatar.startsWith('http'))}
+                    <div class="review-portrait-img-wrapper">
+                      <img src={$currentSetup.protagonistAvatar} alt="Portrait" class="review-portrait-img" />
+                    </div>
+                  {:else}
+                    <span class="review-emoji">{$currentSetup.protagonistAvatar || '🧑‍🚀'}</span>
+                  {/if}
+                  <strong class="review-protagonist-name">{protagonistDisplayName}</strong>
+                </li>
                 <li>{($currentSetup.premise || 'Aucune accroche').trim()}</li>
                 <li class="provider-status">Provider: {providerStatus}</li>
               </ul>
@@ -1135,5 +1240,188 @@
     min-height: calc(100dvh - 140px);
     gap: 12px;
   }
+}
+
+/* ─── PORTRAIT IA STYLING ─── */
+.portrait-ai-section {
+  margin-top: var(--space-md);
+  padding: var(--space-md);
+  background: var(--surface-glass);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.portrait-ai-container {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-top: var(--space-sm);
+}
+
+.portrait-preview-wrapper {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  border: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.01);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 0 16px rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
+}
+
+.portrait-image-wrapper {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.portrait-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.btn-clear-portrait {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(10, 12, 18, 0.75);
+  border: 1px solid var(--border-subtle);
+  color: var(--color-text-primary);
+  font-size: 0.65rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: all var(--transition-fast);
+}
+
+.btn-clear-portrait:hover {
+  background: var(--color-red);
+  border-color: var(--color-red);
+}
+
+.portrait-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.placeholder-emoji {
+  font-size: 1.75rem;
+}
+
+.placeholder-text {
+  font-size: 0.55rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.portrait-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  flex: 1;
+}
+
+.btn-generate-portrait {
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-subtle);
+  color: var(--color-text-primary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transition: all var(--transition-fast);
+  align-self: flex-start;
+}
+
+.btn-generate-portrait:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--color-text-primary);
+}
+
+.portrait-loader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.spinner-mini {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-top-color: var(--color-text-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.loader-copy {
+  font-family: var(--font-display);
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.portrait-error {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--color-red);
+  font-family: var(--font-body);
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── REVIEW PORTRAIT STYLING ─── */
+.review-avatar-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xs);
+}
+
+.review-portrait-img-wrapper {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--border-subtle);
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.01);
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.15);
+}
+
+.review-portrait-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.review-emoji {
+  font-size: 1.25rem;
+}
+
+.review-protagonist-name {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  color: var(--color-text-primary);
 }
 </style>

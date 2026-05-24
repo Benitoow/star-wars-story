@@ -106,19 +106,17 @@ export const IMAGE_PROVIDERS: ProviderCatalog[] = [
     id: 'openrouter_img',
     name: 'OpenRouter Images',
     models: [
-      'google/gemini-2.5-flash-preview:thinking',
-      'google/gemini-2.0-flash-exp:free',
-      'openai/gpt-image-1',
-      'openai/gpt-4o-image',
       'black-forest-labs/flux-1.1-pro',
       'black-forest-labs/flux-1.1-pro:ultra',
       'black-forest-labs/flux-1-schnell:free',
       'black-forest-labs/flux-1-dev',
       'recraft-ai/recraft-v3',
-      'ideogram-ai/ideogram-v2'
+      'ideogram-ai/ideogram-v2',
+      'openai/dall-e-3',
+      'stabilityai/stable-diffusion-xl-base-1.0'
     ],
     icon: providerIconSvg('openrouter'),
-    badges: ['400+ modèles', 'Gemini · FLUX · GPT']
+    badges: ['Modèles d\'images', 'FLUX · Recraft · DALL-E']
   },
   {
     id: 'fal_img',
@@ -130,19 +128,18 @@ export const IMAGE_PROVIDERS: ProviderCatalog[] = [
       'fal-ai/flux/schnell',
       'fal-ai/recraft-v3',
       'fal-ai/ideogram/v2',
-      'fal-ai/hidream-i1-full',
       'fal-ai/stable-diffusion-3.5-large',
       'fal-ai/stable-diffusion-v3-medium'
     ],
     icon: providerIconSvg('fal_img'),
-    badges: ['FLUX Pro', 'HiDream', 'SD 3.5']
+    badges: ['FLUX Pro', 'Recraft', 'SD 3.5']
   },
   {
     id: 'openai_img',
     name: 'OpenAI Images',
-    models: ['gpt-image-1'],
+    models: ['dall-e-3', 'dall-e-2'],
     icon: providerIconSvg('openai'),
-    badges: ['GPT-Image-1']
+    badges: ['DALL-E 3', 'DALL-E 2']
   },
   {
     id: 'stability',

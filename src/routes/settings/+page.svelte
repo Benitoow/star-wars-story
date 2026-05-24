@@ -277,6 +277,10 @@
 
         const allModels = await fetchModelsFromJsonEndpoint('https://openrouter.ai/api/v1/models', headers);
         models = allModels.filter(model => IMAGE_MODEL_PATTERN.test(model));
+        
+        if (!models.length) {
+          models = IMAGE_PROVIDERS.find(provider => provider.id === 'openrouter_img')?.models || [];
+        }
       } else if (providerId === 'openai_img') {
         const key = requireApiKey(preferences.imageApiKey || preferences.textApiKey);
         if (!key) {
@@ -287,10 +291,10 @@
         const allModels = await fetchModelsFromJsonEndpoint('https://api.openai.com/v1/models', {
           Authorization: `Bearer ${key}`
         });
-        models = allModels.filter(model => /^gpt-image/i.test(model) || /image/i.test(model));
+        models = allModels.filter(model => /^gpt-image/i.test(model) || /image/i.test(model) || /dall/i.test(model));
 
         if (!models.length) {
-          models = ['gpt-image-1'];
+          models = ['dall-e-3', 'dall-e-2'];
         }
       } else {
         models = IMAGE_PROVIDERS.find(provider => provider.id === providerId)?.models || [];
