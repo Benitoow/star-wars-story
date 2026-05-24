@@ -1,14 +1,11 @@
 # Changelog
 
-## v2.7.0 — 2026-05-24
+## v2.7.1 — 2026-05-24
 
-### ✨ Refonte Visuelle "Musée-Cinéma" (CanariasArt)
+### 🎭 Libération du Lieu d'Ouverture & Introduction Narrative (Choix IA)
 
-- **Esthétique Épurée Ultra-Premium** : Remplacement de l'ancien style "cockpit" surchargé, des lueurs jaunes néon et des ombres portées de science-fiction agressives par une interface minimaliste en verre transparent (`var(--surface-glass)` et `var(--border-subtle)`).
-- **Typographie d'Exposition Fine** : Intégration de la police **Cinzel** (majuscules fines et espacées) pour tous les en-têtes, boutons ghosts et breadcrumbs.
-- **Confort de Lecture Littéraire** : Alignement de la prose narrative sur la police à empattement **Bitter** avec une colonne de lecture rationalisée à une largeur idéale de **64ch**.
-- **HUD Flottant & Graphiques 3px** : Amincissement des barres de progression de statut (points de vie, influence de secteur, standings de factions) à **3px** d'épaisseur maximum pour un rendu minimaliste haut de gamme.
-- **Refonte des Composants Majeurs** : Alignement complet de [SetupWizard.svelte](file:///c:/Users/starx/Documents/CODE/star-wars-story/src/lib/components/editor/SetupWizard.svelte), [GameHUD.svelte](file:///c:/Users/starx/Documents/CODE/star-wars-story/src/lib/components/GameHUD.svelte), [PageHeader.svelte](file:///c:/Users/starx/Documents/CODE/star-wars-story/src/lib/components/PageHeader.svelte), de la page de jeu [+page.svelte (editor)](file:///c:/Users/starx/Documents/CODE/star-wars-story/src/routes/editor/%5Bid%5D/+page.svelte) et de la page des paramètres [+page.svelte (settings)](file:///c:/Users/starx/Documents/CODE/star-wars-story/src/routes/settings/+page.svelte).
+- **Lieu de Départ Dynamique (IA)** : Remplacement de l'initialisation rigide et pré-déterminée par faction (`worldStateReducer.ts`) par un placeholder `"À déterminer par l'introduction"`. L'IA choisit désormais en toute liberté le lieu de départ le plus pertinent avec le rôle et la prémisse (ex: évite de faire démarrer un *Padawan banni* dans une enclave Jedi sacrée sous l'Empire, le plaçant plutôt dans une cantina crasseuse ou un vaisseau cargo en fuite).
+- **Introduction Cinématique du Personnage** : Refonte de l'exigence du premier tour dans le prompt initial (`buildStartPrompt`). L'IA n'ouvre plus de manière abrupte sans contexte (*in medias res*), mais compose une véritable scène d'ouverture introduisant l'identité du protagoniste, son rôle, sa situation présente et la menace immédiate qui pèse sur lui.
 
 ### 🎨 Portrait IA de Protagoniste & Génération d'Images
 
@@ -26,6 +23,16 @@
 - **Résolution Native de Langue** : Liaison automatique de la langue de l'histoire à la préférence d'interface `uiLanguage` de l'utilisateur ou à la langue de son navigateur en cas de sélection automatique (`auto`).
 - **Titrages Évocateurs & Hardening du Brain** : Amélioration du prompt de l'agent `brain` (`buildPipelineBrainUserPrompt`) pour exiger systématiquement des titres de scènes hautement cinématiques et créatifs en Français, évitant les retours vides ou génériques ("Tour N").
 - **Générateur Thématique de Secours** : Refonte complète des algorithmes de titrage programmatiques (`deriveFallbackChapterTitleFromScene` et `deriveChapterTitleFromNarrative`) avec un moteur de correspondance de mots-clés Star Wars (ex: sabre -> "Échos dans la Force", enclave -> "Les Mystères de l'Enclave", etc.) et une extraction de phrase beaucoup plus naturelle et concise (limitée à 5 mots pertinents).
+
+## v2.7.0 — 2026-05-24
+
+### ✨ Refonte Visuelle "Musée-Cinéma" (CanariasArt)
+
+- **Esthétique Épurée Ultra-Premium** : Remplacement de l'ancien style "cockpit" surchargé, des lueurs jaunes néon et des ombres portées de science-fiction agressives par une interface minimaliste en verre transparent (`var(--surface-glass)` et `var(--border-subtle)`).
+- **Typographie d'Exposition Fine** : Intégration de la police **Cinzel** (majuscules fines et espacées) pour tous les en-têtes, boutons ghosts et breadcrumbs.
+- **Confort de Lecture Littéraire** : Alignement de la prose narrative sur la police à empattement **Bitter** avec une colonne de lecture rationalisée à une largeur idéale de **64ch**.
+- **HUD Flottant & Graphiques 3px** : Amincissement des barres de progression de statut (points de vie, influence de secteur, standings de factions) à **3px** d'épaisseur maximum pour un rendu minimaliste haut de gamme.
+- **Refonte des Composants Majeurs** : Alignement complet de [SetupWizard.svelte](file:///c:/Users/starx/Documents/CODE/star-wars-story/src/lib/components/editor/SetupWizard.svelte), [GameHUD.svelte](file:///c:/Users/starx/Documents/CODE/star-wars-story/src/lib/components/GameHUD.svelte), [PageHeader.svelte](file:///c:/Users/starx/Documents/CODE/star-wars-story/src/lib/components/PageHeader.svelte), de la page de jeu [+page.svelte (editor)](file:///c:/Users/starx/Documents/CODE/star-wars-story/src/routes/editor/%5Bid%5D/+page.svelte) et de la page des paramètres [+page.svelte (settings)](file:///c:/Users/starx/Documents/CODE/star-wars-story/src/routes/settings/+page.svelte).
 
 ### 🔧 Améliorations de l'Environnement de Développement
 

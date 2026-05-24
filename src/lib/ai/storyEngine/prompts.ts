@@ -425,7 +425,8 @@ CADRE D'OUVERTURE:
 - Contenu: ${setup.contentMode || 'cinematic'}
 
 EXIGENCES DU PREMIER TOUR:
-- Ouvre in medias res, sans préambule explicatif, rédigé ENTIÈREMENT EN ${langName} (jamais dans une autre langue).
+- Ouvre la scène par une véritable introduction narrative et cinématique du protagoniste : présente brièvement qui il est, son background immédiat lié à son rôle (${setup.role}) et à sa trame (${selectedTrameLabel || 'Libre'}), sa situation actuelle, pourquoi il se trouve là, et la tension immédiate qui pèse sur lui. Rédige ENTIÈREMENT EN ${langName}.
+- Choisis librement un lieu de départ extrêmement cohérent avec le protagoniste et sa trame (ex: s'il s'agit d'un ${setup.role} banni sous l'ère impériale, évite absolument de le faire commencer dans une enclave Jedi en activité ; place-le plutôt dans une cantina crasseuse de la bordure extérieure, à bord d'un cargo en fuite, ou caché dans des bas-fonds). Renseigne impérativement ce lieu choisi dans "state_update.location".
 - Donne immédiatement une tension claire, un lieu vivant et un objectif en ${langName}.
 - Introduis au moins 1 PNJ mémorable avec un agenda distinct.
 - Fais émerger un enjeu politique, relationnel ou moral dès l'ouverture.

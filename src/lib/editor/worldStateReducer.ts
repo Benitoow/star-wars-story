@@ -292,29 +292,7 @@ import { FACTION_CREDITS, ERA_START_DATES } from '$lib/editor/setupCatalog';
   }
 
   export function deriveInitialLocation(setup: StorySetup): string {
-    const factionSeed: Record<string, string> = {
-      empire: 'Coruscant — Secteur Impérial',
-      rebels: 'Cellule rebelle en bordure extérieure',
-      jedi: 'Enclave Jedi isolée',
-      sith: 'Sanctuaire Sith dissimulé',
-      hutt: 'Nar Shaddaa',
-      mandalore: 'Mandalore'
-    };
-
-    if (setup.faction && factionSeed[setup.faction]) {
-      return factionSeed[setup.faction];
-    }
-
-    const eraSeed: Record<string, string> = {
-      old_republic: 'Coruscant',
-      clone_wars: 'Coruscant — secteur militaire',
-      imperial: 'Coruscant — noyau impérial',
-      rebellion: 'Base rebelle mobile',
-      new_republic: 'Hosnian Prime',
-      first_order: 'Avant-poste de la Bordure Extérieure'
-    };
-
-    return eraSeed[setup.era] || 'Secteur frontalier';
+    return "À déterminer par l'introduction";
   }
 
   export function cloneWorldState(source: WorldState): WorldState {
