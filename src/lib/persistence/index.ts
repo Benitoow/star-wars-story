@@ -191,6 +191,8 @@ function normalizePreferencesRecord(preferences: unknown) {
     textProvider,
     textModel: typeof preferences.textModel === 'string' ? preferences.textModel : undefined,
     textApiKey: typeof preferences.textApiKey === 'string' ? preferences.textApiKey : undefined,
+    textReasoningEffort: typeof preferences.textReasoningEffort === 'string' ? preferences.textReasoningEffort : undefined,
+    textRuntimeMode: (preferences.textRuntimeMode === 'agentic-subagents' || preferences.textRuntimeMode === 'structured-json') ? (preferences.textRuntimeMode as 'agentic-subagents' | 'structured-json') : undefined,
     ollamaUrl: typeof preferences.ollamaUrl === 'string' ? preferences.ollamaUrl : DEFAULT_OLLAMA_URL,
     imageProvider,
     imageModel,

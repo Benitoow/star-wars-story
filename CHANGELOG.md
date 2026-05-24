@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.7.4 — 2026-05-24
+
+### 💾 Correction de Persistance des Paramètres & Libération Narratives des Modèles
+
+- **Sauvegarde du Mode de Génération (persistence/index.ts)** :
+  * Résolution du bug de nettoyage des préférences (`normalizePreferencesRecord`) qui omettait systématiquement les propriétés `textRuntimeMode` (choix du pipeline 4 agents vs 1 agent structuré) et `textReasoningEffort` (effort de raisonnement). Ces choix de l'utilisateur sont désormais correctement validés, castés strictement en TypeScript pour Svelte-check, et persistés de façon permanente dans la base de données locale Dexie (IndexedDB).
+- **Zéro Filtrage Narratif / Libération des IA** :
+  * Retrait et vérification de l'absence totale de tout système de censure, filtrage ou bridage narratif intermédiaire dans l'application. La prémisse, les actions joueur et la prose générée par l'IA circulent de façon transparente pour garantir une liberté narrative absolue en fonction des limites et des filtres propres au modèle d'IA sélectionné (ex: support natif du mode "Brut" et "Adulte" en jeu).
+- **Stabilité Post-Intégration** :
+  * Type-safety absolue confirmée par `svelte-check` avec **0 erreur et 0 avertissement**.
+  * Intégration testée avec succès sur l'ensemble de la suite de **160 tests unitaires 100% au vert**.
+
 ## v2.7.3 — 2026-05-24
 
 ### 🤖 Résolution de l'Orchestration à 4 Agents & Résilience Réseau
