@@ -10,30 +10,30 @@
 
   const COPY = {
     fr: {
-      heroTitle: 'Ta saga commence ici',
-      heroSub: 'Des aventures Star Wars interactives écrites par l’IA, où chaque choix t’appartient.',
-      cta: 'Nouvelle aventure',
-      section: 'Tes aventures',
-      loading: 'Chargement…',
-      noStories: 'Aucune aventure pour l’instant',
-      emptyText: 'Lance ta première histoire et écris ta légende dans la galaxie.',
-      searchPlaceholder: 'Rechercher une aventure…',
+      eyebrow: 'Fiction interactive',
+      title: 'Écris ta légende',
+      sub: 'Des aventures Star Wars menées par l’IA, où chaque choix t’appartient.',
+      enter: 'Commencer',
+      scroll: 'Vos aventures',
+      library: 'Vos aventures',
+      search: 'Rechercher…',
       allEras: 'Toutes les époques',
-      countSingle: 'aventure',
-      countPlural: 'aventures'
+      empty: 'Aucune aventure',
+      emptyText: 'Votre saga reste à écrire.',
+      create: 'Créer une aventure'
     },
     en: {
-      heroTitle: 'Your saga starts here',
-      heroSub: 'AI-driven interactive Star Wars adventures where every choice is yours.',
-      cta: 'New adventure',
-      section: 'Your adventures',
-      loading: 'Loading…',
-      noStories: 'No adventures yet',
-      emptyText: 'Start your first story and write your legend across the galaxy.',
-      searchPlaceholder: 'Search an adventure…',
+      eyebrow: 'Interactive fiction',
+      title: 'Write your legend',
+      sub: 'AI-driven Star Wars adventures where every choice is yours.',
+      enter: 'Begin',
+      scroll: 'Your adventures',
+      library: 'Your adventures',
+      search: 'Search…',
       allEras: 'All eras',
-      countSingle: 'adventure',
-      countPlural: 'adventures'
+      empty: 'No adventures yet',
+      emptyText: 'Your saga is still unwritten.',
+      create: 'Create an adventure'
     }
   } as const;
 
@@ -47,52 +47,45 @@
 
   let searchInput = '';
   $: searchQuery.set(searchInput);
-
   function setEraFilter(eraId: string | null) {
     filters.update((f) => ({ ...f, era: eraId || undefined }));
   }
-
   $: activeEra = $filters.era;
 </script>
 
 <svelte:head>
-  <title>Star Wars Story — {copy.section}</title>
+  <title>Star Wars Story</title>
 </svelte:head>
 
 <div class="home">
-  <!-- Hero -->
+  <!-- Entrance — full-screen immersive -->
   <section class="hero">
     <div class="hero-bg"></div>
     <div class="hero-scrim"></div>
-    <div class="hero-content">
-      <p class="hero-eyebrow">Star Wars · Interactive Fiction</p>
-      <h1 class="hero-title">{copy.heroTitle}</h1>
-      <p class="hero-sub">{copy.heroSub}</p>
-      <a class="btn btn-primary hero-cta" href="/stories/new">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="17" height="17" aria-hidden="true">
-          <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-        </svg>
-        {copy.cta}
-      </a>
+    <div class="hero-inner">
+      <p class="eyebrow hero-eyebrow">{copy.eyebrow}</p>
+      <h1 class="hero-title">{copy.title}</h1>
+      <p class="hero-sub">{copy.sub}</p>
+      <a class="btn btn-primary hero-cta" href="/stories/new">{copy.enter}</a>
     </div>
+    <a class="hero-scroll" href="#library" aria-label={copy.scroll}>
+      <span>{copy.scroll}</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18" aria-hidden="true">
+        <polyline points="6 9 12 15 18 9" />
+      </svg>
+    </a>
   </section>
 
   <!-- Library -->
-  <section class="library">
-    <div class="library-head">
-      <h2 class="library-title">
-        {copy.section}
-        {#if !loading}<span class="count">{$filteredStories.length} {$filteredStories.length !== 1 ? copy.countPlural : copy.countSingle}</span>{/if}
-      </h2>
-      <div class="search-wrap">
-        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-          <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-        </svg>
-        <input class="search-input" type="text" bind:value={searchInput} placeholder={copy.searchPlaceholder} aria-label={copy.searchPlaceholder} />
+  <section class="library" id="library">
+    <header class="lib-head">
+      <h2 class="lib-title">{copy.library}</h2>
+      <div class="lib-tools">
+        <input class="lib-search input" type="text" bind:value={searchInput} placeholder={copy.search} aria-label={copy.search} />
       </div>
-    </div>
+    </header>
 
-    <div class="era-chips" role="group" aria-label={copy.allEras}>
+    <div class="era-row" role="group" aria-label={copy.allEras}>
       <button class="era-chip" class:active={!activeEra} on:click={() => setEraFilter(null)}>{copy.allEras}</button>
       {#each ERAS as era}
         <button class="era-chip" class:active={activeEra === era.id} on:click={() => setEraFilter(era.id)}>{era.name}</button>
@@ -100,16 +93,12 @@
     </div>
 
     {#if loading}
-      <div class="state">
-        <div class="spinner"></div>
-        <p>{copy.loading}</p>
-      </div>
+      <div class="lib-state"><div class="lib-spinner"></div></div>
     {:else if $filteredStories.length === 0}
-      <div class="state empty">
-        <div class="empty-holo"><div class="holo-ring"></div><span>✦</span></div>
-        <h3>{copy.noStories}</h3>
+      <div class="lib-empty">
+        <h3>{copy.empty}</h3>
         <p>{copy.emptyText}</p>
-        <a href="/stories/new" class="btn btn-primary">{copy.cta}</a>
+        <a href="/stories/new" class="btn btn-primary">{copy.create}</a>
       </div>
     {:else}
       <div class="tiles">
@@ -122,245 +111,197 @@
 </div>
 
 <style>
-  .home {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2xl);
-  }
+  .home { display: flex; flex-direction: column; }
 
-  /* ── Hero ─────────────────────────────────── */
+  /* ── Entrance ─────────────────────────────── */
   .hero {
     position: relative;
-    overflow: hidden;
-    min-height: clamp(340px, 46vh, 500px);
+    min-height: 100vh;
     display: flex;
+    flex-direction: column;
     align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: var(--header-height) var(--space-lg) var(--space-2xl);
+    overflow: hidden;
   }
 
   .hero-bg {
     position: absolute;
     inset: 0;
-    background: url('/backdrops/hyperspace.webp') center / cover no-repeat;
-    transform: scale(1.05);
+    background: url('/backdrops/city-night.webp') center / cover no-repeat;
+    transform: scale(1.06);
+    animation: heroDrift 32s ease-in-out infinite alternate;
+  }
+
+  @keyframes heroDrift {
+    from { transform: scale(1.06) translateY(0); }
+    to { transform: scale(1.12) translateY(-1.5%); }
   }
 
   .hero-scrim {
     position: absolute;
     inset: 0;
-    background:
-      linear-gradient(90deg, rgba(4, 5, 9, 0.92) 0%, rgba(4, 5, 9, 0.72) 45%, rgba(4, 5, 9, 0.35) 100%),
-      radial-gradient(120% 120% at 0% 50%, transparent 40%, rgba(4, 5, 9, 0.6) 100%);
+    background: var(--scrim-image), var(--scrim-center);
   }
 
-  .hero-content {
+  .hero-inner {
     position: relative;
     z-index: 1;
-    padding: clamp(var(--space-lg), 4vw, var(--space-2xl));
-    max-width: 600px;
+    max-width: 720px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-md);
+    animation: fadeIn 1.2s ease both;
   }
 
-  .hero-eyebrow {
-    margin: 0 0 var(--space-sm);
-    font-family: var(--font-display);
-    font-size: 0.72rem;
-    font-weight: 600;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    color: var(--color-gold);
-  }
+  .hero-eyebrow { color: var(--color-text-secondary); }
 
   .hero-title {
-    margin: 0 0 var(--space-sm);
     font-family: var(--font-display);
-    font-size: clamp(2rem, 1.5rem + 2.5vw, 3.2rem);
-    font-weight: 700;
-    line-height: 1.08;
+    font-weight: 600;
+    font-size: clamp(2.6rem, 1.8rem + 4vw, 5rem);
+    line-height: 1.04;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
     color: #fff;
-    text-shadow: 0 2px 30px rgba(0, 0, 0, 0.7);
+    text-shadow: 0 4px 40px rgba(0, 0, 0, 0.7);
+    margin: 0;
   }
 
   .hero-sub {
-    margin: 0 0 var(--space-lg);
-    font-family: var(--font-narrative);
+    font-family: var(--font-body);
     font-size: clamp(1rem, 0.95rem + 0.4vw, 1.2rem);
-    line-height: 1.6;
+    line-height: 1.7;
     color: var(--color-text-secondary);
-    max-width: 46ch;
+    max-width: 44ch;
+    margin: 0;
   }
 
-  .hero-cta {
+  .hero-cta { margin-top: var(--space-md); }
+
+  .hero-scroll {
+    position: absolute;
+    bottom: var(--space-xl);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    color: var(--color-text-muted);
+    font-family: var(--font-display);
+    font-size: 0.62rem;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
     text-decoration: none;
-    padding: 11px 22px;
-    font-size: 0.95rem;
   }
+  .hero-scroll svg { animation: bob 2.4s ease-in-out infinite; }
+  .hero-scroll:hover { color: var(--color-text-primary); }
+  @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(4px); } }
 
   /* ── Library ──────────────────────────────── */
   .library {
-    width: 100%;
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 clamp(var(--space-md), 4vw, var(--space-2xl));
+    position: relative;
+    z-index: 1;
+    background: var(--color-bg-primary);
+    padding: var(--space-2xl) clamp(var(--space-lg), 5vw, var(--space-2xl)) var(--space-2xl);
     display: flex;
     flex-direction: column;
-    gap: var(--space-md);
+    gap: var(--space-lg);
+    max-width: 1280px;
+    width: 100%;
+    margin: 0 auto;
   }
 
-  .library-head {
+  .lib-head {
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     justify-content: space-between;
-    gap: var(--space-md);
+    gap: var(--space-lg);
     flex-wrap: wrap;
+    border-bottom: 1px solid var(--border-subtle);
+    padding-bottom: var(--space-md);
   }
 
-  .library-title {
-    margin: 0;
+  .lib-title {
     font-family: var(--font-display);
-    font-size: 1.35rem;
-    font-weight: 700;
+    font-size: clamp(1.4rem, 1.1rem + 1.2vw, 2rem);
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
     color: var(--color-text-primary);
+    margin: 0;
+  }
+
+  .lib-search { max-width: 280px; border-radius: 999px; }
+
+  .era-row {
     display: flex;
-    align-items: baseline;
+    flex-wrap: wrap;
     gap: var(--space-sm);
   }
 
-  .count {
-    font-size: 0.8rem;
-    font-weight: 400;
-    color: var(--color-text-muted);
-    font-family: var(--font-body);
-  }
-
-  .search-wrap {
-    position: relative;
-    display: flex;
-    align-items: center;
-    flex: 1;
-    min-width: 200px;
-    max-width: 340px;
-  }
-
-  .search-icon {
-    position: absolute;
-    left: 12px;
-    width: 16px;
-    height: 16px;
-    color: var(--color-text-muted);
-    pointer-events: none;
-  }
-
-  .search-input {
-    width: 100%;
-    padding: 9px 14px 9px 36px;
-    background: var(--surface-glass);
-    border: 1px solid var(--border-subtle);
-    border-radius: 999px;
-    color: var(--color-text-primary);
-    font-size: 0.875rem;
-    font-family: var(--font-body);
-    transition: border-color var(--transition-fast), background var(--transition-fast);
-  }
-
-  .search-input:focus {
-    outline: none;
-    border-color: var(--color-gold);
-  }
-
-  .search-input::placeholder { color: var(--color-text-muted); }
-
-  .era-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-
   .era-chip {
-    padding: 5px 14px;
+    padding: 5px 16px;
     background: transparent;
     border: 1px solid var(--border-subtle);
     border-radius: 999px;
-    font-size: 0.78rem;
+    font-family: var(--font-display);
+    font-size: 0.66rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
     color: var(--color-text-secondary);
     cursor: pointer;
     transition: all var(--transition-fast);
-    font-family: var(--font-body);
     white-space: nowrap;
   }
+  .era-chip:hover { border-color: var(--color-border-hover); color: var(--color-text-primary); }
+  .era-chip.active { border-color: var(--color-text-primary); color: var(--color-text-primary); }
 
-  .era-chip:hover { border-color: var(--color-gold); color: var(--color-gold); }
-
-  .era-chip.active {
-    background: rgba(255, 232, 31, 0.12);
-    border-color: var(--color-gold);
-    color: var(--color-gold);
-  }
-
-  /* ── Tiles grid ───────────────────────────── */
   .tiles {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
     gap: var(--space-lg);
+    margin-top: var(--space-sm);
   }
 
-  /* ── States ───────────────────────────────── */
-  .state {
+  .lib-state { display: flex; justify-content: center; padding: var(--space-2xl); }
+  .lib-spinner {
+    width: 32px; height: 32px;
+    border: 1px solid var(--border-subtle);
+    border-top-color: var(--color-text-primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .lib-empty {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: var(--space-md);
-    padding: var(--space-2xl) var(--space-lg);
-    color: var(--color-text-muted);
     text-align: center;
+    padding: var(--space-2xl);
+    color: var(--color-text-muted);
   }
-
-  .state.empty {
-    border: 1px dashed var(--border-subtle);
-    border-radius: var(--radius-xl);
-    background: var(--surface-glass);
+  .lib-empty h3 {
+    font-family: var(--font-display);
+    font-size: 1.4rem;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-text-secondary);
+    margin: 0;
   }
-
-  .state.empty h3 { color: var(--color-text-primary); font-size: 1.2rem; margin: 0; }
-  .state.empty p { margin: 0; max-width: 380px; }
-  .state.empty .btn { text-decoration: none; margin-top: var(--space-xs); }
-
-  .empty-holo {
-    position: relative;
-    width: 72px;
-    height: 72px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--color-gold);
-    font-size: 1.8rem;
-  }
-
-  .holo-ring {
-    position: absolute;
-    inset: 0;
-    border: 2px solid rgba(255, 232, 31, 0.3);
-    border-radius: 50%;
-    animation: holo-pulse 2s ease-in-out infinite;
-  }
-
-  @keyframes holo-pulse {
-    0%, 100% { opacity: 0.4; transform: scale(1); }
-    50% { opacity: 1; transform: scale(1.06); }
-  }
-
-  .spinner {
-    width: 38px;
-    height: 38px;
-    border: 3px solid var(--color-border);
-    border-top-color: var(--color-gold);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-  }
-
-  @keyframes spin { to { transform: rotate(360deg); } }
+  .lib-empty p { margin: 0; }
+  .lib-empty .btn { margin-top: var(--space-sm); text-decoration: none; }
 
   @media (max-width: 600px) {
     .tiles { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--space-md); }
-    .library-head { flex-direction: column; align-items: stretch; }
-    .search-wrap { max-width: none; }
+    .lib-head { flex-direction: column; align-items: stretch; }
+    .lib-search { max-width: none; }
   }
 </style>
