@@ -1,0 +1,35 @@
+import type { StoryChapter } from '$lib/engine/types';
+import { db, SESSION_VERSION, type StoredSession } from './db';
+
+function asArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
+/** Light shape repair — IndexedDB data may predate the current code. */
+function sanitize(raw: StoredSession): StoredSession {
+  const chapterHistory = asArray<StoryChapter>(raw.chapterHistory);
+  return {
+    storyId: raw.storyId,
+    version: SESSION_VERSION,
+    turnNumber: Number.isFinite(raw.turnNumber) && raw.turnNumber >= 0 ? raw.turnNumber : chapterHistory.length,
+    worldState: raw.worldState,
+    currentChapter: raw.currentChapter ?? chapterHistory[chapterHistory.length - 1] ?? null,
+    chapterHistory,
+    actionHistory: asArray<string>(raw.actionHistory),
+    memoryFacts: asArray<string>(raw.memoryFacts),
+    trameId: raw.trameId ?? null
+  };
+}
+
+export async function saveSession(session: StoredSession): Promise<void> {
+  await db.sessions.put({ ...session, version: SESSION_VERSION });
+}
+
+export async function loadSession(storyId: string): Promise<StoredSession | null> {
+  const raw = await db.sessions.get(storyId);
+  return raw ? sanitize(raw) : null;
+}
+
+export async function clearSession(storyId: string): Promise<void> {
+  await db.sessions.delete(storyId);
+}

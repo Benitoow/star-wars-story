@@ -1,17 +1,33 @@
 <script lang="ts">
   import '../app.css';
   import { onMount } from 'svelte';
-  import { theme } from '$lib/stores/ui';
+  import { initDB } from '$lib/persistence';
+  import { preferences } from '$lib/stores/preferences';
+  import { logger } from '$lib/logger';
   import Toast from '$lib/ui/Toast.svelte';
 
+  let ready = false;
+
   onMount(() => {
-    theme.init();
+    void (async () => {
+      try {
+        await initDB();
+        await preferences.load();
+      } catch (error) {
+        logger.error('boot failed', error);
+      }
+      ready = true;
+    })();
   });
 </script>
 
 <div class="app">
   <main class="main">
-    <slot />
+    {#if ready}
+      <slot />
+    {:else}
+      <div class="boot"><div class="boot-spinner"></div></div>
+    {/if}
   </main>
   <Toast />
 </div>
@@ -22,8 +38,22 @@
     min-height: 100vh;
     background: var(--color-bg-primary);
   }
-
   .main {
     min-height: 100vh;
   }
+  .boot {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+  }
+  .boot-spinner {
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--border-subtle);
+    border-top-color: var(--color-text-primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
 </style>

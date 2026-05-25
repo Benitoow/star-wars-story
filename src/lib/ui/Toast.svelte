@@ -4,13 +4,23 @@
 
 <div class="toasts" role="status" aria-live="polite">
   {#each $toasts as toast (toast.id)}
-    <button
-      type="button"
-      class="toast toast-{toast.kind}"
-      on:click={() => toasts.dismiss(toast.id)}
-    >
-      {toast.message}
-    </button>
+    <div class="toast toast-{toast.kind}">
+      <button type="button" class="toast-message" on:click={() => toasts.dismiss(toast.id)}>
+        {toast.message}
+      </button>
+      {#if toast.action}
+        <button
+          type="button"
+          class="toast-action"
+          on:click={() => {
+            toast.action?.run();
+            toasts.dismiss(toast.id);
+          }}
+        >
+          {toast.action.label}
+        </button>
+      {/if}
+    </div>
   {/each}
 </div>
 
@@ -24,26 +34,46 @@
     flex-direction: column;
     gap: var(--space-sm);
     z-index: 1000;
-    pointer-events: none;
-    width: min(440px, calc(100vw - 2 * var(--space-lg)));
+    width: min(460px, calc(100vw - 2 * var(--space-lg)));
   }
 
   .toast {
-    pointer-events: auto;
-    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
     padding: 12px 16px;
-    font-family: var(--font-body);
-    font-size: 0.9rem;
-    color: var(--color-text-primary);
     background: var(--surface-glass-strong);
     backdrop-filter: blur(12px);
     border: 1px solid var(--color-border);
     border-left-width: 3px;
     border-radius: var(--radius-sm);
     box-shadow: var(--shadow-md);
-    cursor: pointer;
     animation: slideUp var(--transition-normal) ease forwards;
   }
+
+  .toast-message {
+    flex: 1;
+    text-align: left;
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    color: var(--color-text-primary);
+    background: none;
+    cursor: pointer;
+  }
+
+  .toast-action {
+    flex-shrink: 0;
+    font-family: var(--font-display);
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-gold);
+    background: none;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+  }
+  .toast-action:hover { background: var(--color-bg-hover); }
 
   .toast-success { border-left-color: var(--color-green); }
   .toast-warning { border-left-color: var(--color-gold); }
