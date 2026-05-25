@@ -562,11 +562,10 @@ export async function callOpenAiCompatibleRaw(
 
     const rawResponseBodies = new WeakMap<Response, string>();
     const client = createOpenRouterClient(String(normalizedConfig.apiKey || '').trim(), rawResponseBodies);
-    const resolvedMaxTokens = options.maxTokens ?? caps.maxOutputTokens ?? 4096;
+    const resolvedMaxTokens = options.maxTokens ?? caps.maxOutputTokens;
     const chatRequest: ChatRequest = {
       model: modelId,
       messages: toOpenRouterChatMessages(messages),
-      maxCompletionTokens: resolvedMaxTokens,
       temperature: options.temperature ?? caps.idealTemperature,
       provider: providerPreferences,
       reasoning: reasoningPayload,
@@ -575,6 +574,9 @@ export async function callOpenAiCompatibleRaw(
       toolChoice: options.tools?.length ? options.toolChoice ?? 'auto' : undefined,
       stream: false
     };
+    if (resolvedMaxTokens !== undefined) {
+      chatRequest.maxCompletionTokens = resolvedMaxTokens;
+    }
 
     const request: SendChatCompletionRequestRequest = {
       httpReferer: getOpenRouterReferer(),
@@ -937,13 +939,15 @@ export async function callOpenAiCompatibleRaw(
     'Content-Type': 'application/json'
   };
 
-  const resolvedMaxTokens = options.maxTokens ?? caps.maxOutputTokens ?? 4096;
+  const resolvedMaxTokens = options.maxTokens ?? caps.maxOutputTokens;
   const body: Record<string, unknown> = {
     model: modelId,
     messages,
-    max_tokens: resolvedMaxTokens,
     temperature: options.temperature ?? caps.idealTemperature
   };
+  if (resolvedMaxTokens !== undefined) {
+    body.max_tokens = resolvedMaxTokens;
+  }
 
   if (providerPreferences) {
     body.provider = serializeProviderPreferences(providerPreferences);

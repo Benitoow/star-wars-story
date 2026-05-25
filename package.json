@@ -1,6 +1,6 @@
 {
   "name": "star-wars-story",
-  "version": "2.7.15",
+  "version": "2.7.19",
   "private": true,
   "type": "module",
   "scripts": {

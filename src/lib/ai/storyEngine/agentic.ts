@@ -391,7 +391,7 @@ async function callPipelineStep(
         const response = await callOpenAiCompatibleRaw(messages as any, normalizedConfig, {
           maxTokens,
           temperature,
-          skipReasoning: true,
+          skipReasoning: false,
           responseFormat: { type: 'json_object' }
         });
 
@@ -411,7 +411,7 @@ async function callPipelineStep(
     const retryResponse = await callOpenAiCompatibleRaw(messages as any, normalizedConfig, {
       maxTokens,
       temperature,
-      skipReasoning: step !== 'writer'
+      skipReasoning: false
     });
 
     return cleanText(retryResponse.content, 16000);
@@ -427,7 +427,7 @@ async function callPipelineStep(
     {
       maxTokens,
       temperature,
-      skipReasoning: step !== 'writer'
+      skipReasoning: false
     }
   );
 

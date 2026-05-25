@@ -1,5 +1,54 @@
 # Changelog
 
+## v2.7.19 — 2026-05-25
+
+### 🧠 Libération totale et globale du raisonnement à toutes les étapes (`agentic.ts`)
+
+- **Raisonnement systématique activé pour tous** :
+  * Suite à la demande expresse de l'utilisateur d'activer le raisonnement à l'ensemble du pipeline multi-agent, nous avons passé le paramètre `skipReasoning` à `false` pour l'ensemble des étapes de génération de l'histoire.
+  * Les quatre étapes du pipeline (*Scribe*, *Directeur*, *Écrivain*, *Cerveau*) s'exécutent désormais avec le **raisonnement activé à 100%**.
+  * Permet aux modèles modernes (GPT 5.5, Sonnet 4.6, Grok 4.3, Gemini 3.5 Flash, DeepSeek V4 Pro/Flash) de mobiliser toute leur puissance de réflexion structurée non seulement pour la prose littéraire, mais aussi pour résumer la situation, ajuster la tension dramatique, et calculer les statistiques et choix en JSON de façon ultra-intelligente.
+- **Diagnostics** :
+  * 162 tests Vitest validés à 100% au vert.
+  * Svelte-check à 0 erreur et 0 warning.
+
+## v2.7.18 — 2026-05-25
+
+### 🧠 Restauration du raisonnement global par défaut (`providers.ts`)
+
+- **Rétablissement du raisonnement pour tous les modèles** :
+  * Suite à la clarification essentielle de l'utilisateur concernant l'écosystème moderne de modèles d'IA (GPT 5.5, Sonnet 4.6, Grok 4.3, Gemini 3.5 Flash, DeepSeek V4 Pro/Flash), nous avons rétabli l'activation globale du `reasoningStyle: 'openai-effort'` par défaut.
+  * Tous les modèles, y compris les versions de Grok et les autres modèles haut de gamme, gèrent de façon native et fluide le raisonnement et supportent l'envoi de ces paramètres.
+  * Suppression de la liste restrictive de détection manuelle qui avait été introduite à tort.
+- **Diagnostics** :
+  * Intégration validée à 100% avec 162 tests Vitest au vert.
+  * Type-checking global `svelte-check` validé à 0 erreur et 0 warning.
+
+## v2.7.17 — 2026-05-25
+
+### 🛡️ Correction du plantage et fallback silencieux des modèles non-raisonnement comme Grok-2 (`providers.ts`)
+
+- **Raisonnement conditionnel strict** :
+  * Détection d'une anomalie critique : par défaut, le `reasoningStyle` était forcé à `'openai-effort'` pour TOUS les modèles du catalogue. Cela forçait l'envoi systématique du paramètre `reasoning: { effort: 'none' }` pour les requêtes rapides (`scribe`, `director`, `world-adjudicator`).
+  * Des modèles comme **Grok-2**, **Grok-beta**, **GPT-4o** ou **Claude** sur OpenRouter ne supportent pas le paramètre `reasoning`. Son envoi provoquait une erreur HTTP 400 Bad Request silencieuse rejetée par l'API.
+  * À cause de cet échec, notre pipeline multi-agent basculait systématiquement sur les **fallbacks locaux d'urgence** (qui renvoyaient des textes de secours très courts et des choix génériques et peu pertinents).
+  * Résolution en limitant l'activation de `reasoningStyle: 'openai-effort'` **exclusivement** aux modèles de raisonnement confirmés (`o1`, `o3`, `r1`, `grok-3`, `grok-4`, `thinking`, `mimo`). Pour tous les autres, le paramètre `reasoning` est désormais totalement omis, rétablissant des appels d'API réussis à 100% avec des réponses complètes et riches pour Grok-2.
+- **Diagnostics** :
+  * Intégration validée avec succès sur 162 tests unitaires au vert.
+  * Svelte-check à 0 erreur et 0 warning.
+
+## v2.7.16 — 2026-05-25
+
+### 🔓 Suppression du bridage forcé de `max_tokens` (`providers.ts`)
+
+- **Bannissement des limites de sortie forcées par défaut** :
+  * Suite au retour de l'utilisateur sur le fait que l'injection forcée d'une limite `max_tokens` / `max_completion_tokens` de 4096 par défaut bride la créativité et casse le raisonnement de modèles comme Grok et DeepSeek V4 Pro (surtout dans le mode "Long"), nous avons supprimé ce plafond.
+  * La payload HTTP transmise à OpenRouter ou aux APIs OpenAI compatibles n'inclut désormais **plus aucun paramètre `max_tokens` ou `max_completion_tokens` par défaut** lorsque celui-ci est `undefined` dans la configuration de l'étape et que le modèle ne définit pas sa propre limite physique de sortie (`caps.maxOutputTokens`).
+  * Permet aux modèles de s'auto-réguler et d'utiliser toute leur enveloppe de génération naturelle pour fournir une prose riche et non tronquée.
+- **Diagnostics** :
+  * Suite de 162 tests Vitest validée à 100% au vert.
+  * Diagnostic `svelte-check` à 0 erreur et 0 warning.
+
 ## v2.7.15 — 2026-05-25
 
 ### 🔓 Correction du bridage silencieux de tokens d'OpenRouter (`providers.ts`)
