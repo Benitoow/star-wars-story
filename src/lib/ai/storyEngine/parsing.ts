@@ -91,7 +91,7 @@ export function sanitizeNarrativeText(value: unknown, maxLength = 2200): string 
       continue;
     }
 
-    const normalized = line
+    let normalized = line
       .replace(/^#{1,6}\s*/, '')
       .replace(/^>\s*/, '')
       .replace(/^\*\*\s*/, '')
@@ -99,6 +99,12 @@ export function sanitizeNarrativeText(value: unknown, maxLength = 2200): string 
       .replace(/^[_`*]+|[_`*]+$/g, '')
       .replace(/^\[[^\]]+\]\s*/, '')
       .trim();
+
+    // Suppression stricte et absolue de tout tiret cadratin ou tiret standard d'ouverture en début de ligne (ex: "— Leia : ..." -> "Leia : ...")
+    normalized = normalized.replace(/^[—\-\–\s]+(?!\d)/, '').trim();
+    // Suppression de tout tiret cadratin ou tiret standard d'introduction après les deux-points (ex: "Leia : — Je..." -> "Leia : Je...")
+    normalized = normalized.replace(/:\s*[—\-\–]\s*(?!\d)/, ': ').trim();
+
     const choiceMarkerCandidate = normalizeChoiceMarkerText(normalized);
 
     if (!normalized) continue;

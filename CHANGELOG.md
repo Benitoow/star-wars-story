@@ -1,5 +1,18 @@
 # Changelog
 
+## v2.7.14 — 2026-05-25
+
+### 🚫 Interdiction stricte et nettoyage absolu du tiret cadratin "—" dans les dialogues (`prompts.ts`, `parsing.ts`)
+
+- **Bannissement des tirets dans les prompts de l'IA** :
+  * Mise à jour de toutes les instructions système du Maître du Jeu (`prompts.ts`) et de l'Écrivain (`buildPipelineWriterSystemPrompt`) pour y formuler une **interdiction absolue et explicite** d'utiliser le tiret cadratin `"—"` ou n'importe quel tiret en début de réplique de dialogue.
+  * Force le format de dialogue exclusif `"Nom : réplique"`.
+- **Nettoyage automatique robuste** :
+  * Intégration d'un double filtre de sécurité dans `sanitizeNarrativeText` (`parsing.ts`) pour supprimer de manière automatique et transparente tout tiret cadratin (`—`, `–`, `-`) situé au début d'une ligne ou après le double point d'introduction d'une réplique.
+  * Utilisation d'un negative lookahead `(?!\d)` pour s'assurer que les signes moins suivis de chiffres (ex: `hp:-10` ou `credits:-200`) restent parfaitement intacts et préservés pour la mise à jour de l'état monde.
+- **Diagnostics** :
+  * Validation globale maintenue à **162 tests Vitest 100% au vert** et `svelte-check` à 0 erreur.
+
 ## v2.7.13 — 2026-05-25
 
 ### 🛡️ Protection robuste du portrait d'avatar généré par IA (`interactiveSession.ts`, `+page.svelte`)
