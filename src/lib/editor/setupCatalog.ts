@@ -90,37 +90,37 @@ export const TRAMES = [
     id: 'solo',
     name: 'Le Solitaire',
     icon: '🚀',
-    premise: `Vous acceptez un contrat en apparence simple, mais il vous entraîne dans un conflit galactique majeur.`
+    premise: `Un contrat de routine aux confins de la Bordure Extérieure tourne au désastre lorsqu'un mystérieux conteneur scellé révèle un secret convoité par les plus dangereuses puissances de la galaxie.`
   },
   {
     id: 'chosen',
     name: "L'Élu",
     icon: '✨',
-    premise: `Une intuition de la Force vous pousse sur une piste que personne ne comprend encore.`
+    premise: `Un murmure persistant dans le courant de la Force perturbe vos nuits et vous guide vers des ruines oubliées, éveillant une relique dont la lumière — ou l'ombre — pourrait sceller le destin d'un secteur entier.`
   },
   {
     id: 'exile',
     name: 'Le Banni',
     icon: '🌑',
-    premise: `Exilé après un incident obscur, vous survivez dans l'ombre jusqu'au jour où tout bascule.`
+    premise: `Marqué par la honte et chassé de votre ancien ordre, vous dissimulez vos compétences dans la crasse des bas-fonds d'une planète industrielle, jusqu'à ce que votre passé ne vous traque et ne vous accule.`
   },
   {
     id: 'rebel',
     name: 'Le Résistant',
     icon: '⚡',
-    premise: `Vous combattez l'oppresseur et découvrez un enjeu plus grand que votre vengeance.`
+    premise: `Au cœur de l'occupation, sabotages et réunions clandestines forment votre quotidien. Mais le vol d'un transpondeur militaire hautement crypté vous jette dans une traque spatiale impitoyable.`
   },
   {
     id: 'redeemed',
     name: 'La Rédemption',
     icon: '🔥',
-    premise: `Ancien serviteur de l'Obscur, vous tentez de réparer ce qui peut encore l'être.`
+    premise: `Les échos des cris de vos anciennes victimes hantent chacun de vos pas. Pour racheter vos fautes passées sous la bannière du Côté Obscur, vous vous jetez au secours d'un groupe de réfugiés pourchassés.`
   },
   {
     id: 'spy',
     name: "L'Infiltrateur",
     icon: '🕵️',
-    premise: `Votre mission d'infiltration brouille progressivement la frontière entre vos deux identités.`
+    premise: `Opérant sous une fausse identité au sein des rangs ennemis, chaque mensonge érode votre loyauté d'origine alors que l'heure de la trahison finale approche sous la menace d'une détection imminente.`
   },
   { id: 'custom', name: 'Libre', icon: '✏️', premise: '' }
 ];

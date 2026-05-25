@@ -6,7 +6,8 @@
   import { currentSetup, updateSetupField } from '$lib/stores/editor';
   import {
     AVATARS, CONTENT_MODES, defaultRoleForFaction, ERAS, FACTIONS, ROLES,
-    SETUP_SCREENS, TRAMES, WRITING_LENGTHS, WRITING_POVS, WRITING_STYLES, WRITING_TONES
+    SETUP_SCREENS, TRAMES, WRITING_LENGTHS, WRITING_POVS, WRITING_STYLES, WRITING_TONES,
+    NARRATIVE_PRESETS, findNarrativePreset
   } from '$lib/editor/setupCatalog';
   import type { SetupScreenId } from '$lib/editor/setupCatalog';
 
@@ -154,6 +155,25 @@
 
   function selectContentMode(modeId: string): void {
     updateSetupField('contentMode', modeId);
+  }
+
+  let advancedMode = false;
+
+  $: currentPreset = findNarrativePreset($currentSetup);
+
+  $: if (activeSetupStep?.id === 'style' && !currentPreset && !advancedMode) {
+    advancedMode = true;
+  }
+
+  function selectNarrativePreset(presetId: string): void {
+    const preset = NARRATIVE_PRESETS.find(p => p.id === presetId);
+    if (preset) {
+      updateSetupField('writingStyle', preset.writingStyle);
+      updateSetupField('writingTone', preset.writingTone);
+      updateSetupField('writingPov', preset.writingPov);
+      updateSetupField('writingLength', preset.writingLength);
+      updateSetupField('contentMode', preset.contentMode);
+    }
   }
 
   function selectAvatar(avatar: string): void {
@@ -387,96 +407,143 @@
           </div>
         {:else if activeSetupStep.id === 'style'}
           <div class="style-stack">
-            <div class="setup-section">
+            <!-- SECTION PRESETS -->
+            <div class="setup-section preset-section">
               <div class="setup-section-header">
-                <p class="subheading">Voix de narration</p>
-                <p class="helper-text">Le style décide si ton histoire respire ou si elle récite des bullet points déguisés.</p>
+                <p class="subheading">Style de récit (Presets)</p>
+                <p class="helper-text">Configure l'ambiance narrative globale de la Force en un clic. Chaque choix ajuste précisément les cinq axes d'écriture de l'IA.</p>
               </div>
-              <div class="style-grid">
-                {#each WRITING_STYLES as style}
+              <div class="preset-grid">
+                {#each NARRATIVE_PRESETS as preset}
                   <button
                     type="button"
-                    class:selected={$currentSetup.writingStyle === style.id}
-                    class="style-card"
-                    on:click={() => selectWritingStyle(style.id)}
+                    class="preset-card"
+                    class:selected={currentPreset?.id === preset.id}
+                    on:click={() => selectNarrativePreset(preset.id)}
                   >
-                    <span class="style-name">{style.name}</span>
-                    <span class="style-desc">{style.desc}</span>
+                    <span class="preset-icon">{preset.icon}</span>
+                    <div class="preset-content">
+                      <strong>{preset.name}</strong>
+                      <span class="preset-desc">{preset.desc}</span>
+                    </div>
                   </button>
                 {/each}
               </div>
             </div>
 
-            <div class="double-stack">
-              <div class="setup-section">
-                <p class="subheading">Tonalité</p>
-                <div class="tone-grid">
-                  {#each WRITING_TONES as tone}
-                    <button
-                      type="button"
-                      class:selected={$currentSetup.writingTone === tone.id}
-                      class="tone-chip"
-                      title={tone.desc}
-                      on:click={() => selectWritingTone(tone.id)}
-                    >
-                      {tone.name}
-                    </button>
-                  {/each}
-                </div>
-              </div>
-
-              <div class="setup-section">
-                <p class="subheading">Point de vue</p>
-                <div class="toggle-chip-group">
-                  {#each WRITING_POVS as pov}
-                    <button
-                      type="button"
-                      class:active={$currentSetup.writingPov === pov.id}
-                      class="toggle-chip"
-                      on:click={() => selectWritingPov(pov.id)}
-                    >
-                      {pov.name}
-                    </button>
-                  {/each}
-                </div>
-              </div>
+            <!-- TOGGLE POUR LE MODE AVANCÉ -->
+            <div class="advanced-toggle-wrapper">
+              <button
+                type="button"
+                class="btn btn-ghost advanced-toggle"
+                class:active={advancedMode}
+                on:click={() => advancedMode = !advancedMode}
+              >
+                {#if advancedMode}
+                  ▲ Masquer les réglages détaillés
+                {:else}
+                  ▼ Afficher les réglages détaillés (Style, Ton, POV, Longueur...)
+                {/if}
+              </button>
             </div>
 
-            <div class="double-stack">
-              <div class="setup-section">
-                <p class="subheading">Longueur</p>
-                <div class="toggle-chip-group">
-                  {#each WRITING_LENGTHS as length}
-                    <button
-                      type="button"
-                      class:active={$currentSetup.writingLength === length.id}
-                      class="toggle-chip"
-                      on:click={() => selectWritingLength(length.id)}
-                    >
-                      {length.name}
-                    </button>
-                  {/each}
+            <!-- AXES DE RÉGLAGES DU MODE AVANCÉ -->
+            {#if advancedMode}
+              <div class="advanced-options-container" transition:fly={{ y: 15, duration: 200 }}>
+                <div class="style-stack">
+                  <div class="setup-section">
+                    <div class="setup-section-header">
+                      <p class="subheading">Voix de narration</p>
+                      <p class="helper-text">Le style décide si ton histoire respire ou si elle récite des bullet points déguisés.</p>
+                    </div>
+                    <div class="style-grid">
+                      {#each WRITING_STYLES as style}
+                        <button
+                          type="button"
+                          class:selected={$currentSetup.writingStyle === style.id}
+                          class="style-card"
+                          on:click={() => selectWritingStyle(style.id)}
+                        >
+                          <span class="style-name">{style.name}</span>
+                          <span class="style-desc">{style.desc}</span>
+                        </button>
+                      {/each}
+                    </div>
+                  </div>
+      
+                  <div class="double-stack">
+                    <div class="setup-section">
+                      <p class="subheading">Tonalité</p>
+                      <div class="tone-grid">
+                        {#each WRITING_TONES as tone}
+                          <button
+                            type="button"
+                            class:selected={$currentSetup.writingTone === tone.id}
+                            class="tone-chip"
+                            title={tone.desc}
+                            on:click={() => selectWritingTone(tone.id)}
+                          >
+                            {tone.name}
+                          </button>
+                        {/each}
+                      </div>
+                    </div>
+      
+                    <div class="setup-section">
+                      <p class="subheading">Point de vue</p>
+                      <div class="toggle-chip-group">
+                        {#each WRITING_POVS as pov}
+                          <button
+                            type="button"
+                            class:active={$currentSetup.writingPov === pov.id}
+                            class="toggle-chip"
+                            on:click={() => selectWritingPov(pov.id)}
+                          >
+                            {pov.name}
+                          </button>
+                        {/each}
+                      </div>
+                    </div>
+                  </div>
+      
+                  <div class="double-stack">
+                    <div class="setup-section">
+                      <p class="subheading">Longueur</p>
+                      <div class="toggle-chip-group">
+                        {#each WRITING_LENGTHS as length}
+                          <button
+                            type="button"
+                            class:active={$currentSetup.writingLength === length.id}
+                            class="toggle-chip"
+                            on:click={() => selectWritingLength(length.id)}
+                          >
+                            {length.name}
+                          </button>
+                        {/each}
+                      </div>
+                    </div>
+      
+                    <div class="setup-section">
+                      <p class="subheading">Mode de contenu</p>
+                      <div class="content-mode-grid">
+                        {#each CONTENT_MODES as mode}
+                          <button
+                            type="button"
+                            class:selected={$currentSetup.contentMode === mode.id}
+                            class="content-mode-card"
+                            on:click={() => selectContentMode(mode.id)}
+                          >
+                            <span class="content-mode-icon" aria-hidden="true">{mode.icon}</span>
+                            <strong>{mode.name}</strong>
+                            <span class="content-mode-desc">{mode.desc}</span>
+                          </button>
+                        {/each}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-
-              <div class="setup-section">
-                <p class="subheading">Mode de contenu</p>
-                <div class="content-mode-grid">
-                  {#each CONTENT_MODES as mode}
-                    <button
-                      type="button"
-                      class:selected={$currentSetup.contentMode === mode.id}
-                      class="content-mode-card"
-                      on:click={() => selectContentMode(mode.id)}
-                    >
-                      <span class="content-mode-icon" aria-hidden="true">{mode.icon}</span>
-                      <strong>{mode.name}</strong>
-                      <span class="content-mode-desc">{mode.desc}</span>
-                    </button>
-                  {/each}
-                </div>
-              </div>
-            </div>
+            {/if}
           </div>
         {:else if activeSetupStep.id === 'profile'}
           <div class="profile-card">
@@ -1478,5 +1545,108 @@
   font-size: 0.85rem;
   letter-spacing: 0.04em;
   color: var(--color-text-primary);
+}
+
+/* ─── NARRATIVE PRESETS ─── */
+.preset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-sm);
+  margin-top: var(--space-xs);
+}
+
+.preset-card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: left;
+}
+
+.preset-card:hover {
+  border-color: var(--color-border-hover);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.preset-card.selected {
+  border-color: var(--color-text-primary);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.03);
+}
+
+.preset-icon {
+  font-size: 1.8rem;
+  flex-shrink: 0;
+  line-height: 1;
+  margin-top: 2px;
+}
+
+.preset-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.preset-content strong {
+  font-family: var(--font-display);
+  font-size: 0.88rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-primary);
+}
+
+.preset-desc {
+  font-size: 0.76rem;
+  color: var(--color-text-muted);
+  font-family: var(--font-body);
+  line-height: 1.35;
+}
+
+.advanced-toggle-wrapper {
+  display: flex;
+  justify-content: center;
+  margin: var(--space-xs) 0;
+}
+
+.advanced-toggle {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.advanced-toggle:hover {
+  color: var(--color-text-primary);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.advanced-toggle.active {
+  color: var(--color-text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.advanced-options-container {
+  animation: slideDown 0.25s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>

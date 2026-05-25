@@ -368,23 +368,40 @@ RÈGLES MJ:
     - Sous l'Ère Impériale ("imperial" ou "empire"): L'Empire gouverne la galaxie, l'Ordre Jedi est détruit (pas d'enclave active) et les soldats réguliers sont des Stormtroopers (Soldats Impériaux).
     - Sous l'Ancienne République ("old_republic"): Ni Clones, ni Stormtroopers impériaux. Les forces sont celles de la République classique ou de l'Empire Sith de l'époque.`;
 
+  // Directives d'écriture sur-mesure pour sublimer la voix de l'IA en fonction du style/ton
+  let styleDirectives = '';
+  const styleVal = (setup.writingStyle || '').toLowerCase();
+  const toneVal = (setup.writingTone || '').toLowerCase();
+
+  if (styleVal === 'litteraire' || toneVal === 'sombre') {
+    styleDirectives = `\n13. DIRECTIVES STYLISTIQUES (PROSE LITTÉRAIRE & SOMBRE COHÉRENTE) : Prends ton temps pour poser une prose dense, viscérale et riche en métaphores Star Wars. Explore les climats hostiles, la rouille, l'odeur de la sueur ou de l'ozone de blaster, la crasse et les ombres. Insiste sur le dilemme moral, le poids des décisions, et l'ambiguïté des PNJs. Le rythme est lent, introspectif, avec des silences lourds de sens.`;
+  } else if (styleVal === 'cinematique' || toneVal === 'aventure') {
+    styleDirectives = `\n13. DIRECTIVES STYLISTIQUES (CINÉMATIQUE & AVENTURE DYNAMIQUE) : L'action démarre 'in media res' : pose une situation d'ouverture visuelle et percutante. Utilise des phrases courtes, nerveuses et dynamiques, dignes d'un storyboard de film. Mets en avant l'héroïsme, le panache, l'esprit d'initiative ou les acrobaties. Injecte des touches de repartie, d'humour ou de punchlines de contrebandier au milieu du danger immédiat.`;
+  } else if (styleVal === 'epique' || toneVal === 'heroique') {
+    styleDirectives = `\n13. DIRECTIVES STYLISTIQUES (ÉPIQUE & HÉROÏQUE LÉGENDAIRE) : Donne à la prose un souffle légendaire et solennel, digne d'un opéra de l'espace majeur. Décris la scène avec de la grandeur : architectures monumentales, planètes lointaines, destins croisés. Insiste sur le courage face à l'adversité, la noblesse d'âme, la protection des innocents et l'honneur. Les enjeux géopolitiques galactiques et le sens du sacrifice sont omniprésents.`;
+  } else {
+    styleDirectives = `\n13. DIRECTIVES STYLISTIQUES (IMMERSIF, INTIME & SENSORIEL) : Rapproche la caméra au plus près de la psychologie interne et des capteurs sensoriels du protagoniste. Fais ressentir le froid mordant de l'acier, le grondement sourd des réacteurs, la panique ou la détermination pure. Rédige au plus près de l'action physique directe pour donner l'impression que chaque choix est une question de survie.`;
+  }
+
   const isTurn1 = turnNumber === 1 || (!worldState || !worldState.chronology || worldState.chronology.length === 0);
   const prologueRule = isTurn1
-    ? `\n13. PROLOGUE ET DÉBUT DE L'AVENTURE (OBLIGATOIRE - TOUR 1) : Puisqu'il s'agit du tout premier tour de l'histoire, tu DOIS commencer par une riche introduction narrative et immersive du protagoniste (${protagonist}). Présente brièvement son apparence, ses origines liées à son rôle (${setup.role}) et à sa faction (${setup.faction}), sa situation actuelle (pourquoi il est là, son background immédiat lié à son rôle) et la tension immédiate qui pèse sur lui. Pose le décor et le lieu de départ choisi (state_update.location) avec soin et ambiance avant d'enclencher de l'action ou de la confrontation.`
+    ? `\n14. PROLOGUE ET DÉBUT DE L'AVENTURE (OBLIGATOIRE - TOUR 1) : Puisqu'il s'agit du tout premier tour de l'histoire, tu DOIS commencer par une riche introduction narrative et immersive du protagoniste (${protagonist}). Présente brièvement son apparence, ses origines liées à son rôle (${setup.role}) et à sa faction (${setup.faction}), sa situation actuelle (pourquoi il est là, son background immédiat lié à son rôle) et la tension immédiate qui pèse sur lui. Pose le décor et le lieu de départ choisi (state_update.location) avec soin et ambiance avant d'enclencher de l'action ou de la confrontation.`
     : '';
 
   const narrativeProseRule = prologueRule
     ? `
+${styleDirectives}
 ${prologueRule}
+15. PROSE UNIQUEMENT dans "narrative.action": pas de markdown, pas de titres H1/H2, pas de listes numérotées, pas de bloc "Que faites-vous ?", pas de répétition des choix. Les choix vivent uniquement dans le tableau "choices".
+16. DIALOGUES: chaque réplique doit être sur son propre paragraphe, au format "Nom : réplique" (préfixe "—" optionnel), et placée dans "narrative.dialogue". Ne colle jamais une réplique au milieu d'un paragraphe d'action.
+17. DIALOGUES OBLIGATOIREMENT DANS narrative.dialogue: chaque échange verbal doit être placé dans le champ "dialogue", jamais dans "action". "action" = narration pure et actions, "dialogue" = tous les échanges verbaux. Si un personnage parle, utilise ce champ dédié.
+18. CHOIX ULTRA-PERTINENTS (CRITIQUE): Chaque choix dans le tableau "choices" doit être une action physique, verbale ou tactique concrète, immédiate et unique à cette scène exacte. Il est STRICTEMENT INTERDIT de proposer des choix génériques et répétitifs (ex: "Observer les alentours", "Utiliser la Force pour ressentir le danger", "Négocier avec le marchand", "Préparer un plan"). Relie chaque choix aux détails précis (objets, PNJs, menaces) de la scène.;`
+    : `
+${styleDirectives}
 14. PROSE UNIQUEMENT dans "narrative.action": pas de markdown, pas de titres H1/H2, pas de listes numérotées, pas de bloc "Que faites-vous ?", pas de répétition des choix. Les choix vivent uniquement dans le tableau "choices".
 15. DIALOGUES: chaque réplique doit être sur son propre paragraphe, au format "Nom : réplique" (préfixe "—" optionnel), et placée dans "narrative.dialogue". Ne colle jamais une réplique au milieu d'un paragraphe d'action.
 16. DIALOGUES OBLIGATOIREMENT DANS narrative.dialogue: chaque échange verbal doit être placé dans le champ "dialogue", jamais dans "action". "action" = narration pure et actions, "dialogue" = tous les échanges verbaux. Si un personnage parle, utilise ce champ dédié.
-17. CHOIX ULTRA-PERTINENTS (CRITIQUE): Chaque choix dans le tableau "choices" doit être une action physique, verbale ou tactique concrète, immédiate et unique à cette scène exacte. Il est STRICTEMENT INTERDIT de proposer des choix génériques et répétitifs (ex: "Observer les alentours", "Utiliser la Force pour ressentir le danger", "Négocier avec le marchand", "Préparer un plan"). Relie chaque choix aux détails précis (objets, PNJs, menaces) de la scène.;`
-    : `
-13. PROSE UNIQUEMENT dans "narrative.action": pas de markdown, pas de titres H1/H2, pas de listes numérotées, pas de bloc "Que faites-vous ?", pas de répétition des choix. Les choix vivent uniquement dans le tableau "choices".
-14. DIALOGUES: chaque réplique doit être sur son propre paragraphe, au format "Nom : réplique" (préfixe "—" optionnel), et placée dans "narrative.dialogue". Ne colle jamais une réplique au milieu d'un paragraphe d'action.
-15. DIALOGUES OBLIGATOIREMENT DANS narrative.dialogue: chaque échange verbal doit être placé dans le champ "dialogue", jamais dans "action". "action" = narration pure et actions, "dialogue" = tous les échanges verbaux. Si un personnage parle, utilise ce champ dédié.
-16. CHOIX ULTRA-PERTINENTS (CRITIQUE): Chaque choix dans le tableau "choices" doit être une action physique, verbale ou tactique concrète, immédiate et unique à cette scène exacte. Il est STRICTEMENT INTERDIT de proposer des choix génériques et répétitifs (ex: "Observer les alentours", "Utiliser la Force pour ressentir le danger", "Négocier avec le marchand", "Préparer un plan"). Relie chaque choix aux détails précis (objets, PNJs, menaces) de la scène.;`;
+17. CHOIX ULTRA-PERTINENTS (CRITIQUE): Chaque choix dans le tableau "choices" doit être une action physique, verbale ou tactique concrète, immédiate et unique à cette scène exacte. Il est STRICTEMENT INTERDIT de proposer des choix génériques et répétitifs (ex: "Observer les alentours", "Utiliser la Force pour ressentir le danger", "Négocier avec le marchand", "Préparer un plan"). Relie chaque choix aux détails précis (objets, PNJs, menaces) de la scène.;`;
 
   const jsonContract = `Réponds UNIQUEMENT en JSON valide, sans markdown ni texte autour. TOUT le texte des champs est rédigé ENTIÈREMENT EN ${langName} (jamais dans une autre langue). Priorité absolue: prose narrative riche dans "action" (2-4 paragraphes). Remplis state_update avec toutes les conséquences.
 
@@ -431,9 +448,45 @@ export function buildStartPrompt(
   const lang = languageCode || setup.language || 'fr';
   const { name: langName } = getPromptLanguageInstructions(lang);
 
+  // Directives d'écriture sur-mesure pour sublimer la voix de l'IA en fonction du style/ton
+  let styleDirectives = '';
+  const style = (setup.writingStyle || '').toLowerCase();
+  const tone = (setup.writingTone || '').toLowerCase();
+
+  if (style === 'litteraire' || tone === 'sombre') {
+    styleDirectives = `
+STYLE DE NARRATION (PROSE LITTÉRAIRE & SOMBRE DE HAUTE QUALITÉ) :
+- Prends ton temps pour poser une prose dense, viscérale et riche en métaphores Star Wars.
+- Explore les climats hostiles, la rouille, l'odeur de la sueur ou de l'ozone de blaster, la crasse et les ombres.
+- Insiste sur le dilemme moral, le poids des décisions, et l'ambiguïté des PNJs.
+- Le rythme est lent, introspectif, avec des silences lourds de sens.`;
+  } else if (style === 'cinematique' || tone === 'aventure') {
+    styleDirectives = `
+STYLE DE NARRATION (CINÉMATIQUE & AVENTURE RYTHMÉE) :
+- L'action démarre 'in media res' : pose une situation d'ouverture visuelle et percutante.
+- Utilise des phrases courtes, nerveuses et dynamiques, dignes d'un storyboard de film.
+- Mets en avant l'héroïsme, le panache, l'esprit d'initiative ou les acrobaties.
+- Injecte des touches de repartie, d'humour ou de punchlines de contrebandier au milieu du danger immédiat.`;
+  } else if (style === 'epique' || tone === 'heroique') {
+    styleDirectives = `
+STYLE DE NARRATION (ÉPIQUE & HÉROÏQUE LÉGENDAIRE) :
+- Donne à la prose un souffle légendaire et solennel, digne d'un opéra de l'espace majeur.
+- Décris la scène avec de la grandeur : architectures monumentales, planètes lointaines, destins croisés.
+- Insiste sur le courage face à l'adversité, la noblesse d'âme, la protection des innocents et l'honneur.
+- Les enjeux géopolitiques galactiques et le sens du sacrifice sont omniprésents.`;
+  } else {
+    styleDirectives = `
+STYLE DE NARRATION (IMMERSIF, INTIME & REPRÉSENTATION SENSORIELLE) :
+- Rapproche la caméra au plus près de la psychologie interne et des capteurs sensoriels du protagoniste.
+- Fais ressentir le froid mordant de l'acier, le grondement sourd des réacteurs, la panique ou la détermination pure.
+- Rédige au plus près de l'action physique directe pour donner l'impression que chaque choix est une question de survie.`;
+  }
+
   return `Lance une histoire interactive Star Wars avec un prologue immédiatement jouable.
 
 ACTION JOUEUR CANONIQUE: Entrer dans la scène d'ouverture et survivre aux premières secondes.
+
+${styleDirectives}
 
 CADRE D'OUVERTURE:
 - Protagoniste: ${displayName}

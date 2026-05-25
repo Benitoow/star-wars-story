@@ -1,5 +1,27 @@
 # Changelog
 
+## v2.7.9 — 2026-05-25
+
+### 🎬 Refonte de la création d'histoires & Presets Narratifs (`SetupWizard.svelte`, `setupCatalog.ts`, `prompts.ts`)
+
+- **Presets Narratifs en 1 Clic (`setupCatalog.ts`)** :
+  * Introduction de `NARRATIVE_PRESETS` configurant instantanément les 5 axes d'écriture de l'IA (Style, Ton, POV, Longueur, Contenu) pour une prise en main intuitive.
+  * Ajout des presets d'ambiance canoniques : *Cinématique héroïque*, *Saga sombre*, *Aventure pulp*, *Légende épique* et *Immersif — tu es le héros*.
+  * Consolidation des valeurs par défaut de configuration d'une histoire via `withSetupDefaults()`.
+- **Refonte Ergonomique du Wizard UI (`SetupWizard.svelte`)** :
+  * Remplacement de la grille complexe de 5 sélecteurs d'axes d'écriture par une grille moderne de cartes élégantes avec icônes pour les presets narratifs.
+  * Intégration d'un bouton dépliable avec micro-animations fluides pour dévoiler les **Options Avancées** (les 5 axes d'écriture individuels historiques) à tout moment.
+  * Détection automatique de configuration personnalisée pour forcer le déploiement du panneau d'options avancées.
+  * Ajout d'une charte graphique PWA immersive, moderne et parfaitement intégrée au design system.
+- **Enrichissement Littéraire des Trames de Départ (`setupCatalog.ts`)** :
+  * Réécriture intégrale des prémisses des `TRAMES` de départ pour en faire de véritables amorces de tension dramatique riches en vocabulaire Star Wars (sabotages, reliques mystérieuses, secrets sombres, dilemmes de la Force).
+- **Parité Stylistique de l'Ouverture Narrative (`prompts.ts`)** :
+  * Injection automatique de directives d'écriture hyper-spécifiques dans `buildStartPrompt` et `buildSystemPrompt` adaptées en temps réel au style et ton choisis.
+  * La Force applique désormais rigoureusement le style et le ton littéraire, cinématique ou immersif dès le premier paragraphe du prologue et sur l'ensemble de la campagne.
+- **Certification Stabilité** :
+  * 161 tests unitaires 100% au vert.
+  * `svelte-check` : 0 erreur, 0 avertissement.
+
 ## v2.7.8 — 2026-05-25
 
 ### ⚡ Fast-Fail Réseau & Pipeline Intelligent (`providers.ts`, `agentic.ts`)
