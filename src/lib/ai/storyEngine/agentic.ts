@@ -355,6 +355,14 @@ function buildPipelineStoryPayload(
   };
 }
 
+// Messages d'erreur (FR + EN) signalant un provider injoignable ou un timeout.
+// callOpenAiCompatibleRaw a déjà épuisé ses retries internes : relancer un 2e appel
+// complet ne ferait que gaspiller du temps et des appels API (objectif fast-fail réseau).
+function isProviderUnreachableError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return /failed to fetch|network|timeout|aborted|unreachable|délai|réseau|ECONN|ENOTFOUND/i.test(error.message);
+}
+
 async function callPipelineStep(
   step: StoryPipelineStep,
   systemPrompt: string,
@@ -385,12 +393,13 @@ async function callPipelineStep(
         const content = cleanText(response.content, 16000);
         if (content) return content;
       } catch (error) {
-        const isNetworkError = error instanceof Error && /failed to fetch|network|timeout|aborted/i.test(error.message);
-        if (isNetworkError) {
-          logger.warn('storyEngine: réseau indisponible, aucun appel au provider.', error);
-        } else {
-          logger.warn('storyEngine: response_format json_object indisponible, fallback prompt strict.', error);
+        // Provider injoignable / timeout → on remonte l'erreur sans relancer de 2e appel.
+        if (isProviderUnreachableError(error)) {
+          logger.warn('storyEngine: provider injoignable, abandon de l’étape sans 2e appel.', error);
+          throw error;
         }
+        // Sinon (ex: response_format json_object refusé par le modèle) → fallback prompt strict.
+        logger.warn('storyEngine: response_format json_object indisponible, fallback prompt strict.', error);
       }
     }
 
@@ -743,12 +752,14 @@ export async function generateStoryTurnStructured(
         });
         raw = cleanText(response.content, 24000);
       } catch (error) {
-        const isNetworkError = error instanceof Error && /failed to fetch|network|timeout|aborted/i.test(error.message);
-        if (isNetworkError) {
-          logger.warn('storyEngine: réseau indisponible en mode structuré, aucun appel.', error);
-        } else {
-          logger.warn('storyEngine: structured json_object indisponible, fallback prompt strict.', error);
+        // Provider injoignable / timeout → on remonte vers le catch externe (fallback
+        // local) sans tenter de 2e appel réseau.
+        if (isProviderUnreachableError(error)) {
+          logger.warn('storyEngine: provider injoignable en mode structuré, fallback local sans 2e appel.', error);
+          throw error;
         }
+        // Sinon (response_format json_object refusé) → fallback prompt strict.
+        logger.warn('storyEngine: structured json_object indisponible, fallback prompt strict.', error);
       }
 
       if (!raw) {

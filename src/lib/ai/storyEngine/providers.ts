@@ -896,6 +896,8 @@ export async function callOpenAiCompatibleRaw(
           attempt += 1;
           continue;
         }
+        // Exception non-retryable (ex: 4xx) : inutile de reboucler, on échoue vite.
+        break;
       }
 
       attempt += 1;
