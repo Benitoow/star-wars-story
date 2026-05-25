@@ -343,14 +343,14 @@ function resolveModel(config: StoryProviderConfig): string {
 }
 
 type ModelTier = 'small' | 'medium' | 'large';
-type ReasoningStyle = 'openai-effort' | 'anthropic-thinking' | 'none';
+type ReasoningStyle = 'openai-effort' | 'anthropic-thinking' | 'adaptive' | 'none';
 
 export interface ModelCapabilities {
   tier: ModelTier;
   reasoningStyle: ReasoningStyle;
-  reasoningEffort: 'low' | 'medium' | 'high' | 'xhigh' | 'minimal' | 'none';
+  reasoningEffort: 'low' | 'medium' | 'high' | 'xhigh' | 'minimal' | 'none' | 'adaptive';
   supportsNativeTools: boolean;
-  maxOutputTokens: number;
+  maxOutputTokens: number | undefined;
   idealTemperature: number;
 }
 
@@ -360,7 +360,7 @@ const DEFAULT_CAPS: ModelCapabilities = {
   reasoningStyle: 'openai-effort',
   reasoningEffort: 'high',
   supportsNativeTools: true,
-  maxOutputTokens: 16000,  // l'IA décide, pas de bridage
+  maxOutputTokens: undefined,  // pas de limite, le provider décide
   idealTemperature: 0.9
 };
 
@@ -387,11 +387,15 @@ export function detectModelCapabilities(config: StoryProviderConfig): ModelCapab
   const supportsReasoning = !NO_REASONING_PATTERNS.some(p => p.test(modelId));
   const tier = isProOrLarge(modelId) ? 'large' : isFlashOrMini(modelId) ? 'small' : 'medium';
 
+  // Claude 4.6+ utilise le thinking adaptatif natif OpenRouter
+  const isAdaptiveModel = /claude-(?:opus|sonnet)-4\.[6-9]|claude-(?:opus|sonnet)-[5-9]/i.test(modelId)
+    || /claude-4\.[6-9]-/i.test(modelId);
+
   return {
     ...DEFAULT_CAPS,
     tier,
-    reasoningStyle: supportsReasoning ? 'openai-effort' : 'none',
-    reasoningEffort: supportsReasoning ? 'high' : 'none'
+    reasoningStyle: isAdaptiveModel ? 'adaptive' : supportsReasoning ? 'openai-effort' : 'none',
+    reasoningEffort: isAdaptiveModel ? 'adaptive' : supportsReasoning ? 'high' : 'none'
   };
 }
 
@@ -463,6 +467,12 @@ function buildReasoningPayload(
   skipReasoning = false,
   effortOverride?: string
 ): Reasoning | undefined {
+  // adaptive → ne pas envoyer de paramètre reasoning, OpenRouter décide nativement
+  if (caps.reasoningStyle === 'adaptive' || caps.reasoningEffort === 'adaptive') {
+    if (skipReasoning || effortOverride === 'none') return { effort: 'none' };
+    return undefined;
+  }
+
   if (caps.reasoningStyle !== 'openai-effort') return undefined;
 
   const effort = skipReasoning || effortOverride === 'none'

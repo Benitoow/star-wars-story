@@ -76,16 +76,18 @@ function resolveStepConfig(baseConfig: StoryProviderConfig, override?: StoryProv
   return normalizeProviderConfig(override ?? baseConfig);
 }
 
-function getStepTokenBudget(stepConfig: StoryProviderConfig, step: StoryPipelineStep): number {
+function getStepTokenBudget(stepConfig: StoryProviderConfig, step: StoryPipelineStep): number | undefined {
   const caps = detectModelCapabilities(stepConfig);
-  // Plus de bridage: chaque agent reçoit le max tokens du modèle
+  const maxTokens = caps.maxOutputTokens;
+  // Si pas de limite → aucun bridage, le provider décide
+  if (maxTokens === undefined) return undefined;
   // Les steps moins verbeux utilisent une fraction, mais sans cap haut
-  if (step === 'scribe') return Math.max(Math.round(caps.maxOutputTokens * 0.2), 400);
-  if (step === 'director') return Math.max(Math.round(caps.maxOutputTokens * 0.3), 600);
-  if (step === 'writer') return caps.maxOutputTokens;  // pas de limite, l'IA décide
-  if (step === 'world-observer') return Math.max(Math.round(caps.maxOutputTokens * 0.2), 400);
-  if (step === 'world-adjudicator') return Math.max(Math.round(caps.maxOutputTokens * 0.3), 600);
-  return caps.maxOutputTokens;  // brain: pas de limite
+  if (step === 'scribe') return Math.max(Math.round(maxTokens * 0.2), 400);
+  if (step === 'director') return Math.max(Math.round(maxTokens * 0.3), 600);
+  if (step === 'writer') return maxTokens;
+  if (step === 'world-observer') return Math.max(Math.round(maxTokens * 0.2), 400);
+  if (step === 'world-adjudicator') return Math.max(Math.round(maxTokens * 0.3), 600);
+  return maxTokens;  // brain
 }
 
 function getStepTemperature(step: StoryPipelineStep): number {
@@ -726,7 +728,9 @@ export async function generateStoryTurnStructured(
   const normalizedConfig = normalizeProviderConfig(config);
   const providerId = normalizedConfig.providerId;
   const caps = detectModelCapabilities(normalizedConfig);
-  const maxTokens = clamp(Math.round(caps.maxOutputTokens * 0.82), 1200, 3200);
+  const maxTokens = caps.maxOutputTokens !== undefined
+    ? clamp(Math.round(caps.maxOutputTokens * 0.82), 1200, 3200)
+    : undefined;
   const temperature = 0.85;
 
   let raw = '';

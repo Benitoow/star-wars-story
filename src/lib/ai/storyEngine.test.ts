@@ -74,7 +74,7 @@ describe('grok-4.1-fast optimization profile', () => {
 
     expect(caps.reasoningStyle).toBe('openai-effort');
     expect(caps.reasoningEffort).toBe('low');
-    expect(caps.maxOutputTokens).toBe(3600);
+    expect(caps.maxOutputTokens).toBeUndefined();
   });
 
   it('disables reasoning explicitly when skipReasoning=true', async () => {
@@ -131,7 +131,7 @@ describe('mimo-v2-flash optimization profile', () => {
 
     expect(caps.reasoningStyle).toBe('openai-effort');
     expect(caps.reasoningEffort).toBe('low');
-    expect(caps.maxOutputTokens).toBe(3200);
+    expect(caps.maxOutputTokens).toBeUndefined();
   });
 
   it('uses boolean reasoning toggle + latency-first provider tuning', async () => {
