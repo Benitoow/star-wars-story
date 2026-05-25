@@ -76,7 +76,11 @@ function resolveStepConfig(baseConfig: StoryProviderConfig, override?: StoryProv
   return normalizeProviderConfig(override ?? baseConfig);
 }
 
-function getStepTokenBudget(stepConfig: StoryProviderConfig, step: StoryPipelineStep): number | undefined {
+function getStepTokenBudget(stepConfig: StoryProviderConfig, step: StoryPipelineStep, writingLength?: string): number | undefined {
+  if (writingLength === 'long' && (step === 'writer' || step === 'brain')) {
+    // Aucun plafond artificiel de tokens pour le mode long, on laisse le provider et le modèle s'exprimer pleinement
+    return undefined;
+  }
   const caps = detectModelCapabilities(stepConfig);
   const max = caps.maxOutputTokens;
   // Aucun plafond par défaut (max === undefined) : on laisse le provider décider,
@@ -368,11 +372,12 @@ async function callPipelineStep(
   systemPrompt: string,
   userPrompt: string,
   config: StoryProviderConfig,
-  requireJsonObject = false
+  requireJsonObject = false,
+  writingLength?: string
 ): Promise<string> {
   const normalizedConfig = normalizeProviderConfig(config);
   const providerId = normalizedConfig.providerId;
-  const maxTokens = getStepTokenBudget(normalizedConfig, step);
+  const maxTokens = getStepTokenBudget(normalizedConfig, step, writingLength);
   const temperature = getStepTemperature(step);
 
   const messages: ChatMessage[] = [
@@ -523,19 +528,21 @@ async function runWriterStep(
 ): Promise<string> {
   const userPrompt = buildPipelineWriterUserPromptWithDirector(scribeSummary, directorBrief);
   const baseWriterPrompt = buildPipelineWriterSystemPrompt(setup, turnNumber, languageCode);
-  const raw = await callPipelineStep('writer', baseWriterPrompt, userPrompt, config, false);
-  return sanitizeNarrativeText(raw, 5500);
+  const raw = await callPipelineStep('writer', baseWriterPrompt, userPrompt, config, false, setup.writingLength);
+  const maxLength = setup.writingLength === 'long' ? 24000 : 5500;
+  return sanitizeNarrativeText(raw, maxLength);
 }
 
 async function runBrainStep(
   writerScene: string,
   directorBrief: StoryDirectorBrief,
   config: StoryProviderConfig,
-  languageCode: string
+  languageCode: string,
+  writingLength?: string
 ): Promise<Record<string, unknown>> {
   const userPrompt = buildPipelineBrainUserPrompt(writerScene, directorBrief);
   const brainPrompt = appendLanguageInstruction(STORY_PIPELINE_BRAIN_SYSTEM_PROMPT, languageCode);
-  const raw = await callPipelineStep('brain', brainPrompt, userPrompt, config, true);
+  const raw = await callPipelineStep('brain', brainPrompt, userPrompt, config, true, writingLength);
   const parsed = parseJsonSafely(raw);
   if (parsed) return parsed;
   throw new Error('Extraction mécanique invalide: JSON introuvable.');
@@ -658,7 +665,7 @@ export async function generateStoryTurn(
 
   let brainPayload = fallbackBrainPayload();
   try {
-    brainPayload = await runBrainStep(writerScene, directorBrief, brainConfig, languageCode);
+    brainPayload = await runBrainStep(writerScene, directorBrief, brainConfig, languageCode, resolvedSetup?.writingLength);
     completedSteps = 4;
   } catch (error) {
     logger.warn('storyEngine: étape 4 (cerveau) indisponible, fallback mécanique local.', error);
@@ -729,15 +736,23 @@ export async function generateStoryTurnStructured(
   messages: ChatMessage[],
   config: StoryProviderConfig,
   turnNumber: number,
-  languageCode: string = 'fr'
+  languageCode: string = 'fr',
+  setup?: StorySetupSnapshot
 ): Promise<StoryTurnGenerationResult> {
   const safeMessages = sanitizeStoryMessageHistory(messages);
   const normalizedConfig = normalizeProviderConfig(config);
   const providerId = normalizedConfig.providerId;
   const caps = detectModelCapabilities(normalizedConfig);
-  const maxTokens = caps.maxOutputTokens !== undefined
-    ? clamp(Math.round(caps.maxOutputTokens * 0.82), 1200, 3200)
-    : undefined;
+
+  const systemPrompt = safeMessages.find(m => m.role === 'system')?.content || '';
+  const resolvedSetup = setup || parseSetupFromSystemPrompt(systemPrompt);
+  const writingLength = resolvedSetup?.writingLength;
+
+  const maxTokens = writingLength === 'long'
+    ? undefined
+    : (caps.maxOutputTokens !== undefined
+      ? clamp(Math.round(caps.maxOutputTokens * 0.82), 1200, 3200)
+      : undefined);
   const temperature = 0.85;
 
   let raw = '';

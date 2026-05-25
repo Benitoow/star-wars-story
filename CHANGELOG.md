@@ -1,5 +1,18 @@
 # Changelog
 
+## v2.7.10 — 2026-05-25
+
+### 🔓 Libération complète de l'écriture en mode "Long" (`agentic.ts`)
+
+- **Bypass des limites artificielles de tokens** :
+  * Lorsque l'utilisateur sélectionne l'écriture en mode "Long" (`writingLength === 'long'`), le budget maximum de tokens de sortie (`maxTokens` / `max_tokens`) transmis à l'API OpenRouter est désormais défini à `undefined`.
+  * Cela supprime tout plafond artificiel et permet aux modèles (en particulier les modèles à fort raisonnement comme DeepSeek V4 Pro) d'écrire sans brides de tokens.
+  * S'applique aussi bien au pipeline agentique à 4 sous-agents (étapes `writer` et `brain`) qu'au mode structuré mono-agent (`generateStoryTurnStructured`).
+- **Suppression de la troncature narrative** :
+  * Rehaussement du plafond de désérialisation narrative et de nettoyage de texte brut de 5 500 à **24 000 caractères** pour l'étape `writer` en mode "Long", évitant toute troncature intempestive de la prose.
+- **Diagnostics & Type-Check** :
+  * Intégration validée sur l'ensemble de la suite de 161 tests unitaires et 0 erreur statique `svelte-check`.
+
 ## v2.7.9 — 2026-05-25
 
 ### 🎬 Refonte de la création d'histoires & Presets Narratifs (`SetupWizard.svelte`, `setupCatalog.ts`, `prompts.ts`)
