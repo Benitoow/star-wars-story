@@ -1,5 +1,16 @@
 # Changelog
 
+## v2.7.12 — 2026-05-25
+
+### 🛠️ Résolution du bug de bascule réactive du panneau avancé (`SetupWizard.svelte`)
+
+- **Correction du toggle d'options avancées** :
+  * Résolution du bug de boucle réactive qui forçait la réouverture instantanée du panneau d'options avancées à la milliseconde près lorsque l'utilisateur cliquait sur "Masquer les réglages détaillés" sous une configuration personnalisée.
+  * Remplacement de la condition réactive agressive par un suivi intelligent à usage unique (`lastActiveStepId`) qui détecte la transition vers l'étape de style pour initialiser l'état du panneau une seule fois.
+  * Laisse désormais l'utilisateur plier et déplier les réglages détaillés librement et sans interférence.
+- **Diagnostics & Type-Check** :
+  * Validation réussie sur l'ensemble de la suite de 161 tests unitaires et 0 erreur statique `svelte-check`.
+
 ## v2.7.11 — 2026-05-25
 
 ### 💾 Migration & Mise à Jour Automatique Transparente des Histoires (`index.ts` persistence & DB)

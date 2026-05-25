@@ -158,11 +158,15 @@
   }
 
   let advancedMode = false;
+  let lastActiveStepId: string | null = null;
 
   $: currentPreset = findNarrativePreset($currentSetup);
 
-  $: if (activeSetupStep?.id === 'style' && !currentPreset && !advancedMode) {
-    advancedMode = true;
+  $: if (activeSetupStep?.id) {
+    if (activeSetupStep.id === 'style' && lastActiveStepId !== 'style') {
+      advancedMode = !currentPreset;
+    }
+    lastActiveStepId = activeSetupStep.id;
   }
 
   function selectNarrativePreset(presetId: string): void {
