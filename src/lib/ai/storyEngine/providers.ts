@@ -34,6 +34,12 @@ function ensureApiKey(providerId: string, apiKey?: string): void {
 
 const OPENROUTER_APP_TITLE = 'Star Wars Story Manager';
 
+// Le SDK OpenRouter échoue systématiquement dans le navigateur avec
+// "TypeError: Failed to fetch" (incompatibilité CORS/requête). Confirmé par les
+// diagnostics du 2026-05-25 : 0 succès SDK sur 95 appels, alors que le fetch direct
+// fonctionne (28 succès). On conserve donc le transport fetch direct, éprouvé.
+const USE_OPENROUTER_SDK: boolean = false;
+
 function getOpenRouterReferer(): string {
   return typeof window !== 'undefined' ? window.location.origin : 'https://localhost';
 }
@@ -443,6 +449,20 @@ function getOpenRouterProviderPreferences(modelId: string): ProviderPreferences 
   return undefined;
 }
 
+// Sérialise les provider preferences (camelCase, type SDK) au format wire OpenRouter
+// (snake_case), pour les envoyer via le transport fetch direct.
+function serializeProviderPreferences(prefs: ProviderPreferences): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (prefs.requireParameters !== undefined) out.require_parameters = prefs.requireParameters;
+  if (prefs.order !== undefined) out.order = prefs.order;
+  if (prefs.sort !== undefined) out.sort = prefs.sort;
+  if (prefs.allowFallbacks !== undefined) out.allow_fallbacks = prefs.allowFallbacks;
+  if (prefs.preferredMaxLatency !== undefined) out.preferred_max_latency = prefs.preferredMaxLatency;
+  if (prefs.preferredMinThroughput !== undefined) out.preferred_min_throughput = prefs.preferredMinThroughput;
+  if (prefs.maxPrice !== undefined) out.max_price = prefs.maxPrice;
+  return out;
+}
+
 function isOpenRouterMimoV2FlashModel(modelId: string): boolean {
   return /xiaomi\/mimo-v2-flash/i.test(modelId);
 }
@@ -537,7 +557,7 @@ export async function callOpenAiCompatibleRaw(
   let lastError: Error | null = null;
   let connectionFaults = 0;
 
-  if (isOpenRouterProvider) {
+  if (isOpenRouterProvider && USE_OPENROUTER_SDK) {
     ensureApiKey(normalizedConfig.providerId, normalizedConfig.apiKey);
 
     const rawResponseBodies = new WeakMap<Response, string>();
@@ -923,6 +943,10 @@ export async function callOpenAiCompatibleRaw(
     temperature: options.temperature ?? caps.idealTemperature
   };
 
+  if (providerPreferences) {
+    body.provider = serializeProviderPreferences(providerPreferences);
+  }
+
   if (reasoningPayload) {
     body.reasoning = reasoningPayload;
   }
@@ -977,6 +1001,7 @@ export async function callOpenAiCompatibleRaw(
             maxTokens: body.max_tokens,
             temperature: body.temperature,
             reasoning: body.reasoning,
+            providerPreferences: body.provider,
             hasTools: Array.isArray(options.tools) && options.tools.length > 0,
             timeoutMs
           }
@@ -1012,7 +1037,10 @@ export async function callOpenAiCompatibleRaw(
               response: extractResponseMeta(rawPayload)
             }
           });
-          throw new Error(`${getProviderDisplayName(normalizedConfig.providerId)}: réponse vide ou incomplète du provider.`);
+          // Contenu vide sur un 200 : ce n'est pas transitoire (le modèle n'a rien
+          // produit d'exploitable). Inutile de retenter — on échoue vite.
+          lastError = new Error(`${getProviderDisplayName(normalizedConfig.providerId)}: réponse vide ou incomplète du provider.`);
+          break;
         }
 
         recordDiagnosticEvent({
@@ -1091,6 +1119,13 @@ export async function callOpenAiCompatibleRaw(
           validation: 'repaired',
           meta: { transport: 'fetch', error: msg }
         });
+        // Fast-fail connexion: "failed to fetch" = provider injoignable (CORS, DNS,
+        // réseau coupé). On tolère une tentative puis on abandonne, pour ne pas
+        // enchaîner des retries voués à l'échec.
+        if (/failed to fetch|unable to make request|networkerror/i.test(msg)) {
+          connectionFaults += 1;
+          if (connectionFaults > 1) break;
+        }
       }
     }
 

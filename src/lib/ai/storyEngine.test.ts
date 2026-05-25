@@ -26,9 +26,14 @@ function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
 }
 
 async function readRequestJson(fetchMock: ReturnType<typeof vi.fn>): Promise<Record<string, unknown>> {
-  const request = fetchMock.mock.calls[0]?.[0];
-  expect(request).toBeInstanceOf(Request);
-  return await (request as Request).clone().json();
+  const [input, init] = fetchMock.mock.calls[0] ?? [];
+  // Transport SDK: fetch(Request). Transport fetch direct: fetch(url, { body }).
+  if (input instanceof Request) {
+    return await input.clone().json() as Record<string, unknown>;
+  }
+  const body = (init as RequestInit | undefined)?.body;
+  expect(typeof body).toBe('string');
+  return JSON.parse(body as string) as Record<string, unknown>;
 }
 
 describe('supportsAgenticToolCalling', () => {
