@@ -29,6 +29,7 @@
   import SceneBackdrop from '$lib/components/SceneBackdrop.svelte';
   import {
     defaultRoleForFaction,
+    withSetupDefaults,
     AVATARS,
     CONTENT_MODES,
     ERAS,
@@ -242,22 +243,7 @@
 
   function ensureSetupDefaults(): StorySetup {
     const setup = get(currentSetup);
-    const next: StorySetup = { ...setup };
-
-    if (!next.era) next.era = ERAS[0].id;
-    if (!next.faction) next.faction = FACTIONS[0].id;
-    if (!next.role) next.role = defaultRoleForFaction(next.faction);
-    if (!next.writingStyle) next.writingStyle = WRITING_STYLES[0].id;
-    if (!next.writingTone) next.writingTone = WRITING_TONES[2].id;
-    if (!next.writingPov) next.writingPov = WRITING_POVS[1].id;
-    if (!next.writingLength) next.writingLength = WRITING_LENGTHS[1].id;
-    if (!next.contentMode) next.contentMode = CONTENT_MODES[0].id;
-    if (!next.protagonistAvatar) next.protagonistAvatar = AVATARS[0];
-
-    if (!next.premise) {
-      const trame = TRAMES.find(item => item.id === selectedTrame);
-      next.premise = trame?.premise || 'Un appel de détresse inattendu force votre protagoniste à agir immédiatement.';
-    }
+    const next = withSetupDefaults(setup, selectedTrame);
 
     setSetupField('era', next.era);
     setSetupField('faction', next.faction);

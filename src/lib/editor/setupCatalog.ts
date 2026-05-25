@@ -1,3 +1,5 @@
+import type { StorySetup } from '$lib/stores/editor';
+
 export type SetupScreenId = 'era' | 'faction_role' | 'premise' | 'style' | 'profile' | 'review';
 
 export type SetupScreen = {
@@ -159,4 +161,62 @@ export const CONTENT_MODES = [
 
 export function defaultRoleForFaction(factionId: string): string {
   return ROLES.find(role => role.faction === factionId)?.id || ROLES[0].id;
+}
+
+export const DEFAULT_PREMISE = 'Un appel de détresse inattendu force votre protagoniste à agir immédiatement.';
+
+export type NarrativePreset = {
+  id: string;
+  name: string;
+  icon: string;
+  desc: string;
+  writingStyle: string;
+  writingTone: string;
+  writingPov: string;
+  writingLength: string;
+  contentMode: string;
+};
+
+// Presets narratifs : un clic configure les 5 axes d'écriture (style/ton/POV/
+// longueur/contenu). Le mode avancé du wizard permet d'affiner chaque axe ensuite.
+export const NARRATIVE_PRESETS: NarrativePreset[] = [
+  { id: 'cinematic_hero', name: 'Cinématique héroïque', icon: '🎬', desc: 'Rythme de film, courage et panache. Le choix sûr.', writingStyle: 'cinematique', writingTone: 'heroique', writingPov: 'troisieme', writingLength: 'moyen', contentMode: 'cinematic' },
+  { id: 'dark_saga', name: 'Saga sombre', icon: '🌒', desc: 'Prose dense, tension morale, enjeux lourds.', writingStyle: 'litteraire', writingTone: 'sombre', writingPov: 'troisieme', writingLength: 'long', contentMode: 'dark' },
+  { id: 'pulp_adventure', name: 'Aventure pulp', icon: '⚡', desc: 'Action nerveuse, humour, légèreté.', writingStyle: 'cinematique', writingTone: 'aventure', writingPov: 'troisieme', writingLength: 'court', contentMode: 'cinematic' },
+  { id: 'epic_legend', name: 'Légende épique', icon: '✨', desc: 'Souffle, grandes batailles, destins héroïques.', writingStyle: 'epique', writingTone: 'heroique', writingPov: 'troisieme', writingLength: 'long', contentMode: 'cinematic' },
+  { id: 'immersive_rp', name: 'Immersif — tu es le héros', icon: '🕹️', desc: 'JdR à la 1ʳᵉ personne, drame intime.', writingStyle: 'immersif', writingTone: 'drame', writingPov: 'premiere', writingLength: 'moyen', contentMode: 'dark' }
+];
+
+type WritingAxes = Pick<StorySetup, 'writingStyle' | 'writingTone' | 'writingPov' | 'writingLength' | 'contentMode'>;
+
+// Retrouve le preset correspondant aux 5 axes courants (undefined = réglage personnalisé).
+export function findNarrativePreset(axes: WritingAxes): NarrativePreset | undefined {
+  return NARRATIVE_PRESETS.find(p =>
+    p.writingStyle === axes.writingStyle &&
+    p.writingTone === axes.writingTone &&
+    p.writingPov === axes.writingPov &&
+    p.writingLength === axes.writingLength &&
+    p.contentMode === axes.contentMode
+  );
+}
+
+// Source unique des valeurs par défaut d'un setup. Remplace les remplissages ad-hoc
+// dispersés dans le code de lancement.
+export function withSetupDefaults(setup: StorySetup, trameId?: string | null): StorySetup {
+  const preset = NARRATIVE_PRESETS[0];
+  const faction = setup.faction || FACTIONS[0].id;
+  const trame = trameId ? TRAMES.find(t => t.id === trameId) : undefined;
+  return {
+    ...setup,
+    era: setup.era || ERAS[0].id,
+    faction,
+    role: setup.role || defaultRoleForFaction(faction),
+    premise: setup.premise || trame?.premise || DEFAULT_PREMISE,
+    writingStyle: setup.writingStyle || preset.writingStyle,
+    writingTone: setup.writingTone || preset.writingTone,
+    writingPov: setup.writingPov || preset.writingPov,
+    writingLength: setup.writingLength || preset.writingLength,
+    contentMode: setup.contentMode || preset.contentMode,
+    protagonistAvatar: setup.protagonistAvatar || AVATARS[0]
+  };
 }
