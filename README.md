@@ -1,4 +1,4 @@
-# Star Wars Story Manager — v2.7.10
+# Star Wars Story Manager — v2.7.11
 
 > Créez et vivez des histoires Star Wars interactives propulsées par IA agentique.
 

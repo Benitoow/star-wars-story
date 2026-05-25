@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.7.11 — 2026-05-25
+
+### 💾 Migration & Mise à Jour Automatique Transparente des Histoires (`index.ts` persistence & DB)
+
+- **Migration automatique au démarrage (`db/index.ts`)** :
+  * Lors de l'initialisation de la base de données (`initializeDB`), l'application parcourt désormais l'ensemble des histoires stockées dans IndexedDB, les normalise et met à jour de façon permanente en base de données les enregistrements obsolètes de manière 100% transparente.
+- **Normalisation ultra-robuste du Setup (`persistence/index.ts`)** :
+  * Amélioration de `normalizeSetup` pour y appliquer des valeurs par défaut cohérentes (ère impériale, faction indépendante, prémisse de détresse d'origine, etc.) et les nouveaux réglages de presets narratifs (style cinématique, ton héroïque, POV troisième personne, longueur moyenne) si ceux-ci étaient absents ou corrompus.
+  * Garantit qu'aucune ancienne histoire ne peut corrompre ou faire planter l'interface ou les prompts du moteur de jeu.
+- **Diagnostics & Type-Check** :
+  * Validation complète avec 161 tests Vitest au vert et 0 erreur statique `svelte-check`.
+
 ## v2.7.10 — 2026-05-25
 
 ### 🔓 Libération complète de l'écriture en mode "Long" (`agentic.ts`)

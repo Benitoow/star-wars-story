@@ -73,19 +73,25 @@ function normalizeMetadata(metadata: unknown) {
 function normalizeSetup(setup: unknown) {
   const source = isRecord(setup) ? setup : {};
 
+  // Valeurs par défaut robustes issues des presets narratives
+  const defaultEra = 'imperial';
+  const defaultFaction = 'neutral';
+  const defaultRole = 'bounty_hunter';
+  const defaultPremise = 'Un appel de détresse inattendu force votre protagoniste à agir immédiatement.';
+
   return {
-    era: typeof source.era === 'string' ? source.era : '',
-    faction: typeof source.faction === 'string' ? source.faction : '',
-    role: typeof source.role === 'string' ? source.role : '',
-    premise: typeof source.premise === 'string' ? source.premise : '',
+    era: typeof source.era === 'string' ? (source.era || defaultEra) : defaultEra,
+    faction: typeof source.faction === 'string' ? (source.faction || defaultFaction) : defaultFaction,
+    role: typeof source.role === 'string' ? (source.role || defaultRole) : defaultRole,
+    premise: typeof source.premise === 'string' ? (source.premise || defaultPremise) : defaultPremise,
     protagonistFirstName: typeof source.protagonistFirstName === 'string' ? source.protagonistFirstName : undefined,
     protagonistLastName: typeof source.protagonistLastName === 'string' ? source.protagonistLastName : undefined,
-    protagonistAvatar: typeof source.protagonistAvatar === 'string' ? source.protagonistAvatar : undefined,
-    writingStyle: typeof source.writingStyle === 'string' ? source.writingStyle : undefined,
-    writingTone: typeof source.writingTone === 'string' ? source.writingTone : undefined,
-    writingPov: typeof source.writingPov === 'string' ? source.writingPov : undefined,
-    writingLength: typeof source.writingLength === 'string' ? source.writingLength : undefined,
-    contentMode: typeof source.contentMode === 'string' ? source.contentMode : undefined
+    protagonistAvatar: typeof source.protagonistAvatar === 'string' ? (source.protagonistAvatar || '🧑‍🚀') : '🧑‍🚀',
+    writingStyle: typeof source.writingStyle === 'string' ? (source.writingStyle || 'cinematique') : 'cinematique',
+    writingTone: typeof source.writingTone === 'string' ? (source.writingTone || 'heroique') : 'heroique',
+    writingPov: typeof source.writingPov === 'string' ? (source.writingPov || 'troisieme') : 'troisieme',
+    writingLength: typeof source.writingLength === 'string' ? (source.writingLength || 'moyen') : 'moyen',
+    contentMode: typeof source.contentMode === 'string' ? (source.contentMode || 'cinematic') : 'cinematic'
   };
 }
 

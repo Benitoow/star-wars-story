@@ -20,6 +20,7 @@ import {
   parseAllDataImportEnvelope,
   parseStoryImportEnvelope
 } from '$lib/persistence';
+import { logger } from '$lib/utils/logger';
 
 export interface Story {
   id: string;
@@ -285,6 +286,21 @@ export async function initializeDB(): Promise<void> {
   const appState = await db.appState.get('appState');
   if (!appState) {
     await db.appState.put(createDefaultAppState());
+  }
+
+  // Migration et mise à jour automatique transparente des anciennes histoires stockées
+  try {
+    const allStories = await db.stories.toArray();
+    for (const story of allStories) {
+      const normalized = normalizeStoryForStorage(story);
+      // On compare l'objet stringifié pour savoir si la normalisation a rajouté des propriétés manquantes
+      if (JSON.stringify(story) !== JSON.stringify(normalized)) {
+        await db.stories.put(normalized);
+        logger.info(`DB Migration: Histoire '${story.id}' mise à jour et normalisée avec succès.`);
+      }
+    }
+  } catch (err) {
+    logger.warn('DB Migration: Échec lors de la migration automatique des histoires.', err);
   }
 }
 
