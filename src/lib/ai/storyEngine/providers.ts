@@ -354,51 +354,45 @@ export interface ModelCapabilities {
   idealTemperature: number;
 }
 
+// Défaut: tous les modèles supportent le reasoning via l'API OpenAI-compatible
 const DEFAULT_CAPS: ModelCapabilities = {
-  tier: 'small',
-  reasoningStyle: 'none',
-  reasoningEffort: 'low',
+  tier: 'medium',
+  reasoningStyle: 'openai-effort',
+  reasoningEffort: 'high',
   supportsNativeTools: true,
-  maxOutputTokens: 2000,
+  maxOutputTokens: 16000,  // l'IA décide, pas de bridage
   idealTemperature: 0.9
 };
 
-const MODEL_CAPS_PATTERNS: Array<[RegExp, Partial<ModelCapabilities>]> = [
-  [/gemini-3-flash-preview/, { tier: 'medium', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 3000, idealTemperature: 0.9 }],
-  [/gemini-2\.5-flash-lite/, { tier: 'small', reasoningStyle: 'none', supportsNativeTools: true, maxOutputTokens: 2600, idealTemperature: 0.85 }],
-  [/gpt-oss-120b/, { tier: 'large', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 3400, idealTemperature: 0.9 }],
-  [/deepseek-v3\.2/, { tier: 'large', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 3400, idealTemperature: 0.9 }],
-  [/deepseek-v4-flash/, { tier: 'medium', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 3200, idealTemperature: 0.9 }],
-  [/kimi-k2\.6/, { tier: 'large', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 3500, idealTemperature: 0.9 }],
-  [/mimo-v2-omni/, { tier: 'large', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 3400, idealTemperature: 0.9 }],
-  [/mimo-v2-flash/, { tier: 'medium', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 3200, idealTemperature: 0.9 }],
-  [/minimax-m2\.7/, { tier: 'large', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 3400, idealTemperature: 0.9 }],
-  [/qwen(3\.5|3\.6|.*plus)/, { tier: 'large', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 3400, idealTemperature: 0.9 }],
-  [/grok-4\.20/, { tier: 'large', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 3600, idealTemperature: 0.9 }],
-  [/grok-4\.1-fast/, { tier: 'large', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 3600, idealTemperature: 0.9 }],
-  [/gemma-4-31b-it/, { tier: 'medium', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 3000, idealTemperature: 0.95 }],
-  [/gemma-4-26b-a4b-it/, { tier: 'small', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 2800, idealTemperature: 0.95 }],
-  [/gemma-3-27b-it:free|gemma-3-27b-it/i, { tier: 'large', reasoningStyle: 'none', supportsNativeTools: true, maxOutputTokens: 2400, idealTemperature: 0.9 }],
-  [/gemma-4/, { tier: 'small', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 2500, idealTemperature: 1.0 }],
-  [/gpt-5\.4-mini/, { tier: 'small', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 2400, idealTemperature: 1.0 }],
-  [/gpt-5\.4/, { tier: 'medium', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 3500, idealTemperature: 1.0 }],
-  [/claude-opus-4/, { tier: 'large', reasoningStyle: 'anthropic-thinking', supportsNativeTools: true, maxOutputTokens: 4500, idealTemperature: 1.0 }],
-  [/claude-sonnet-4/, { tier: 'medium', reasoningStyle: 'anthropic-thinking', supportsNativeTools: true, maxOutputTokens: 3000, idealTemperature: 1.0 }],
-  [/\/o[1-9][-/]|\/o4-mini/, { tier: 'large', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 4000, idealTemperature: 1.0 }],
-  [/grok-3-mini/, { tier: 'small', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 2400, idealTemperature: 1.0 }],
-  [/grok-3/, { tier: 'medium', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 3000, idealTemperature: 1.0 }],
-  [/mistral-(medium|large)/, { tier: 'medium', reasoningStyle: 'none', supportsNativeTools: true, maxOutputTokens: 2400, idealTemperature: 0.85 }],
-  [/deepseek-r|qwen.*think/, { tier: 'medium', reasoningStyle: 'openai-effort', supportsNativeTools: true, maxOutputTokens: 2800, idealTemperature: 1.0 }]
+// Petite liste d'exclusion: uniquement les modèles qui ne supportent PAS reasoning.effort
+const NO_REASONING_PATTERNS: RegExp[] = [
+  /llama.*instruct.*free/i,
+  /mistral-small(?!.*thinking)/i,
+  /gemini-2\.5-flash-lite/i,
+  /gemma-3-27b-it(?!.*thinking)/i,
+  /gemini-2\.0-flash(?!.*thinking)/i,
+  /claude-3-7-sonnet/i,
 ];
+
+function isFlashOrMini(modelId: string): boolean {
+  return /flash|mini|small|scout|nano|lite/i.test(modelId) && !/pro|max|ultra|plus/i.test(modelId);
+}
+
+function isProOrLarge(modelId: string): boolean {
+  return /pro|max|large|opus|omni|premium|plus|ultra/i.test(modelId);
+}
 
 export function detectModelCapabilities(config: StoryProviderConfig): ModelCapabilities {
   const modelId = resolveModel(config).toLowerCase();
-  for (const [pattern, overrides] of MODEL_CAPS_PATTERNS) {
-    if (pattern.test(modelId)) {
-      return { ...DEFAULT_CAPS, ...overrides };
-    }
-  }
-  return DEFAULT_CAPS;
+  const supportsReasoning = !NO_REASONING_PATTERNS.some(p => p.test(modelId));
+  const tier = isProOrLarge(modelId) ? 'large' : isFlashOrMini(modelId) ? 'small' : 'medium';
+
+  return {
+    ...DEFAULT_CAPS,
+    tier,
+    reasoningStyle: supportsReasoning ? 'openai-effort' : 'none',
+    reasoningEffort: supportsReasoning ? 'high' : 'none'
+  };
 }
 
 function getOpenRouterProviderPreferences(modelId: string): ProviderPreferences | undefined {
@@ -418,6 +412,9 @@ function getOpenRouterProviderPreferences(modelId: string): ProviderPreferences 
   }
   if (/deepseek\/deepseek-v4-flash/.test(normalized)) {
     return { requireParameters: true, sort: 'throughput', preferredMaxLatency: { p90: 2 }, preferredMinThroughput: { p90: 60 }, maxPrice: { prompt: '0.14', completion: '0.28' }, allowFallbacks: true };
+  }
+  if (/deepseek\/deepseek-v4-pro/.test(normalized)) {
+    return { requireParameters: true, sort: 'throughput', preferredMaxLatency: { p90: 3 }, preferredMinThroughput: { p90: 30 }, maxPrice: { prompt: '0.5', completion: '1.0' }, allowFallbacks: true };
   }
   if (/moonshotai\/kimi-k2\.6/.test(normalized)) {
     return { requireParameters: true, sort: 'latency', preferredMaxLatency: { p90: 2 }, preferredMinThroughput: { p90: 25 }, maxPrice: { prompt: '0.6', completion: '2.4' }, allowFallbacks: true };

@@ -60,40 +60,7 @@ export const TEXT_PROVIDERS: ProviderCatalog[] = [
   {
     id: 'openrouter',
     name: 'OpenRouter',
-    models: [
-      'qwen/qwen3.5-9b',
-      'google/gemma-3-27b-it:free',
-      'google/gemma-4-26b-a4b-it',
-      'google/gemma-4-31b-it',
-      'meta-llama/llama-4-scout:free',
-      'meta-llama/llama-3.3-70b-instruct:free',
-      'mistralai/mistral-small-3.2-24b-instruct:free',
-      'qwen/qwen3-30b-a3b:free',
-      'qwen/qwen3-235b-a22b:free',
-      'xiaomi/mimo-v2-flash',
-      'xiaomi/mimo-v2-omni',
-      'x-ai/grok-4.1-fast',
-      'x-ai/grok-4.20',
-      'minimax/minimax-m2.7',
-      'deepseek/deepseek-v3.2',
-      'deepseek/deepseek-v4-flash',
-      'moonshotai/kimi-k2.6',
-      'openai/gpt-oss-120b',
-      'google/gemini-2.5-flash-lite',
-      'google/gemini-3-flash-preview',
-      'mistralai/mistral-small-2603',
-      'meta-llama/llama-4-maverick',
-      'google/gemini-2.0-flash-001',
-      'google/gemini-2.5-flash-preview',
-      'openai/gpt-5.4-mini',
-      'anthropic/claude-3-7-sonnet',
-      'anthropic/claude-sonnet-4-5',
-      'openai/gpt-5.4',
-      'x-ai/grok-4',
-      'google/gemini-2.5-pro',
-      'anthropic/claude-opus-4-5',
-      'openai/gpt-5'
-    ],
+    models: [], // chargés dynamiquement depuis l'API OpenRouter
     icon: providerIconSvg('openrouter'),
     recommended: true,
     badges: ['Orchestration à sous-agents', 'Catalogue unifié', 'Mode supporté']
@@ -105,49 +72,9 @@ export const IMAGE_PROVIDERS: ProviderCatalog[] = [
   {
     id: 'openrouter_img',
     name: 'OpenRouter Images',
-    models: [
-      'black-forest-labs/flux-1.1-pro',
-      'black-forest-labs/flux-1.1-pro:ultra',
-      'black-forest-labs/flux-1-schnell:free',
-      'black-forest-labs/flux-1-dev',
-      'recraft-ai/recraft-v3',
-      'ideogram-ai/ideogram-v2',
-      'openai/dall-e-3',
-      'stabilityai/stable-diffusion-xl-base-1.0',
-      'x-ai/grok-imagine-image-quality'
-    ],
+    models: [], // chargés dynamiquement
     icon: providerIconSvg('openrouter'),
     badges: ['Modèles d\'images', 'FLUX · Recraft · DALL-E']
-  },
-  {
-    id: 'fal_img',
-    name: 'fal.ai',
-    models: [
-      'fal-ai/flux-pro/v1.1-ultra',
-      'fal-ai/flux-pro/v1.1',
-      'fal-ai/flux/dev',
-      'fal-ai/flux/schnell',
-      'fal-ai/recraft-v3',
-      'fal-ai/ideogram/v2',
-      'fal-ai/stable-diffusion-3.5-large',
-      'fal-ai/stable-diffusion-v3-medium'
-    ],
-    icon: providerIconSvg('fal_img'),
-    badges: ['FLUX Pro', 'Recraft', 'SD 3.5']
-  },
-  {
-    id: 'openai_img',
-    name: 'OpenAI Images',
-    models: ['dall-e-3', 'dall-e-2'],
-    icon: providerIconSvg('openai'),
-    badges: ['DALL-E 3', 'DALL-E 2']
-  },
-  {
-    id: 'stability',
-    name: 'Stability AI',
-    models: ['stable-image-ultra', 'stable-image-core', 'sd3.5-large', 'sd3.5-medium'],
-    icon: providerIconSvg('stability'),
-    badges: ['SD 3.5', 'Ultra']
   },
   { id: 'none', name: 'Aucun (texte uniquement)', models: [], icon: providerIconSvg('none') }
 ];

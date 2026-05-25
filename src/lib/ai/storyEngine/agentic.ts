@@ -78,12 +78,14 @@ function resolveStepConfig(baseConfig: StoryProviderConfig, override?: StoryProv
 
 function getStepTokenBudget(stepConfig: StoryProviderConfig, step: StoryPipelineStep): number {
   const caps = detectModelCapabilities(stepConfig);
-  if (step === 'scribe') return clamp(Math.round(caps.maxOutputTokens * 0.2), 240, 560);
-  if (step === 'director') return clamp(Math.round(caps.maxOutputTokens * 0.24), 320, 720);
-  if (step === 'writer') return clamp(Math.round(caps.maxOutputTokens * 0.72), 900, 2600);
-  if (step === 'world-observer') return clamp(Math.round(caps.maxOutputTokens * 0.18), 220, 520);
-  if (step === 'world-adjudicator') return clamp(Math.round(caps.maxOutputTokens * 0.26), 320, 760);
-  return clamp(Math.round(caps.maxOutputTokens * 0.58), 900, 2200);
+  // Plus de bridage: chaque agent reçoit le max tokens du modèle
+  // Les steps moins verbeux utilisent une fraction, mais sans cap haut
+  if (step === 'scribe') return Math.max(Math.round(caps.maxOutputTokens * 0.2), 400);
+  if (step === 'director') return Math.max(Math.round(caps.maxOutputTokens * 0.3), 600);
+  if (step === 'writer') return caps.maxOutputTokens;  // pas de limite, l'IA décide
+  if (step === 'world-observer') return Math.max(Math.round(caps.maxOutputTokens * 0.2), 400);
+  if (step === 'world-adjudicator') return Math.max(Math.round(caps.maxOutputTokens * 0.3), 600);
+  return caps.maxOutputTokens;  // brain: pas de limite
 }
 
 function getStepTemperature(step: StoryPipelineStep): number {

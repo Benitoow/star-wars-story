@@ -104,17 +104,17 @@
   $: activeTextProviderId = preferences?.textProvider ?? '';
   $: activeImageProviderId = preferences?.imageProvider ?? '';
   $: textProviderModels = activeTextProviderId
-    ? (dynamicTextModels[activeTextProviderId] ?? TEXT_PROVIDERS.find(p => p.id === activeTextProviderId)?.models ?? [])
+    ? (dynamicTextModels[activeTextProviderId] ?? [])
     : [];
   $: imageProviderModels = activeImageProviderId
-    ? (dynamicImageModels[activeImageProviderId] ?? IMAGE_PROVIDERS.find(p => p.id === activeImageProviderId)?.models ?? [])
+    ? (dynamicImageModels[activeImageProviderId] ?? [])
     : [];
 
   $: providerModelCounts = Object.fromEntries(
-    TEXT_PROVIDERS.map(p => [p.id, (dynamicTextModels[p.id] ?? p.models).length])
+    TEXT_PROVIDERS.map(p => [p.id, (dynamicTextModels[p.id] ?? []).length])
   );
   $: imageProviderModelCounts = Object.fromEntries(
-    IMAGE_PROVIDERS.map(p => [p.id, (dynamicImageModels[p.id] ?? p.models).length])
+    IMAGE_PROVIDERS.map(p => [p.id, (dynamicImageModels[p.id] ?? []).length])
   );
 
   $: normalizedTextSearch = textModelSearch.trim().toLowerCase();
@@ -203,12 +203,12 @@
 
   function getTextProviderModels(providerId?: string): string[] {
     if (!providerId) return [];
-    return dynamicTextModels[providerId] ?? TEXT_PROVIDERS.find(p => p.id === providerId)?.models ?? [];
+    return dynamicTextModels[providerId] ?? [];
   }
 
   function getImageProviderModels(providerId?: string): string[] {
     if (!providerId) return [];
-    return dynamicImageModels[providerId] ?? IMAGE_PROVIDERS.find(p => p.id === providerId)?.models ?? [];
+    return dynamicImageModels[providerId] ?? [];
   }
 
   function scheduleAutoTextSync() {
