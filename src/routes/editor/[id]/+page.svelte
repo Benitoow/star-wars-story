@@ -649,7 +649,13 @@
         setSetupField('premise', snapshot.premise || get(currentSetup).premise);
         setSetupField('protagonistFirstName', snapshot.protagonistFirstName);
         setSetupField('protagonistLastName', snapshot.protagonistLastName);
-        setSetupField('protagonistAvatar', snapshot.protagonistAvatar || get(currentSetup).protagonistAvatar);
+
+        const isImage = (val: unknown) => typeof val === 'string' && (val.startsWith('data:') || val.startsWith('http:') || val.startsWith('https:'));
+        const currentAvatar = get(currentSetup).protagonistAvatar;
+        const snapshotAvatar = snapshot.protagonistAvatar;
+        const avatarToSet = (isImage(currentAvatar) && !isImage(snapshotAvatar)) ? currentAvatar : (snapshotAvatar || currentAvatar);
+        setSetupField('protagonistAvatar', avatarToSet);
+
         setSetupField('writingStyle', snapshot.writingStyle || get(currentSetup).writingStyle);
         setSetupField('writingTone', snapshot.writingTone || get(currentSetup).writingTone);
         setSetupField('writingPov', snapshot.writingPov || get(currentSetup).writingPov);

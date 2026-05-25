@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.7.13 — 2026-05-25
+
+### 🛡️ Protection robuste du portrait d'avatar généré par IA (`interactiveSession.ts`, `+page.svelte`)
+
+- **Préservation des images d'avatar IA** :
+  * Résolution du bug où l'avatar sous forme d'image Base64 générée par l'IA était effacé et réinitialisé par l'emoji de base `'🧑‍🚀'` lors du rechargement d'une session de jeu.
+  * Implémentation d'une règle de protection d'avatar dans `sanitizeSetupSnapshot` (`interactiveSession.ts`) et dans le chargement de page principal (`+page.svelte`).
+  * Si la story chargée dispose d'une image d'avatar IA valide (commençant par `data:` ou `http`) et que la session restaurée tente de lui appliquer un emoji de base ou une chaîne vide, l'image d'avatar IA est désormais systématiquement conservée et protégée de tout écrasement.
+- **Tests unitaires dédiés** :
+  * Ajout d'un test d'intégration pour valider la protection de l'avatar IA en cas de session contenant un emoji par défaut.
+  * Validation globale portée à **162 tests Vitest 100% au vert** et 0 avertissement.
+
 ## v2.7.12 — 2026-05-25
 
 ### 🛠️ Résolution du bug de bascule réactive du panneau avancé (`SetupWizard.svelte`)

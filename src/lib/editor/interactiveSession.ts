@@ -129,6 +129,19 @@ function sanitizeChatMessages(values: unknown): ChatMessage[] {
 function sanitizeSetupSnapshot(value: unknown, fallbackSetup: StorySetup): StorySetup {
   if (!isRecord(value)) return fallbackSetup;
 
+  const isImage = (val: unknown) => typeof val === 'string' && (val.startsWith('data:') || val.startsWith('http:') || val.startsWith('https:'));
+  
+  let protagonistAvatar = fallbackSetup.protagonistAvatar;
+  if (typeof value.protagonistAvatar === 'string') {
+    // Si la session a un emoji simple ou vide et que la story (fallback) possède déjà un portrait IA généré,
+    // on protège impérativement le portrait IA.
+    if (isImage(fallbackSetup.protagonistAvatar) && !isImage(value.protagonistAvatar)) {
+      protagonistAvatar = fallbackSetup.protagonistAvatar;
+    } else {
+      protagonistAvatar = value.protagonistAvatar;
+    }
+  }
+
   const setup = {
     ...fallbackSetup,
     era: typeof value.era === 'string' && value.era ? value.era : fallbackSetup.era,
@@ -137,7 +150,7 @@ function sanitizeSetupSnapshot(value: unknown, fallbackSetup: StorySetup): Story
     premise: typeof value.premise === 'string' && value.premise ? value.premise : fallbackSetup.premise,
     protagonistFirstName: typeof value.protagonistFirstName === 'string' ? value.protagonistFirstName : fallbackSetup.protagonistFirstName,
     protagonistLastName: typeof value.protagonistLastName === 'string' ? value.protagonistLastName : fallbackSetup.protagonistLastName,
-    protagonistAvatar: typeof value.protagonistAvatar === 'string' ? value.protagonistAvatar : fallbackSetup.protagonistAvatar,
+    protagonistAvatar,
     writingStyle: typeof value.writingStyle === 'string' ? value.writingStyle : fallbackSetup.writingStyle,
     writingTone: typeof value.writingTone === 'string' ? value.writingTone : fallbackSetup.writingTone,
     writingPov: typeof value.writingPov === 'string' ? value.writingPov : fallbackSetup.writingPov,

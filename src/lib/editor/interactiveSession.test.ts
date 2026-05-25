@@ -216,4 +216,37 @@ describe('interactiveSession', () => {
     expect(loaded?.setupSnapshot).toEqual(fallbackSetup);
     expect(Array.isArray(loaded?.chapterHistory)).toBe(true);
   });
+
+  it('protects AI-generated protagonist avatar from being overwritten by emoji', async () => {
+    const store = createMemoryStore();
+    const localStorage = createLocalStorageMock();
+    vi.stubGlobal('localStorage', localStorage);
+
+    const setupWithAiAvatar = {
+      ...fallbackSetup,
+      protagonistAvatar: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA'
+    };
+
+    localStorage.setItem(
+      'sw_svelte_interactive_story_story-protect-avatar',
+      JSON.stringify({
+        version: 2,
+        turnNumber: 1,
+        chapterHistory: [],
+        actionHistory: [],
+        aiMessages: [],
+        memoryLog: [],
+        setupSnapshot: {
+          ...fallbackSetup,
+          protagonistAvatar: '🧑‍🚀' // Emoji par défaut dans la session stockée
+        }
+      })
+    );
+
+    // On charge la session avec le fallback setup possédant l'avatar IA
+    const loaded = await loadInteractiveSessionPayload('story-protect-avatar', setupWithAiAvatar, store);
+
+    expect(loaded).not.toBeNull();
+    expect(loaded?.setupSnapshot.protagonistAvatar).toBe('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA');
+  });
 });
