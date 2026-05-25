@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.7.15 — 2026-05-25
+
+### 🔓 Correction du bridage silencieux de tokens d'OpenRouter (`providers.ts`)
+
+- **Résolution du bridage de tokens par défaut** :
+  * Détection d'un comportement d'OpenRouter qui applique une limite de sortie extrêmement basse par défaut (souvent 256 ou 512 tokens maximum) lorsque le paramètre `max_tokens` (`max_completion_tokens`) est omis de la requête API.
+  * Ce bridage silencieux affectait lourdement les modèles sensibles comme Grok (qui raccourcissaient drastiquement leurs réponses pour tenir dans cette petite enveloppe).
+  * Résolution définitive en imposant une **valeur par défaut généreuse de 4096 tokens** (`resolvedMaxTokens`) dans les payloads des transports SDK et fetch direct lorsque aucune limite n'est explicitement requise.
+  * Redonne aux modèles (comme Grok ou Qwen) l'espace complet pour s'exprimer avec une prose riche et des choix complexes sans être coupés ou bridés par le réseau.
+- **Diagnostics** :
+  * Validation globale validée à **162 tests Vitest 100% au vert** et `svelte-check` à 0 erreur.
+
 ## v2.7.14 — 2026-05-25
 
 ### 🚫 Interdiction stricte et nettoyage absolu du tiret cadratin "—" dans les dialogues (`prompts.ts`, `parsing.ts`)

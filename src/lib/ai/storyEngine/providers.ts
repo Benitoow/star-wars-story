@@ -562,10 +562,11 @@ export async function callOpenAiCompatibleRaw(
 
     const rawResponseBodies = new WeakMap<Response, string>();
     const client = createOpenRouterClient(String(normalizedConfig.apiKey || '').trim(), rawResponseBodies);
+    const resolvedMaxTokens = options.maxTokens ?? caps.maxOutputTokens ?? 4096;
     const chatRequest: ChatRequest = {
       model: modelId,
       messages: toOpenRouterChatMessages(messages),
-      maxCompletionTokens: options.maxTokens ?? caps.maxOutputTokens,
+      maxCompletionTokens: resolvedMaxTokens,
       temperature: options.temperature ?? caps.idealTemperature,
       provider: providerPreferences,
       reasoning: reasoningPayload,
@@ -936,10 +937,11 @@ export async function callOpenAiCompatibleRaw(
     'Content-Type': 'application/json'
   };
 
+  const resolvedMaxTokens = options.maxTokens ?? caps.maxOutputTokens ?? 4096;
   const body: Record<string, unknown> = {
     model: modelId,
     messages,
-    max_tokens: options.maxTokens ?? caps.maxOutputTokens,
+    max_tokens: resolvedMaxTokens,
     temperature: options.temperature ?? caps.idealTemperature
   };
 
