@@ -16,7 +16,7 @@
     TEXT_PROVIDER_ALIAS_MAP,
     TEXT_PROVIDERS
   } from '$lib/config/providers';
-  const REASONING_EFFORTS = ['xhigh', 'high', 'medium', 'low', 'minimal', 'none'] as const;
+  const REASONING_EFFORTS = ['auto', 'xhigh', 'high', 'medium', 'low', 'minimal', 'none'] as const;
   import { AVATARS, CONTENT_MODES, WRITING_STYLES, WRITING_TONES } from '$lib/editor/setupCatalog';
   import { exportDiagnosticsLog, logger, recordDiagnosticEvent } from '$lib/utils/logger';
   import PageHeader from '$lib/components/PageHeader.svelte';

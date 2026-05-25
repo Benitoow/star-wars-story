@@ -68,12 +68,12 @@ describe('supportsAgenticToolCalling', () => {
   });
 });
 
-describe('grok-4.1-fast optimization profile', () => {
-  it('uses low-effort reasoning with an expanded output budget', () => {
+describe('grok-4.1-fast reasoning + provider tuning', () => {
+  it('defaults to auto reasoning with no output cap', () => {
     const caps = detectModelCapabilities({ providerId: 'openrouter', model: 'x-ai/grok-4.1-fast' });
 
     expect(caps.reasoningStyle).toBe('openai-effort');
-    expect(caps.reasoningEffort).toBe('low');
+    expect(caps.reasoningEffort).toBe('auto');
     expect(caps.maxOutputTokens).toBeUndefined();
   });
 
@@ -102,7 +102,7 @@ describe('grok-4.1-fast optimization profile', () => {
     expect(chatRequest.provider?.preferred_min_throughput).toEqual({ p90: 90, p99: 55 });
   });
 
-  it('enables explicit reasoning for normal narrative calls', async () => {
+  it('omits the reasoning param by default (model decides)', async () => {
     const fetchMock = vi.fn().mockImplementation(() => jsonResponse({
       choices: [
         {
@@ -121,20 +121,42 @@ describe('grok-4.1-fast optimization profile', () => {
     const body = await readRequestJson(fetchMock);
     const chatRequest = body as Record<string, any>;
 
-    expect(chatRequest.reasoning).toEqual({ effort: 'low' });
+    expect(chatRequest.reasoning).toBeUndefined();
+  });
+
+  it('forwards an explicit reasoning effort override', async () => {
+    const fetchMock = vi.fn().mockImplementation(() => jsonResponse({
+      choices: [
+        {
+          message: { role: 'assistant', content: 'ok' }
+        }
+      ]
+    }));
+    vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
+
+    await callOpenAiCompatibleRaw(
+      [{ role: 'user', content: 'test narrative pass' }],
+      { providerId: 'openrouter', model: 'x-ai/grok-4.1-fast', apiKey: 'test-key', reasoningEffortOverride: 'high' },
+      { skipReasoning: false, maxTokens: 1200 }
+    );
+
+    const body = await readRequestJson(fetchMock);
+    const chatRequest = body as Record<string, any>;
+
+    expect(chatRequest.reasoning).toEqual({ effort: 'high' });
   });
 });
 
-describe('mimo-v2-flash optimization profile', () => {
-  it('uses low-effort profile with an expanded output budget', () => {
+describe('mimo-v2-flash reasoning + latency-first tuning', () => {
+  it('defaults to auto reasoning with no output cap', () => {
     const caps = detectModelCapabilities({ providerId: 'openrouter', model: 'xiaomi/mimo-v2-flash' });
 
     expect(caps.reasoningStyle).toBe('openai-effort');
-    expect(caps.reasoningEffort).toBe('low');
+    expect(caps.reasoningEffort).toBe('auto');
     expect(caps.maxOutputTokens).toBeUndefined();
   });
 
-  it('uses boolean reasoning toggle + latency-first provider tuning', async () => {
+  it('omits reasoning by default + applies latency-first provider tuning', async () => {
     const fetchMock = vi.fn().mockImplementation(() => jsonResponse({
       choices: [
         {
@@ -153,7 +175,7 @@ describe('mimo-v2-flash optimization profile', () => {
     const body = await readRequestJson(fetchMock);
     const chatRequest = body as Record<string, any>;
 
-    expect(chatRequest.reasoning).toEqual({ effort: 'low' });
+    expect(chatRequest.reasoning).toBeUndefined();
     expect(chatRequest.provider?.sort).toBe('latency');
     expect(chatRequest.provider?.preferred_max_latency).toEqual({ p90: 2, p99: 4.5 });
     expect(chatRequest.provider?.preferred_min_throughput).toEqual({ p90: 45, p99: 20 });

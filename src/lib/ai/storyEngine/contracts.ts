@@ -46,7 +46,8 @@ export function assertSupportedStoryProviderConfig(
     providerId,
     model: cleanText(config.model, 160) || DEFAULT_TEXT_MODEL_ID,
     apiKey: cleanText(config.apiKey, 500),
-    ollamaUrl: cleanText(config.ollamaUrl, 240) || undefined
+    ollamaUrl: cleanText(config.ollamaUrl, 240) || undefined,
+    reasoningEffortOverride: cleanText(config.reasoningEffortOverride, 16) || undefined
   };
 }
 

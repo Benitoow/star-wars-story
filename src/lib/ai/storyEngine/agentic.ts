@@ -78,16 +78,14 @@ function resolveStepConfig(baseConfig: StoryProviderConfig, override?: StoryProv
 
 function getStepTokenBudget(stepConfig: StoryProviderConfig, step: StoryPipelineStep): number | undefined {
   const caps = detectModelCapabilities(stepConfig);
-  const maxTokens = caps.maxOutputTokens;
-  // Si pas de limite → aucun bridage, le provider décide
-  if (maxTokens === undefined) return undefined;
-  // Les steps moins verbeux utilisent une fraction, mais sans cap haut
-  if (step === 'scribe') return Math.max(Math.round(maxTokens * 0.2), 400);
-  if (step === 'director') return Math.max(Math.round(maxTokens * 0.3), 600);
-  if (step === 'writer') return maxTokens;
-  if (step === 'world-observer') return Math.max(Math.round(maxTokens * 0.2), 400);
-  if (step === 'world-adjudicator') return Math.max(Math.round(maxTokens * 0.3), 600);
-  return maxTokens;  // brain
+  const max = caps.maxOutputTokens;
+  // Aucun plafond par défaut (max === undefined) : on laisse le provider décider,
+  // pour ne pas étouffer les modèles verbeux en raisonnement (ex: DeepSeek V4 Pro).
+  if (max === undefined) return undefined;
+  // Si jamais un plafond est défini, les steps courts en prennent une fraction.
+  if (step === 'scribe' || step === 'world-observer') return Math.max(Math.round(max * 0.2), 400);
+  if (step === 'director' || step === 'world-adjudicator') return Math.max(Math.round(max * 0.3), 600);
+  return max;  // writer, brain
 }
 
 function getStepTemperature(step: StoryPipelineStep): number {

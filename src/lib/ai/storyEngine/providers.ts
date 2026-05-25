@@ -343,36 +343,31 @@ function resolveModel(config: StoryProviderConfig): string {
 }
 
 type ModelTier = 'small' | 'medium' | 'large';
-type ReasoningStyle = 'openai-effort' | 'anthropic-thinking' | 'adaptive' | 'none';
+type ReasoningStyle = 'openai-effort' | 'anthropic-thinking' | 'none';
+// 'auto' = on n'envoie aucun param reasoning → le modèle applique son comportement
+// natif (adaptatif pour ceux qui le supportent). Les autres valeurs forcent l'effort.
+export type ReasoningEffortSetting = 'auto' | 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
 
 export interface ModelCapabilities {
   tier: ModelTier;
   reasoningStyle: ReasoningStyle;
-  reasoningEffort: 'low' | 'medium' | 'high' | 'xhigh' | 'minimal' | 'none' | 'adaptive';
+  reasoningEffort: ReasoningEffortSetting;
   supportsNativeTools: boolean;
-  maxOutputTokens: number | undefined;
+  maxOutputTokens: number | undefined;  // undefined = aucun plafond, le provider décide
   idealTemperature: number;
 }
 
-// Défaut: tous les modèles supportent le reasoning via l'API OpenAI-compatible
+// Défaut: on laisse le modèle gérer son raisonnement ET sa longueur de sortie.
+// L'effort n'est forcé que si l'utilisateur le choisit dans Settings — UI elle-même
+// filtrée par les supported_parameters renvoyés par l'API OpenRouter.
 const DEFAULT_CAPS: ModelCapabilities = {
   tier: 'medium',
   reasoningStyle: 'openai-effort',
-  reasoningEffort: 'high',
+  reasoningEffort: 'auto',
   supportsNativeTools: true,
-  maxOutputTokens: undefined,  // pas de limite, le provider décide
+  maxOutputTokens: undefined,
   idealTemperature: 0.9
 };
-
-// Petite liste d'exclusion: uniquement les modèles qui ne supportent PAS reasoning.effort
-const NO_REASONING_PATTERNS: RegExp[] = [
-  /llama.*instruct.*free/i,
-  /mistral-small(?!.*thinking)/i,
-  /gemini-2\.5-flash-lite/i,
-  /gemma-3-27b-it(?!.*thinking)/i,
-  /gemini-2\.0-flash(?!.*thinking)/i,
-  /claude-3-7-sonnet/i,
-];
 
 function isFlashOrMini(modelId: string): boolean {
   return /flash|mini|small|scout|nano|lite/i.test(modelId) && !/pro|max|ultra|plus/i.test(modelId);
@@ -382,21 +377,11 @@ function isProOrLarge(modelId: string): boolean {
   return /pro|max|large|opus|omni|premium|plus|ultra/i.test(modelId);
 }
 
+// tier ne sert qu'à ajuster le timeout réseau — il n'impose aucun plafond de tokens.
 export function detectModelCapabilities(config: StoryProviderConfig): ModelCapabilities {
   const modelId = resolveModel(config).toLowerCase();
-  const supportsReasoning = !NO_REASONING_PATTERNS.some(p => p.test(modelId));
   const tier = isProOrLarge(modelId) ? 'large' : isFlashOrMini(modelId) ? 'small' : 'medium';
-
-  // Claude 4.6+ utilise le thinking adaptatif natif OpenRouter
-  const isAdaptiveModel = /claude-(?:opus|sonnet)-4\.[6-9]|claude-(?:opus|sonnet)-[5-9]/i.test(modelId)
-    || /claude-4\.[6-9]-/i.test(modelId);
-
-  return {
-    ...DEFAULT_CAPS,
-    tier,
-    reasoningStyle: isAdaptiveModel ? 'adaptive' : supportsReasoning ? 'openai-effort' : 'none',
-    reasoningEffort: isAdaptiveModel ? 'adaptive' : supportsReasoning ? 'high' : 'none'
-  };
+  return { ...DEFAULT_CAPS, tier };
 }
 
 function getOpenRouterProviderPreferences(modelId: string): ProviderPreferences | undefined {
@@ -467,17 +452,16 @@ function buildReasoningPayload(
   skipReasoning = false,
   effortOverride?: string
 ): Reasoning | undefined {
-  // adaptive → ne pas envoyer de paramètre reasoning, OpenRouter décide nativement
-  if (caps.reasoningStyle === 'adaptive' || caps.reasoningEffort === 'adaptive') {
-    if (skipReasoning || effortOverride === 'none') return { effort: 'none' };
-    return undefined;
-  }
-
   if (caps.reasoningStyle !== 'openai-effort') return undefined;
 
-  const effort = skipReasoning || effortOverride === 'none'
-    ? 'none'
-    : (effortOverride ?? caps.reasoningEffort);
+  // Passes d'extraction interne (scribe, observer) : raisonnement coupé.
+  if (skipReasoning) return { effort: 'none' };
+
+  const effort = (effortOverride && effortOverride.trim()) || caps.reasoningEffort;
+
+  // 'auto' (défaut) → aucun param reasoning envoyé : le modèle décide lui-même.
+  // C'est universellement sûr (un modèle non-reasoning ignore simplement l'absence).
+  if (effort === 'auto') return undefined;
 
   return { effort: effort as Reasoning['effort'] };
 }
