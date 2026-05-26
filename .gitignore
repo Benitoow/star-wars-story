@@ -27,3 +27,6 @@ npm-debug.log*
 yarn-debug.log*
 pnpm-debug.log*
 fav.jpg
+
+# Diagnostic exports (downloaded by the user, must never be committed)
+sw-diagnostic-*.json
