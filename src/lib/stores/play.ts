@@ -19,6 +19,7 @@ import {
   type WorldState
 } from '$lib/engine';
 import { SESSION_VERSION, getPreferences, getStory, loadSession, saveSession, touchStory } from '$lib/persistence';
+import { resolveUiLanguage } from '$lib/content/languages';
 import { toasts } from './ui';
 
 export type PlayStatus = 'idle' | 'loading' | 'generating' | 'ready' | 'error';
@@ -45,11 +46,12 @@ const { subscribe, set, update } = writable<PlayState>({ ...initial });
 let snap: PlayState = { ...initial };
 subscribe((s) => (snap = s));
 
-async function loadProvider(): Promise<{ config: StoryProviderConfig; mode: StoryGenerationMode }> {
+async function loadProvider(): Promise<{ config: StoryProviderConfig; mode: StoryGenerationMode; language: string }> {
   const p = await getPreferences();
   return {
     config: { providerId: p.textProvider, model: p.textModel, apiKey: p.textApiKey, reasoningEffort: p.reasoningEffort },
-    mode: p.runtimeMode
+    mode: p.runtimeMode,
+    language: resolveUiLanguage(p.uiLanguage)
   };
 }
 
@@ -97,8 +99,8 @@ async function startOpening(): Promise<void> {
   if (!setup) return;
   update((s) => ({ ...s, status: 'generating', error: null }));
   try {
-    const { config, mode } = await loadProvider();
-    applyResult(await generateOpening(setup, config, { mode }), '');
+    const { config, mode, language } = await loadProvider();
+    applyResult(await generateOpening({ ...setup, language }, config, { mode }), '');
   } catch (error) {
     fail(error);
   }
@@ -112,10 +114,10 @@ async function submit(actionText: string, outcomeDirective = ''): Promise<void> 
 
   update((s) => ({ ...s, status: 'generating', error: null }));
   try {
-    const { config, mode } = await loadProvider();
+    const { config, mode, language } = await loadProvider();
     const result = await generateTurn(
       {
-        setup,
+        setup: { ...setup, language },
         worldState,
         turnNumber: snap.turnNumber + 1,
         actionText: action,
