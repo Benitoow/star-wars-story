@@ -7,7 +7,6 @@
   import { APP_NAME, APP_VERSION_LABEL } from '$lib/version';
   import { getModelContextLimit, getDynamicContextBudget } from '$lib/engine/context';
   import { fetchContextLengths } from '$lib/engine';
-  import { CONTENT_MODES } from '$lib/content/catalog';
   import type { Preferences } from '$lib/persistence';
 
   const REASONING = [
@@ -23,8 +22,7 @@
     textModel: '',
     uiLanguage: 'auto' as Preferences['uiLanguage'],
     runtimeMode: 'agentic-subagents' as Preferences['runtimeMode'],
-    reasoningEffort: 'auto',
-    contentMode: 'cinematic'
+    reasoningEffort: 'auto'
   };
   let showAdvanced = false;
   let saving = false;
@@ -54,8 +52,7 @@
       textModel: p.textModel,
       uiLanguage: p.uiLanguage,
       runtimeMode: p.runtimeMode,
-      reasoningEffort: p.reasoningEffort,
-      contentMode: p.contentMode || 'cinematic'
+      reasoningEffort: p.reasoningEffort
     };
   });
 
@@ -64,8 +61,7 @@
     form.textModel.trim() !== $preferences.textModel ||
     form.uiLanguage !== $preferences.uiLanguage ||
     form.runtimeMode !== $preferences.runtimeMode ||
-    form.reasoningEffort !== $preferences.reasoningEffort ||
-    form.contentMode !== $preferences.contentMode;
+    form.reasoningEffort !== $preferences.reasoningEffort;
 
   async function save() {
     if (!dirty || saving) return;
@@ -76,8 +72,7 @@
         textModel: form.textModel.trim(),
         uiLanguage: form.uiLanguage,
         runtimeMode: form.runtimeMode,
-        reasoningEffort: form.reasoningEffort,
-        contentMode: form.contentMode
+        reasoningEffort: form.reasoningEffort
       });
       toasts.show('Réglages enregistrés.', 'success', 2000);
     } catch {
@@ -155,15 +150,6 @@
           {#each REASONING as o}<option value={o.id}>{o.name}</option>{/each}
         </select>
         <p class="hint">« Auto » laisse chaque modèle gérer son raisonnement (recommandé).</p>
-      </div>
-      <div class="field mt">
-        <label class="label" for="content-mode">Modérateur / Directive de contenu</label>
-        <select id="content-mode" class="input" bind:value={form.contentMode}>
-          {#each CONTENT_MODES as m}
-            <option value={m.id}>{m.icon} {m.name} — {m.desc}</option>
-          {/each}
-        </select>
-        <p class="hint">Définit la censure par défaut pour vos histoires (ex: "Brut" supprime tous les filtres de violence ou de romance).</p>
       </div>
     {/if}
   </section>
