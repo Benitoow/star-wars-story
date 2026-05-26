@@ -10,7 +10,7 @@ import { callTextModel } from './provider';
 import { languageInstruction, languageName } from './prompts/language';
 import { ERA_COHERENCE, styleDirective } from './prompts/style';
 import { renderWorldBlock, renderWorldDigest } from './prompts/system';
-import type { StoryChapter, StoryProviderConfig, StorySetup, WorldState } from './types';
+import type { ChatMessage, StoryChapter, StoryProviderConfig, StorySetup, WorldState } from './types';
 
 const DIRECTOR_SYSTEM = `Tu es le DIRECTEUR de scène d'une campagne Star Wars. Tu transformes l'action du joueur en brief de scène concret et court. Réponds UNIQUEMENT en JSON valide, aucune prose autour.`;
 
@@ -24,17 +24,20 @@ Règles ABSOLUES :
 - Dialogues : chaque réplique sur sa ligne, format "Nom : réplique" (INTERDICTION du tiret cadratin '—' ou de tout tiret en début de ligne).
 - Réponds UNIQUEMENT avec la scène finale réécrite.`;
 
-function writerSystem(setup: StorySetup, turnNumber: number, world: WorldState, canon: string): string {
+function writerSystem(setup: StorySetup, turnNumber: number, world: WorldState, canon: string, archive: string[]): string {
   const protagonist = [setup.protagonistFirstName, setup.protagonistLastName].filter(Boolean).join(' ').trim() || 'Le protagoniste';
   const prologue = turnNumber <= 1
     ? `\n- TOUR 1 : commence par une riche introduction du protagoniste (${protagonist}) — origines liées à son rôle (${setup.role}) et sa faction (${setup.faction}), situation actuelle, tension immédiate — avant l'action.`
     : '';
+  const archiveBlock = archive.length
+    ? `\nRÉSUMÉ DES TOURS ANCIENS (continuité, ne pas répéter mot à mot) :\n${archive.map((a) => `- ${a}`).join('\n')}`
+    : '';
   return `${languageInstruction(setup.language)}
 
-Tu es l'ÉCRIVAIN d'une campagne Star Wars d'élite : prose cinématique, immersive, soignée.
+Tu es l'ÉCRIVAIN d'une campagne Star Wars d'élite : prose cinématique, immersive, soignée. Les messages précédents sont la scène déjà jouée — écris la SUITE en continuité.
 Protagoniste : ${protagonist} | Ère : ${setup.era} | Faction : ${setup.faction} | Rôle : ${setup.role}
 Style : ${setup.writingStyle || 'cinématique'} · Ton : ${setup.writingTone || 'aventure'}
-${renderWorldBlock(world, protagonist)}
+${renderWorldBlock(world, protagonist)}${archiveBlock}
 
 RÈGLES :
 1. Écris 2 à 3 paragraphes. Aucune sortie technique (ni JSON, ni markdown, ni liste).
@@ -65,16 +68,15 @@ Réponds en JSON strict :
 }`;
 }
 
-function writerUser(summary: string, brief: Record<string, unknown>, action: string, outcomeDirective: string): string {
+function writerUser(brief: Record<string, unknown>, action: string, outcomeDirective: string): string {
   const mustInclude = Array.isArray(brief.must_include) ? brief.must_include.map((m) => `- ${cleanText(m, 100)}`).join('\n') : '- Conséquence directe de l\'action';
-  return `Situation : ${cleanText(summary, 1000) || '(ouverture de l\'aventure)'}
-But de scène : ${cleanText(brief.scene_goal, 200)}
+  return `But de scène : ${cleanText(brief.scene_goal, 200)}
 Tension : ${cleanText(brief.tension, 200)}
 Éléments obligatoires :
 ${mustInclude}
 
 ACTION À RENDRE : ${cleanText(action, 240)}
-${outcomeDirective ? `${outcomeDirective}\n` : ''}Écris la scène maintenant (2 à 3 paragraphes). La première impulsion montre la conséquence directe de l'action.`;
+${outcomeDirective ? `${outcomeDirective}\n` : ''}Écris la suite immédiate (2 à 3 paragraphes), en continuité directe de la scène précédente ci-dessus. La première impulsion montre la conséquence de l'action.`;
 }
 
 function brainUser(prose: string, brief: Record<string, unknown>, digest: string): string {
@@ -125,7 +127,9 @@ export interface AgenticContext {
   worldState: WorldState;
   turnNumber: number;
   actionText: string;
-  summary: string;
+  situation: string;            // compressed story-so-far for the Director
+  transcript: ChatMessage[];    // raw recent scenes (conversation) for the Writer
+  archive: string[];            // older turns, condensed (into the Writer's system)
   outcomeDirective?: string;
   playerDirectives?: string[];
 }
@@ -145,9 +149,9 @@ export async function runAgenticTurn(
   const digest = renderWorldDigest(ctx.worldState);
   const canon = playerCanonBlock(ctx.playerDirectives);
 
-  // 1. Director — scene brief (JSON)
+  // 1. Director — scene brief (JSON), planned from the condensed story-so-far
   const briefRaw = await callTextModel(
-    [{ role: 'system', content: `${languageInstruction(lang)}\n\n${DIRECTOR_SYSTEM}` }, { role: 'user', content: directorUser(ctx.summary, ctx.actionText, ctx.turnNumber, digest, canon) }],
+    [{ role: 'system', content: `${languageInstruction(lang)}\n\n${DIRECTOR_SYSTEM}` }, { role: 'user', content: directorUser(ctx.situation, ctx.actionText, ctx.turnNumber, digest, canon) }],
     provider,
     { jsonMode: true, skipReasoning: true }
   );
@@ -160,9 +164,14 @@ export async function runAgenticTurn(
     }
   })();
 
-  // 2. Writer — cinematic prose (grounded in the full world block)
+  // 2. Writer — cinematic prose, grounded in the world block + archive and
+  // reading the RAW recent scenes (transcript) as the conversation so far.
   const draft = await callTextModel(
-    [{ role: 'system', content: writerSystem(ctx.setup, ctx.turnNumber, ctx.worldState, canon) }, { role: 'user', content: writerUser(ctx.summary, brief, ctx.actionText, ctx.outcomeDirective ?? '') }],
+    [
+      { role: 'system', content: writerSystem(ctx.setup, ctx.turnNumber, ctx.worldState, canon, ctx.archive) },
+      ...ctx.transcript,
+      { role: 'user', content: writerUser(brief, ctx.actionText, ctx.outcomeDirective ?? '') }
+    ],
     provider
   );
 

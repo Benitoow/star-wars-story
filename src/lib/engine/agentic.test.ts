@@ -35,7 +35,7 @@ describe('agentic pipeline (mocked transport)', () => {
     const mock = stubSequence([director, writer, reviewer, brain]);
 
     const result = await generateTurn(
-      { setup, worldState: initWorldState(setup), turnNumber: 2, actionText: 'Courir vers le hangar', recentSummary: ['Tour 1 : capture.'] },
+      { setup, worldState: initWorldState(setup), turnNumber: 2, actionText: 'Courir vers le hangar' },
       provider,
       { mode: 'agentic-subagents' }
     );

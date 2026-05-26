@@ -8,8 +8,8 @@ import {
   generateOpening,
   generateTurn,
   rebuildWorldState,
+  resolveContextBudget,
   rollForChoice,
-  summarizeChapterForPrompt,
   type StoryChapter,
   type StoryChoice,
   type StoryGenerationMode,
@@ -46,12 +46,14 @@ const { subscribe, set, update } = writable<PlayState>({ ...initial });
 let snap: PlayState = { ...initial };
 subscribe((s) => (snap = s));
 
-async function loadProvider(): Promise<{ config: StoryProviderConfig; mode: StoryGenerationMode; language: string }> {
+async function loadProvider(): Promise<{ config: StoryProviderConfig; mode: StoryGenerationMode; language: string; contextBudget: number }> {
   const p = await getPreferences();
+  const config: StoryProviderConfig = { providerId: p.textProvider, model: p.textModel, apiKey: p.textApiKey, reasoningEffort: p.reasoningEffort };
   return {
-    config: { providerId: p.textProvider, model: p.textModel, apiKey: p.textApiKey, reasoningEffort: p.reasoningEffort },
+    config,
     mode: p.runtimeMode,
-    language: resolveUiLanguage(p.uiLanguage)
+    language: resolveUiLanguage(p.uiLanguage),
+    contextBudget: await resolveContextBudget(config) // auto-detected from the model's window
   };
 }
 
@@ -114,7 +116,7 @@ async function submit(actionText: string, outcomeDirective = ''): Promise<void> 
 
   update((s) => ({ ...s, status: 'generating', error: null }));
   try {
-    const { config, mode, language } = await loadProvider();
+    const { config, mode, language, contextBudget } = await loadProvider();
     const result = await generateTurn(
       {
         setup: { ...setup, language },
@@ -122,9 +124,9 @@ async function submit(actionText: string, outcomeDirective = ''): Promise<void> 
         turnNumber: snap.turnNumber + 1,
         actionText: action,
         memoryFacts: snap.memoryFacts,
-        recentSummary: snap.chapterHistory.slice(-5).map(summarizeChapterForPrompt),
-        recentSectionTypes: snap.chapterHistory.slice(-6).map((c) => c.section_type),
-        recentChoiceTexts: snap.chapterHistory.slice(-4).flatMap((c) => c.choices.map((ch) => ch.text)),
+        chapterHistory: snap.chapterHistory,
+        actionHistory: snap.actionHistory,
+        contextBudget,
         playerDirectives: snap.actionHistory.slice(-6),
         outcomeDirective
       },

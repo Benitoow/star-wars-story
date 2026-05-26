@@ -43,7 +43,6 @@ EXIGENCES DU PREMIER TOUR (rédige ENTIÈREMENT EN ${langName}) :
 export function buildContinuePrompt(
   actionText: string,
   turnNumber: number,
-  recentSummary: string[] = [],
   recentSectionTypes: string[] = [],
   recentChoiceTexts: string[] = [],
   languageCode?: string,
@@ -53,12 +52,13 @@ export function buildContinuePrompt(
   const langName = languageName(languageCode || 'fr');
   const action = cleanText(actionText, 280);
 
+  // History is carried by the raw transcript messages now — this prompt only
+  // adds the current action, the player canon, choice de-dup and pacing.
   const outcome = outcomeDirective ? `${outcomeDirective}\n` : '';
   const recentDirectives = playerDirectives.map((d) => d.trim()).filter(Boolean).slice(-6);
   const canon = recentDirectives.length
     ? `\nCANON DU JOUEUR (à respecter absolument, ne jamais contredire — ex: ne pas faire apparaître un groupe qu'il a exclu) :\n${recentDirectives.map((d) => `- ${d}`).join('\n')}`
     : '';
-  const history = recentSummary.length ? `\nRésumé récent :\n${recentSummary.map((s) => `- ${s}`).join('\n')}` : '';
 
   const recentChoices = Array.from(new Set(recentChoiceTexts.map((c) => cleanText(c, 160)).filter(Boolean))).slice(-20);
   const choicesBlock = recentChoices.length ? `\nChoix déjà proposés à éviter : ${recentChoices.map((c) => `"${c}"`).join(' | ')}` : '';
@@ -75,7 +75,7 @@ export function buildContinuePrompt(
   return `ACTION JOUEUR CANONIQUE : ${action}
 ${outcome}OBLIGATION : la scène suivante traite cette action comme cause immédiate (ou tentative avec conséquence concrète), rédigée ENTIÈREMENT EN ${langName}.
 
-Tour ${turnNumber}.${canon}${history}${choicesBlock}${pacing}
+Tour ${turnNumber}.${canon}${choicesBlock}${pacing}
 
 Écris une scène forte et précise — conséquences réelles, PNJs avec mémoire et intention propre.
 Aucun markdown, aucun titre interne, aucun bloc de choix dans le récit.

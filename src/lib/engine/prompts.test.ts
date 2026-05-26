@@ -7,7 +7,7 @@ const setup: StorySetup = { era: 'imperial', faction: 'jedi', role: 'padawan', p
 
 describe('player canon — keeps the player\'s stated constraints in context', () => {
   it('the continue prompt injects recent player directives as canon', () => {
-    const prompt = buildContinuePrompt('Je négocie', 3, [], [], [], 'fr', '', [
+    const prompt = buildContinuePrompt('Je négocie', 3, [], [], 'fr', '', [
       "Il n'y a pas de soldats sur ce marché"
     ]);
     expect(prompt).toContain('CANON DU JOUEUR');

@@ -114,13 +114,17 @@ export function buildSystemPrompt(
   memoryFacts: string[] = [],
   worldState?: WorldState,
   turnNumber?: number,
-  playerDirectives: string[] = []
+  playerDirectives: string[] = [],
+  campaignArchive: string[] = []
 ): string {
   const protagonist = protagonistName(setup);
   const lang = setup.language || 'fr';
   const langName = languageName(lang);
   const worldBlock = worldState ? renderWorldBlock(worldState, protagonist) : '';
   const memory = memoryFacts.length ? `\nMÉMOIRE NARRATIVE (faits établis) :\n${memoryFacts.map((f) => `- ${f}`).join('\n')}` : '';
+  const archive = campaignArchive.length
+    ? `\nRÉSUMÉ DES TOURS ANCIENS (condensés pour la continuité — ne pas répéter mot à mot) :\n${campaignArchive.map((a) => `- ${a}`).join('\n')}`
+    : '';
   const canon = renderPlayerCanon(playerDirectives);
   const isTurn1 = turnNumber === 1 || !worldState || worldState.chronology.length === 0;
   const prologue = isTurn1
@@ -134,7 +138,7 @@ Tu es un Maître du Jeu Star Wars d'élite. Tu écris avec précision et cinéma
 Protagoniste : ${protagonist} | Ère : ${setup.era} | Faction : ${setup.faction} | Rôle : ${setup.role}
 Prémisse : ${setup.premise || 'Libre'}
 Style : ${setup.writingStyle || 'cinématique'} · Ton : ${setup.writingTone || 'aventure'} · POV : ${setup.writingPov || 'première personne'} · Longueur : ${setup.writingLength || 'moyen'} · Contenu : ${setup.contentMode || 'cinematic'}
-${worldBlock}${memory}${canon}
+${worldBlock}${memory}${archive}${canon}
 
 ${GM_RULES}
 11. DIRECTIVE STYLISTIQUE : ${styleDirective(setup.writingStyle, setup.writingTone)}

@@ -1,14 +1,14 @@
 /* ═══════════════════════════════════════════════
    Turn orchestration. Dispatches on the generation mode:
-   - structured-json: one call, [system, user] → parse
-   - agentic-subagents: Director → Writer → Brain pipeline
-   Either way the system prompt/summary carries the live
-   world, so a turn is stateless per call; the reducer then
-   advances the world.
+   - structured-json: one call → [system, …raw transcript, user] → parse
+   - agentic-subagents: Director → Writer → Reviewer → Brain
+   The RAW recent history is sent verbatim within the model's context budget;
+   only the overflow (oldest turns) is compressed into a campaign archive.
 ══════════════════════════════════════════════ */
 import { runAgenticTurn } from './agentic';
+import { buildNarrativeContext, DEFAULT_CONTEXT_BUDGET } from './context';
 import { parseStoryResponse } from './parsing';
-import { buildContinuePrompt, buildStartPrompt, buildSystemPrompt } from './prompts';
+import { buildContinuePrompt, buildStartPrompt, buildSystemPrompt, summarizeChapterForPrompt } from './prompts';
 import { callTextModel } from './provider';
 import { cleanText } from './text';
 import type {
@@ -27,16 +27,16 @@ export interface TurnInput {
   turnNumber: number;
   actionText: string;
   memoryFacts?: string[];
-  recentSummary?: string[];
-  recentSectionTypes?: string[];
-  recentChoiceTexts?: string[];
-  outcomeDirective?: string; // hidden dice-roll result that biases the scene
-  playerDirectives?: string[]; // recent player actions/statements — canon to respect
+  chapterHistory?: StoryChapter[]; // full history — kept raw up to the budget
+  actionHistory?: string[];        // player actions paired with the chapters
+  contextBudget?: number;          // token budget for the raw transcript
+  playerDirectives?: string[];     // recent player actions/statements — canon to respect
+  outcomeDirective?: string;       // hidden dice-roll result that biases the scene
 }
 
 const OPENING_ACTION = "Entrer dans la scène d'ouverture et survivre aux premières secondes.";
 
-/** Turn 1 — generate the opening scene from setup. */
+/** Turn 1 — generate the opening scene from setup (no history yet). */
 export async function generateOpening(
   setup: StorySetup,
   provider: StoryProviderConfig,
@@ -48,7 +48,10 @@ export async function generateOpening(
   let mode: StoryGenerationMode;
 
   if (options.mode === 'agentic-subagents') {
-    const r = await runAgenticTurn({ setup, worldState: world, turnNumber: 1, actionText: OPENING_ACTION, summary: cleanText(setup.premise, 800) }, provider);
+    const r = await runAgenticTurn(
+      { setup, worldState: world, turnNumber: 1, actionText: OPENING_ACTION, situation: cleanText(setup.premise, 800), transcript: [], archive: [] },
+      provider
+    );
     chapter = r.chapter;
     rawResponse = r.raw;
     mode = 'agentic-subagents';
@@ -71,18 +74,29 @@ export async function generateTurn(
   provider: StoryProviderConfig,
   options: { mode?: StoryGenerationMode } = {}
 ): Promise<StoryTurnResult> {
+  const history = input.chapterHistory ?? [];
+  const budget = input.contextBudget ?? DEFAULT_CONTEXT_BUDGET;
+  const { transcript, archive } = buildNarrativeContext(history, input.actionHistory ?? [], budget);
+  const recentSectionTypes = history.slice(-6).map((c) => c.section_type);
+  const recentChoiceTexts = history.slice(-4).flatMap((c) => c.choices.map((ch) => ch.text));
+
   let chapter: StoryChapter;
   let rawResponse: string;
   let mode: StoryGenerationMode;
 
   if (options.mode === 'agentic-subagents') {
+    // The Director plans from a condensed story-so-far (archive + a short recap);
+    // the Writer reads the raw transcript.
+    const situation = [...archive, ...history.slice(-2).map(summarizeChapterForPrompt)].join('\n');
     const r = await runAgenticTurn(
       {
         setup: input.setup,
         worldState: input.worldState,
         turnNumber: input.turnNumber,
         actionText: input.actionText,
-        summary: (input.recentSummary ?? []).join('\n'),
+        situation,
+        transcript,
+        archive,
         outcomeDirective: input.outcomeDirective,
         playerDirectives: input.playerDirectives
       },
@@ -93,15 +107,15 @@ export async function generateTurn(
     mode = 'agentic-subagents';
   } else {
     const messages = [
-      { role: 'system' as const, content: buildSystemPrompt(input.setup, input.memoryFacts ?? [], input.worldState, input.turnNumber, input.playerDirectives ?? []) },
+      { role: 'system' as const, content: buildSystemPrompt(input.setup, input.memoryFacts ?? [], input.worldState, input.turnNumber, input.playerDirectives ?? [], archive) },
+      ...transcript,
       {
         role: 'user' as const,
         content: buildContinuePrompt(
           input.actionText,
           input.turnNumber,
-          input.recentSummary ?? [],
-          input.recentSectionTypes ?? [],
-          input.recentChoiceTexts ?? [],
+          recentSectionTypes,
+          recentChoiceTexts,
           input.setup.language,
           input.outcomeDirective ?? '',
           input.playerDirectives ?? []
