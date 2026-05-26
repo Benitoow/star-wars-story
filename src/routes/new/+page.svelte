@@ -1,7 +1,10 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import { onMount } from 'svelte';
+  import { get } from 'svelte/store';
+  import { preferences } from '$lib/stores/preferences';
   import {
-    ERAS, FACTIONS, ROLES, TRAMES, AVATARS, NARRATIVE_PRESETS,
+    ERAS, FACTIONS, ROLES, TRAMES, AVATARS, NARRATIVE_PRESETS, CONTENT_MODES,
     eraBackdrop, defaultRoleForFaction, withSetupDefaults, type NarrativePreset
   } from '$lib/content/catalog';
   import { createStory } from '$lib/persistence';
@@ -18,9 +21,20 @@
   let trameId = TRAMES[0].id;
   let premise = TRAMES[0].premise;
   let preset: NarrativePreset = NARRATIVE_PRESETS[0];
+  let contentMode = NARRATIVE_PRESETS[0].contentMode;
   let firstName = '';
   let lastName = '';
   let avatar = AVATARS[0];
+
+  onMount(() => {
+    const defaultMode = get(preferences).contentMode;
+    if (defaultMode) {
+      contentMode = defaultMode;
+      // Optionnel : s'il y a un preset qui matche exactement, on le sélectionne
+      const matchingPreset = NARRATIVE_PRESETS.find(p => p.contentMode === defaultMode);
+      if (matchingPreset) preset = matchingPreset;
+    }
+  });
 
   $: roleOptions = ROLES.filter((r) => r.faction === faction || r.faction === 'neutral');
   $: backdrop = eraBackdrop(era);
@@ -46,7 +60,7 @@
           era, faction, role, premise: premise.trim(),
           protagonistFirstName: firstName.trim(), protagonistLastName: lastName.trim(), protagonistAvatar: avatar,
           writingStyle: preset.writingStyle, writingTone: preset.writingTone,
-          writingPov: preset.writingPov, writingLength: preset.writingLength, contentMode: preset.contentMode
+          writingPov: preset.writingPov, writingLength: preset.writingLength, contentMode
         },
         trameId
       );
@@ -115,9 +129,18 @@
         <p class="eyebrow">Ambiance narrative</p>
         <div class="grid">
           {#each NARRATIVE_PRESETS as p}
-            <button type="button" class="tile" class:selected={preset.id === p.id} on:click={() => (preset = p)}>
+            <button type="button" class="tile" class:selected={preset.id === p.id} on:click={() => { preset = p; contentMode = p.contentMode; }}>
               <span class="tile-icon">{p.icon}</span><span class="tile-name">{p.name}</span>
               <span class="tile-sub">{p.desc}</span>
+            </button>
+          {/each}
+        </div>
+        <p class="eyebrow mt">Directive de contenu (Modérateur)</p>
+        <div class="grid compact">
+          {#each CONTENT_MODES as m}
+            <button type="button" class="tile" class:selected={contentMode === m.id} on:click={() => (contentMode = m.id)}>
+              <span class="tile-icon">{m.icon}</span><span class="tile-name">{m.name}</span>
+              <span class="tile-sub">{m.desc}</span>
             </button>
           {/each}
         </div>
