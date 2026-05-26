@@ -22,6 +22,12 @@ export interface TextGenOptions {
   skipReasoning?: boolean;  // for internal extraction passes
 }
 
+export interface StreamOptions {
+  temperature?: number;
+  skipReasoning?: boolean;
+  signal?: AbortSignal;     // external cancel (e.g. the user closes the chat)
+}
+
 const MAX_RETRIES = 3;
 const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
 
@@ -151,4 +157,102 @@ export async function callTextModel(
   }
 
   throw lastError || new Error('Impossible d\'obtenir une réponse du provider.');
+}
+
+function requestHeaders(apiKey: string): Record<string, string> {
+  return {
+    Authorization: `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+    'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'https://localhost',
+    'X-Title': OPENROUTER_APP_TITLE
+  };
+}
+
+/**
+ * Streaming chat completion (SSE). Invokes onToken(delta) as text arrives and
+ * resolves with the full text. Single attempt (no retry — the caller can resend).
+ * If aborted via options.signal, resolves with the partial text gathered so far.
+ */
+export async function callTextModelStream(
+  messages: ChatMessage[],
+  config: StoryProviderConfig,
+  onToken: (delta: string) => void,
+  options: StreamOptions = {}
+): Promise<string> {
+  const cfg = normalizeProviderConfig(config);
+  if (cfg.providerId === 'none') {
+    throw new Error('Aucun provider IA configuré. Ajoute une clé OpenRouter dans les réglages.');
+  }
+  if (!cfg.apiKey) {
+    throw new Error(`Clé API manquante pour ${getProviderDisplayName(cfg.providerId)}.`);
+  }
+
+  const body: Record<string, unknown> = {
+    model: cfg.model,
+    messages,
+    temperature: options.temperature ?? 0.9,
+    stream: true
+  };
+  const reasoning = reasoningPayload(cfg.reasoningEffort, options.skipReasoning === true, cfg.model);
+  if (reasoning) body.reasoning = reasoning;
+
+  const timeoutMs = timeoutFor(cfg.model);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  if (options.signal) {
+    if (options.signal.aborted) controller.abort();
+    else options.signal.addEventListener('abort', () => controller.abort(), { once: true });
+  }
+
+  let full = '';
+  try {
+    const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+      method: 'POST',
+      headers: requestHeaders(cfg.apiKey),
+      body: JSON.stringify(body),
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      const message = parseError(await response.text().catch(() => ''), `HTTP ${response.status}`);
+      throw new Error(`${getProviderDisplayName(cfg.providerId)} : ${message}`);
+    }
+    if (!response.body) throw new Error('Réponse sans flux (streaming indisponible).');
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? ''; // keep the last (possibly incomplete) line
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data:')) continue;
+        const data = trimmed.slice(5).trim();
+        if (!data || data === '[DONE]') continue;
+        try {
+          const json = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string } }> };
+          const delta = json.choices?.[0]?.delta?.content;
+          if (typeof delta === 'string' && delta) {
+            full += delta;
+            onToken(delta);
+          }
+        } catch {
+          /* keep-alive or partial frame — ignore */
+        }
+      }
+    }
+    clearTimeout(timer);
+    return cleanText(full, 16000);
+  } catch (error) {
+    clearTimeout(timer);
+    const msg = error instanceof Error ? error.message : String(error);
+    // User-initiated cancel → return whatever we already streamed.
+    if (options.signal?.aborted) return cleanText(full, 16000);
+    logger.warn(`provider stream error: ${msg}`);
+    throw error instanceof Error ? error : new Error(msg);
+  }
 }
