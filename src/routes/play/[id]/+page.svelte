@@ -8,6 +8,7 @@
   import { toasts } from '$lib/stores/ui';
   import SceneBackdrop from '$lib/ui/SceneBackdrop.svelte';
   import GameHud from '$lib/ui/GameHud.svelte';
+  import ChatPanel from '$lib/ui/ChatPanel.svelte';
 
   $: id = $page.params.id;
   $: if (browser && id) void play.open(id);
@@ -31,6 +32,8 @@
   $: actionParagraphs = (chapter?.narrative.action || '').split(/\n{2,}/).map((s) => s.trim()).filter(Boolean);
   $: dialogueLines = (chapter?.narrative.dialogue || '').split(/\n+/).map((s) => s.trim()).filter(Boolean);
   $: reflection = chapter?.narrative.reflection?.trim() || '';
+  $: presentNpcs = ($play.worldState?.npcs ?? []).filter((n) => n.alive !== false);
+  $: interactive = chapter ? ['dialogue', 'confrontation'].includes(chapter.section_type) : false;
 
   async function onFreeAction() {
     const text = freeText.trim();
@@ -54,7 +57,9 @@
   </div>
 
   <div class="stage">
-    {#if $play.status === 'loading'}
+    {#if $play.chat.active}
+      <ChatPanel />
+    {:else if $play.status === 'loading'}
       <div class="center"><div class="spinner"></div></div>
     {:else if !chapter && generating}
       <div class="center prologue-loading">
@@ -90,6 +95,19 @@
           <input class="input" bind:value={freeText} placeholder="Ou écris ta propre action…" disabled={generating} />
           <button type="submit" class="btn btn-secondary" disabled={generating || !freeText.trim()}>Agir</button>
         </form>
+
+        {#if presentNpcs.length}
+          <div class="talk" class:prominent={interactive}>
+            {#if interactive}<p class="talk-cue eyebrow">Engage la conversation</p>{/if}
+            <div class="talk-actions">
+              {#each presentNpcs as npc}
+                <button type="button" class="talk-btn" on:click={() => play.enterChat(npc.name)} disabled={generating}>
+                  💬 Parler à {npc.name}
+                </button>
+              {/each}
+            </div>
+          </div>
+        {/if}
       </article>
 
       {#if generating}<div class="center overlay"><div class="spinner"></div></div>{/if}
@@ -169,6 +187,20 @@
 
   .free { display: flex; gap: var(--space-sm); margin-top: var(--space-md); }
   .free .input { flex: 1; }
+
+  .talk { margin-top: var(--space-lg); }
+  .talk-cue { margin-bottom: var(--space-sm); color: var(--color-gold); }
+  .talk-actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
+  .talk-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 9px 14px; font-family: var(--font-body); font-size: 0.9rem;
+    color: var(--color-text-secondary); background: transparent;
+    border: 1px dashed var(--color-border); border-radius: 999px; cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+  .talk-btn:hover:not(:disabled) { color: var(--color-text-primary); border-color: var(--color-gold-dim); }
+  .talk-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .talk.prominent .talk-btn { border-style: solid; border-color: var(--color-gold-dim); background: rgba(216,185,119,0.08); color: var(--color-text-primary); }
 
   .center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-lg); text-align: center; padding: var(--space-xl); }
   .overlay { position: absolute; inset: 0; }
