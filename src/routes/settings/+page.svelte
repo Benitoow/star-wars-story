@@ -4,6 +4,7 @@
   import { preferences } from '$lib/stores/preferences';
   import { UI_LANGUAGE_OPTIONS } from '$lib/content/languages';
   import { toasts } from '$lib/stores/ui';
+  import { APP_NAME, APP_VERSION_LABEL } from '$lib/version';
   import type { Preferences } from '$lib/persistence';
 
   const REASONING = [
@@ -127,6 +128,8 @@
     {/if}
   </section>
 
+  <p class="version">{APP_NAME} · {APP_VERSION_LABEL}</p>
+
   <div class="savebar">
     <span class="save-status">{dirty ? 'Modifications non enregistrées' : 'Tout est enregistré'}</span>
     <button type="button" class="btn btn-primary" disabled={!dirty || saving} on:click={save}>
@@ -161,4 +164,5 @@
     border-top: 1px solid var(--color-border);
   }
   .save-status { font-size: 0.82rem; color: var(--color-text-muted); }
+  .version { text-align: center; font-size: 0.74rem; letter-spacing: 0.1em; color: var(--color-text-muted); }
 </style>

@@ -1,5 +1,38 @@
 # Changelog
 
+## v3.0.0 — « Lite » — 2026-05-26
+
+**Réécriture complète, depuis zéro.** La 2.x était devenue trop lourde et impossible à maintenir — le désordre était concentré dans 3 fichiers de 1 600 à 2 400 lignes (settings, écran de jeu, assistant). La 3.0 « Lite » repart sur une base **propre, modulaire et testée**, sans rien perdre du cœur du jeu. ~21 500 lignes supprimées, reconstruites proprement.
+
+### 🎮 Le jeu (préservé et affûté)
+- **Maître du Jeu IA** : aventure interactive Star Wars à monde vivant.
+- **Deux moteurs narratifs**, au choix dans les réglages :
+  * **Direct** — un seul appel (rapide).
+  * **Agentique** — pipeline **Directeur → Écrivain → Relecteur → Cerveau** (4 appels). Nouveauté majeure : les sous-agents **partagent l'état du monde** (l'Écrivain reçoit le bloc monde complet, le Directeur et le Cerveau un digest) → prose cohérente (pas de PNJ ressuscité ni de lieu erroné) et deltas mécaniques sains. Un **Relecteur** peaufine la scène avant affichage, avec repli sûr sur le brouillon en cas d'échec.
+- **Jet de dé caché** : chaque choix (attribut + difficulté) déclenche un jet invisible qui oriente la narration, sans fiche de perso à l'écran.
+- **Monde vivant** persistant : PV, crédits, lieu, date, blessures, inventaire, PNJ, réputation des factions, chronologie. Sauvegarde et reprise automatiques.
+
+### 🎨 Interface
+- Direction **« museum-cinema »** : plein écran, imagerie cinématique, typo gravée (Cinzel / Bitter), sobre.
+- Bibliothèque en grille « affiches », **assistant de création en 4 étapes** (ère → personnage → trame → style), écran de jeu immersif.
+- HUD **« État »** repensé : relations PNJ et réputation des factions en **paliers lisibles** (Loyal/Allié/Amical/Neutre/Méfiant/Hostile/Ennemi…) plutôt qu'en nombres bruts −100/+100, avec barres froid→chaud.
+- **Réglages épurés** : clé OpenRouter + modèle, langue (qui pilote vraiment les récits), thème, et avancés (moteur narratif, raisonnement). Sauvegarde explicite et claire.
+
+### 🧱 Technique
+- Stack conservée et saine : SvelteKit 2 · Svelte 5 · Vite · Dexie (IndexedDB) · Vitest.
+- Moteur **100 % modulaire** — discipline anti-bordel : **aucun fichier > ~300 lignes**, zéro logique métier dans les composants. **39 tests** verts.
+- **OpenRouter en `fetch` direct** (jamais le SDK, cassé en navigateur), pas de plafond de tokens, raisonnement « auto » par défaut.
+- Bannissement strict du tiret cadratin en tête de dialogue, choix génériques proscrits, cohérence d'ère imposée — reconstruits proprement.
+- Base IndexedDB neuve (`StarWarsStory`), application installable (PWA, manifest assaini).
+
+### 🗑️ Retiré (par rapport à la 2.x)
+- Dossiers, page Corbeille dédiée (→ **suppression annulable**), historique de versions, statistiques, profils créatifs, génération d'images, raccourcis clavier, catalogue de modèles statique, et les réglages de style **globaux** redondants (désormais uniquement par histoire, dans l'assistant). Réintroductibles si le besoin se confirme.
+
+### ⏳ Repoussé (hors v1 Lite)
+- Service worker hors-ligne, génération d'images, récupération dynamique de la liste des modèles OpenRouter.
+
+> _La lignée 2.x (jusqu'à 2.7.19) n'est plus maintenue : la 3.0 est une base neuve. L'historique complet reste ci-dessous et dans Git._
+
 ## v2.7.19 — 2026-05-25
 
 ### 🧠 Libération totale et globale du raisonnement à toutes les étapes (`agentic.ts`)

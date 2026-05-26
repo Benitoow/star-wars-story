@@ -1,13 +1,13 @@
 {
-  "name": "Star Wars Story Manager",
-  "short_name": "SW Stories",
-  "version": "2.7.12",
-  "description": "Créez et vivez vos propres histoires interactives Star Wars — propulsé par IA agentique",
+  "name": "Star Wars Story",
+  "short_name": "Star Wars",
+  "version": "3.0.0",
+  "description": "Écris ta légende — une aventure interactive Star Wars où chaque choix façonne un monde vivant.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#07070f",
-  "theme_color": "#FFE81F",
+  "background_color": "#06070b",
+  "theme_color": "#06070b",
   "orientation": "portrait-primary",
   "icons": [
     { "src": "/favicon-16.png",       "sizes": "16x16",   "type": "image/png" },
@@ -22,16 +22,10 @@
   "screenshots": [],
   "shortcuts": [
     {
-      "name": "Nouvelle Histoire",
+      "name": "Nouvelle histoire",
       "short_name": "Nouveau",
-      "url": "/stories/new",
-      "description": "Créer une nouvelle histoire"
-    },
-    {
-      "name": "Corbeille",
-      "short_name": "Corbeille",
-      "url": "/trash",
-      "description": "Voir les histoires supprimées"
+      "url": "/new",
+      "description": "Créer une nouvelle aventure"
     }
   ]
 }
