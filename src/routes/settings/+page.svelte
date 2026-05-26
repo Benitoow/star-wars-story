@@ -5,6 +5,7 @@
   import { UI_LANGUAGE_OPTIONS } from '$lib/content/languages';
   import { toasts } from '$lib/stores/ui';
   import { APP_NAME, APP_VERSION_LABEL } from '$lib/version';
+  import { getModelContextLimit, getDynamicContextBudget } from '$lib/engine/context';
   import type { Preferences } from '$lib/persistence';
 
   const REASONING = [
@@ -24,6 +25,9 @@
   };
   let showAdvanced = false;
   let saving = false;
+
+  $: contextLimit = getModelContextLimit(form.textModel);
+  $: contextBudget = getDynamicContextBudget(form.textModel);
 
   onMount(() => {
     const p = get(preferences); // settings render after boot, so this is the persisted value
@@ -84,6 +88,12 @@
     <label class="label mt" for="model">Modèle</label>
     <input id="model" class="input" placeholder="ex : qwen/qwen3.5-9b" bind:value={form.textModel} />
     <p class="hint">Identifiant de modèle OpenRouter (provider/modèle).</p>
+    {#if form.textModel}
+      <div class="model-info-badge">
+        <span>Limite de Contexte : <strong>{contextLimit.toLocaleString()}</strong> tokens</span>
+        <span>Budget Écrivain (50%) : <strong>{contextBudget.toLocaleString()}</strong> tokens</span>
+      </div>
+    {/if}
   </section>
 
   <section class="card">
@@ -144,6 +154,22 @@
   .card { display: flex; flex-direction: column; }
   .card h2 { font-size: 1.1rem; margin-bottom: var(--space-sm); }
   .hint { font-size: 0.82rem; color: var(--color-text-muted); margin-bottom: var(--space-sm); }
+  .model-info-badge {
+    margin-top: var(--space-xs);
+    padding: var(--space-xs) var(--space-sm);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: var(--radius-sm);
+    font-size: 0.74rem;
+    color: var(--color-text-secondary);
+    display: flex;
+    gap: var(--space-md);
+    flex-wrap: wrap;
+    font-family: var(--font-mono);
+  }
+  .model-info-badge strong {
+    color: var(--color-gold);
+  }
   .label.mt, .field.mt { margin-top: var(--space-md); }
   .row { display: flex; gap: var(--space-md); flex-wrap: wrap; }
   .field { flex: 1; min-width: 200px; }

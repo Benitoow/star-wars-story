@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildNarrativeContext, detectOverusedTerms } from './context';
+import { buildNarrativeContext, detectOverusedTerms, getModelContextLimit, getDynamicContextBudget } from './context';
 import type { StoryChapter } from './types';
 
 function ch(n: number, text: string): StoryChapter {
@@ -53,3 +53,21 @@ describe('detectOverusedTerms', () => {
     expect(detectOverusedTerms([ch(1, 'pourpre pourpre pourpre')])).toEqual([]);
   });
 });
+
+describe('dynamic context budget', () => {
+  it('correctly maps model names to context limits', () => {
+    expect(getModelContextLimit('google/gemini-3.5-flash')).toBe(1_000_000);
+    expect(getModelContextLimit('x-ai/grok-4.3')).toBe(128_000);
+    expect(getModelContextLimit('openai/gpt-4o')).toBe(128_000);
+    expect(getModelContextLimit('meta-llama/llama-3.3-70b')).toBe(128_000);
+    expect(getModelContextLimit('gpt-3.5-turbo')).toBe(16_384);
+    expect(getModelContextLimit('unknown-model')).toBe(128_000); // default
+  });
+
+  it('correctly calculates dynamic budget as 50% of the limit', () => {
+    expect(getDynamicContextBudget('google/gemini-3.5-flash')).toBe(500_000);
+    expect(getDynamicContextBudget('x-ai/grok-4.3')).toBe(64_000);
+    expect(getDynamicContextBudget('gpt-3.5-turbo')).toBe(8_192);
+  });
+});
+

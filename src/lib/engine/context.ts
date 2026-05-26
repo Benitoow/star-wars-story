@@ -11,10 +11,25 @@ import type { ChatMessage, StoryChapter } from './types';
 
 // Token budget for the RAW transcript (≈ chars / 4). Tuned in settings; this
 // default is safe for common models while already far richer than summaries.
-export const DEFAULT_CONTEXT_BUDGET = 12000;
+export const DEFAULT_CONTEXT_BUDGET = 200000;
 
 export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
+}
+
+export function getModelContextLimit(modelId: string): number {
+  const m = String(modelId || '').toLowerCase();
+  if (/\bgemini\b|google\/gemini-/i.test(m)) return 1000000; // 1M
+  if (/\b(?:o1|o3|r1|grok-3|grok-4|gpt-4o|claude-3-5|llama-3\.1|llama-3\.3)\b/i.test(m)) return 128000; // 128K
+  if (/\b(?:claude-3|mixtral-8x22b)\b/i.test(m)) return 200000; // 200K
+  if (/\b(?:gpt-4-turbo|gpt-4)\b/i.test(m)) return 128000;
+  if (/\b(?:gpt-3\.5-turbo)\b/i.test(m)) return 16384;
+  return 128000; // default
+}
+
+export function getDynamicContextBudget(modelId: string): number {
+  const limit = getModelContextLimit(modelId);
+  return Math.floor(limit * 0.5); // 50% threshold
 }
 
 /** The scene as the player saw it (prose + dialogue), used as the assistant turn. */

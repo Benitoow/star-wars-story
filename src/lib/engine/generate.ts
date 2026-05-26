@@ -6,7 +6,7 @@
    only the overflow (oldest turns) is compressed into a campaign archive.
 ══════════════════════════════════════════════ */
 import { runAgenticTurn } from './agentic';
-import { buildNarrativeContext, detectOverusedTerms, DEFAULT_CONTEXT_BUDGET } from './context';
+import { buildNarrativeContext, detectOverusedTerms, DEFAULT_CONTEXT_BUDGET, getDynamicContextBudget } from './context';
 import { parseStoryResponse } from './parsing';
 import { buildContinuePrompt, buildStartPrompt, buildSystemPrompt, summarizeChapterForPrompt } from './prompts';
 import { callTextModel } from './provider';
@@ -75,7 +75,7 @@ export async function generateTurn(
   options: { mode?: StoryGenerationMode } = {}
 ): Promise<StoryTurnResult> {
   const history = input.chapterHistory ?? [];
-  const budget = input.contextBudget ?? DEFAULT_CONTEXT_BUDGET;
+  const budget = input.contextBudget ?? getDynamicContextBudget(provider.model);
   const { transcript, archive } = buildNarrativeContext(history, input.actionHistory ?? [], budget);
   const recentSectionTypes = history.slice(-6).map((c) => c.section_type);
   const recentChoiceTexts = history.slice(-4).flatMap((c) => c.choices.map((ch) => ch.text));
@@ -86,9 +86,8 @@ export async function generateTurn(
   let mode: StoryGenerationMode;
 
   if (options.mode === 'agentic-subagents') {
-    // The Director plans from a condensed story-so-far (archive + a short recap);
-    // the Writer reads the raw transcript.
-    const situation = [...archive, ...history.slice(-2).map(summarizeChapterForPrompt)].join('\n');
+    // The Director plans from a condensed story-so-far containing the summaries of all chapters in history
+    const situation = history.map(summarizeChapterForPrompt).join('\n');
     const r = await runAgenticTurn(
       {
         setup: input.setup,
