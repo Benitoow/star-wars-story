@@ -20,6 +20,7 @@ import {
 } from '$lib/engine';
 import { SESSION_VERSION, getPreferences, getStory, loadSession, saveSession, touchStory } from '$lib/persistence';
 import { resolveUiLanguage } from '$lib/content/languages';
+import { logger, recordDiag } from '$lib/logger';
 import { toasts } from './ui';
 
 export type PlayStatus = 'idle' | 'loading' | 'generating' | 'ready' | 'error';
@@ -92,6 +93,7 @@ function applyResult(result: StoryTurnResult, actionText: string): void {
 
 function fail(error: unknown): void {
   const message = error instanceof Error ? error.message : String(error);
+  logger.error('génération échouée', error);
   update((s) => ({ ...s, status: 'error', error: message }));
   toasts.show(message, 'error', 6000);
 }
@@ -102,7 +104,9 @@ async function startOpening(): Promise<void> {
   update((s) => ({ ...s, status: 'generating', error: null }));
   try {
     const { config, mode, language } = await loadProvider();
-    applyResult(await generateOpening({ ...setup, language }, config, { mode }), '');
+    const result = await generateOpening({ ...setup, language }, config, { mode });
+    recordDiag(`ouverture générée (${result.mode}, ${config.model})`, { rawResponse: result.rawResponse });
+    applyResult(result, '');
   } catch (error) {
     fail(error);
   }
@@ -133,6 +137,7 @@ async function submit(actionText: string, outcomeDirective = ''): Promise<void> 
       config,
       { mode }
     );
+    recordDiag(`tour ${result.chapter.chapter_number} (${result.mode}, ${config.model})`, { action, rawResponse: result.rawResponse });
     applyResult(result, action);
   } catch (error) {
     fail(error);

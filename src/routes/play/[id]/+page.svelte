@@ -4,6 +4,8 @@
   import { goto } from '$app/navigation';
   import { play } from '$lib/stores/play';
   import { eraBackdrop } from '$lib/content/catalog';
+  import { exportStoryDiagnostics } from '$lib/diagnostics';
+  import { toasts } from '$lib/stores/ui';
   import SceneBackdrop from '$lib/ui/SceneBackdrop.svelte';
   import GameHud from '$lib/ui/GameHud.svelte';
 
@@ -11,6 +13,17 @@
   $: if (browser && id) void play.open(id);
 
   let freeText = '';
+
+  async function exportDiag() {
+    const storyId = id;
+    if (!storyId) return;
+    try {
+      await exportStoryDiagnostics(storyId);
+      toasts.show('Diagnostic exporté.', 'success', 2500);
+    } catch {
+      toasts.show('Export impossible.', 'error');
+    }
+  }
 
   $: generating = $play.status === 'generating';
   $: chapter = $play.currentChapter;
@@ -33,7 +46,10 @@
   <SceneBackdrop {backdrop} />
 
   <div class="topbar">
-    <button type="button" class="icon-btn" on:click={() => goto('/')} aria-label="Bibliothèque">←</button>
+    <div class="topbar-actions">
+      <button type="button" class="icon-btn" on:click={() => goto('/')} aria-label="Bibliothèque">←</button>
+      <button type="button" class="icon-btn" on:click={exportDiag} aria-label="Exporter le diagnostic" title="Exporter le diagnostic (à partager pour le debug)">⤓</button>
+    </div>
     {#if $play.worldState}<div class="topbar-hud"><GameHud world={$play.worldState} /></div>{/if}
   </div>
 
@@ -93,6 +109,7 @@
     gap: var(--space-md);
     padding: var(--space-md) var(--space-lg);
   }
+  .topbar-actions { display: flex; gap: var(--space-sm); }
   .topbar-hud { width: min(360px, 60vw); }
   .icon-btn {
     width: 40px; height: 40px;
