@@ -9,13 +9,14 @@ import { parseStoryResponse, sanitizeProse } from './parsing';
 import { callTextModel } from './provider';
 import { languageInstruction, languageName } from './prompts/language';
 import { ERA_COHERENCE, styleDirective } from './prompts/style';
-import type { StoryChapter, StoryProviderConfig, StorySetup } from './types';
+import { renderWorldBlock, renderWorldDigest } from './prompts/system';
+import type { StoryChapter, StoryProviderConfig, StorySetup, WorldState } from './types';
 
 const DIRECTOR_SYSTEM = `Tu es le DIRECTEUR de scène d'une campagne Star Wars. Tu transformes l'action du joueur en brief de scène concret et court. Réponds UNIQUEMENT en JSON valide, aucune prose autour.`;
 
 const BRAIN_SYSTEM = `Tu es le CERVEAU mécanique d'une campagne Star Wars. Tu extrais les conséquences d'une scène déjà écrite. Réponds UNIQUEMENT en JSON valide, aucune prose autour.`;
 
-function writerSystem(setup: StorySetup, turnNumber: number): string {
+function writerSystem(setup: StorySetup, turnNumber: number, world: WorldState): string {
   const protagonist = [setup.protagonistFirstName, setup.protagonistLastName].filter(Boolean).join(' ').trim() || 'Le protagoniste';
   const prologue = turnNumber <= 1
     ? `\n- TOUR 1 : commence par une riche introduction du protagoniste (${protagonist}) — origines liées à son rôle (${setup.role}) et sa faction (${setup.faction}), situation actuelle, tension immédiate — avant l'action.`
@@ -25,18 +26,24 @@ function writerSystem(setup: StorySetup, turnNumber: number): string {
 Tu es l'ÉCRIVAIN d'une campagne Star Wars d'élite : prose cinématique, immersive, soignée.
 Protagoniste : ${protagonist} | Ère : ${setup.era} | Faction : ${setup.faction} | Rôle : ${setup.role}
 Style : ${setup.writingStyle || 'cinématique'} · Ton : ${setup.writingTone || 'aventure'}
+${renderWorldBlock(world, protagonist)}
 
 RÈGLES :
 1. Écris 2 à 3 paragraphes. Aucune sortie technique (ni JSON, ni markdown, ni liste).
 2. Ne propose AUCUN choix.
-3. DIRECTIVE : ${styleDirective(setup.writingStyle, setup.writingTone)}
-4. ${ERA_COHERENCE}
-5. RÔLE CANONIQUE IMMUABLE : garde le rôle "${setup.role}".
-6. Dialogues : chaque réplique sur sa ligne, format "Nom : réplique" (INTERDICTION du tiret cadratin '—' ou de tout tiret en début de ligne).${prologue}`;
+3. COHÉRENCE MONDE : respecte scrupuleusement l'état ci-dessus — lieu actuel, PV/blessures, et surtout les PNJ (n'utilise QUE des personnages vivants connus ou nouvellement introduits ; ne fais jamais réapparaître un mort).
+4. DIRECTIVE : ${styleDirective(setup.writingStyle, setup.writingTone)}
+5. ${ERA_COHERENCE}
+6. RÔLE CANONIQUE IMMUABLE : garde le rôle "${setup.role}".
+7. Dialogues : chaque réplique sur sa ligne, format "Nom : réplique" (INTERDICTION du tiret cadratin '—' ou de tout tiret en début de ligne).${prologue}`;
 }
 
-function directorUser(summary: string, action: string, turnNumber: number): string {
+function directorUser(summary: string, action: string, turnNumber: number, digest: string): string {
   return `Tour ${turnNumber}. Situation : ${cleanText(summary, 1200) || '(ouverture)'}
+
+ÉTAT DU MONDE :
+${digest}
+
 Action joueur : ${cleanText(action, 240)}
 
 Réponds en JSON strict :
@@ -61,11 +68,14 @@ ACTION À RENDRE : ${cleanText(action, 240)}
 ${outcomeDirective ? `${outcomeDirective}\n` : ''}Écris la scène maintenant (2 à 3 paragraphes). La première impulsion montre la conséquence directe de l'action.`;
 }
 
-function brainUser(prose: string, brief: Record<string, unknown>): string {
-  return `Voici la scène qui vient de se dérouler :
+function brainUser(prose: string, brief: Record<string, unknown>, digest: string): string {
+  return `ÉTAT ACTUEL DU MONDE (avant cette scène) :
+${digest}
+
+Voici la scène qui vient de se dérouler :
 ${cleanText(prose, 2800)}
 
-Déduis-en les conséquences mécaniques et propose 3 à 4 choix concrets, uniques à cette scène (INTERDIT : choix génériques type "Observer", "Méditer"). Réponds en JSON strict :
+Déduis-en les conséquences mécaniques, COHÉRENTES avec l'état ci-dessus : hp et credits sont des DELTAS signés (ex: hp:-15) ; ne ressuscite jamais un mort ; réutilise les PNJ existants par leur nom EXACT (pas de doublon). Propose 3 à 4 choix concrets, uniques à cette scène (INTERDIT : choix génériques type "Observer", "Méditer"). Réponds en JSON strict :
 {
   "chapter_title": "Titre évocateur — jamais Chapitre N",
   "section_type": "${cleanText(brief.section_type, 40) || 'action'}",
@@ -91,6 +101,7 @@ function splitProse(prose: string): { action: string; dialogue: string } {
 
 export interface AgenticContext {
   setup: StorySetup;
+  worldState: WorldState;
   turnNumber: number;
   actionText: string;
   summary: string;
@@ -103,10 +114,11 @@ export async function runAgenticTurn(
   provider: StoryProviderConfig
 ): Promise<{ chapter: StoryChapter; raw: string }> {
   const lang = ctx.setup.language || 'fr';
+  const digest = renderWorldDigest(ctx.worldState);
 
   // 1. Director — scene brief (JSON)
   const briefRaw = await callTextModel(
-    [{ role: 'system', content: `${languageInstruction(lang)}\n\n${DIRECTOR_SYSTEM}` }, { role: 'user', content: directorUser(ctx.summary, ctx.actionText, ctx.turnNumber) }],
+    [{ role: 'system', content: `${languageInstruction(lang)}\n\n${DIRECTOR_SYSTEM}` }, { role: 'user', content: directorUser(ctx.summary, ctx.actionText, ctx.turnNumber, digest) }],
     provider,
     { jsonMode: true, skipReasoning: true }
   );
@@ -119,15 +131,15 @@ export async function runAgenticTurn(
     }
   })();
 
-  // 2. Writer — cinematic prose
+  // 2. Writer — cinematic prose (grounded in the full world block)
   const prose = await callTextModel(
-    [{ role: 'system', content: writerSystem(ctx.setup, ctx.turnNumber) }, { role: 'user', content: writerUser(ctx.summary, brief, ctx.actionText, ctx.outcomeDirective ?? '') }],
+    [{ role: 'system', content: writerSystem(ctx.setup, ctx.turnNumber, ctx.worldState) }, { role: 'user', content: writerUser(ctx.summary, brief, ctx.actionText, ctx.outcomeDirective ?? '') }],
     provider
   );
 
   // 3. Brain — mechanical consequences + choices (JSON)
   const brainRaw = await callTextModel(
-    [{ role: 'system', content: `${languageInstruction(lang)} TOUT le texte est en ${languageName(lang)}.\n\n${BRAIN_SYSTEM}` }, { role: 'user', content: brainUser(prose, brief) }],
+    [{ role: 'system', content: `${languageInstruction(lang)} TOUT le texte est en ${languageName(lang)}.\n\n${BRAIN_SYSTEM}` }, { role: 'user', content: brainUser(prose, brief, digest) }],
     provider,
     { jsonMode: true }
   );

@@ -7,7 +7,23 @@ function protagonistName(setup: StorySetup): string {
   return [setup.protagonistFirstName, setup.protagonistLastName].filter(Boolean).join(' ').trim() || 'Le protagoniste';
 }
 
-function renderWorldBlock(world: WorldState, protagonist: string): string {
+/** Compact one-glance world summary — for sub-agents that don't need the full block. */
+export function renderWorldDigest(world: WorldState): string {
+  const p = world.player;
+  const hpLabel = p.hp >= 80 ? 'en forme' : p.hp >= 50 ? 'légèrement blessé' : p.hp >= 20 ? 'blessé' : 'critique';
+  const alive = world.npcs.filter((n) => n.alive !== false).slice(0, 8)
+    .map((n) => `${n.name} (${n.affinity > 30 ? 'allié' : n.affinity < -30 ? 'hostile' : 'neutre'})`).join(', ') || 'aucun';
+  const dead = world.npcs.filter((n) => n.alive === false).map((n) => n.name);
+  const deadLine = dead.length ? ` | Morts (ne pas ressusciter) : ${dead.join(', ')}` : '';
+  const factions = Object.entries(world.factions).filter(([, v]) => v !== 0)
+    .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 4)
+    .map(([id, s]) => `${id} ${s > 0 ? '+' : ''}${s}`).join(', ') || 'neutre';
+  return `Lieu : ${p.location} | PV : ${p.hp}/100 (${hpLabel}) | Crédits : ₡${p.credits}
+PNJ présents : ${alive}${deadLine}
+Factions : ${factions}`;
+}
+
+export function renderWorldBlock(world: WorldState, protagonist: string): string {
   const p = world.player;
   const hpLabel = p.hp >= 80 ? 'en forme' : p.hp >= 50 ? 'légèrement blessé' : p.hp >= 20 ? 'blessé' : 'état critique';
   const injuries = p.injuries.length ? p.injuries.map((i) => `  • ${i.description} [${i.severity}]`).join('\n') : '  (aucune)';

@@ -47,7 +47,7 @@ export async function generateOpening(
   let mode: StoryGenerationMode;
 
   if (options.mode === 'agentic-subagents') {
-    const r = await runAgenticTurn({ setup, turnNumber: 1, actionText: OPENING_ACTION, summary: cleanText(setup.premise, 800) }, provider);
+    const r = await runAgenticTurn({ setup, worldState: world, turnNumber: 1, actionText: OPENING_ACTION, summary: cleanText(setup.premise, 800) }, provider);
     chapter = r.chapter;
     rawResponse = r.raw;
     mode = 'agentic-subagents';
@@ -78,6 +78,7 @@ export async function generateTurn(
     const r = await runAgenticTurn(
       {
         setup: input.setup,
+        worldState: input.worldState,
         turnNumber: input.turnNumber,
         actionText: input.actionText,
         summary: (input.recentSummary ?? []).join('\n'),
