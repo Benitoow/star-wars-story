@@ -31,6 +31,7 @@ export interface TurnInput {
   recentSectionTypes?: string[];
   recentChoiceTexts?: string[];
   outcomeDirective?: string; // hidden dice-roll result that biases the scene
+  playerDirectives?: string[]; // recent player actions/statements — canon to respect
 }
 
 const OPENING_ACTION = "Entrer dans la scène d'ouverture et survivre aux premières secondes.";
@@ -82,7 +83,8 @@ export async function generateTurn(
         turnNumber: input.turnNumber,
         actionText: input.actionText,
         summary: (input.recentSummary ?? []).join('\n'),
-        outcomeDirective: input.outcomeDirective
+        outcomeDirective: input.outcomeDirective,
+        playerDirectives: input.playerDirectives
       },
       provider
     );
@@ -91,7 +93,7 @@ export async function generateTurn(
     mode = 'agentic-subagents';
   } else {
     const messages = [
-      { role: 'system' as const, content: buildSystemPrompt(input.setup, input.memoryFacts ?? [], input.worldState, input.turnNumber) },
+      { role: 'system' as const, content: buildSystemPrompt(input.setup, input.memoryFacts ?? [], input.worldState, input.turnNumber, input.playerDirectives ?? []) },
       {
         role: 'user' as const,
         content: buildContinuePrompt(
@@ -101,7 +103,8 @@ export async function generateTurn(
           input.recentSectionTypes ?? [],
           input.recentChoiceTexts ?? [],
           input.setup.language,
-          input.outcomeDirective ?? ''
+          input.outcomeDirective ?? '',
+          input.playerDirectives ?? []
         )
       }
     ];

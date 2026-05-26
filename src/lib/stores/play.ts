@@ -125,6 +125,7 @@ async function submit(actionText: string, outcomeDirective = ''): Promise<void> 
         recentSummary: snap.chapterHistory.slice(-5).map(summarizeChapterForPrompt),
         recentSectionTypes: snap.chapterHistory.slice(-6).map((c) => c.section_type),
         recentChoiceTexts: snap.chapterHistory.slice(-4).flatMap((c) => c.choices.map((ch) => ch.text)),
+        playerDirectives: snap.actionHistory.slice(-6),
         outcomeDirective
       },
       config,

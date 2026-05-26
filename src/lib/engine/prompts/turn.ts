@@ -47,12 +47,17 @@ export function buildContinuePrompt(
   recentSectionTypes: string[] = [],
   recentChoiceTexts: string[] = [],
   languageCode?: string,
-  outcomeDirective = ''
+  outcomeDirective = '',
+  playerDirectives: string[] = []
 ): string {
   const langName = languageName(languageCode || 'fr');
   const action = cleanText(actionText, 280);
 
   const outcome = outcomeDirective ? `${outcomeDirective}\n` : '';
+  const recentDirectives = playerDirectives.map((d) => d.trim()).filter(Boolean).slice(-6);
+  const canon = recentDirectives.length
+    ? `\nCANON DU JOUEUR (à respecter absolument, ne jamais contredire — ex: ne pas faire apparaître un groupe qu'il a exclu) :\n${recentDirectives.map((d) => `- ${d}`).join('\n')}`
+    : '';
   const history = recentSummary.length ? `\nRésumé récent :\n${recentSummary.map((s) => `- ${s}`).join('\n')}` : '';
 
   const recentChoices = Array.from(new Set(recentChoiceTexts.map((c) => cleanText(c, 160)).filter(Boolean))).slice(-20);
@@ -70,7 +75,7 @@ export function buildContinuePrompt(
   return `ACTION JOUEUR CANONIQUE : ${action}
 ${outcome}OBLIGATION : la scène suivante traite cette action comme cause immédiate (ou tentative avec conséquence concrète), rédigée ENTIÈREMENT EN ${langName}.
 
-Tour ${turnNumber}.${history}${choicesBlock}${pacing}
+Tour ${turnNumber}.${canon}${history}${choicesBlock}${pacing}
 
 Écris une scène forte et précise — conséquences réelles, PNJs avec mémoire et intention propre.
 Aucun markdown, aucun titre interne, aucun bloc de choix dans le récit.

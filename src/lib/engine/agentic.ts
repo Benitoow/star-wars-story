@@ -24,7 +24,7 @@ Règles ABSOLUES :
 - Dialogues : chaque réplique sur sa ligne, format "Nom : réplique" (INTERDICTION du tiret cadratin '—' ou de tout tiret en début de ligne).
 - Réponds UNIQUEMENT avec la scène finale réécrite.`;
 
-function writerSystem(setup: StorySetup, turnNumber: number, world: WorldState): string {
+function writerSystem(setup: StorySetup, turnNumber: number, world: WorldState, canon: string): string {
   const protagonist = [setup.protagonistFirstName, setup.protagonistLastName].filter(Boolean).join(' ').trim() || 'Le protagoniste';
   const prologue = turnNumber <= 1
     ? `\n- TOUR 1 : commence par une riche introduction du protagoniste (${protagonist}) — origines liées à son rôle (${setup.role}) et sa faction (${setup.faction}), situation actuelle, tension immédiate — avant l'action.`
@@ -43,14 +43,15 @@ RÈGLES :
 4. DIRECTIVE : ${styleDirective(setup.writingStyle, setup.writingTone)}
 5. ${ERA_COHERENCE}
 6. RÔLE CANONIQUE IMMUABLE : garde le rôle "${setup.role}".
-7. Dialogues : chaque réplique sur sa ligne, format "Nom : réplique" (INTERDICTION du tiret cadratin '—' ou de tout tiret en début de ligne).${prologue}`;
+7. Dialogues : chaque réplique sur sa ligne, format "Nom : réplique" (INTERDICTION du tiret cadratin '—' ou de tout tiret en début de ligne).
+8. CANON DU JOUEUR & ESCALADE : respecte les faits que le joueur a établis (ci-dessous) ; ne les contredis jamais et n'introduis pas un groupe/élément qu'il a exclu. Un lieu civil (marché, cantina) reste civil sans escalade fortement justifiée — pas de stormtroopers en masse ni de marcheurs/AT-ST surgissant sans cause proportionnée.${prologue}${canon}`;
 }
 
-function directorUser(summary: string, action: string, turnNumber: number, digest: string): string {
+function directorUser(summary: string, action: string, turnNumber: number, digest: string, canon: string): string {
   return `Tour ${turnNumber}. Situation : ${cleanText(summary, 1200) || '(ouverture)'}
 
 ÉTAT DU MONDE :
-${digest}
+${digest}${canon}
 
 Action joueur : ${cleanText(action, 240)}
 
@@ -126,6 +127,13 @@ export interface AgenticContext {
   actionText: string;
   summary: string;
   outcomeDirective?: string;
+  playerDirectives?: string[];
+}
+
+function playerCanonBlock(playerDirectives: string[] = []): string {
+  const recent = playerDirectives.map((d) => d.trim()).filter(Boolean).slice(-6);
+  if (!recent.length) return '';
+  return `\nCANON DU JOUEUR (à respecter absolument, ne jamais contredire ; n'introduis pas un groupe/élément qu'il a exclu) :\n${recent.map((d) => `- ${d}`).join('\n')}`;
 }
 
 /** Run Director → Writer → Brain and assemble a StoryChapter (raw = writer prose). */
@@ -135,10 +143,11 @@ export async function runAgenticTurn(
 ): Promise<{ chapter: StoryChapter; raw: string }> {
   const lang = ctx.setup.language || 'fr';
   const digest = renderWorldDigest(ctx.worldState);
+  const canon = playerCanonBlock(ctx.playerDirectives);
 
   // 1. Director — scene brief (JSON)
   const briefRaw = await callTextModel(
-    [{ role: 'system', content: `${languageInstruction(lang)}\n\n${DIRECTOR_SYSTEM}` }, { role: 'user', content: directorUser(ctx.summary, ctx.actionText, ctx.turnNumber, digest) }],
+    [{ role: 'system', content: `${languageInstruction(lang)}\n\n${DIRECTOR_SYSTEM}` }, { role: 'user', content: directorUser(ctx.summary, ctx.actionText, ctx.turnNumber, digest, canon) }],
     provider,
     { jsonMode: true, skipReasoning: true }
   );
@@ -153,7 +162,7 @@ export async function runAgenticTurn(
 
   // 2. Writer — cinematic prose (grounded in the full world block)
   const draft = await callTextModel(
-    [{ role: 'system', content: writerSystem(ctx.setup, ctx.turnNumber, ctx.worldState) }, { role: 'user', content: writerUser(ctx.summary, brief, ctx.actionText, ctx.outcomeDirective ?? '') }],
+    [{ role: 'system', content: writerSystem(ctx.setup, ctx.turnNumber, ctx.worldState, canon) }, { role: 'user', content: writerUser(ctx.summary, brief, ctx.actionText, ctx.outcomeDirective ?? '') }],
     provider
   );
 

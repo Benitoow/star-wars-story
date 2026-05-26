@@ -68,7 +68,9 @@ const GM_RULES = `RÈGLES DU MAÎTRE DU JEU :
 5. Titre : chapter_title = titre de scène évocateur. INTERDIT d'y mettre un numéro ou "Chapitre N".
 6. PNJs nommés : si un personnage nommé parle/apparaît, ajoute/mets à jour une entrée dans state_update.npcs (jamais de doublon — mets à jour l'entrée existante).
 7. État monde : chaque tour met à jour au moins un signal via state_update (location, npcs, factions, hp/credits, blessures ou inventaire). location est obligatoire au tour 1.
-8. Rôle canonique IMMUABLE : le protagoniste garde son rôle. Ne le promeus/rétrograde jamais sans validation explicite du joueur.`;
+8. Rôle canonique IMMUABLE : le protagoniste garde son rôle. Ne le promeus/rétrograde jamais sans validation explicite du joueur.
+9. CANON DU JOUEUR (PRIORITÉ ABSOLUE) : respecte les faits et contraintes que le joueur a établis sur la scène ou le lieu (ambiance, présence ou ABSENCE de tel groupe). Ne les contredis JAMAIS d'un tour à l'autre. N'introduis pas un élément, un PNJ ou une faction que le joueur a explicitement exclus. Si le joueur établit une contrainte (ex : « il n'y a pas de soldats ici »), consigne-la dans memory_updates.notes pour t'en souvenir.
+10. ESCALADE MESURÉE & ÉCHELLE : un lieu civil (marché, cantina, quartier) reste civil tant qu'aucune escalade n'est fortement justifiée par les actions du joueur. N'invoque pas de forces militaires lourdes (stormtroopers en masse, marcheurs/AT-ST) sans cause claire et proportionnée — et jamais d'engins de combat (marcheurs) pour du maintien de l'ordre dans une foule.`;
 
 function jsonContract(langName: string): string {
   return `Réponds UNIQUEMENT en JSON valide, sans markdown ni texte autour. TOUT le texte des champs est rédigé ENTIÈREMENT EN ${langName}. Priorité : prose riche dans "action" (2 à 4 paragraphes). Remplis state_update avec toutes les conséquences.
@@ -101,20 +103,28 @@ function jsonContract(langName: string): string {
 }`;
 }
 
+export function renderPlayerCanon(playerDirectives: string[] = []): string {
+  const recent = playerDirectives.map((d) => d.trim()).filter(Boolean).slice(-6);
+  if (!recent.length) return '';
+  return `\nCANON DU JOUEUR — ce qu'il a fait/établi récemment (à respecter, ne jamais contredire) :\n${recent.map((d) => `- ${d}`).join('\n')}`;
+}
+
 export function buildSystemPrompt(
   setup: StorySetup,
   memoryFacts: string[] = [],
   worldState?: WorldState,
-  turnNumber?: number
+  turnNumber?: number,
+  playerDirectives: string[] = []
 ): string {
   const protagonist = protagonistName(setup);
   const lang = setup.language || 'fr';
   const langName = languageName(lang);
   const worldBlock = worldState ? renderWorldBlock(worldState, protagonist) : '';
   const memory = memoryFacts.length ? `\nMÉMOIRE NARRATIVE (faits établis) :\n${memoryFacts.map((f) => `- ${f}`).join('\n')}` : '';
+  const canon = renderPlayerCanon(playerDirectives);
   const isTurn1 = turnNumber === 1 || !worldState || worldState.chronology.length === 0;
   const prologue = isTurn1
-    ? `\n9. PROLOGUE (TOUR 1) : commence par une riche introduction du protagoniste (${protagonist}) — apparence, origines liées à son rôle (${setup.role}) et sa faction (${setup.faction}), situation actuelle et tension immédiate. Pose le décor (state_update.location) avec soin avant l'action.`
+    ? `\n12. PROLOGUE (TOUR 1) : commence par une riche introduction du protagoniste (${protagonist}) — apparence, origines liées à son rôle (${setup.role}) et sa faction (${setup.faction}), situation actuelle et tension immédiate. Pose le décor (state_update.location) avec soin avant l'action.`
     : '';
 
   return `${languageInstruction(lang)}
@@ -124,10 +134,10 @@ Tu es un Maître du Jeu Star Wars d'élite. Tu écris avec précision et cinéma
 Protagoniste : ${protagonist} | Ère : ${setup.era} | Faction : ${setup.faction} | Rôle : ${setup.role}
 Prémisse : ${setup.premise || 'Libre'}
 Style : ${setup.writingStyle || 'cinématique'} · Ton : ${setup.writingTone || 'aventure'} · POV : ${setup.writingPov || 'première personne'} · Longueur : ${setup.writingLength || 'moyen'} · Contenu : ${setup.contentMode || 'cinematic'}
-${worldBlock}${memory}
+${worldBlock}${memory}${canon}
 
 ${GM_RULES}
-9bis. DIRECTIVE STYLISTIQUE : ${styleDirective(setup.writingStyle, setup.writingTone)}
+11. DIRECTIVE STYLISTIQUE : ${styleDirective(setup.writingStyle, setup.writingTone)}
 ${ERA_COHERENCE}${prologue}
 
 ${jsonContract(langName)}`;
