@@ -1,8 +1,22 @@
-import type { StoryChapter } from '$lib/engine/types';
+import type { ChatSession, ChatTurn, StoryChapter } from '$lib/engine/types';
 import { db, SESSION_VERSION, type StoredSession } from './db';
 
 function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
+}
+
+function sanitizeChat(raw: unknown): ChatSession | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const c = raw as Partial<ChatSession>;
+  const turns = asArray<ChatTurn>(c.turns).filter(
+    (t) => !!t && (t.speaker === 'player' || t.speaker === 'npc') && typeof t.content === 'string'
+  );
+  if (!turns.length) return undefined;
+  return {
+    npcName: typeof c.npcName === 'string' ? c.npcName : '',
+    sceneSummary: typeof c.sceneSummary === 'string' ? c.sceneSummary : '',
+    turns
+  };
 }
 
 /** Light shape repair — IndexedDB data may predate the current code. */
@@ -17,7 +31,8 @@ function sanitize(raw: StoredSession): StoredSession {
     chapterHistory,
     actionHistory: asArray<string>(raw.actionHistory),
     memoryFacts: asArray<string>(raw.memoryFacts),
-    trameId: raw.trameId ?? null
+    trameId: raw.trameId ?? null,
+    chat: sanitizeChat(raw.chat)
   };
 }
 

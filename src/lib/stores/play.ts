@@ -7,9 +7,13 @@ import { writable } from 'svelte/store';
 import {
   generateOpening,
   generateTurn,
+  npcReply,
+  resolveConversation,
   rebuildWorldState,
   resolveContextBudget,
   rollForChoice,
+  type ChatTurn,
+  type NpcRelation,
   type StoryChapter,
   type StoryChoice,
   type StoryGenerationMode,
@@ -25,6 +29,17 @@ import { toasts } from './ui';
 
 export type PlayStatus = 'idle' | 'loading' | 'generating' | 'ready' | 'error';
 
+/** "Mode Direct" — live chat sub-state nested in a play session. */
+export interface ChatState {
+  active: boolean;
+  npcName: string;
+  sceneSummary: string;
+  turns: ChatTurn[];
+  partial: string;   // NPC reply currently streaming in
+  busy: boolean;     // a reply is streaming or the exit debrief is running
+  error: string | null;
+}
+
 export interface PlayState {
   storyId: string | null;
   setup: StorySetup | null;
@@ -36,16 +51,22 @@ export interface PlayState {
   actionHistory: string[];
   turnNumber: number;
   error: string | null;
+  chat: ChatState;
 }
+
+const initialChat: ChatState = { active: false, npcName: '', sceneSummary: '', turns: [], partial: '', busy: false, error: null };
 
 const initial: PlayState = {
   storyId: null, setup: null, status: 'idle', worldState: null, currentChapter: null,
-  chapterHistory: [], memoryFacts: [], actionHistory: [], turnNumber: 0, error: null
+  chapterHistory: [], memoryFacts: [], actionHistory: [], turnNumber: 0, error: null,
+  chat: { ...initialChat }
 };
 
 const { subscribe, set, update } = writable<PlayState>({ ...initial });
 let snap: PlayState = { ...initial };
 subscribe((s) => (snap = s));
+
+let chatAbort: AbortController | null = null;
 
 async function loadProvider(): Promise<{ config: StoryProviderConfig; mode: StoryGenerationMode; language: string; contextBudget: number }> {
   const p = await getPreferences();
@@ -70,7 +91,9 @@ async function persist(): Promise<void> {
     storyId: snap.storyId, version: SESSION_VERSION, turnNumber: snap.turnNumber,
     worldState: snap.worldState, currentChapter: snap.currentChapter,
     chapterHistory: snap.chapterHistory, actionHistory: snap.actionHistory,
-    memoryFacts: snap.memoryFacts, trameId: null
+    memoryFacts: snap.memoryFacts, trameId: null,
+    // Persist an in-progress conversation so it can be resumed; cleared on exit.
+    chat: snap.chat.active ? { npcName: snap.chat.npcName, sceneSummary: snap.chat.sceneSummary, turns: snap.chat.turns } : undefined
   });
   await touchStory(snap.storyId, snap.turnNumber);
 }
@@ -144,9 +167,75 @@ async function submit(actionText: string, outcomeDirective = ''): Promise<void> 
   }
 }
 
+// ── Mode Direct (live chat) ───────────────────────────
+function currentNpc(): NpcRelation {
+  const found = snap.worldState?.npcs.find((n) => n.name === snap.chat.npcName);
+  return found ?? { name: snap.chat.npcName || 'Inconnu', affinity: 0, status: 'neutral', alive: true };
+}
+
+function chatEnter(npcName: string): void {
+  const chapter = snap.currentChapter;
+  if (!snap.worldState || !npcName.trim() || snap.chat.active) return;
+  const sceneSummary = chapter ? `${chapter.chapter_title}. ${chapter.narrative.action}`.slice(0, 600) : '';
+  update((s) => ({ ...s, chat: { active: true, npcName: npcName.trim(), sceneSummary, turns: [], partial: '', busy: false, error: null } }));
+  void persist();
+}
+
+async function chatSend(text: string): Promise<void> {
+  const setup = snap.setup;
+  const world = snap.worldState;
+  const content = text.trim();
+  if (!setup || !world || !content || !snap.chat.active || snap.chat.busy) return;
+
+  const turns: ChatTurn[] = [...snap.chat.turns, { speaker: 'player', content }];
+  update((s) => ({ ...s, chat: { ...s.chat, turns, partial: '', busy: true, error: null } }));
+  chatAbort = new AbortController();
+  try {
+    const { config, language } = await loadProvider();
+    const reply = await npcReply(
+      { setup: { ...setup, language }, worldState: world, npc: currentNpc(), sceneSummary: snap.chat.sceneSummary, turns, playerDirectives: snap.actionHistory.slice(-6) },
+      config,
+      (delta) => update((s) => ({ ...s, chat: { ...s.chat, partial: s.chat.partial + delta } })),
+      chatAbort.signal
+    );
+    update((s) => ({ ...s, chat: { ...s.chat, turns: [...s.chat.turns, { speaker: 'npc', content: reply || s.chat.partial }], partial: '', busy: false } }));
+    void persist();
+  } catch (error) {
+    update((s) => ({ ...s, chat: { ...s.chat, busy: false, error: error instanceof Error ? error.message : String(error) } }));
+  }
+}
+
+async function chatEnd(): Promise<void> {
+  const setup = snap.setup;
+  const world = snap.worldState;
+  if (!setup || !world || !snap.chat.active) return;
+  if (!snap.chat.turns.length) {
+    update((s) => ({ ...s, chat: { ...initialChat } })); // nothing said → just close
+    void persist();
+    return;
+  }
+  const npc = currentNpc();
+  const turns = snap.chat.turns;
+  const sceneSummary = snap.chat.sceneSummary;
+  update((s) => ({ ...s, chat: { ...s.chat, busy: true, error: null } }));
+  try {
+    const { config, language } = await loadProvider();
+    const result = await resolveConversation(
+      { setup: { ...setup, language }, worldState: world, npc, sceneSummary, turns, turnNumber: snap.turnNumber + 1 },
+      config
+    );
+    recordDiag(`conversation avec ${npc.name} résolue`, { messages: turns.length, rawResponse: result.rawResponse });
+    update((s) => ({ ...s, chat: { ...initialChat } })); // close before applyResult so the saved session drops the chat
+    applyResult(result, `[Conversation avec ${npc.name}]`);
+  } catch (error) {
+    update((s) => ({ ...s, chat: { ...s.chat, busy: false, error: error instanceof Error ? error.message : String(error) } }));
+  }
+}
+
 export const play = {
   subscribe,
   reset(): void {
+    chatAbort?.abort();
     set({ ...initial });
   },
   /** Load a story + its session; auto-generates the opening for a fresh story. */
@@ -167,7 +256,10 @@ export const play = {
         storyId, setup: story.setup, status: 'ready', worldState,
         currentChapter: session.currentChapter ?? session.chapterHistory[session.chapterHistory.length - 1] ?? null,
         chapterHistory: session.chapterHistory, memoryFacts: session.memoryFacts,
-        actionHistory: session.actionHistory, turnNumber: session.turnNumber, error: null
+        actionHistory: session.actionHistory, turnNumber: session.turnNumber, error: null,
+        chat: session.chat
+          ? { active: true, npcName: session.chat.npcName, sceneSummary: session.chat.sceneSummary, turns: session.chat.turns, partial: '', busy: false, error: null }
+          : { ...initialChat }
       });
     } else {
       set({ ...initial, storyId, setup: story.setup, status: 'idle' });
@@ -184,5 +276,18 @@ export const play = {
   },
   freeAction(text: string): Promise<void> {
     return submit(text, '');
+  },
+  // Mode Direct
+  enterChat(npcName: string): void {
+    chatEnter(npcName);
+  },
+  sendChatMessage(text: string): Promise<void> {
+    return chatSend(text);
+  },
+  endChat(): Promise<void> {
+    return chatEnd();
+  },
+  cancelChatReply(): void {
+    chatAbort?.abort();
   }
 };

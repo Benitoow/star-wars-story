@@ -5,7 +5,7 @@
 import Dexie, { type Table } from 'dexie';
 import type { UiLanguageCode } from '$lib/content/languages';
 import { DEFAULT_TEXT_MODEL_ID, DEFAULT_TEXT_PROVIDER_ID } from '$lib/content/providers';
-import type { StoryChapter, StoryGenerationMode, StorySetup, WorldState } from '$lib/engine/types';
+import type { ChatSession, StoryChapter, StoryGenerationMode, StorySetup, WorldState } from '$lib/engine/types';
 
 export interface StoredStory {
   id: string;
@@ -30,6 +30,7 @@ export interface StoredSession {
   actionHistory: string[];
   memoryFacts: string[];
   trameId?: string | null;
+  chat?: ChatSession; // an in-progress live conversation, if any
 }
 
 export interface Preferences {
