@@ -46,11 +46,13 @@ export function buildContinuePrompt(
   recentSummary: string[] = [],
   recentSectionTypes: string[] = [],
   recentChoiceTexts: string[] = [],
-  languageCode?: string
+  languageCode?: string,
+  outcomeDirective = ''
 ): string {
   const langName = languageName(languageCode || 'fr');
   const action = cleanText(actionText, 280);
 
+  const outcome = outcomeDirective ? `${outcomeDirective}\n` : '';
   const history = recentSummary.length ? `\nRésumé récent :\n${recentSummary.map((s) => `- ${s}`).join('\n')}` : '';
 
   const recentChoices = Array.from(new Set(recentChoiceTexts.map((c) => cleanText(c, 160)).filter(Boolean))).slice(-20);
@@ -66,7 +68,7 @@ export function buildContinuePrompt(
     : '';
 
   return `ACTION JOUEUR CANONIQUE : ${action}
-OBLIGATION : la scène suivante traite cette action comme cause immédiate (ou tentative avec conséquence concrète), rédigée ENTIÈREMENT EN ${langName}.
+${outcome}OBLIGATION : la scène suivante traite cette action comme cause immédiate (ou tentative avec conséquence concrète), rédigée ENTIÈREMENT EN ${langName}.
 
 Tour ${turnNumber}.${history}${choicesBlock}${pacing}
 

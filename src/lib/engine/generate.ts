@@ -25,6 +25,7 @@ export interface TurnInput {
   recentSummary?: string[];
   recentSectionTypes?: string[];
   recentChoiceTexts?: string[];
+  outcomeDirective?: string; // hidden dice-roll result that biases the scene
 }
 
 async function runStructuredJson(messages: ChatMessage[], provider: StoryProviderConfig): Promise<string> {
@@ -78,7 +79,8 @@ export async function generateTurn(
         input.recentSummary ?? [],
         input.recentSectionTypes ?? [],
         input.recentChoiceTexts ?? [],
-        input.setup.language
+        input.setup.language,
+        input.outcomeDirective ?? ''
       )
     }
   ];

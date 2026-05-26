@@ -1,12 +1,17 @@
 <script lang="ts">
   import '../app.css';
   import { onMount } from 'svelte';
+  import { page } from '$app/stores';
   import { initDB } from '$lib/persistence';
   import { preferences } from '$lib/stores/preferences';
   import { logger } from '$lib/logger';
   import Toast from '$lib/ui/Toast.svelte';
+  import TopNav from '$lib/ui/TopNav.svelte';
 
   let ready = false;
+
+  // Immersive routes (play, creation) hide the global nav.
+  $: immersive = $page.url.pathname.startsWith('/play') || $page.url.pathname.startsWith('/new');
 
   onMount(() => {
     void (async () => {
@@ -22,6 +27,7 @@
 </script>
 
 <div class="app">
+  {#if ready && !immersive}<TopNav />{/if}
   <main class="main">
     {#if ready}
       <slot />
