@@ -16,7 +16,11 @@ describe('rollForChoice', () => {
 
   it('a mid roll clears an easy DC but misses a hard one', () => {
     expect(rollForChoice({ difficulty: 1 }, () => 0.5).outcome).toBe('success'); // roll 11 vs DC 9
-    expect(rollForChoice({ difficulty: 5 }, () => 0.5).outcome).toBe('failure'); // roll 11 vs DC 21
+    expect(rollForChoice({ difficulty: 5 }, () => 0.5).outcome).toBe('failure'); // roll 11 vs DC 17
+  });
+
+  it('difficulty 5 is hard but reachable with a strong roll (no longer near-unwinnable)', () => {
+    expect(rollForChoice({ difficulty: 5 }, () => 0.9).outcome).toBe('success'); // roll 19 vs DC 17
   });
 
   it('always carries a hidden directive the player never sees', () => {

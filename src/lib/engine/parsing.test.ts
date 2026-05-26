@@ -90,4 +90,13 @@ describe('parseStoryResponse', () => {
     const c = parseStoryResponse('Le hangar est plongé dans le noir.', 1);
     expect(c.narrative.action).toContain('hangar');
   });
+
+  it('clips an over-long memory note at a word boundary (no mid-word cut)', () => {
+    const long = 'A survécu à l effondrement du temple de Lothal en y laissant sa cheville gauche mais a récupéré un artefact ancien dont la puissance brute dépasse tout entendement et menace de le consumer entièrement avant la fin';
+    const c = parseStoryResponse(`{"narrative":{"action":"Bla"},"memory_updates":{"notes":["${long}"]}}`, 1);
+    const note = c.memory_updates.notes[0];
+    expect(note.endsWith('…')).toBe(true);
+    expect(note.length).toBeLessThanOrEqual(181);
+    expect(long.startsWith(note.slice(0, -1))).toBe(true); // clean prefix, not mangled
+  });
 });

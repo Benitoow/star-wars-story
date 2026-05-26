@@ -22,7 +22,9 @@ const DIRECTIVES: Record<Outcome, string> = {
 export function rollForChoice(choice: Pick<StoryChoice, 'difficulty'>, rng: () => number = Math.random): RollResult {
   const roll = 1 + Math.floor(rng() * 20);
   const difficulty = Math.max(1, Math.min(5, choice.difficulty || 3));
-  const dc = 6 + difficulty * 3; // difficulty 1 → DC 9 … difficulty 5 → DC 21
+  // DC 9 / 11 / 13 / 15 / 17 — even difficulty 5 is hard-but-possible on a d20
+  // (≈20% clean success + partials), instead of the old DC 21 = near-unwinnable.
+  const dc = 7 + difficulty * 2;
   const margin = roll - dc;
 
   let outcome: Outcome;

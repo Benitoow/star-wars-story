@@ -47,9 +47,9 @@ RÈGLES :
 4. DIRECTIVE STYLE : ${styleDirective(setup.writingStyle, setup.writingTone)}
 5. DIRECTIVE CONTENU : ${contentModeDirective(setup.contentMode)}
 6. ${ERA_COHERENCE}
-6. RÔLE CANONIQUE IMMUABLE : garde le rôle "${setup.role}".
-7. Dialogues : chaque réplique sur sa ligne, format "Nom : réplique" (INTERDICTION du tiret cadratin '—' ou de tout tiret en début de ligne).
-8. CANON DU JOUEUR & ESCALADE : respecte les faits que le joueur a établis (ci-dessous) ; ne les contredis jamais et n'introduis pas un groupe/élément qu'il a exclu. Un lieu civil (marché, cantina) reste civil sans escalade fortement justifiée — pas de stormtroopers en masse ni de marcheurs/AT-ST surgissant sans cause proportionnée.${prologue}${canon}${varietyNote(overusedTerms)}`;
+7. RÔLE CANONIQUE IMMUABLE : garde le rôle "${setup.role}".
+8. Dialogues : chaque réplique sur sa ligne, format "Nom : réplique" (INTERDICTION du tiret cadratin '—' ou de tout tiret en début de ligne).
+9. CANON DU JOUEUR & ESCALADE : respecte les faits que le joueur a établis (ci-dessous) ; ne les contredis jamais et n'introduis pas un groupe/élément qu'il a exclu. Un lieu civil (marché, cantina) reste civil sans escalade fortement justifiée — pas de stormtroopers en masse ni de marcheurs/AT-ST surgissant sans cause proportionnée.${prologue}${canon}${varietyNote(overusedTerms)}`;
 }
 
 function directorUser(summary: string, action: string, turnNumber: number, digest: string, canon: string): string {
@@ -88,14 +88,20 @@ ${digest}
 Voici la scène qui vient de se dérouler :
 ${cleanText(prose, 2800)}
 
-Déduis-en les conséquences mécaniques, COHÉRENTES avec l'état ci-dessus : hp et credits sont des DELTAS signés (ex: hp:-15) ; ne ressuscite jamais un mort ; réutilise les PNJ existants par leur nom EXACT (pas de doublon). Propose 3 à 4 choix concrets, uniques à cette scène (INTERDIT : choix génériques type "Observer", "Méditer"). Réponds en JSON strict :
+Déduis-en les conséquences mécaniques, COHÉRENTES avec l'état ci-dessus :
+- hp et credits sont des DELTAS signés (ex: hp:-15) ; ne ressuscite jamais un mort ; réutilise les PNJ existants par leur nom EXACT (pas de doublon).
+- BLESSURES : si la scène inflige une blessure concrète (fracture, brûlure, entaille…), remplis injuries_new (description + severity light|moderate|severe). Ce qui se soigne va dans injuries_resolved. Ne laisse pas une blessure décrite rester invisible.
+- TEMPS : si du temps passe (repos, soin, voyage, ellipse), renseigne date_advance (ex: "quelques heures").
+- CHOIX : 3 à 4, concrets et uniques à cette scène (INTERDIT : "Observer", "Méditer"). difficulty calibrée selon l'action réelle (1 trivial … 5 héroïque) — la plupart valent 2-3, réserve 4-5 aux exploits, NE mets PAS 5 partout (une attelle = 2).
+
+Réponds en JSON strict :
 {
   "chapter_title": "Titre évocateur — jamais Chapitre N",
   "section_type": "${cleanText(brief.section_type, 40) || 'action'}",
   "narrative": { "atmosphere": "${cleanText(brief.atmosphere, 40) || 'tense'}" },
-  "state_update": { "hp": 0, "credits": 0, "location": "", "npcs": [], "factions": {}, "injuries_new": [], "inventory_gained": [] },
+  "state_update": { "hp": -15, "credits": 0, "location": "", "date_advance": "", "npcs": [], "factions": {}, "injuries_new": [{ "description": "blessure précise", "severity": "moderate" }], "injuries_resolved": [], "inventory_gained": [] },
   "memory_updates": { "relations": [], "places": [], "notes": [] },
-  "choices": [ { "text": "", "attribute": "combat|diplomacy|stealth|tech|force|survival", "difficulty": 3, "faction_impact": {} } ]
+  "choices": [ { "text": "", "attribute": "combat|diplomacy|stealth|tech|force|survival", "difficulty": 2, "faction_impact": {} } ]
 }`;
 }
 

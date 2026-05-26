@@ -70,7 +70,10 @@ const GM_RULES = `RÈGLES DU MAÎTRE DU JEU :
 7. État monde : chaque tour met à jour au moins un signal via state_update (location, npcs, factions, hp/credits, blessures ou inventaire). location est obligatoire au tour 1.
 8. Rôle canonique IMMUABLE : le protagoniste garde son rôle. Ne le promeus/rétrograde jamais sans validation explicite du joueur.
 9. CANON DU JOUEUR (PRIORITÉ ABSOLUE) : respecte les faits et contraintes que le joueur a établis sur la scène ou le lieu (ambiance, présence ou ABSENCE de tel groupe). Ne les contredis JAMAIS d'un tour à l'autre. N'introduis pas un élément, un PNJ ou une faction que le joueur a explicitement exclus. Si le joueur établit une contrainte (ex : « il n'y a pas de soldats ici »), consigne-la dans memory_updates.notes pour t'en souvenir.
-10. ESCALADE MESURÉE & ÉCHELLE : un lieu civil (marché, cantina, quartier) reste civil tant qu'aucune escalade n'est fortement justifiée par les actions du joueur. N'invoque pas de forces militaires lourdes (stormtroopers en masse, marcheurs/AT-ST) sans cause claire et proportionnée — et jamais d'engins de combat (marcheurs) pour du maintien de l'ordre dans une foule.`;
+10. ESCALADE MESURÉE & ÉCHELLE : un lieu civil (marché, cantina, quartier) reste civil tant qu'aucune escalade n'est fortement justifiée par les actions du joueur. N'invoque pas de forces militaires lourdes (stormtroopers en masse, marcheurs/AT-ST) sans cause claire et proportionnée — et jamais d'engins de combat (marcheurs) pour du maintien de l'ordre dans une foule.
+11. BLESSURES RÉELLES : si la scène inflige une blessure concrète (fracture, brûlure, entaille, contusion…), tu DOIS l'ajouter dans state_update.injuries_new (description + severity: light|moderate|severe). Ce qui se soigne va dans injuries_resolved. Une blessure décrite dans la prose ne doit jamais rester invisible dans l'état.
+12. ÉCOULEMENT DU TEMPS : quand du temps passe réellement (repos, soin, voyage, ellipse), renseigne state_update.date_advance (ex: "quelques heures", "1 jour"). Si la scène est continue (même instant), laisse-le vide.
+13. DIFFICULTÉ DES CHOIX : calibre chaque difficulty selon l'action RÉELLE — 1 = trivial, 2 = facile, 3 = incertain, 4 = difficile, 5 = héroïque/quasi-impossible. La plupart des actions valent 2-3 ; réserve 4-5 aux vrais exploits. NE mets PAS 5 partout (fabriquer une attelle = 2, pas 5).`;
 
 function jsonContract(langName: string): string {
   return `Réponds UNIQUEMENT en JSON valide, sans markdown ni texte autour. TOUT le texte des champs est rédigé ENTIÈREMENT EN ${langName}. Priorité : prose riche dans "action" (2 à 4 paragraphes). Remplis state_update avec toutes les conséquences.
@@ -128,7 +131,7 @@ export function buildSystemPrompt(
   const canon = renderPlayerCanon(playerDirectives);
   const isTurn1 = turnNumber === 1 || !worldState || worldState.chronology.length === 0;
   const prologue = isTurn1
-    ? `\n12. PROLOGUE (TOUR 1) : commence par une riche introduction du protagoniste (${protagonist}) — apparence, origines liées à son rôle (${setup.role}) et sa faction (${setup.faction}), situation actuelle et tension immédiate. Pose le décor (state_update.location) avec soin avant l'action.`
+    ? `\n16. PROLOGUE (TOUR 1) : commence par une riche introduction du protagoniste (${protagonist}) — apparence, origines liées à son rôle (${setup.role}) et sa faction (${setup.faction}), situation actuelle et tension immédiate. Pose le décor (state_update.location) avec soin avant l'action.`
     : '';
 
   return `${languageInstruction(lang)}
@@ -141,8 +144,8 @@ Style : ${setup.writingStyle || 'cinématique'} · Ton : ${setup.writingTone || 
 ${worldBlock}${memory}${archive}${canon}
 
 ${GM_RULES}
-11. DIRECTIVE STYLISTIQUE : ${styleDirective(setup.writingStyle, setup.writingTone)}
-12. DIRECTIVE DE CONTENU : ${contentModeDirective(setup.contentMode)}
+14. DIRECTIVE STYLISTIQUE : ${styleDirective(setup.writingStyle, setup.writingTone)}
+15. DIRECTIVE DE CONTENU : ${contentModeDirective(setup.contentMode)}
 ${ERA_COHERENCE}${prologue}
 
 ${jsonContract(langName)}`;

@@ -178,7 +178,9 @@ export const play = {
     return snap.turnNumber === 0 || !snap.currentChapter ? startOpening() : Promise.resolve();
   },
   chooseChoice(choice: StoryChoice): Promise<void> {
-    return submit(choice.text, rollForChoice(choice).directive);
+    const roll = rollForChoice(choice);
+    recordDiag(`jet caché : ${roll.outcome} (d20=${roll.roll} vs DC ${roll.dc}, difficulté ${choice.difficulty})`, { choix: choice.text });
+    return submit(choice.text, roll.directive);
   },
   freeAction(text: string): Promise<void> {
     return submit(text, '');

@@ -4,7 +4,7 @@
    sanitizes prose (strips markdown, choice blocks, and any
    leading dash / em-dash on dialogue lines).
 ══════════════════════════════════════════════ */
-import { cleanText, foldText, isRecord } from './text';
+import { cleanText, clip, foldText, isRecord } from './text';
 import {
   STORY_ATTRIBUTES,
   type NpcRelation,
@@ -284,8 +284,7 @@ function coerceMemoryUpdates(source: unknown): StoryMemoryUpdates {
   };
 
   const list = (v: unknown): string[] =>
-    (Array.isArray(v) ? v : []).map((s) => cleanText(coerceToString(s), 120)).filter((s) => s.length >= 4).slice(0, 10);
-
+    (Array.isArray(v) ? v : []).map((s) => clip(coerceToString(s), 180)).filter((s) => s.length >= 4).slice(0, 10);
   return {
     relations: list(d.relations),
     places: list(d.places),
