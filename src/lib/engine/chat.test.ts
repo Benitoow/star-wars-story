@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { npcReply, resolveConversation } from './chat';
 import { initWorldState } from './worldState';
-import type { NpcRelation, StoryProviderConfig, StorySetup } from './types';
+import type { ChatTurn, NpcRelation, StoryProviderConfig, StorySetup } from './types';
 
 const provider: StoryProviderConfig = { providerId: 'openrouter', model: 'x', apiKey: 'k' };
 const setup: StorySetup = { era: 'imperial', faction: 'rebels', role: 'smuggler', premise: 'x', protagonistFirstName: 'Kael', language: 'fr' };
@@ -28,6 +28,17 @@ describe('npcReply (streamed, in-character)', () => {
     );
     expect(tokens.length).toBeGreaterThan(0);
     expect(reply).toContain('Que veux-tu');
+  });
+
+  it('caps the conversation context on long chats (keeps the most recent turns)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, body: sseBody(['data: [DONE]\n\n']) });
+    vi.stubGlobal('fetch', fetchMock);
+    const turns: ChatTurn[] = Array.from({ length: 30 }, (_, i) => ({ speaker: i % 2 === 0 ? 'player' : 'npc', content: `msg ${i}` }));
+    await npcReply({ setup, worldState: initWorldState(setup), npc, sceneSummary: 'x', turns }, provider, () => {});
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1].body)) as { messages: Array<{ content: string }> };
+    expect(body.messages.length).toBe(25); // 1 system + the last 24 turns
+    expect(body.messages.some((m) => m.content === 'msg 0')).toBe(false); // oldest dropped
+    expect(body.messages.some((m) => m.content === 'msg 29')).toBe(true); // newest kept
   });
 });
 

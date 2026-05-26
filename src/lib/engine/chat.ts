@@ -19,6 +19,11 @@ import type {
 } from './types';
 import { applyStateUpdate } from './worldState';
 
+// Keep conversations bounded: the most recent turns drive an NPC reply; the
+// debrief reads a few more. Avoids an ever-growing prompt on long chats.
+const REPLY_CONTEXT_TURNS = 24;
+const RESOLVE_CONTEXT_TURNS = 40;
+
 export interface NpcReplyInput {
   setup: StorySetup;
   worldState: WorldState;
@@ -44,7 +49,9 @@ export async function npcReply(
   );
   const messages: ChatMessage[] = [
     { role: 'system', content: system },
-    ...input.turns.map((t): ChatMessage => ({ role: t.speaker === 'player' ? 'user' : 'assistant', content: t.content }))
+    ...input.turns
+      .slice(-REPLY_CONTEXT_TURNS)
+      .map((t): ChatMessage => ({ role: t.speaker === 'player' ? 'user' : 'assistant', content: t.content }))
   ];
   return callTextModelStream(messages, provider, onToken, { skipReasoning: true, signal });
 }
@@ -66,7 +73,7 @@ export async function resolveConversation(
   const lang = input.setup.language || 'fr';
   const messages: ChatMessage[] = [
     { role: 'system', content: `${languageInstruction(lang)}\n\n${RESOLVE_SYSTEM}` },
-    { role: 'user', content: buildResolveUser(input.setup, input.worldState, input.npc, input.sceneSummary, input.turns, languageName(lang)) }
+    { role: 'user', content: buildResolveUser(input.setup, input.worldState, input.npc, input.sceneSummary, input.turns.slice(-RESOLVE_CONTEXT_TURNS), languageName(lang)) }
   ];
   const rawResponse = await callTextModel(messages, provider, { jsonMode: true });
   const chapter = parseStoryResponse(rawResponse, input.turnNumber);
