@@ -20,9 +20,10 @@ function stubSequence(contents: string[]) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('agentic pipeline (mocked transport)', () => {
-  it('runs Director → Writer → Brain and assembles a chapter', async () => {
+  it('runs Director → Writer → Reviewer → Brain and assembles the reviewed scene', async () => {
     const director = JSON.stringify({ scene_goal: 'fuir', tension: 'gardes', must_include: ['un sas'], section_type: 'action', atmosphere: 'tense' });
-    const writer = 'Les sirènes hurlent dans la coursive enfumée.\n\nKael : On ne s\'arrête pas maintenant.';
+    const writer = 'Les sirènes hurlent dans la coursive enfumée.\n\nKael : On ne s\'arrête pas.';
+    const reviewer = 'Les sirènes déchirent la coursive noyée de fumée.\n\nKael : On ne lâche rien.';
     const brain = JSON.stringify({
       chapter_title: 'Coursive en feu',
       section_type: 'action',
@@ -31,7 +32,7 @@ describe('agentic pipeline (mocked transport)', () => {
       choices: [{ text: 'Sceller le sas derrière soi', attribute: 'tech', difficulty: 3 }],
       memory_updates: {}
     });
-    const mock = stubSequence([director, writer, brain]);
+    const mock = stubSequence([director, writer, reviewer, brain]);
 
     const result = await generateTurn(
       { setup, worldState: initWorldState(setup), turnNumber: 2, actionText: 'Courir vers le hangar', recentSummary: ['Tour 1 : capture.'] },
@@ -39,10 +40,10 @@ describe('agentic pipeline (mocked transport)', () => {
       { mode: 'agentic-subagents' }
     );
 
-    expect(mock).toHaveBeenCalledTimes(3);
+    expect(mock).toHaveBeenCalledTimes(4);
     expect(result.mode).toBe('agentic-subagents');
     expect(result.chapter.chapter_title).toBe('Coursive en feu');
-    expect(result.chapter.narrative.action).toContain('sirènes');
+    expect(result.chapter.narrative.action).toContain('déchirent'); // the reviewed prose is used
     expect(result.chapter.narrative.dialogue).toContain('Kael :');
     expect(result.chapter.choices[0].text).toBe('Sceller le sas derrière soi');
     expect(result.worldState.player.hp).toBe(90);

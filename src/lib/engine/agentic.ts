@@ -16,6 +16,14 @@ const DIRECTOR_SYSTEM = `Tu es le DIRECTEUR de scène d'une campagne Star Wars. 
 
 const BRAIN_SYSTEM = `Tu es le CERVEAU mécanique d'une campagne Star Wars. Tu extrais les conséquences d'une scène déjà écrite. Réponds UNIQUEMENT en JSON valide, aucune prose autour.`;
 
+const REVIEWER_SYSTEM = `Tu es le RELECTEUR d'une campagne Star Wars : tu transformes une scène brute en version finale, plus forte, SANS en changer les faits.
+Règles ABSOLUES :
+- Ne change NI les événements, NI les personnages, NI le lieu, NI l'issue de l'action — uniquement l'écriture.
+- Supprime les répétitions et les formules creuses ; renforce la première phrase ; resserre le rythme.
+- 2 à 3 paragraphes. Aucune sortie technique (ni JSON, ni markdown, ni liste). Aucun choix.
+- Dialogues : chaque réplique sur sa ligne, format "Nom : réplique" (INTERDICTION du tiret cadratin '—' ou de tout tiret en début de ligne).
+- Réponds UNIQUEMENT avec la scène finale réécrite.`;
+
 function writerSystem(setup: StorySetup, turnNumber: number, world: WorldState): string {
   const protagonist = [setup.protagonistFirstName, setup.protagonistLastName].filter(Boolean).join(' ').trim() || 'Le protagoniste';
   const prologue = turnNumber <= 1
@@ -86,6 +94,18 @@ Déduis-en les conséquences mécaniques, COHÉRENTES avec l'état ci-dessus : h
 }`;
 }
 
+function reviewerUser(draft: string, brief: Record<string, unknown>, digest: string): string {
+  const mustInclude = Array.isArray(brief.must_include) ? brief.must_include.map((m) => cleanText(m, 80)).filter(Boolean).join(' ; ') : '';
+  return `ÉTAT DU MONDE (à respecter, ne rien contredire) :
+${digest}
+${mustInclude ? `\nÉléments imposés de la scène : ${mustInclude}` : ''}
+
+SCÈNE BRUTE À PEAUFINER :
+${cleanText(draft, 3000)}
+
+Livre la version finale : mêmes faits, même issue, meilleure écriture.`;
+}
+
 /** Split mixed writer prose into action vs "Nom : réplique" dialogue lines. */
 function splitProse(prose: string): { action: string; dialogue: string } {
   const speaker = /^[A-Za-zÀ-ÖØ-öø-ÿ0-9'’ .-]{2,40}\s*:\s+\S/;
@@ -132,19 +152,32 @@ export async function runAgenticTurn(
   })();
 
   // 2. Writer — cinematic prose (grounded in the full world block)
-  const prose = await callTextModel(
+  const draft = await callTextModel(
     [{ role: 'system', content: writerSystem(ctx.setup, ctx.turnNumber, ctx.worldState) }, { role: 'user', content: writerUser(ctx.summary, brief, ctx.actionText, ctx.outcomeDirective ?? '') }],
     provider
   );
 
-  // 3. Brain — mechanical consequences + choices (JSON)
+  // 3. Reviewer — polish the scene (same facts, sharper writing). Falls back to the
+  // draft if it returns nothing usable.
+  let prose = draft;
+  try {
+    const reviewed = await callTextModel(
+      [{ role: 'system', content: `${languageInstruction(lang)}\n\n${REVIEWER_SYSTEM}` }, { role: 'user', content: reviewerUser(draft, brief, digest) }],
+      provider
+    );
+    if (reviewed.trim().length >= 40) prose = reviewed;
+  } catch {
+    /* keep the draft — a reviewer failure must never lose the scene */
+  }
+
+  // 4. Brain — mechanical consequences + choices (JSON) from the final prose
   const brainRaw = await callTextModel(
     [{ role: 'system', content: `${languageInstruction(lang)} TOUT le texte est en ${languageName(lang)}.\n\n${BRAIN_SYSTEM}` }, { role: 'user', content: brainUser(prose, brief, digest) }],
     provider,
     { jsonMode: true }
   );
 
-  // Assemble: writer prose into narrative, brain JSON for mechanics — then reuse
+  // Assemble: final prose into narrative, brain JSON for mechanics — then reuse
   // parseStoryResponse for sanitization (incl. the dash ban) + validation.
   const brain = parseStoryResponse(brainRaw, ctx.turnNumber);
   const { action, dialogue } = splitProse(prose);

@@ -115,7 +115,7 @@
           <option value="agentic-subagents">Agentique — multi-agents, plus riche</option>
           <option value="structured-json">Direct — un seul appel, plus rapide</option>
         </select>
-        <p class="hint">L'agentique enchaîne Directeur → Écrivain → Cerveau (3 appels/tour).</p>
+        <p class="hint">L'agentique enchaîne Directeur → Écrivain → Relecteur → Cerveau (4 appels/tour, plus riche mais plus lent).</p>
       </div>
       <div class="field mt">
         <label class="label" for="reason">Effort de raisonnement</label>
