@@ -1,19 +1,24 @@
 /* ═══════════════════════════════════════════════
-   Turn orchestration. A turn is stateless per call:
-   the system prompt carries the live world + memory, so
-   we send just [system, user] and apply the reducer.
+   Turn orchestration. Dispatches on the generation mode:
+   - structured-json: one call, [system, user] → parse
+   - agentic-subagents: Director → Writer → Brain pipeline
+   Either way the system prompt/summary carries the live
+   world, so a turn is stateless per call; the reducer then
+   advances the world.
 ══════════════════════════════════════════════ */
+import { runAgenticTurn } from './agentic';
+import { parseStoryResponse } from './parsing';
+import { buildContinuePrompt, buildStartPrompt, buildSystemPrompt } from './prompts';
+import { callTextModel } from './provider';
+import { cleanText } from './text';
 import type {
-  ChatMessage,
+  StoryChapter,
   StoryGenerationMode,
   StoryProviderConfig,
   StorySetup,
   StoryTurnResult,
   WorldState
 } from './types';
-import { buildSystemPrompt, buildStartPrompt, buildContinuePrompt } from './prompts';
-import { parseStoryResponse } from './parsing';
-import { callTextModel } from './provider';
 import { applyStateUpdate, initWorldState } from './worldState';
 
 export interface TurnInput {
@@ -28,20 +33,7 @@ export interface TurnInput {
   outcomeDirective?: string; // hidden dice-roll result that biases the scene
 }
 
-async function runStructuredJson(messages: ChatMessage[], provider: StoryProviderConfig): Promise<string> {
-  return callTextModel(messages, provider, { jsonMode: true });
-}
-
-/** Dispatch to the chosen generation strategy. Agentic pipeline lands in a later module. */
-async function runTurn(
-  messages: ChatMessage[],
-  provider: StoryProviderConfig,
-  mode: StoryGenerationMode
-): Promise<{ raw: string; mode: StoryGenerationMode }> {
-  // 'agentic-subagents' is wired in ./agentic and selected here once available.
-  void mode;
-  return { raw: await runStructuredJson(messages, provider), mode: 'structured-json' };
-}
+const OPENING_ACTION = "Entrer dans la scène d'ouverture et survivre aux premières secondes.";
 
 /** Turn 1 — generate the opening scene from setup. */
 export async function generateOpening(
@@ -50,14 +42,26 @@ export async function generateOpening(
   options: { trameLabel?: string | null; mode?: StoryGenerationMode } = {}
 ): Promise<StoryTurnResult> {
   const world = initWorldState(setup);
-  const messages: ChatMessage[] = [
-    { role: 'system', content: buildSystemPrompt(setup, [], world, 1) },
-    { role: 'user', content: buildStartPrompt(setup, options.trameLabel) }
-  ];
+  let chapter: StoryChapter;
+  let rawResponse: string;
+  let mode: StoryGenerationMode;
 
-  const { raw, mode } = await runTurn(messages, provider, options.mode ?? 'structured-json');
-  const chapter = parseStoryResponse(raw, 1);
-  return { chapter, worldState: applyStateUpdate(world, chapter), rawResponse: raw, mode };
+  if (options.mode === 'agentic-subagents') {
+    const r = await runAgenticTurn({ setup, turnNumber: 1, actionText: OPENING_ACTION, summary: cleanText(setup.premise, 800) }, provider);
+    chapter = r.chapter;
+    rawResponse = r.raw;
+    mode = 'agentic-subagents';
+  } else {
+    const messages = [
+      { role: 'system' as const, content: buildSystemPrompt(setup, [], world, 1) },
+      { role: 'user' as const, content: buildStartPrompt(setup, options.trameLabel) }
+    ];
+    rawResponse = await callTextModel(messages, provider, { jsonMode: true });
+    chapter = parseStoryResponse(rawResponse, 1);
+    mode = 'structured-json';
+  }
+
+  return { chapter, worldState: applyStateUpdate(world, chapter), rawResponse, mode };
 }
 
 /** Turn N — react to the player's action and advance the world. */
@@ -66,26 +70,44 @@ export async function generateTurn(
   provider: StoryProviderConfig,
   options: { mode?: StoryGenerationMode } = {}
 ): Promise<StoryTurnResult> {
-  const messages: ChatMessage[] = [
-    {
-      role: 'system',
-      content: buildSystemPrompt(input.setup, input.memoryFacts ?? [], input.worldState, input.turnNumber)
-    },
-    {
-      role: 'user',
-      content: buildContinuePrompt(
-        input.actionText,
-        input.turnNumber,
-        input.recentSummary ?? [],
-        input.recentSectionTypes ?? [],
-        input.recentChoiceTexts ?? [],
-        input.setup.language,
-        input.outcomeDirective ?? ''
-      )
-    }
-  ];
+  let chapter: StoryChapter;
+  let rawResponse: string;
+  let mode: StoryGenerationMode;
 
-  const { raw, mode } = await runTurn(messages, provider, options.mode ?? 'structured-json');
-  const chapter = parseStoryResponse(raw, input.turnNumber);
-  return { chapter, worldState: applyStateUpdate(input.worldState, chapter), rawResponse: raw, mode };
+  if (options.mode === 'agentic-subagents') {
+    const r = await runAgenticTurn(
+      {
+        setup: input.setup,
+        turnNumber: input.turnNumber,
+        actionText: input.actionText,
+        summary: (input.recentSummary ?? []).join('\n'),
+        outcomeDirective: input.outcomeDirective
+      },
+      provider
+    );
+    chapter = r.chapter;
+    rawResponse = r.raw;
+    mode = 'agentic-subagents';
+  } else {
+    const messages = [
+      { role: 'system' as const, content: buildSystemPrompt(input.setup, input.memoryFacts ?? [], input.worldState, input.turnNumber) },
+      {
+        role: 'user' as const,
+        content: buildContinuePrompt(
+          input.actionText,
+          input.turnNumber,
+          input.recentSummary ?? [],
+          input.recentSectionTypes ?? [],
+          input.recentChoiceTexts ?? [],
+          input.setup.language,
+          input.outcomeDirective ?? ''
+        )
+      }
+    ];
+    rawResponse = await callTextModel(messages, provider, { jsonMode: true });
+    chapter = parseStoryResponse(rawResponse, input.turnNumber);
+    mode = 'structured-json';
+  }
+
+  return { chapter, worldState: applyStateUpdate(input.worldState, chapter), rawResponse, mode };
 }

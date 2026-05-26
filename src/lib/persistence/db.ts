@@ -57,7 +57,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   textModel: DEFAULT_TEXT_MODEL_ID,
   textApiKey: '',
   reasoningEffort: 'auto',
-  runtimeMode: 'structured-json', // flips to 'agentic-subagents' once the pipeline ships
+  runtimeMode: 'agentic-subagents', // richer multi-agent pipeline by default
   uiLanguage: 'auto',
   theme: 'dark',
   writingStyle: 'cinematique',

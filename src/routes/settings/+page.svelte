@@ -108,6 +108,14 @@
     </button>
     {#if showAdvanced}
       <div class="field mt">
+        <label class="label" for="mode">Moteur narratif</label>
+        <select id="mode" class="input" value={$preferences.runtimeMode} on:change={(e) => set({ runtimeMode: e.currentTarget.value as Preferences['runtimeMode'] })}>
+          <option value="agentic-subagents">Agentique — multi-agents, plus riche</option>
+          <option value="structured-json">Direct — un seul appel, plus rapide</option>
+        </select>
+        <p class="hint">L'agentique enchaîne Directeur → Écrivain → Cerveau (3 appels/tour).</p>
+      </div>
+      <div class="field mt">
         <label class="label" for="reason">Effort de raisonnement</label>
         <select id="reason" class="input" value={$preferences.reasoningEffort} on:change={(e) => set({ reasoningEffort: e.currentTarget.value })}>
           {#each REASONING as o}<option value={o.id}>{o.name}</option>{/each}
