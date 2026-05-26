@@ -19,11 +19,13 @@ export function estimateTokens(text: string): number {
 
 export function getModelContextLimit(modelId: string): number {
   const m = String(modelId || '').toLowerCase();
-  if (/\bgemini\b|google\/gemini-/i.test(m)) return 1000000; // 1M
-  if (/\b(?:o1|o3|r1|grok-3|grok-4|gpt-4o|claude-3-5|llama-3\.1|llama-3\.3)\b/i.test(m)) return 128000; // 128K
-  if (/\b(?:claude-3|mixtral-8x22b)\b/i.test(m)) return 200000; // 200K
-  if (/\b(?:gpt-4-turbo|gpt-4)\b/i.test(m)) return 128000;
-  if (/\b(?:gpt-3\.5-turbo)\b/i.test(m)) return 16384;
+  if (/gemini/i.test(m)) return 1000000; // 1M
+  if (/grok-3|grok-4/i.test(m)) return 1000000; // 1M
+  if (/gpt-5/i.test(m)) return 400000; // 400K
+  if (/(?:o1|o3|r1|gpt-4o|claude-3-5|llama-3\.1|llama-3\.3)/i.test(m)) return 128000; // 128K
+  if (/(?:claude-3|mixtral-8x22b)/i.test(m)) return 200000; // 200K
+  if (/(?:gpt-4-turbo|gpt-4)/i.test(m)) return 128000;
+  if (/(?:gpt-3\.5-turbo)/i.test(m)) return 16384;
   return 128000; // default
 }
 

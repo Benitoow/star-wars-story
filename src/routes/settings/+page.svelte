@@ -6,6 +6,7 @@
   import { toasts } from '$lib/stores/ui';
   import { APP_NAME, APP_VERSION_LABEL } from '$lib/version';
   import { getModelContextLimit, getDynamicContextBudget } from '$lib/engine/context';
+  import { fetchContextLengths } from '$lib/engine';
   import type { Preferences } from '$lib/persistence';
 
   const REASONING = [
@@ -26,8 +27,23 @@
   let showAdvanced = false;
   let saving = false;
 
-  $: contextLimit = getModelContextLimit(form.textModel);
-  $: contextBudget = getDynamicContextBudget(form.textModel);
+  let lengths: Record<string, number> = {};
+
+  async function loadLengths(apiKey: string) {
+    if (!apiKey) return;
+    try {
+      lengths = await fetchContextLengths(apiKey);
+    } catch {
+      // fallback
+    }
+  }
+
+  $: if (form.textApiKey) {
+    void loadLengths(form.textApiKey.trim());
+  }
+
+  $: contextLimit = lengths[form.textModel.trim()] || getModelContextLimit(form.textModel);
+  $: contextBudget = Math.floor(contextLimit * 0.5);
 
   onMount(() => {
     const p = get(preferences); // settings render after boot, so this is the persisted value

@@ -15,7 +15,7 @@ const TRANSCRIPT_SHARE = 0.7;
 
 let cache: { key: string; lengths: Record<string, number> } | null = null;
 
-async function fetchContextLengths(apiKey: string): Promise<Record<string, number>> {
+export async function fetchContextLengths(apiKey: string): Promise<Record<string, number>> {
   if (cache && cache.key === apiKey) return cache.lengths;
 
   const headers: Record<string, string> = {};
