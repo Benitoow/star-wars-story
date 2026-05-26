@@ -138,6 +138,18 @@ export interface StoryTurnResult {
   mode: StoryGenerationMode;
 }
 
+// ── Live chat ("Mode Direct") ─────────────────────────
+export interface ChatTurn {
+  speaker: 'player' | 'npc';
+  content: string;
+}
+
+export interface ChatSession {
+  npcName: string;     // who we're talking to
+  sceneSummary: string; // the beat that opened the conversation
+  turns: ChatTurn[];
+}
+
 // ── Story setup (player's choices at creation) ────────
 export interface StorySetup {
   era: string;
