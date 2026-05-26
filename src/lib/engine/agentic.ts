@@ -8,7 +8,7 @@ import { cleanText, isRecord } from './text';
 import { parseStoryResponse, sanitizeProse } from './parsing';
 import { callTextModel } from './provider';
 import { languageInstruction, languageName } from './prompts/language';
-import { ERA_COHERENCE, styleDirective } from './prompts/style';
+import { ERA_COHERENCE, styleDirective, contentModeDirective } from './prompts/style';
 import { renderWorldBlock, renderWorldDigest } from './prompts/system';
 import type { ChatMessage, StoryChapter, StoryProviderConfig, StorySetup, WorldState } from './types';
 
@@ -37,15 +37,16 @@ function writerSystem(setup: StorySetup, turnNumber: number, world: WorldState, 
 
 Tu es l'ÉCRIVAIN d'une campagne Star Wars d'élite : prose cinématique, immersive, soignée. Les messages précédents sont la scène déjà jouée — écris la SUITE en continuité.
 Protagoniste : ${protagonist} | Ère : ${setup.era} | Faction : ${setup.faction} | Rôle : ${setup.role}
-Style : ${setup.writingStyle || 'cinématique'} · Ton : ${setup.writingTone || 'aventure'}
+Style : ${setup.writingStyle || 'cinématique'} · Ton : ${setup.writingTone || 'aventure'} · Contenu : ${setup.contentMode || 'cinematic'}
 ${renderWorldBlock(world, protagonist)}${archiveBlock}
 
 RÈGLES :
 1. Écris 2 à 3 paragraphes. Aucune sortie technique (ni JSON, ni markdown, ni liste).
 2. Ne propose AUCUN choix.
 3. COHÉRENCE MONDE : respecte scrupuleusement l'état ci-dessus — lieu actuel, PV/blessures, et surtout les PNJ (n'utilise QUE des personnages vivants connus ou nouvellement introduits ; ne fais jamais réapparaître un mort).
-4. DIRECTIVE : ${styleDirective(setup.writingStyle, setup.writingTone)}
-5. ${ERA_COHERENCE}
+4. DIRECTIVE STYLE : ${styleDirective(setup.writingStyle, setup.writingTone)}
+5. DIRECTIVE CONTENU : ${contentModeDirective(setup.contentMode)}
+6. ${ERA_COHERENCE}
 6. RÔLE CANONIQUE IMMUABLE : garde le rôle "${setup.role}".
 7. Dialogues : chaque réplique sur sa ligne, format "Nom : réplique" (INTERDICTION du tiret cadratin '—' ou de tout tiret en début de ligne).
 8. CANON DU JOUEUR & ESCALADE : respecte les faits que le joueur a établis (ci-dessous) ; ne les contredis jamais et n'introduis pas un groupe/élément qu'il a exclu. Un lieu civil (marché, cantina) reste civil sans escalade fortement justifiée — pas de stormtroopers en masse ni de marcheurs/AT-ST surgissant sans cause proportionnée.${prologue}${canon}${varietyNote(overusedTerms)}`;

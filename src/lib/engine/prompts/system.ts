@@ -1,7 +1,7 @@
 import { cleanText } from '../text';
 import type { StorySetup, StoryChapter, WorldState } from '../types';
 import { languageInstruction, languageName } from './language';
-import { ERA_COHERENCE, styleDirective } from './style';
+import { ERA_COHERENCE, styleDirective, contentModeDirective } from './style';
 
 function protagonistName(setup: StorySetup): string {
   return [setup.protagonistFirstName, setup.protagonistLastName].filter(Boolean).join(' ').trim() || 'Le protagoniste';
@@ -142,6 +142,7 @@ ${worldBlock}${memory}${archive}${canon}
 
 ${GM_RULES}
 11. DIRECTIVE STYLISTIQUE : ${styleDirective(setup.writingStyle, setup.writingTone)}
+12. DIRECTIVE DE CONTENU : ${contentModeDirective(setup.contentMode)}
 ${ERA_COHERENCE}${prologue}
 
 ${jsonContract(langName)}`;
