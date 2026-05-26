@@ -1,6 +1,6 @@
 <script lang="ts">
   import { FACTIONS } from '$lib/content/catalog';
-  import type { NpcRelation, WorldState } from '$lib/engine';
+  import type { WorldState } from '$lib/engine';
 
   export let world: WorldState;
 
@@ -18,11 +18,28 @@
   function factionName(id: string): string {
     return FACTIONS.find((f) => f.id === id)?.name || id;
   }
-  function npcStatus(npc: NpcRelation): { label: string; cls: string } {
-    if (npc.status === 'ally' || npc.affinity > 30) return { label: 'Allié', cls: 'ally' };
-    if (npc.status === 'hostile' || npc.affinity < -30) return { label: 'Hostile', cls: 'hostile' };
-    return { label: 'Neutre', cls: 'neutral' };
+
+  // -100..100 → readable relationship tiers (no raw numbers shown).
+  function bond(a: number): { label: string; cls: string } {
+    if (a >= 70) return { label: 'Loyal', cls: 'good' };
+    if (a >= 35) return { label: 'Allié', cls: 'good' };
+    if (a >= 10) return { label: 'Amical', cls: 'good' };
+    if (a > -10) return { label: 'Neutre', cls: 'neutral' };
+    if (a > -35) return { label: 'Méfiant', cls: 'bad' };
+    if (a > -70) return { label: 'Hostile', cls: 'bad' };
+    return { label: 'Ennemi juré', cls: 'bad' };
   }
+  function standing(r: number): { label: string; cls: string } {
+    if (r >= 70) return { label: 'Vénéré', cls: 'good' };
+    if (r >= 35) return { label: 'Allié', cls: 'good' };
+    if (r >= 10) return { label: 'Apprécié', cls: 'good' };
+    if (r > -10) return { label: 'Neutre', cls: 'neutral' };
+    if (r > -35) return { label: 'Suspect', cls: 'bad' };
+    if (r > -70) return { label: 'Hostile', cls: 'bad' };
+    return { label: 'Recherché', cls: 'bad' };
+  }
+  const warmth = (v: number) => Math.max(3, Math.min(100, (v + 100) / 2)); // bar fill %
+
   const sev: Record<string, string> = { light: 'Légère', moderate: 'Modérée', severe: 'Grave' };
 </script>
 
@@ -48,21 +65,18 @@
       {#if livingNpcs.length}
         <section>
           <h4 class="eyebrow">Personnages <span class="count">{livingNpcs.length}</span></h4>
-          <ul class="npcs">
+          <ul class="rows">
             {#each livingNpcs as npc}
-              {@const s = npcStatus(npc)}
+              {@const b = bond(npc.affinity)}
               <li class="npc">
-                <span class="npc-badge {s.cls}">{npc.name.charAt(0).toUpperCase()}</span>
-                <div class="npc-body">
-                  <span class="npc-name">{npc.name}</span>
-                  {#if npc.note}<span class="npc-note">{npc.note}</span>{/if}
+                <span class="badge {b.cls}">{npc.name.charAt(0).toUpperCase()}</span>
+                <div class="body">
+                  <span class="name">{npc.name}</span>
+                  {#if npc.note}<span class="note">{npc.note}</span>{/if}
                 </div>
-                <div class="npc-aff">
-                  <span class="status-tag {s.cls}">{s.label}</span>
-                  <div class="meter">
-                    <span class="meter-center"></span>
-                    <span class="meter-fill {npc.affinity >= 0 ? 'pos' : 'neg'}" style="width:{Math.min(50, Math.abs(npc.affinity) / 2)}%"></span>
-                  </div>
+                <div class="rel">
+                  <span class="tier {b.cls}">{b.label}</span>
+                  <div class="warmth"><span class="warmth-fill {b.cls}" style="width:{warmth(npc.affinity)}%"></span></div>
                 </div>
               </li>
             {/each}
@@ -73,15 +87,13 @@
       {#if topFactions.length}
         <section>
           <h4 class="eyebrow">Réputation</h4>
-          <ul class="factions">
+          <ul class="rows">
             {#each topFactions as [id, score]}
+              {@const st = standing(score)}
               <li class="faction">
-                <span class="faction-name">{factionName(id)}</span>
-                <div class="meter">
-                  <span class="meter-center"></span>
-                  <span class="meter-fill {score >= 0 ? 'pos' : 'neg'}" style="width:{Math.min(50, Math.abs(score) / 2)}%"></span>
-                </div>
-                <span class="faction-val {score >= 0 ? 'pos' : 'neg'}">{score > 0 ? '+' : ''}{score}</span>
+                <span class="name">{factionName(id)}</span>
+                <div class="warmth"><span class="warmth-fill {st.cls}" style="width:{warmth(score)}%"></span></div>
+                <span class="tier {st.cls}">{st.label}</span>
               </li>
             {/each}
           </ul>
@@ -151,36 +163,35 @@
   section h4 { display: flex; align-items: center; gap: 6px; margin-bottom: var(--space-sm); }
   .count { font-family: var(--font-body); font-size: 0.62rem; letter-spacing: normal; color: var(--color-text-muted); background: rgba(255,255,255,0.06); border-radius: 99px; padding: 0 6px; }
 
-  /* NPC relation rows */
-  .npcs, .factions { list-style: none; display: flex; flex-direction: column; gap: var(--space-sm); }
-  .npc { display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: var(--space-sm); }
-  .npc-badge {
+  .rows { list-style: none; display: flex; flex-direction: column; gap: var(--space-sm); }
+  .name { color: var(--color-text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* NPC relation row */
+  .npc { display: grid; grid-template-columns: 30px 1fr 90px; align-items: center; gap: var(--space-sm); }
+  .badge {
     width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
     font-family: var(--font-display); font-size: 0.8rem; color: var(--color-text-primary);
     background: rgba(255,255,255,0.06); border: 1px solid var(--color-border);
   }
-  .npc-badge.ally { border-color: rgba(143,206,154,0.6); color: var(--color-green); }
-  .npc-badge.hostile { border-color: rgba(215,107,107,0.6); color: var(--color-red); }
-  .npc-body { display: flex; flex-direction: column; min-width: 0; }
-  .npc-name { color: var(--color-text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .npc-note { font-size: 0.72rem; color: var(--color-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .npc-aff { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; width: 84px; }
-  .status-tag { font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-muted); }
-  .status-tag.ally { color: var(--color-green); }
-  .status-tag.hostile { color: var(--color-red); }
+  .badge.good { border-color: rgba(143,206,154,0.6); color: var(--color-green); }
+  .badge.bad { border-color: rgba(215,107,107,0.6); color: var(--color-red); }
+  .body { display: flex; flex-direction: column; min-width: 0; }
+  .note { font-size: 0.72rem; color: var(--color-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rel { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 
-  /* Centered -100..100 meter */
-  .meter { position: relative; width: 100%; height: 4px; background: rgba(255,255,255,0.1); border-radius: 99px; }
-  .meter-center { position: absolute; left: 50%; top: -1px; bottom: -1px; width: 1px; background: rgba(255,255,255,0.25); }
-  .meter-fill { position: absolute; top: 0; bottom: 0; border-radius: 99px; }
-  .meter-fill.pos { left: 50%; background: var(--color-green); }
-  .meter-fill.neg { right: 50%; background: var(--color-red); }
+  /* Faction standing row */
+  .faction { display: grid; grid-template-columns: 1fr 56px auto; align-items: center; gap: var(--space-sm); }
 
-  .faction { display: grid; grid-template-columns: 1fr 70px auto; align-items: center; gap: var(--space-sm); }
-  .faction-name { color: var(--color-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .faction-val { font-variant-numeric: tabular-nums; font-size: 0.78rem; width: 34px; text-align: right; }
-  .faction-val.pos { color: var(--color-green); }
-  .faction-val.neg { color: var(--color-red); }
+  /* Tier word — the primary, readable signal */
+  .tier { font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-muted); white-space: nowrap; }
+  .tier.good { color: var(--color-green); }
+  .tier.bad { color: var(--color-red); }
+
+  /* Warmth bar (cold → warm), no numbers */
+  .warmth { width: 100%; min-width: 40px; height: 4px; background: rgba(255,255,255,0.1); border-radius: 99px; overflow: hidden; }
+  .warmth-fill { display: block; height: 100%; border-radius: 99px; background: var(--color-gold-dim); }
+  .warmth-fill.good { background: var(--color-green); }
+  .warmth-fill.bad { background: var(--color-red); }
 
   /* Chips */
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
