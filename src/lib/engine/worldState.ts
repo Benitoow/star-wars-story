@@ -192,7 +192,13 @@ export function applyStateUpdate(source: WorldState, chapter: StoryChapter): Wor
   upsertNpcs(state, upd);
 
   for (const [id, delta] of Object.entries(upd.factions ?? {})) {
-    if (Number.isFinite(delta)) state.factions[id] = clamp((state.factions[id] ?? 0) + delta, -100, 100);
+    if (Number.isFinite(delta)) {
+      const cleanId = id.trim();
+      const canonicalKey = ['jedi', 'sith', 'empire', 'rebels', 'republic', 'mandalore', 'first_order', 'hutt', 'neutral'].find(
+        (f) => f === cleanId.toLowerCase()
+      ) || cleanId;
+      state.factions[canonicalKey] = clamp((state.factions[canonicalKey] ?? 0) + delta, -100, 100);
+    }
   }
 
   if (upd.rumors_new?.length) {

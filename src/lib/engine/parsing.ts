@@ -269,8 +269,23 @@ function coerceStateUpdate(source: unknown): StateUpdate | undefined {
 
 function coerceMemoryUpdates(source: unknown): StoryMemoryUpdates {
   const d = isRecord(source) ? source : {};
+  
+  const coerceToString = (value: unknown): string => {
+    if (value === null || value === undefined) return '';
+    if (isRecord(value)) {
+      const name = String(value.name || value.target || value.label || value.place || value.note || '').trim();
+      const detail = String(value.relation || value.type || value.status || value.role || '').trim();
+      if (name && detail) return `${name} (${detail})`;
+      if (name) return name;
+      if (detail) return detail;
+      return JSON.stringify(value);
+    }
+    return String(value);
+  };
+
   const list = (v: unknown): string[] =>
-    (Array.isArray(v) ? v : []).map((s) => cleanText(s, 120)).filter((s) => s.length >= 4).slice(0, 10);
+    (Array.isArray(v) ? v : []).map((s) => cleanText(coerceToString(s), 120)).filter((s) => s.length >= 4).slice(0, 10);
+
   return {
     relations: list(d.relations),
     places: list(d.places),

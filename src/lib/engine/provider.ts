@@ -41,8 +41,18 @@ function timeoutFor(model: string): number {
   return 90000;
 }
 
-function reasoningPayload(effort: string, skip: boolean): { effort: string } | undefined {
-  if (skip) return { effort: 'none' };
+function reasoningPayload(effort: string, skip: boolean, model: string): { effort: string } | undefined {
+  if (skip) {
+    const m = model.toLowerCase();
+    const isReasoningModel = /\b(?:o1|o3|r1|grok-3|grok-4|thinking|kimi-k2\.6|sonar-reasoning)\b|deepseek\/deepseek-r1|openai\/o1|openai\/o3-mini/i.test(m);
+    if (!isReasoningModel) {
+      return undefined;
+    }
+    if (/\b(?:o1|r1|deepseek-r1|o3-mini)\b/i.test(m)) {
+      return undefined;
+    }
+    return { effort: 'none' };
+  }
   if (!effort || effort === 'auto') return undefined; // let the model decide
   return { effort };
 }
@@ -89,7 +99,7 @@ export async function callTextModel(
     temperature: options.temperature ?? 0.9
     // No max_tokens — capping it silently truncates verbose reasoning models.
   };
-  const reasoning = reasoningPayload(cfg.reasoningEffort, options.skipReasoning === true);
+  const reasoning = reasoningPayload(cfg.reasoningEffort, options.skipReasoning === true, cfg.model);
   if (reasoning) body.reasoning = reasoning;
   if (options.jsonMode) body.response_format = { type: 'json_object' };
 
