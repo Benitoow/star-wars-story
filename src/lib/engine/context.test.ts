@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildNarrativeContext } from './context';
+import { buildNarrativeContext, detectOverusedTerms } from './context';
 import type { StoryChapter } from './types';
 
 function ch(n: number, text: string): StoryChapter {
@@ -35,5 +35,21 @@ describe('buildNarrativeContext', () => {
 
   it('returns empty for empty history', () => {
     expect(buildNarrativeContext([], [], 1000)).toEqual({ transcript: [], archive: [] });
+  });
+});
+
+describe('detectOverusedTerms', () => {
+  it('flags a word that recurs across many scenes', () => {
+    const chapters = Array.from({ length: 5 }, (_, i) => ch(i + 1, `Une lueur pourpre traverse la pièce numéro ${i}.`));
+    expect(detectOverusedTerms(chapters)).toContain('pourpre');
+  });
+
+  it('ignores a word used in only one scene', () => {
+    const chapters = [ch(1, 'Le blaster crépite.'), ch(2, 'Le calme revient.'), ch(3, 'Le sable brille.'), ch(4, 'La nuit tombe.')];
+    expect(detectOverusedTerms(chapters)).not.toContain('blaster');
+  });
+
+  it('returns nothing without enough history', () => {
+    expect(detectOverusedTerms([ch(1, 'pourpre pourpre pourpre')])).toEqual([]);
   });
 });

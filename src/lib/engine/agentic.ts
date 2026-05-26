@@ -20,11 +20,12 @@ const REVIEWER_SYSTEM = `Tu es le RELECTEUR d'une campagne Star Wars : tu transf
 Règles ABSOLUES :
 - Ne change NI les événements, NI les personnages, NI le lieu, NI l'issue de l'action — uniquement l'écriture.
 - Supprime les répétitions et les formules creuses ; renforce la première phrase ; resserre le rythme.
+- VARIÉTÉ : si des mots reviennent trop d'une scène à l'autre (couleurs, images « signatures »), remplace-les activement par des synonymes ou d'autres images. Ne laisse pas un tic de vocabulaire s'installer.
 - 2 à 3 paragraphes. Aucune sortie technique (ni JSON, ni markdown, ni liste). Aucun choix.
 - Dialogues : chaque réplique sur sa ligne, format "Nom : réplique" (INTERDICTION du tiret cadratin '—' ou de tout tiret en début de ligne).
 - Réponds UNIQUEMENT avec la scène finale réécrite.`;
 
-function writerSystem(setup: StorySetup, turnNumber: number, world: WorldState, canon: string, archive: string[]): string {
+function writerSystem(setup: StorySetup, turnNumber: number, world: WorldState, canon: string, archive: string[], overusedTerms: string[]): string {
   const protagonist = [setup.protagonistFirstName, setup.protagonistLastName].filter(Boolean).join(' ').trim() || 'Le protagoniste';
   const prologue = turnNumber <= 1
     ? `\n- TOUR 1 : commence par une riche introduction du protagoniste (${protagonist}) — origines liées à son rôle (${setup.role}) et sa faction (${setup.faction}), situation actuelle, tension immédiate — avant l'action.`
@@ -47,7 +48,7 @@ RÈGLES :
 5. ${ERA_COHERENCE}
 6. RÔLE CANONIQUE IMMUABLE : garde le rôle "${setup.role}".
 7. Dialogues : chaque réplique sur sa ligne, format "Nom : réplique" (INTERDICTION du tiret cadratin '—' ou de tout tiret en début de ligne).
-8. CANON DU JOUEUR & ESCALADE : respecte les faits que le joueur a établis (ci-dessous) ; ne les contredis jamais et n'introduis pas un groupe/élément qu'il a exclu. Un lieu civil (marché, cantina) reste civil sans escalade fortement justifiée — pas de stormtroopers en masse ni de marcheurs/AT-ST surgissant sans cause proportionnée.${prologue}${canon}`;
+8. CANON DU JOUEUR & ESCALADE : respecte les faits que le joueur a établis (ci-dessous) ; ne les contredis jamais et n'introduis pas un groupe/élément qu'il a exclu. Un lieu civil (marché, cantina) reste civil sans escalade fortement justifiée — pas de stormtroopers en masse ni de marcheurs/AT-ST surgissant sans cause proportionnée.${prologue}${canon}${varietyNote(overusedTerms)}`;
 }
 
 function directorUser(summary: string, action: string, turnNumber: number, digest: string, canon: string): string {
@@ -97,16 +98,16 @@ Déduis-en les conséquences mécaniques, COHÉRENTES avec l'état ci-dessus : h
 }`;
 }
 
-function reviewerUser(draft: string, brief: Record<string, unknown>, digest: string): string {
+function reviewerUser(draft: string, brief: Record<string, unknown>, digest: string, overusedTerms: string[]): string {
   const mustInclude = Array.isArray(brief.must_include) ? brief.must_include.map((m) => cleanText(m, 80)).filter(Boolean).join(' ; ') : '';
   return `ÉTAT DU MONDE (à respecter, ne rien contredire) :
 ${digest}
-${mustInclude ? `\nÉléments imposés de la scène : ${mustInclude}` : ''}
+${mustInclude ? `\nÉléments imposés de la scène : ${mustInclude}` : ''}${varietyNote(overusedTerms)}
 
 SCÈNE BRUTE À PEAUFINER :
 ${cleanText(draft, 3000)}
 
-Livre la version finale : mêmes faits, même issue, meilleure écriture.`;
+Livre la version finale : mêmes faits, même issue, meilleure écriture (et vocabulaire varié si des mots récurrents sont signalés ci-dessus).`;
 }
 
 /** Split mixed writer prose into action vs "Nom : réplique" dialogue lines. */
@@ -132,6 +133,13 @@ export interface AgenticContext {
   archive: string[];            // older turns, condensed (into the Writer's system)
   outcomeDirective?: string;
   playerDirectives?: string[];
+  overusedTerms?: string[];     // words the model has leaned on across recent scenes
+}
+
+function varietyNote(overusedTerms: string[] = []): string {
+  return overusedTerms.length
+    ? `\nVARIÉTÉ (IMPORTANT) : ces mots reviennent trop d'une scène à l'autre — ne les réemploie pas par réflexe, varie le vocabulaire et les images : ${overusedTerms.join(', ')}.`
+    : '';
 }
 
 function playerCanonBlock(playerDirectives: string[] = []): string {
@@ -168,7 +176,7 @@ export async function runAgenticTurn(
   // reading the RAW recent scenes (transcript) as the conversation so far.
   const draft = await callTextModel(
     [
-      { role: 'system', content: writerSystem(ctx.setup, ctx.turnNumber, ctx.worldState, canon, ctx.archive) },
+      { role: 'system', content: writerSystem(ctx.setup, ctx.turnNumber, ctx.worldState, canon, ctx.archive, ctx.overusedTerms ?? []) },
       ...ctx.transcript,
       { role: 'user', content: writerUser(brief, ctx.actionText, ctx.outcomeDirective ?? '') }
     ],
@@ -180,7 +188,7 @@ export async function runAgenticTurn(
   let prose = draft;
   try {
     const reviewed = await callTextModel(
-      [{ role: 'system', content: `${languageInstruction(lang)}\n\n${REVIEWER_SYSTEM}` }, { role: 'user', content: reviewerUser(draft, brief, digest) }],
+      [{ role: 'system', content: `${languageInstruction(lang)}\n\n${REVIEWER_SYSTEM}` }, { role: 'user', content: reviewerUser(draft, brief, digest, ctx.overusedTerms ?? []) }],
       provider
     );
     if (reviewed.trim().length >= 40) prose = reviewed;

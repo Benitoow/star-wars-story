@@ -70,3 +70,40 @@ export function buildNarrativeContext(
   const transcript = units.slice(keepFrom).flatMap((u) => u.messages);
   return { transcript, archive };
 }
+
+// Grammatical 6+ letter words to ignore (connectors, not imagery).
+const STOP_TERMS = new Set([
+  'toujours', 'pendant', 'devant', 'derrière', 'derriere', 'encore', 'autour', 'contre',
+  'lorsque', 'ensuite', 'pourtant', 'cependant', 'désormais', 'desormais', 'aussitôt',
+  'aussitot', 'comme', 'parmi', 'malgré', 'malgre', 'tandis', 'puisque'
+]);
+const TERM_RE = /[a-zà-öø-ÿ]{6,}/gi;
+
+/**
+ * Words a model has leaned on across recent scenes (e.g. "pourpre" every turn).
+ * Data-driven — counts how many distinct scenes each word appears in — so it
+ * generalizes to any stylistic tic instead of hardcoding a banned list.
+ */
+export function detectOverusedTerms(
+  chapters: StoryChapter[],
+  { scenes = 8, minScenes = 3, max = 6 } = {}
+): string[] {
+  const recent = chapters.slice(-scenes);
+  if (recent.length < minScenes) return [];
+
+  const scenesPerWord = new Map<string, number>();
+  for (const chapter of recent) {
+    const text = `${chapter.narrative.action}\n${chapter.narrative.dialogue}\n${chapter.narrative.reflection}`.toLowerCase();
+    const seen = new Set(text.match(TERM_RE) ?? []);
+    for (const word of seen) {
+      if (!STOP_TERMS.has(word)) scenesPerWord.set(word, (scenesPerWord.get(word) ?? 0) + 1);
+    }
+  }
+
+  const threshold = Math.max(minScenes, Math.ceil(recent.length * 0.5));
+  return [...scenesPerWord.entries()]
+    .filter(([, count]) => count >= threshold)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, max)
+    .map(([word]) => word);
+}

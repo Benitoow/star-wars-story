@@ -47,10 +47,14 @@ export function buildContinuePrompt(
   recentChoiceTexts: string[] = [],
   languageCode?: string,
   outcomeDirective = '',
-  playerDirectives: string[] = []
+  playerDirectives: string[] = [],
+  overusedTerms: string[] = []
 ): string {
   const langName = languageName(languageCode || 'fr');
   const action = cleanText(actionText, 280);
+  const variety = overusedTerms.length
+    ? `\nVARIÉTÉ : ces mots reviennent trop dans l'histoire — évite de les réemployer par réflexe, varie le vocabulaire : ${overusedTerms.join(', ')}.`
+    : '';
 
   // History is carried by the raw transcript messages now — this prompt only
   // adds the current action, the player canon, choice de-dup and pacing.
@@ -75,7 +79,7 @@ export function buildContinuePrompt(
   return `ACTION JOUEUR CANONIQUE : ${action}
 ${outcome}OBLIGATION : la scène suivante traite cette action comme cause immédiate (ou tentative avec conséquence concrète), rédigée ENTIÈREMENT EN ${langName}.
 
-Tour ${turnNumber}.${canon}${choicesBlock}${pacing}
+Tour ${turnNumber}.${canon}${choicesBlock}${pacing}${variety}
 
 Écris une scène forte et précise — conséquences réelles, PNJs avec mémoire et intention propre.
 Aucun markdown, aucun titre interne, aucun bloc de choix dans le récit.
