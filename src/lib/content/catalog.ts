@@ -65,11 +65,14 @@ export const ROLES: Array<CatalogItem & { faction: string }> = [
   { id: 'jedi_exile', name: 'Jedi Banni', faction: 'neutral', icon: 'alone-characterized-embodied-svgrepo-com.svg' }
 ];
 
+// Starting credits per role id — one entry for every role in ROLES (grunts and
+// apprentices at the bottom), plus a generic fallback. Keep in sync with ROLES.
 export const FACTION_CREDITS: Record<string, number> = {
-  imperial_officer: 3000, bounty_hunter: 1500, hutt_enforcer: 2000, smuggler: 800,
-  rebel_pilot: 600, rebel_leader: 900, jedi_knight: 500, jedi_master: 800,
-  sith_lord: 2500, sith_apprentice: 1000, mandalorian_warrior: 1200, senator: 5000,
-  scavenger: 300, default: 1000
+  senator: 5000, imperial_officer: 3000, sith_lord: 2500, bounty_hunter: 1500,
+  mandalorian_warrior: 1200, sith_apprentice: 1000, rebel_leader: 900,
+  jedi_master: 800, smuggler: 800, rebel_pilot: 600, jedi_knight: 500,
+  scavenger: 300, stormtrooper: 300, clone_trooper: 300, jedi_exile: 300,
+  padawan: 250, default: 1000
 };
 
 export const TRAMES: Array<CatalogItem & { premise: string }> = [

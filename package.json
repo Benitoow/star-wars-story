@@ -9,10 +9,10 @@
     "preview": "vite preview",
     "lint": "eslint . --max-warnings=0",
     "lint:fix": "eslint . --fix",
-    "test": "vitest run",
+    "test": "svelte-kit sync && vitest run",
     "test:browser": "playwright test",
-    "test:soak": "vitest run --config vitest.soak.config.ts",
-    "test:watch": "vitest",
+    "test:soak": "svelte-kit sync && vitest run --config vitest.soak.config.ts",
+    "test:watch": "svelte-kit sync && vitest",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
   },

@@ -41,7 +41,10 @@
 
   function pickFaction(id: string) {
     faction = id;
-    if (!roleOptions.some((r) => r.id === role)) role = defaultRoleForFaction(id);
+    // Recompute here: the reactive `roleOptions` still reflects the previous
+    // faction inside this handler, so a faction-specific role would wrongly pass.
+    const nextOptions = ROLES.filter((r) => r.faction === id || r.faction === 'neutral');
+    if (!nextOptions.some((r) => r.id === role)) role = defaultRoleForFaction(id);
   }
   function pickTrame(id: string) {
     trameId = id;

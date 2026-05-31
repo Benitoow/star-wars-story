@@ -37,7 +37,6 @@ function push(level: Level, message: string, data: unknown[]): void {
 function emit(level: Level, message: string, ...rest: unknown[]): void {
   if (level !== 'debug') push(level, message, rest);
   if (level === 'debug' && !dev) return;
-  // eslint-disable-next-line no-console
   console[level](`[sw] ${message}`, ...rest);
 }
 

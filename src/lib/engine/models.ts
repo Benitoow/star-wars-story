@@ -46,7 +46,9 @@ export async function resolveContextBudget(config: StoryProviderConfig): Promise
     const lengths = await fetchContextLengths(config.apiKey);
     const window = lengths[config.model];
     if (!window || !Number.isFinite(window)) return DEFAULT_CONTEXT_BUDGET;
-    return Math.max(DEFAULT_CONTEXT_BUDGET, Math.floor(window * TRANSCRIPT_SHARE));
+    // Scale to the model's real window — never floor it at the default, or a
+    // small/medium model gets a transcript budget bigger than its whole window.
+    return Math.floor(window * TRANSCRIPT_SHARE);
   } catch (error) {
     logger.debug('context window auto-detect failed, using default budget', error);
     return DEFAULT_CONTEXT_BUDGET;

@@ -198,7 +198,12 @@ async function chatSend(text: string): Promise<void> {
       (delta) => update((s) => ({ ...s, chat: { ...s.chat, partial: s.chat.partial + delta } })),
       chatAbort.signal
     );
-    update((s) => ({ ...s, chat: { ...s.chat, turns: [...s.chat.turns, { speaker: 'npc', content: reply || s.chat.partial }], partial: '', busy: false } }));
+    update((s) => {
+      const content = (reply || s.chat.partial).trim();
+      // An empty reply (model returned nothing, or instant cancel) must not push a blank bubble.
+      if (!content) return { ...s, chat: { ...s.chat, partial: '', busy: false, error: 'Réponse vide du modèle.' } };
+      return { ...s, chat: { ...s.chat, turns: [...s.chat.turns, { speaker: 'npc', content }], partial: '', busy: false, error: null } };
+    });
     void persist();
   } catch (error) {
     update((s) => ({ ...s, chat: { ...s.chat, busy: false, error: error instanceof Error ? error.message : String(error) } }));
