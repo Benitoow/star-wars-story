@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseJsonSafely, sanitizeProse, parseStoryResponse } from './parsing';
+import { extractStreamingJsonField, parseJsonSafely, sanitizeProse, parseStoryResponse } from './parsing';
 
 describe('parseJsonSafely', () => {
   it('extracts JSON from a ```json fenced block', () => {
@@ -12,6 +12,40 @@ describe('parseJsonSafely', () => {
   });
   it('returns null for non-JSON', () => {
     expect(parseJsonSafely('juste du texte')).toBeNull();
+  });
+});
+
+describe('extractStreamingJsonField — live narrative preview', () => {
+  it('decodes the field progressively as the JSON streams in', () => {
+    expect(extractStreamingJsonField('{"chapter_title', 'chapter_title')).toBeNull(); // value not open yet
+    expect(extractStreamingJsonField('{"chapter_title":"Fui', 'chapter_title')).toBe('Fui');
+    expect(extractStreamingJsonField('{"chapter_title":"Fuite","narrative":{"action', 'action')).toBeNull();
+    expect(extractStreamingJsonField('{"chapter_title":"Fuite","narrative":{"action":"Le hangar', 'action')).toBe('Le hangar');
+    const doc = '{"chapter_title":"Fuite","narrative":{"action":"Le hangar gronde.\\nLes troopers arrivent.","dialogue":""}}';
+    expect(extractStreamingJsonField(doc, 'action')).toBe('Le hangar gronde.\nLes troopers arrivent.');
+  });
+
+  it('stops at the closing quote (does not bleed into the next field)', () => {
+    const doc = '{"action":"Fin de scène.","dialogue":"Han : Pas un mot."}';
+    expect(extractStreamingJsonField(doc, 'action')).toBe('Fin de scène.');
+  });
+
+  it('skips "action" appearing as a VALUE (section_type) and reads the real key', () => {
+    const doc = '{"section_type":"action","narrative":{"action":"La vraie prose."}}';
+    expect(extractStreamingJsonField(doc, 'action')).toBe('La vraie prose.');
+    // Stream edge right after the value occurrence: undecidable yet → null, no garbage.
+    expect(extractStreamingJsonField('{"section_type":"action"', 'action')).toBeNull();
+  });
+
+  it('decodes escapes and drops a trailing incomplete escape', () => {
+    expect(extractStreamingJsonField('{"action":"Il dit \\"pars\\" et', 'action')).toBe('Il dit "pars" et');
+    expect(extractStreamingJsonField('{"action":"coupé net \\', 'action')).toBe('coupé net ');
+    expect(extractStreamingJsonField('{"action":"unicode \\u00e9', 'action')).toBe('unicode é');
+    expect(extractStreamingJsonField('{"action":"unicode \\u00e', 'action')).toBe('unicode ');
+  });
+
+  it('returns null when the field is absent', () => {
+    expect(extractStreamingJsonField('{"autre":"x"}', 'action')).toBeNull();
   });
 });
 

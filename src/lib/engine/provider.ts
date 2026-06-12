@@ -26,6 +26,7 @@ export interface TextGenOptions {
 
 export interface StreamOptions {
   temperature?: number;
+  jsonMode?: boolean;       // request a JSON object response (streamed)
   skipReasoning?: boolean;
   signal?: AbortSignal;     // external cancel (e.g. the user closes the chat)
 }
@@ -207,6 +208,7 @@ export async function callTextModelStream(
   };
   const reasoning = await resolveReasoning(cfg, options.skipReasoning === true);
   if (reasoning) body.reasoning = reasoning;
+  if (options.jsonMode) body.response_format = { type: 'json_object' };
 
   const timeoutMs = REQUEST_TIMEOUT_MS;
   const controller = new AbortController();

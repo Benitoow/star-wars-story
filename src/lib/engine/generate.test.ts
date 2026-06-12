@@ -67,6 +67,61 @@ describe('generateOpening (mocked transport)', () => {
   });
 });
 
+describe('generateTurn — streamed narrative preview (onPartial)', () => {
+  function sseBody(chunks: string[]) {
+    let i = 0;
+    const enc = new TextEncoder();
+    return { getReader: () => ({ read: async () => (i < chunks.length ? { done: false, value: enc.encode(chunks[i++]) } : { done: true, value: undefined }) }) };
+  }
+  function sseFrames(content: string, chunkSize = 16): string[] {
+    const frames: string[] = [];
+    for (let i = 0; i < content.length; i += chunkSize) {
+      frames.push(`data: ${JSON.stringify({ choices: [{ delta: { content: content.slice(i, i + chunkSize) } }] })}\n\n`);
+    }
+    frames.push('data: [DONE]\n\n');
+    return frames;
+  }
+
+  it('streams the JSON, surfaces title + prose progressively, then parses the chapter', async () => {
+    const doc = JSON.stringify({
+      chapter_title: 'Percée',
+      chapter_number: 2,
+      section_type: 'action',
+      narrative: { action: 'Le sas cède sous la poussée.', dialogue: '', reflection: '', atmosphere: 'tense' },
+      choices: [{ text: 'Foncer dans la brèche', attribute: 'combat', difficulty: 2 }]
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200, body: sseBody(sseFrames(doc)), text: async () => '' }));
+
+    const partials: Array<{ title: string; text: string }> = [];
+    const result = await generateTurn(
+      { setup, worldState: initWorldState(setup), turnNumber: 2, actionText: 'Pousser le sas' },
+      provider,
+      { onPartial: (p) => partials.push({ ...p }) }
+    );
+
+    expect(partials.length).toBeGreaterThan(1);
+    expect(partials[partials.length - 1].title).toBe('Percée');
+    expect(partials[partials.length - 1].text).toBe('Le sas cède sous la poussée.');
+    expect(result.chapter.chapter_title).toBe('Percée');
+    expect(result.chapter.narrative.action).toContain('sas');
+  });
+
+  it('falls back to the non-streaming (retried) call when the stream fails', async () => {
+    const doc = JSON.stringify({ chapter_title: 'Secours', narrative: { action: 'On le relève doucement.' } });
+    const mock = vi.fn()
+      .mockResolvedValueOnce({ ok: false, status: 500, body: null, text: async () => 'stream en panne' })
+      .mockResolvedValue({ ok: true, status: 200, json: async () => ({ choices: [{ message: { content: doc } }] }), text: async () => doc });
+    vi.stubGlobal('fetch', mock);
+
+    const result = await generateTurn(
+      { setup, worldState: initWorldState(setup), turnNumber: 3, actionText: 'Le relever' },
+      provider,
+      { onPartial: () => {} }
+    );
+    expect(result.chapter.chapter_title).toBe('Secours');
+  });
+});
+
 describe('generateTurn (mocked transport)', () => {
   it('applies the action consequences onto the existing world', async () => {
     stubFetch(JSON.stringify({

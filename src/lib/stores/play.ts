@@ -13,6 +13,7 @@ import {
   resolveContextBudget,
   rollForChoice,
   type ChatTurn,
+  type GeneratePartial,
   type NpcRelation,
   type StoryChapter,
   type StoryChoice,
@@ -51,6 +52,7 @@ export interface PlayState {
   actionHistory: string[];
   turnNumber: number;
   error: string | null;
+  partialChapter: GeneratePartial | null; // the scene streaming in while status === 'generating'
   chat: ChatState;
 }
 
@@ -59,6 +61,7 @@ const initialChat: ChatState = { active: false, npcName: '', sceneSummary: '', t
 const initial: PlayState = {
   storyId: null, setup: null, status: 'idle', worldState: null, currentChapter: null,
   chapterHistory: [], memoryFacts: [], actionHistory: [], turnNumber: 0, error: null,
+  partialChapter: null,
   chat: { ...initialChat }
 };
 
@@ -109,7 +112,8 @@ function applyResult(result: StoryTurnResult, actionText: string): void {
     memoryFacts: mergeMemory(s.memoryFacts, chapter),
     actionHistory: actionText ? [...s.actionHistory, actionText] : s.actionHistory,
     turnNumber: chapter.chapter_number,
-    error: null
+    error: null,
+    partialChapter: null
   }));
   void persist();
 }
@@ -117,17 +121,21 @@ function applyResult(result: StoryTurnResult, actionText: string): void {
 function fail(error: unknown): void {
   const message = error instanceof Error ? error.message : String(error);
   logger.error('génération échouée', error);
-  update((s) => ({ ...s, status: 'error', error: message }));
+  update((s) => ({ ...s, status: 'error', error: message, partialChapter: null }));
   toasts.show(message, 'error', 6000);
+}
+
+function onPartial(partial: GeneratePartial): void {
+  update((s) => ({ ...s, partialChapter: partial }));
 }
 
 async function startOpening(): Promise<void> {
   const setup = snap.setup;
   if (!setup) return;
-  update((s) => ({ ...s, status: 'generating', error: null }));
+  update((s) => ({ ...s, status: 'generating', error: null, partialChapter: null }));
   try {
     const { config, mode, language } = await loadProvider();
-    const result = await generateOpening({ ...setup, language }, config, { mode });
+    const result = await generateOpening({ ...setup, language }, config, { mode, onPartial });
     recordDiag(`ouverture générée (${result.mode}, ${config.model})`, { rawResponse: result.rawResponse });
     applyResult(result, '');
   } catch (error) {
@@ -141,7 +149,7 @@ async function submit(actionText: string, outcomeDirective = ''): Promise<void> 
   const action = actionText.trim();
   if (!setup || !worldState || !action || snap.status === 'generating') return;
 
-  update((s) => ({ ...s, status: 'generating', error: null }));
+  update((s) => ({ ...s, status: 'generating', error: null, partialChapter: null }));
   try {
     const { config, mode, language, contextBudget } = await loadProvider();
     const result = await generateTurn(
@@ -158,7 +166,7 @@ async function submit(actionText: string, outcomeDirective = ''): Promise<void> 
         outcomeDirective
       },
       config,
-      { mode }
+      { mode, onPartial }
     );
     recordDiag(`tour ${result.chapter.chapter_number} (${result.mode}, ${config.model})`, { action, rawResponse: result.rawResponse });
     applyResult(result, action);
@@ -275,6 +283,7 @@ export const play = {
         currentChapter: session.currentChapter ?? session.chapterHistory[session.chapterHistory.length - 1] ?? null,
         chapterHistory: session.chapterHistory, memoryFacts: session.memoryFacts,
         actionHistory: session.actionHistory, turnNumber: session.turnNumber, error: null,
+        partialChapter: null,
         chat: session.chat
           ? { active: true, npcName: session.chat.npcName, sceneSummary: session.chat.sceneSummary, turns: session.chat.turns, partial: '', busy: false, error: null }
           : { ...initialChat }

@@ -9,9 +9,9 @@ export {
   isUnknownLocation,
   isLikelyNpcName
 } from './worldState';
-export { parseStoryResponse, parseJsonSafely, sanitizeProse } from './parsing';
+export { parseStoryResponse, parseJsonSafely, sanitizeProse, extractStreamingJsonField } from './parsing';
 export { callTextModel, callTextModelStream, normalizeProviderConfig, type TextGenOptions, type StreamOptions } from './provider';
-export { generateOpening, generateTurn, type TurnInput } from './generate';
+export { generateOpening, generateTurn, type TurnInput, type GenerateOptions, type GeneratePartial } from './generate';
 export { npcReply, resolveConversation, type NpcReplyInput, type ResolveConversationInput } from './chat';
 export { buildNarrativeContext, DEFAULT_CONTEXT_BUDGET, type NarrativeContext } from './context';
 export { resolveContextBudget, fetchContextLengths, fetchModelCatalog, supportsReasoningParam, TRANSCRIPT_SHARE, type ModelCapabilities } from './models';

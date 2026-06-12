@@ -6,7 +6,7 @@
 ══════════════════════════════════════════════ */
 import { cleanText, isRecord } from './text';
 import { parseStoryResponse, sanitizeProse } from './parsing';
-import { callTextModel } from './provider';
+import { callTextModel, callTextModelStream } from './provider';
 import { languageInstruction, languageName } from './prompts/language';
 import { ERA_COHERENCE, styleDirective, contentModeDirective } from './prompts/style';
 import { renderWorldBlock, renderWorldDigest } from './prompts/system';
@@ -143,6 +143,7 @@ export interface AgenticContext {
   outcomeDirective?: string;
   playerDirectives?: string[];
   overusedTerms?: string[];     // words the model has leaned on across recent scenes
+  onPartial?: (partial: { title: string; text: string }) => void; // live preview of the Writer's draft
 }
 
 function varietyNote(overusedTerms: string[] = []): string {
@@ -183,14 +184,26 @@ export async function runAgenticTurn(
 
   // 2. Writer — cinematic prose, grounded in the world block + archive and
   // reading the RAW recent scenes (transcript) as the conversation so far.
-  const draft = await callTextModel(
-    [
-      { role: 'system', content: writerSystem(ctx.setup, ctx.turnNumber, ctx.worldState, canon, ctx.archive, ctx.overusedTerms ?? []) },
-      ...ctx.transcript,
-      { role: 'user', content: writerUser(brief, ctx.actionText, ctx.outcomeDirective ?? '') }
-    ],
-    provider
-  );
+  // With onPartial the draft STREAMS to the player while Reviewer/Brain run;
+  // any stream failure falls back to the plain (retried) call.
+  const writerMessages: ChatMessage[] = [
+    { role: 'system', content: writerSystem(ctx.setup, ctx.turnNumber, ctx.worldState, canon, ctx.archive, ctx.overusedTerms ?? []) },
+    ...ctx.transcript,
+    { role: 'user', content: writerUser(brief, ctx.actionText, ctx.outcomeDirective ?? '') }
+  ];
+  let draft = '';
+  if (ctx.onPartial) {
+    try {
+      let acc = '';
+      draft = await callTextModelStream(writerMessages, provider, (delta) => {
+        acc += delta;
+        ctx.onPartial!({ title: '', text: acc });
+      });
+    } catch {
+      /* stream failed — retry below over the sturdier non-streaming path */
+    }
+  }
+  if (!draft.trim()) draft = await callTextModel(writerMessages, provider);
 
   // 3. Reviewer — polish the scene (same facts, sharper writing). Falls back to the
   // draft if it returns nothing usable.

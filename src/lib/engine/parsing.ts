@@ -69,6 +69,56 @@ function extractLargestJsonObject(text: string): string | null {
   return null;
 }
 
+/**
+ * Incrementally decode the string value of `"field": "…"` from a PARTIAL JSON
+ * document still streaming in. Returns the text decoded so far, or null if the
+ * field hasn't opened yet. A trailing incomplete escape is dropped (it will
+ * complete on the next push). Used to show the narrative while the turn streams.
+ */
+export function extractStreamingJsonField(buffer: string, field: string): string | null {
+  const key = `"${field}"`;
+  // Find the KEY occurrence — `"action"` can also appear as a VALUE earlier in
+  // the document (e.g. "section_type": "action"), so require the key colon.
+  let i = -1;
+  for (let from = 0; ; ) {
+    const at = buffer.indexOf(key, from);
+    if (at === -1) return null;
+    let j = at + key.length;
+    while (j < buffer.length && /\s/.test(buffer[j])) j += 1;
+    if (j >= buffer.length) return null; // stream edge — can't tell key from value yet
+    if (buffer[j] === ':') {
+      i = j + 1;
+      break;
+    }
+    from = at + 1;
+  }
+  while (i < buffer.length && /\s/.test(buffer[i])) i += 1;
+  if (i >= buffer.length || buffer[i] !== '"') return null;
+  i += 1;
+  let out = '';
+  while (i < buffer.length) {
+    const ch = buffer[i];
+    if (ch === '"') break; // value closed
+    if (ch !== '\\') {
+      out += ch;
+      i += 1;
+      continue;
+    }
+    if (i + 1 >= buffer.length) break; // incomplete escape at the stream edge
+    const esc = buffer[i + 1];
+    if (esc === 'u') {
+      if (i + 6 > buffer.length) break;
+      const hex = buffer.slice(i + 2, i + 6);
+      if (/^[0-9a-fA-F]{4}$/.test(hex)) out += String.fromCharCode(parseInt(hex, 16));
+      i += 6;
+      continue;
+    }
+    out += esc === 'n' ? '\n' : esc === 't' ? '\t' : esc === 'r' ? '' : esc; // \" \\ \/ → literal
+    i += 2;
+  }
+  return out;
+}
+
 export function parseJsonSafely(raw: string): Record<string, unknown> | null {
   const cleaned = stripFences(raw);
   const largest = extractLargestJsonObject(cleaned);

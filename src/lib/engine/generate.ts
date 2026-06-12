@@ -7,11 +7,12 @@
 ══════════════════════════════════════════════ */
 import { runAgenticTurn } from './agentic';
 import { buildNarrativeContext, detectOverusedTerms, DEFAULT_CONTEXT_BUDGET } from './context';
-import { parseStoryResponse } from './parsing';
+import { extractStreamingJsonField, parseStoryResponse } from './parsing';
 import { buildContinuePrompt, buildStartPrompt, buildSystemPrompt, summarizeChapterForPrompt } from './prompts';
-import { callTextModel } from './provider';
+import { callTextModel, callTextModelStream } from './provider';
 import { cleanText } from './text';
 import type {
+  ChatMessage,
   StoryChapter,
   StoryGenerationMode,
   StoryProviderConfig,
@@ -20,6 +21,50 @@ import type {
   WorldState
 } from './types';
 import { applyStateUpdate, initWorldState } from './worldState';
+
+/** Live preview of the turn being generated — title + narrative prose so far. */
+export interface GeneratePartial {
+  title: string;
+  text: string;
+}
+
+export interface GenerateOptions {
+  trameLabel?: string | null;
+  mode?: StoryGenerationMode;
+  onPartial?: (partial: GeneratePartial) => void; // stream the scene as it writes itself
+}
+
+/**
+ * One structured-json completion. With onPartial, the JSON is STREAMED and the
+ * chapter_title / narrative.action fields are surfaced live as they arrive;
+ * any stream failure falls back to the plain (retried) non-streaming call.
+ */
+async function callStructuredJson(
+  messages: ChatMessage[],
+  provider: StoryProviderConfig,
+  onPartial?: (partial: GeneratePartial) => void
+): Promise<string> {
+  if (onPartial) {
+    try {
+      let buffer = '';
+      const raw = await callTextModelStream(
+        messages,
+        provider,
+        (delta) => {
+          buffer += delta;
+          const title = extractStreamingJsonField(buffer, 'chapter_title') ?? '';
+          const text = extractStreamingJsonField(buffer, 'action') ?? '';
+          if (title || text) onPartial({ title, text });
+        },
+        { jsonMode: true }
+      );
+      if (raw.trim()) return raw;
+    } catch {
+      /* stream failed — retry below over the sturdier non-streaming path */
+    }
+  }
+  return callTextModel(messages, provider, { jsonMode: true });
+}
 
 export interface TurnInput {
   setup: StorySetup;
@@ -40,7 +85,7 @@ const OPENING_ACTION = "Entrer dans la scène d'ouverture et survivre aux premi�
 export async function generateOpening(
   setup: StorySetup,
   provider: StoryProviderConfig,
-  options: { trameLabel?: string | null; mode?: StoryGenerationMode } = {}
+  options: GenerateOptions = {}
 ): Promise<StoryTurnResult> {
   const world = initWorldState(setup);
   let chapter: StoryChapter;
@@ -49,7 +94,7 @@ export async function generateOpening(
 
   if (options.mode === 'agentic-subagents') {
     const r = await runAgenticTurn(
-      { setup, worldState: world, turnNumber: 1, actionText: OPENING_ACTION, situation: cleanText(setup.premise, 800), transcript: [], archive: [] },
+      { setup, worldState: world, turnNumber: 1, actionText: OPENING_ACTION, situation: cleanText(setup.premise, 800), transcript: [], archive: [], onPartial: options.onPartial },
       provider
     );
     chapter = r.chapter;
@@ -60,7 +105,7 @@ export async function generateOpening(
       { role: 'system' as const, content: buildSystemPrompt(setup, [], world, 1) },
       { role: 'user' as const, content: buildStartPrompt(setup, options.trameLabel) }
     ];
-    rawResponse = await callTextModel(messages, provider, { jsonMode: true });
+    rawResponse = await callStructuredJson(messages, provider, options.onPartial);
     chapter = parseStoryResponse(rawResponse, 1);
     mode = 'structured-json';
   }
@@ -72,7 +117,7 @@ export async function generateOpening(
 export async function generateTurn(
   input: TurnInput,
   provider: StoryProviderConfig,
-  options: { mode?: StoryGenerationMode } = {}
+  options: GenerateOptions = {}
 ): Promise<StoryTurnResult> {
   const history = input.chapterHistory ?? [];
   const budget = input.contextBudget ?? DEFAULT_CONTEXT_BUDGET;
@@ -99,7 +144,8 @@ export async function generateTurn(
         archive,
         outcomeDirective: input.outcomeDirective,
         playerDirectives: input.playerDirectives,
-        overusedTerms
+        overusedTerms,
+        onPartial: options.onPartial
       },
       provider
     );
@@ -124,7 +170,7 @@ export async function generateTurn(
         )
       }
     ];
-    rawResponse = await callTextModel(messages, provider, { jsonMode: true });
+    rawResponse = await callStructuredJson(messages, provider, options.onPartial);
     chapter = parseStoryResponse(rawResponse, input.turnNumber);
     mode = 'structured-json';
   }

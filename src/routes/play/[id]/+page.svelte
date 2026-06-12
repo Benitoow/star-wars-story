@@ -29,6 +29,8 @@
 
   $: generating = $play.status === 'generating';
   $: chapter = $play.currentChapter;
+  $: partial = $play.partialChapter;
+  $: partialParagraphs = (partial?.text || '').split(/\n{2,}/).map((s) => s.trim()).filter(Boolean);
   $: backdrop = $play.setup ? eraBackdrop($play.setup.era) : 'cosmic-darkness';
   $: actionParagraphs = (chapter?.narrative.action || '').split(/\n{2,}/).map((s) => s.trim()).filter(Boolean);
   $: dialogueLines = (chapter?.narrative.dialogue || '').split(/\n+/).map((s) => s.trim()).filter(Boolean);
@@ -74,6 +76,13 @@
       <ChatPanel />
     {:else if $play.status === 'loading'}
       <div class="center"><div class="spinner"></div></div>
+    {:else if generating && partial}
+      <!-- The scene streams in as the model writes it. -->
+      <article class="scene">
+        <h1 class="scene-title">{partial.title || '…'}</h1>
+        {#each partialParagraphs as para}<p class="prose">{para}</p>{/each}
+        <p class="prose"><span class="stream-caret">▍</span></p>
+      </article>
     {:else if !chapter && generating}
       <div class="center prologue-loading">
         <p class="eyebrow">La Force tisse ton destin…</p>
@@ -220,6 +229,8 @@
   .error-card { max-width: 460px; }
   .error-msg { color: var(--color-text-secondary); }
   .error-actions { display: flex; gap: var(--space-sm); }
+
+  .stream-caret { color: var(--color-gold); animation: pulse 1s steps(2) infinite; }
 
   .spinner {
     width: 30px; height: 30px;
