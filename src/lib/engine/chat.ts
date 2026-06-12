@@ -68,14 +68,15 @@ export interface ResolveConversationInput {
 /** Exit debrief — turns the conversation into a recap chapter + applied consequences. */
 export async function resolveConversation(
   input: ResolveConversationInput,
-  provider: StoryProviderConfig
+  provider: StoryProviderConfig,
+  signal?: AbortSignal
 ): Promise<StoryTurnResult> {
   const lang = input.setup.language || 'fr';
   const messages: ChatMessage[] = [
     { role: 'system', content: `${languageInstruction(lang)}\n\n${RESOLVE_SYSTEM}` },
     { role: 'user', content: buildResolveUser(input.setup, input.worldState, input.npc, input.sceneSummary, input.turns.slice(-RESOLVE_CONTEXT_TURNS), languageName(lang)) }
   ];
-  const rawResponse = await callTextModel(messages, provider, { jsonMode: true });
+  const rawResponse = await callTextModel(messages, provider, { jsonMode: true, signal });
   const chapter = parseStoryResponse(rawResponse, input.turnNumber);
   return { chapter, worldState: applyStateUpdate(input.worldState, chapter), rawResponse, mode: 'structured-json' };
 }

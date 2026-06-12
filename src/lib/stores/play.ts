@@ -206,7 +206,13 @@ async function chatSend(text: string): Promise<void> {
     });
     void persist();
   } catch (error) {
-    update((s) => ({ ...s, chat: { ...s.chat, busy: false, error: error instanceof Error ? error.message : String(error) } }));
+    // A reply that died mid-stream is still a reply the player read — keep it.
+    update((s) => {
+      const partial = s.chat.partial.trim();
+      const turns = partial ? [...s.chat.turns, { speaker: 'npc' as const, content: partial }] : s.chat.turns;
+      return { ...s, chat: { ...s.chat, turns, partial: '', busy: false, error: error instanceof Error ? error.message : String(error) } };
+    });
+    void persist();
   }
 }
 
@@ -223,17 +229,22 @@ async function chatEnd(): Promise<void> {
   const turns = snap.chat.turns;
   const sceneSummary = snap.chat.sceneSummary;
   update((s) => ({ ...s, chat: { ...s.chat, busy: true, error: null } }));
+  chatAbort = new AbortController();
+  const signal = chatAbort.signal;
   try {
     const { config, language } = await loadProvider();
     const result = await resolveConversation(
       { setup: { ...setup, language }, worldState: world, npc, sceneSummary, turns, turnNumber: snap.turnNumber + 1 },
-      config
+      config,
+      signal
     );
     recordDiag(`conversation avec ${npc.name} résolue`, { messages: turns.length, rawResponse: result.rawResponse });
     update((s) => ({ ...s, chat: { ...initialChat } })); // close before applyResult so the saved session drops the chat
     applyResult(result, `[Conversation avec ${npc.name}]`);
   } catch (error) {
-    update((s) => ({ ...s, chat: { ...s.chat, busy: false, error: error instanceof Error ? error.message : String(error) } }));
+    // User-cancelled debrief → simply stay in the conversation, no error banner.
+    const aborted = signal.aborted;
+    update((s) => ({ ...s, chat: { ...s.chat, busy: false, error: aborted ? null : error instanceof Error ? error.message : String(error) } }));
   }
 }
 
@@ -245,7 +256,9 @@ export const play = {
   },
   /** Load a story + its session; auto-generates the opening for a fresh story. */
   async open(storyId: string): Promise<void> {
-    if (snap.storyId === storyId && snap.status === 'ready') return;
+    // `$page` updates re-fire the caller's reactive statement: never reset an
+    // already-open story (especially mid-generation). 'error' may re-open.
+    if (snap.storyId === storyId && snap.status !== 'error') return;
     set({ ...initial, storyId, status: 'loading' });
     const story = await getStory(storyId);
     if (!story) {

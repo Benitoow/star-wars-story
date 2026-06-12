@@ -20,6 +20,7 @@ export interface TextGenOptions {
   temperature?: number;
   jsonMode?: boolean;       // request a JSON object response
   skipReasoning?: boolean;  // for internal extraction passes
+  signal?: AbortSignal;     // external cancel — aborts the request and stops retrying
 }
 
 export interface StreamOptions {
@@ -113,10 +114,16 @@ export async function callTextModel(
   let connectionFaults = 0;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
+    if (options.signal?.aborted) {
+      lastError = new Error('Génération annulée.');
+      break;
+    }
     if (attempt > 0) await new Promise((r) => setTimeout(r, attempt * 500));
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const onExternalAbort = () => controller.abort();
+    options.signal?.addEventListener('abort', onExternalAbort, { once: true });
     try {
       const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
         method: 'POST',
@@ -129,7 +136,6 @@ export async function callTextModel(
         body: JSON.stringify(body),
         signal: controller.signal
       });
-      clearTimeout(timer);
 
       if (response.ok) {
         const content = extractContent(await response.json().catch(() => null));
@@ -143,7 +149,10 @@ export async function callTextModel(
       logger.warn(`provider ${response.status}: ${message}`);
       if (!RETRYABLE_STATUS.has(response.status)) break;
     } catch (error) {
-      clearTimeout(timer);
+      if (options.signal?.aborted) {
+        lastError = new Error('Génération annulée.');
+        break;
+      }
       const msg = error instanceof Error ? error.message : String(error);
       const isTimeout = error instanceof Error && (error.name === 'AbortError' || /aborted|timeout/i.test(msg));
       lastError = new Error(isTimeout ? `Délai dépassé après ${timeoutMs}ms` : `Échec réseau : ${msg}`);
@@ -153,6 +162,9 @@ export async function callTextModel(
         connectionFaults += 1;
         if (connectionFaults > 1) break;
       }
+    } finally {
+      clearTimeout(timer);
+      options.signal?.removeEventListener('abort', onExternalAbort);
     }
   }
 

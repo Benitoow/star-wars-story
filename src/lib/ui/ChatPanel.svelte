@@ -31,9 +31,11 @@
         <span class="sub">Conversation en direct</span>
       </div>
     </div>
-    <button type="button" class="btn btn-secondary" on:click={() => play.endChat()} disabled={chat.busy}>
-      {chat.busy && !chat.partial ? 'Patiente…' : 'Terminer'}
-    </button>
+    {#if chat.busy}
+      <button type="button" class="btn btn-secondary" on:click={() => play.cancelChatReply()}>Interrompre</button>
+    {:else}
+      <button type="button" class="btn btn-secondary" on:click={() => play.endChat()}>Terminer</button>
+    {/if}
   </header>
 
   <div class="thread" bind:this={threadEl}>
