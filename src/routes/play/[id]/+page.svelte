@@ -10,11 +10,13 @@
   import SceneBackdrop from '$lib/ui/SceneBackdrop.svelte';
   import GameHud from '$lib/ui/GameHud.svelte';
   import ChatPanel from '$lib/ui/ChatPanel.svelte';
+  import JournalPanel from '$lib/ui/JournalPanel.svelte';
 
   $: id = $page.params.id;
   $: if (browser && id) void play.open(id);
 
   let freeText = '';
+  let showJournal = false;
 
   async function exportDiag() {
     const storyId = id;
@@ -66,6 +68,9 @@
   <div class="topbar">
     <div class="topbar-actions">
       <button type="button" class="icon-btn" on:click={() => goto('/')} aria-label="Bibliothèque">←</button>
+      {#if $play.worldState}
+        <button type="button" class="icon-btn" on:click={() => (showJournal = true)} aria-label="Journal de bord" title="Journal de bord">📖</button>
+      {/if}
       <button type="button" class="icon-btn" on:click={exportDiag} aria-label="Exporter le diagnostic" title="Exporter le diagnostic (à partager pour le debug)">⤓</button>
     </div>
     {#if $play.worldState}<div class="topbar-hud"><GameHud world={$play.worldState} /></div>{/if}
@@ -135,6 +140,10 @@
       {#if generating}<div class="center overlay"><div class="spinner"></div></div>{/if}
     {/if}
   </div>
+
+  {#if showJournal && $play.worldState}
+    <JournalPanel world={$play.worldState} chapters={$play.chapterHistory} onClose={() => (showJournal = false)} />
+  {/if}
 </div>
 
 <style>
