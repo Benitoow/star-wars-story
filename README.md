@@ -28,6 +28,8 @@ PWA **local-first** : tu crées un protagoniste (ère, faction, rôle, trame) et
 - **8 types de scènes** + rythme imposé (après 2 scènes intenses, une accalmie).
 - Multilingue (la langue choisie pilote les récits), thème clair/sombre.
 
+> **Langue (décision assumée) :** l'app est **FR-first** — interface et prompts internes rédigés en français. Seule la **langue des récits** (sortie du modèle) suit le réglage de langue, via une instruction dédiée. Une traduction de l'UI serait un chantier séparé, non planifié.
+
 ### Provider
 
 OpenRouter, en **`fetch` direct** (pas de SDK). Une seule clé → tout le catalogue. Modèle par défaut : `qwen/qwen3.5-9b` (modifiable dans les réglages).
@@ -47,7 +49,7 @@ Puis **Réglages → clé API OpenRouter**, et lance une **Nouvelle histoire**.
 
 ```bash
 npm run check    # svelte-check : 0 erreur / 0 warning
-npm run test     # vitest : 39 tests
+npm run test     # vitest (moteur + store)
 npm run build
 ```
 

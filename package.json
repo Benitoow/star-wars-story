@@ -34,7 +34,6 @@
     "vitest": "^3.2.4"
   },
   "dependencies": {
-    "@openrouter/sdk": "^0.12.35",
     "dexie": "^4.0.1"
   },
   "optionalDependencies": {
