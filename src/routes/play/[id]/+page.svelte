@@ -3,7 +3,7 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { play } from '$lib/stores/play';
-  import { foldText } from '$lib/engine';
+  import { foldText } from '$lib/engine/text';
   import { eraBackdrop } from '$lib/content/catalog';
   import { exportStoryDiagnostics } from '$lib/diagnostics';
   import { toasts } from '$lib/stores/ui';
