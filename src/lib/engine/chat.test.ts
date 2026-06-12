@@ -35,7 +35,9 @@ describe('npcReply (streamed, in-character)', () => {
     vi.stubGlobal('fetch', fetchMock);
     const turns: ChatTurn[] = Array.from({ length: 30 }, (_, i) => ({ speaker: i % 2 === 0 ? 'player' : 'npc', content: `msg ${i}` }));
     await npcReply({ setup, worldState: initWorldState(setup), npc, sceneSummary: 'x', turns }, provider, () => {});
-    const body = JSON.parse(String(fetchMock.mock.calls[0][1].body)) as { messages: Array<{ content: string }> };
+    // skipReasoning may trigger a /models capability lookup first — find the completion call.
+    const call = fetchMock.mock.calls.find((c) => String(c[0]).includes('/chat/completions'));
+    const body = JSON.parse(String((call![1] as RequestInit).body)) as { messages: Array<{ content: string }> };
     expect(body.messages.length).toBe(25); // 1 system + the last 24 turns
     expect(body.messages.some((m) => m.content === 'msg 0')).toBe(false); // oldest dropped
     expect(body.messages.some((m) => m.content === 'msg 29')).toBe(true); // newest kept

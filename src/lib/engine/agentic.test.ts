@@ -8,7 +8,11 @@ const setup: StorySetup = { era: 'imperial', faction: 'rebels', role: 'jedi_knig
 
 function stubSequence(contents: string[]) {
   let i = 0;
-  const mock = vi.fn().mockImplementation(async () => {
+  const mock = vi.fn().mockImplementation(async (url: unknown) => {
+    // Capability lookups (/models) are served separately from the completion sequence.
+    if (String(url).includes('/models')) {
+      return { ok: true, status: 200, json: async () => ({ data: [] }), text: async () => '' };
+    }
     const content = contents[Math.min(i, contents.length - 1)];
     i += 1;
     return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content } }] }), text: async () => content };
@@ -40,7 +44,8 @@ describe('agentic pipeline (mocked transport)', () => {
       { mode: 'agentic-subagents' }
     );
 
-    expect(mock).toHaveBeenCalledTimes(4);
+    const completionCalls = mock.mock.calls.filter((c) => String(c[0]).includes('/chat/completions'));
+    expect(completionCalls).toHaveLength(4);
     expect(result.mode).toBe('agentic-subagents');
     expect(result.chapter.chapter_title).toBe('Coursive en feu');
     expect(result.chapter.narrative.action).toContain('déchirent'); // the reviewed prose is used

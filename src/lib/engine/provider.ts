@@ -13,6 +13,7 @@ import {
   normalizeTextProviderId
 } from '$lib/content/providers';
 import { logger } from '$lib/logger';
+import { supportsReasoningParam } from './models';
 import { cleanText } from './text';
 import type { ChatMessage, StoryProviderConfig } from './types';
 
@@ -41,27 +42,26 @@ export function normalizeProviderConfig(config: StoryProviderConfig): Required<O
   };
 }
 
-function timeoutFor(model: string): number {
-  const m = model.toLowerCase();
-  if (/pro|max|large|opus|ultra/.test(m)) return 120000;
-  if (/flash|mini|nano|lite|small/.test(m)) return 75000;
-  return 90000;
-}
+// One generous ceiling for every model — verbose reasoning models need it,
+// and a hung fast model is now interruptible from the UI anyway.
+const REQUEST_TIMEOUT_MS = 120000;
 
-function reasoningPayload(effort: string, skip: boolean, model: string): { effort: string } | undefined {
-  if (skip) {
-    const m = model.toLowerCase();
-    const isReasoningModel = /\b(?:o1|o3|r1|grok-3|grok-4|thinking|kimi-k2\.6|sonar-reasoning)\b|deepseek\/deepseek-r1|openai\/o1|openai\/o3-mini/i.test(m);
-    if (!isReasoningModel) {
-      return undefined;
-    }
-    if (/\b(?:o1|r1|deepseek-r1|o3-mini)\b/i.test(m)) {
-      return undefined;
-    }
-    return { effort: 'none' };
-  }
-  if (!effort || effort === 'auto') return undefined; // let the model decide
-  return { effort };
+/**
+ * Reasoning payload, driven by the model's real capabilities (OpenRouter
+ * /models → supported_parameters) instead of a hand-maintained regex catalog.
+ * - skipReasoning: send effort 'none' only when the model takes the param.
+ * - explicit user effort: sent unless the catalog says it's unsupported
+ *   (unknown catalog → trust the user's setting; OpenRouter tolerates it).
+ * - 'auto': omit entirely — the model decides, no catalog lookup needed.
+ */
+async function resolveReasoning(
+  cfg: ReturnType<typeof normalizeProviderConfig>,
+  skip: boolean
+): Promise<{ effort: string } | undefined> {
+  if (!skip && (!cfg.reasoningEffort || cfg.reasoningEffort === 'auto')) return undefined;
+  const supports = await supportsReasoningParam(cfg);
+  if (skip) return supports === true ? { effort: 'none' } : undefined;
+  return supports === false ? undefined : { effort: cfg.reasoningEffort };
 }
 
 function extractContent(payload: unknown): string {
@@ -99,14 +99,14 @@ export async function callTextModel(
     throw new Error(`Clé API manquante pour ${getProviderDisplayName(cfg.providerId)}.`);
   }
 
-  const timeoutMs = timeoutFor(cfg.model);
+  const timeoutMs = REQUEST_TIMEOUT_MS;
   const body: Record<string, unknown> = {
     model: cfg.model,
     messages,
     temperature: options.temperature ?? 0.9
     // No max_tokens — capping it silently truncates verbose reasoning models.
   };
-  const reasoning = reasoningPayload(cfg.reasoningEffort, options.skipReasoning === true, cfg.model);
+  const reasoning = await resolveReasoning(cfg, options.skipReasoning === true);
   if (reasoning) body.reasoning = reasoning;
   if (options.jsonMode) body.response_format = { type: 'json_object' };
 
@@ -205,10 +205,10 @@ export async function callTextModelStream(
     temperature: options.temperature ?? 0.9,
     stream: true
   };
-  const reasoning = reasoningPayload(cfg.reasoningEffort, options.skipReasoning === true, cfg.model);
+  const reasoning = await resolveReasoning(cfg, options.skipReasoning === true);
   if (reasoning) body.reasoning = reasoning;
 
-  const timeoutMs = timeoutFor(cfg.model);
+  const timeoutMs = REQUEST_TIMEOUT_MS;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   if (options.signal) {

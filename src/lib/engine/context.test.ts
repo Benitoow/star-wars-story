@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildNarrativeContext, detectOverusedTerms, getModelContextLimit, getDynamicContextBudget } from './context';
+import { buildNarrativeContext, detectOverusedTerms } from './context';
 import type { StoryChapter } from './types';
 
 function ch(n: number, text: string): StoryChapter {
@@ -51,25 +51,6 @@ describe('detectOverusedTerms', () => {
 
   it('returns nothing without enough history', () => {
     expect(detectOverusedTerms([ch(1, 'pourpre pourpre pourpre')])).toEqual([]);
-  });
-});
-
-describe('dynamic context budget', () => {
-  it('correctly maps model names to context limits', () => {
-    expect(getModelContextLimit('google/gemini-3.5-flash')).toBe(1_000_000);
-    expect(getModelContextLimit('x-ai/grok-4.3')).toBe(1_000_000); // updated for Grok 4.3 1M
-    expect(getModelContextLimit('openai/gpt-5.4-mini')).toBe(400_000); // updated for GPT-5.4 400K
-    expect(getModelContextLimit('openai/gpt-4o')).toBe(128_000);
-    expect(getModelContextLimit('meta-llama/llama-3.3-70b')).toBe(128_000);
-    expect(getModelContextLimit('gpt-3.5-turbo')).toBe(16_384);
-    expect(getModelContextLimit('unknown-model')).toBe(128_000); // default
-  });
-
-  it('correctly calculates dynamic budget as 50% of the limit', () => {
-    expect(getDynamicContextBudget('google/gemini-3.5-flash')).toBe(500_000);
-    expect(getDynamicContextBudget('x-ai/grok-4.3')).toBe(500_000); // 50% of 1M
-    expect(getDynamicContextBudget('openai/gpt-5.4-mini')).toBe(200_000); // 50% of 400K
-    expect(getDynamicContextBudget('gpt-3.5-turbo')).toBe(8_192);
   });
 });
 

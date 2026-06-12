@@ -17,23 +17,6 @@ export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
-export function getModelContextLimit(modelId: string): number {
-  const m = String(modelId || '').toLowerCase();
-  if (/gemini/i.test(m)) return 1000000; // 1M
-  if (/grok-3|grok-4/i.test(m)) return 1000000; // 1M
-  if (/gpt-5/i.test(m)) return 400000; // 400K
-  if (/(?:o1|o3|r1|gpt-4o|claude-3-5|llama-3\.1|llama-3\.3)/i.test(m)) return 128000; // 128K
-  if (/(?:claude-3|mixtral-8x22b)/i.test(m)) return 200000; // 200K
-  if (/(?:gpt-4-turbo|gpt-4)/i.test(m)) return 128000;
-  if (/(?:gpt-3\.5-turbo)/i.test(m)) return 16384;
-  return 128000; // default
-}
-
-export function getDynamicContextBudget(modelId: string): number {
-  const limit = getModelContextLimit(modelId);
-  return Math.floor(limit * 0.5); // 50% threshold
-}
-
 /** The scene as the player saw it (prose + dialogue), used as the assistant turn. */
 export function chapterToScene(chapter: StoryChapter): string {
   const parts = [cleanText(chapter.narrative.action, 6000)];

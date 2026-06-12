@@ -5,8 +5,7 @@
   import { UI_LANGUAGE_OPTIONS } from '$lib/content/languages';
   import { toasts } from '$lib/stores/ui';
   import { APP_NAME, APP_VERSION_LABEL } from '$lib/version';
-  import { getModelContextLimit, getDynamicContextBudget } from '$lib/engine/context';
-  import { fetchContextLengths } from '$lib/engine';
+  import { fetchContextLengths, TRANSCRIPT_SHARE } from '$lib/engine';
   import type { Preferences } from '$lib/persistence';
 
   const REASONING = [
@@ -42,8 +41,9 @@
     void loadLengths(form.textApiKey.trim());
   }
 
-  $: contextLimit = lengths[form.textModel.trim()] || getModelContextLimit(form.textModel);
-  $: contextBudget = Math.floor(contextLimit * 0.5);
+  // Detected from OpenRouter /models — no hardcoded per-model catalog.
+  $: contextLimit = lengths[form.textModel.trim()] ?? null;
+  $: contextBudget = contextLimit ? Math.floor(contextLimit * TRANSCRIPT_SHARE) : null;
 
   onMount(() => {
     const p = get(preferences); // settings render after boot, so this is the persisted value
@@ -104,11 +104,13 @@
     <label class="label mt" for="model">Modèle</label>
     <input id="model" class="input" placeholder="ex : qwen/qwen3.5-9b" bind:value={form.textModel} />
     <p class="hint">Identifiant de modèle OpenRouter (provider/modèle).</p>
-    {#if form.textModel}
+    {#if form.textModel && contextLimit && contextBudget}
       <div class="model-info-badge">
         <span>Limite de Contexte : <strong>{contextLimit.toLocaleString()}</strong> tokens</span>
-        <span>Budget Écrivain (50%) : <strong>{contextBudget.toLocaleString()}</strong> tokens</span>
+        <span>Budget Écrivain ({Math.round(TRANSCRIPT_SHARE * 100)}%) : <strong>{contextBudget.toLocaleString()}</strong> tokens</span>
       </div>
+    {:else if form.textModel}
+      <p class="hint">Fenêtre de contexte détectée automatiquement via OpenRouter une fois la clé renseignée.</p>
     {/if}
   </section>
 

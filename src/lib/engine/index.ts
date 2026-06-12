@@ -14,7 +14,7 @@ export { callTextModel, callTextModelStream, normalizeProviderConfig, type TextG
 export { generateOpening, generateTurn, type TurnInput } from './generate';
 export { npcReply, resolveConversation, type NpcReplyInput, type ResolveConversationInput } from './chat';
 export { buildNarrativeContext, DEFAULT_CONTEXT_BUDGET, type NarrativeContext } from './context';
-export { resolveContextBudget, fetchContextLengths } from './models';
+export { resolveContextBudget, fetchContextLengths, fetchModelCatalog, supportsReasoningParam, TRANSCRIPT_SHARE, type ModelCapabilities } from './models';
 export { rollForChoice, type Outcome, type RollResult } from './dice';
 export {
   buildSystemPrompt,
