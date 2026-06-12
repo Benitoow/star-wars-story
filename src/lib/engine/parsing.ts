@@ -321,6 +321,9 @@ export function parseStoryResponse(rawText: string, turnNumber: number): StoryCh
 
   const chapterNum = Number(parsed?.chapter_number);
   const choices = extractChoices(parsed?.choices);
+  const npcsPresent = Array.isArray(parsed?.npcs_present)
+    ? (parsed.npcs_present as unknown[]).map((s) => cleanText(s, 60)).filter(Boolean).slice(0, 8)
+    : [];
 
   return {
     chapter_title,
@@ -329,6 +332,7 @@ export function parseStoryResponse(rawText: string, turnNumber: number): StoryCh
     narrative,
     choices: choices.length ? choices : defaultChoices(),
     memory_updates: coerceMemoryUpdates(parsed?.memory_updates),
-    state_update: coerceStateUpdate(parsed?.state_update)
+    state_update: coerceStateUpdate(parsed?.state_update),
+    ...(npcsPresent.length ? { npcs_present: npcsPresent } : {})
   };
 }

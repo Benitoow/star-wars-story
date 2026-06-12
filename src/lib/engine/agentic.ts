@@ -93,6 +93,7 @@ Déduis-en les conséquences mécaniques, COHÉRENTES avec l'état ci-dessus :
 - BLESSURES : si la scène inflige une blessure concrète (fracture, brûlure, entaille…), remplis injuries_new (description + severity light|moderate|severe). Ce qui se soigne va dans injuries_resolved. Ne laisse pas une blessure décrite rester invisible.
 - TEMPS : si du temps passe (repos, soin, voyage, ellipse), renseigne date_advance (ex: "quelques heures").
 - CHOIX : 3 à 4, concrets et uniques à cette scène (INTERDIT : "Observer", "Méditer"). difficulty calibrée selon l'action réelle (1 trivial … 5 héroïque) — la plupart valent 2-3, réserve 4-5 aux exploits, NE mets PAS 5 partout (une attelle = 2).
+- PRÉSENCE : npcs_present = noms EXACTS des PNJ nommés encore physiquement présents à la FIN de la scène (pas ceux partis, morts ou ailleurs) — c'est ce qui détermine à qui le joueur peut parler. Vide si le protagoniste est seul.
 
 Réponds en JSON strict :
 {
@@ -101,7 +102,8 @@ Réponds en JSON strict :
   "narrative": { "atmosphere": "${cleanText(brief.atmosphere, 40) || 'tense'}" },
   "state_update": { "hp": -15, "credits": 0, "location": "", "date_advance": "", "npcs": [], "factions": {}, "injuries_new": [{ "description": "blessure précise", "severity": "moderate" }], "injuries_resolved": [], "inventory_gained": [] },
   "memory_updates": { "relations": [], "places": [], "notes": [] },
-  "choices": [ { "text": "", "attribute": "combat|diplomacy|stealth|tech|force|survival", "difficulty": 2, "faction_impact": {} } ]
+  "choices": [ { "text": "", "attribute": "combat|diplomacy|stealth|tech|force|survival", "difficulty": 2, "faction_impact": {} } ],
+  "npcs_present": []
 }`;
 }
 

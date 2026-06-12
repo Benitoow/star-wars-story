@@ -3,6 +3,7 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { play } from '$lib/stores/play';
+  import { foldText } from '$lib/engine';
   import { eraBackdrop } from '$lib/content/catalog';
   import { exportStoryDiagnostics } from '$lib/diagnostics';
   import { toasts } from '$lib/stores/ui';
@@ -32,7 +33,19 @@
   $: actionParagraphs = (chapter?.narrative.action || '').split(/\n{2,}/).map((s) => s.trim()).filter(Boolean);
   $: dialogueLines = (chapter?.narrative.dialogue || '').split(/\n+/).map((s) => s.trim()).filter(Boolean);
   $: reflection = chapter?.narrative.reflection?.trim() || '';
-  $: presentNpcs = ($play.worldState?.npcs ?? []).filter((n) => n.alive !== false);
+  // Who can the player talk to? The model lists who's still on site at the end
+  // of the scene (npcs_present); without it (old saves), fall back to every
+  // living NPC known. Dead NPCs are never offered.
+  $: aliveNpcs = ($play.worldState?.npcs ?? []).filter((n) => n.alive !== false);
+  $: talkTargets = (() => {
+    const present = chapter?.npcs_present;
+    if (!present?.length) return aliveNpcs.map((n) => n.name);
+    const dead = new Set(($play.worldState?.npcs ?? []).filter((n) => n.alive === false).map((n) => foldText(n.name)));
+    // Prefer the canonical world-state name when one matches the listed name.
+    return present
+      .filter((name) => !dead.has(foldText(name)))
+      .map((name) => aliveNpcs.find((n) => foldText(n.name) === foldText(name))?.name ?? name);
+  })();
   $: interactive = chapter ? ['dialogue', 'confrontation'].includes(chapter.section_type) : false;
 
   async function onFreeAction() {
@@ -96,13 +109,13 @@
           <button type="submit" class="btn btn-secondary" disabled={generating || !freeText.trim()}>Agir</button>
         </form>
 
-        {#if presentNpcs.length}
+        {#if talkTargets.length}
           <div class="talk" class:prominent={interactive}>
             {#if interactive}<p class="talk-cue eyebrow">Engage la conversation</p>{/if}
             <div class="talk-actions">
-              {#each presentNpcs as npc}
-                <button type="button" class="talk-btn" on:click={() => play.enterChat(npc.name)} disabled={generating}>
-                  💬 Parler à {npc.name}
+              {#each talkTargets as name (name)}
+                <button type="button" class="talk-btn" on:click={() => play.enterChat(name)} disabled={generating}>
+                  💬 Parler à {name}
                 </button>
               {/each}
             </div>

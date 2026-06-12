@@ -75,8 +75,10 @@ Déduis les conséquences de cette conversation (COHÉRENTES avec l'état) et é
   "narrative": { "action": "récap de l'issue — ce qui a été dit, obtenu, décidé, l'ambiance (1 à 2 paragraphes)", "dialogue": "", "reflection": "", "atmosphere": "tense|calm|mysterious|eerie|heroic" },
   "state_update": { "npcs": [{ "name": "${npc.name}", "affinity": ${npc.affinity}, "status": "ally|neutral|hostile", "note": "maj brève" }], "hp": 0, "credits": 0, "injuries_new": [], "inventory_gained": [], "date_advance": "" },
   "memory_updates": { "relations": [], "places": [], "notes": ["ce que le joueur a appris d'important"] },
-  "choices": [ { "text": "suite concrète juste après la conversation", "attribute": "combat|diplomacy|stealth|tech|force|survival", "difficulty": 2, "faction_impact": {} } ]
+  "choices": [ { "text": "suite concrète juste après la conversation", "attribute": "combat|diplomacy|stealth|tech|force|survival", "difficulty": 2, "faction_impact": {} } ],
+  "npcs_present": ["${npc.name}"]
 }
 - "affinity" = NOUVELLE valeur absolue (−100..100), ajustée depuis l'actuelle (${npc.affinity}) selon le ton de l'échange (chaleureux → monte, conflictuel → descend), de façon modérée.
+- "npcs_present" = PNJ encore sur place à la FIN de l'échange (retire ${npc.name} s'il est parti).
 - N'invente pas d'objets/infos qui n'ont pas réellement été obtenus dans la conversation.`;
 }

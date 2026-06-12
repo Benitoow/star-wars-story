@@ -91,6 +91,16 @@ describe('parseStoryResponse', () => {
     expect(c.narrative.action).toContain('hangar');
   });
 
+  it('extracts npcs_present (cleaned, capped), absent when not emitted', () => {
+    const withNpcs = parseStoryResponse(
+      '{"narrative":{"action":"Bla"},"npcs_present":["Vela", "  ", "Dack Ralter", 42]}',
+      1
+    );
+    expect(withNpcs.npcs_present).toEqual(['Vela', 'Dack Ralter', '42']);
+    const without = parseStoryResponse('{"narrative":{"action":"Bla"}}', 1);
+    expect(without.npcs_present).toBeUndefined();
+  });
+
   it('clips an over-long memory note at a word boundary (no mid-word cut)', () => {
     const long = 'A survécu à l effondrement du temple de Lothal en y laissant sa cheville gauche mais a récupéré un artefact ancien dont la puissance brute dépasse tout entendement et menace de le consumer entièrement avant la fin';
     const c = parseStoryResponse(`{"narrative":{"action":"Bla"},"memory_updates":{"notes":["${long}"]}}`, 1);

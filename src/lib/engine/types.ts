@@ -114,6 +114,7 @@ export interface StoryChapter {
   choices: StoryChoice[];
   memory_updates: StoryMemoryUpdates;
   state_update?: StateUpdate;
+  npcs_present?: string[];  // named NPCs physically present at the END of the scene — drives "talk to" offers
 }
 
 // ── Generation I/O ────────────────────────────────────

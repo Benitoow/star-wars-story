@@ -102,8 +102,10 @@ function jsonContract(langName: string): string {
     "inventory_gained": [{ "name": "objet", "qty": 1 }],
     "inventory_lost": [{ "name": "objet", "qty": 1 }]
   },
-  "memory_updates": { "relations": [], "places": [], "injuries": [], "resources": [], "notes": [] }
-}`;
+  "memory_updates": { "relations": [], "places": [], "injuries": [], "resources": [], "notes": [] },
+  "npcs_present": ["Noms EXACTS des PNJ nommés physiquement présents (ou à portée de voix) à la FIN de la scène"]
+}
+- "npcs_present" détermine à qui le joueur peut parler après la scène : liste UNIQUEMENT les PNJ encore sur place à la fin (pas ceux partis, morts ou restés ailleurs). Vide si le protagoniste est seul.`;
 }
 
 export function renderPlayerCanon(playerDirectives: string[] = []): string {

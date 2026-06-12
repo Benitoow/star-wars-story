@@ -191,6 +191,14 @@ export function applyStateUpdate(source: WorldState, chapter: StoryChapter): Wor
   applyInventory(state, upd);
   upsertNpcs(state, upd);
 
+  // Scene presence: stamp last_seen for NPCs the model lists as still on site.
+  if (chapter.npcs_present?.length) {
+    const present = new Set(chapter.npcs_present.map(foldText));
+    for (const npc of state.npcs) {
+      if (present.has(foldText(npc.name))) npc.last_seen = p.date;
+    }
+  }
+
   for (const [id, delta] of Object.entries(upd.factions ?? {})) {
     if (Number.isFinite(delta)) {
       const cleanId = id.trim();

@@ -88,6 +88,14 @@ describe('applyStateUpdate — NPCs', () => {
     expect(b.npcs[0].status).toBe('dead');
     expect(b.npcs[0].alive).toBe(false);
   });
+
+  it('stamps last_seen for NPCs listed in npcs_present (accent-insensitive)', () => {
+    const a = applyStateUpdate(initWorldState(setup), chapter({ npcs: [{ name: 'Véla', affinity: 10 }, { name: 'Dorn', affinity: 0 }] }));
+    const next = { ...chapter({}), npcs_present: ['vela'] };
+    const b = applyStateUpdate(a, next);
+    expect(b.npcs.find((n) => n.name === 'Véla')?.last_seen).toBe(b.player.date);
+    expect(b.npcs.find((n) => n.name === 'Dorn')?.last_seen).toBeUndefined();
+  });
 });
 
 describe('applyStateUpdate — factions & date', () => {
