@@ -1,10 +1,10 @@
 /* ═══════════════════════════════════════════════
-   Model capabilities — auto-detected from OpenRouter
-   (/models → context_length + supported_parameters),
-   cached per key. No hand-maintained model catalogs:
-   the API is the source of truth.
+   Model capabilities — auto-detected from the
+   provider's /models endpoint, or hard-coded for
+   providers without a public catalog (MiMo).
+   Cached per (provider, key) pair.
 ══════════════════════════════════════════════ */
-import { OPENROUTER_BASE_URL } from '$lib/content/providers';
+import { getProviderBaseUrl } from '$lib/content/providers';
 import { logger } from '$lib/logger';
 import { DEFAULT_CONTEXT_BUDGET } from './context';
 import type { StoryProviderConfig } from './types';
@@ -18,14 +18,43 @@ export interface ModelCapabilities {
   supportedParameters?: string[];
 }
 
+// ── Hard-coded catalogs (no /models endpoint) ──────────
+
+const MIMO_CATALOG: Record<string, ModelCapabilities> = {
+  'mimo-v2.5-pro': {
+    contextLength: 131_072,
+    supportedParameters: ['reasoning', 'temperature', 'top_p', 'max_completion_tokens', 'tools']
+  },
+  'mimo-v2.5': {
+    contextLength: 131_072,
+    supportedParameters: ['reasoning', 'temperature', 'top_p', 'max_completion_tokens', 'tools']
+  }
+};
+
+// ── Dynamic catalog cache (OpenRouter, etc.) ───────────
+
 let cache: { key: string; models: Record<string, ModelCapabilities> } | null = null;
 
-export async function fetchModelCatalog(apiKey: string): Promise<Record<string, ModelCapabilities>> {
-  if (cache && cache.key === apiKey) return cache.models;
+/**
+ * Fetch the full model catalog for a provider.
+ * - openrouter: hits /models (dynamic, cached per apiKey)
+ * - mimo: returns the hard-coded catalog
+ * - other/none: empty
+ */
+export async function fetchModelCatalog(
+  apiKey: string,
+  providerId = 'openrouter'
+): Promise<Record<string, ModelCapabilities>> {
+  if (providerId === 'mimo') return { ...MIMO_CATALOG };
+  if (providerId !== 'openrouter' || !apiKey) return {};
 
+  const cacheKey = `${providerId}:${apiKey}`;
+  if (cache && cache.key === cacheKey) return cache.models;
+
+  const baseUrl = getProviderBaseUrl(providerId);
   const headers: Record<string, string> = {};
   if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
-  const res = await fetch(`${OPENROUTER_BASE_URL}/models`, { headers });
+  const res = await fetch(`${baseUrl}/models`, { headers });
   if (!res.ok) throw new Error(`models ${res.status}`);
 
   const data = (await res.json()) as {
@@ -42,13 +71,16 @@ export async function fetchModelCatalog(apiKey: string): Promise<Record<string, 
         : undefined
     };
   }
-  cache = { key: apiKey, models };
+  cache = { key: cacheKey, models };
   return models;
 }
 
 /** Context windows by model id — kept for the settings display. */
-export async function fetchContextLengths(apiKey: string): Promise<Record<string, number>> {
-  const models = await fetchModelCatalog(apiKey);
+export async function fetchContextLengths(
+  apiKey: string,
+  providerId = 'openrouter'
+): Promise<Record<string, number>> {
+  const models = await fetchModelCatalog(apiKey, providerId);
   const lengths: Record<string, number> = {};
   for (const [id, caps] of Object.entries(models)) {
     if (caps.contextLength) lengths[id] = caps.contextLength;
@@ -61,15 +93,11 @@ export async function fetchContextLengths(apiKey: string): Promise<Record<string
  * window. Falls back to a safe default if detection fails. Cached per key.
  */
 export async function resolveContextBudget(config: StoryProviderConfig): Promise<number> {
-  if (config.providerId !== 'openrouter' || !config.apiKey || !config.model) {
-    return DEFAULT_CONTEXT_BUDGET;
-  }
+  if (!config.apiKey || !config.model) return DEFAULT_CONTEXT_BUDGET;
   try {
-    const models = await fetchModelCatalog(config.apiKey);
+    const models = await fetchModelCatalog(config.apiKey, config.providerId);
     const window = models[config.model]?.contextLength;
     if (!window || !Number.isFinite(window)) return DEFAULT_CONTEXT_BUDGET;
-    // Scale to the model's real window — never floor it at the default, or a
-    // small/medium model gets a transcript budget bigger than its whole window.
     return Math.floor(window * TRANSCRIPT_SHARE);
   } catch (error) {
     logger.debug('context window auto-detect failed, using default budget', error);
@@ -78,14 +106,17 @@ export async function resolveContextBudget(config: StoryProviderConfig): Promise
 }
 
 /**
- * Whether the model accepts the OpenRouter `reasoning` parameter.
- * true/false when the catalog knows the model; null when unknown
- * (offline, other provider, model absent from /models).
+ * Whether the model accepts the reasoning parameter.
+ * true/false when the catalog knows the model; null when unknown.
+ * MiMo always returns true (thinking is always supported).
  */
 export async function supportsReasoningParam(config: StoryProviderConfig): Promise<boolean | null> {
-  if (config.providerId !== 'openrouter' || !config.model) return null;
+  if (!config.model) return null;
+  // MiMo always supports thinking — no catalog check needed
+  if (config.providerId === 'mimo') return true;
+  if (config.providerId !== 'openrouter') return null;
   try {
-    const models = await fetchModelCatalog(config.apiKey ?? '');
+    const models = await fetchModelCatalog(config.apiKey ?? '', config.providerId);
     const supported = models[config.model]?.supportedParameters;
     if (!supported) return null;
     return supported.includes('reasoning');

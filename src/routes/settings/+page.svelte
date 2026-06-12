@@ -3,6 +3,12 @@
   import { get } from 'svelte/store';
   import { preferences } from '$lib/stores/preferences';
   import { UI_LANGUAGE_OPTIONS } from '$lib/content/languages';
+  import {
+    MIMO_MODELS,
+    getModelDisplayName,
+    getModelPlaceholder,
+    getProviderDisplayName
+  } from '$lib/content/providers';
   import { toasts } from '$lib/stores/ui';
   import { APP_NAME, APP_VERSION_LABEL } from '$lib/version';
   import { fetchContextLengths, TRANSCRIPT_SHARE } from '$lib/engine';
@@ -15,8 +21,14 @@
     { id: 'high', name: 'Élevé' }
   ];
 
-  // Local editable copy — saved explicitly so the user always sees a clear save.
+  const PROVIDERS = [
+    { id: 'openrouter', name: 'OpenRouter', hint: 'Accès à des centaines de modèles via une seule clé.' },
+    { id: 'mimo', name: 'Xiaomi MiMo', hint: 'MiMo V2.5 — rapide, bon marché, pensée activée par défaut.' }
+  ];
+
+  // Local editable copy
   let form = {
+    textProvider: 'openrouter' as string,
     textApiKey: '',
     textModel: '',
     uiLanguage: 'auto' as Preferences['uiLanguage'],
@@ -28,26 +40,30 @@
 
   let lengths: Record<string, number> = {};
 
-  async function loadLengths(apiKey: string) {
-    if (!apiKey) return;
+  async function loadLengths(apiKey: string, providerId: string) {
+    if (!apiKey && providerId !== 'mimo') return;
     try {
-      lengths = await fetchContextLengths(apiKey);
+      lengths = await fetchContextLengths(apiKey, providerId);
     } catch {
       // fallback
     }
   }
 
-  $: if (form.textApiKey) {
-    void loadLengths(form.textApiKey.trim());
+  // Re-fetch context lengths when provider or key changes
+  $: if (form.textProvider || form.textApiKey) {
+    void loadLengths(form.textApiKey.trim(), form.textProvider);
   }
 
-  // Detected from OpenRouter /models — no hardcoded per-model catalog.
   $: contextLimit = lengths[form.textModel.trim()] ?? null;
   $: contextBudget = contextLimit ? Math.floor(contextLimit * TRANSCRIPT_SHARE) : null;
 
+  // MiMo models available for the current provider
+  $: providerModels = form.textProvider === 'mimo' ? [...MIMO_MODELS] : [];
+
   onMount(() => {
-    const p = get(preferences); // settings render after boot, so this is the persisted value
+    const p = get(preferences);
     form = {
+      textProvider: p.textProvider || 'openrouter',
       textApiKey: p.textApiKey,
       textModel: p.textModel,
       uiLanguage: p.uiLanguage,
@@ -57,17 +73,29 @@
   });
 
   $: dirty =
+    form.textProvider !== ($preferences.textProvider || 'openrouter') ||
     form.textApiKey.trim() !== $preferences.textApiKey ||
     form.textModel.trim() !== $preferences.textModel ||
     form.uiLanguage !== $preferences.uiLanguage ||
     form.runtimeMode !== $preferences.runtimeMode ||
     form.reasoningEffort !== $preferences.reasoningEffort;
 
+  /** When the user switches provider, pre-fill a sensible default model. */
+  function onProviderChange(providerId: string) {
+    form.textProvider = providerId;
+    if (providerId === 'mimo') {
+      form.textModel = 'mimo-v2.5-pro';
+    } else if (providerId === 'openrouter') {
+      form.textModel = 'qwen/qwen3.5-9b';
+    }
+  }
+
   async function save() {
     if (!dirty || saving) return;
     saving = true;
     try {
       await preferences.update({
+        textProvider: form.textProvider,
         textApiKey: form.textApiKey.trim(),
         textModel: form.textModel.trim(),
         uiLanguage: form.uiLanguage,
@@ -82,7 +110,6 @@
     }
   }
 
-  // Theme is a live toggle — applies and persists instantly.
   function setTheme(theme: Preferences['theme']) {
     void preferences.update({ theme });
   }
@@ -96,24 +123,87 @@
     <h1>Ton studio</h1>
   </header>
 
+  <!-- ─── Provider selector ──────────────────────── -->
+  <section class="card">
+    <h2>Fournisseur IA</h2>
+    <p class="hint">Choisis le service qui alimente le Maître du Jeu.</p>
+    <div class="provider-grid">
+      {#each PROVIDERS as p}
+        <button
+          type="button"
+          class="provider-card"
+          class:selected={form.textProvider === p.id}
+          on:click={() => onProviderChange(p.id)}
+        >
+          <span class="provider-name">{p.name}</span>
+          <span class="provider-hint">{p.hint}</span>
+        </button>
+      {/each}
+    </div>
+  </section>
+
+  <!-- ─── API key + model ────────────────────────── -->
   <section class="card">
     <h2>Intelligence narrative</h2>
-    <p class="hint">L'app utilise <strong>OpenRouter</strong>. Colle ta clé pour donner vie au Maître du Jeu.</p>
-    <label class="label" for="key">Clé API OpenRouter</label>
-    <input id="key" class="input" type="password" autocomplete="off" placeholder="sk-or-…" bind:value={form.textApiKey} />
+    <p class="hint">
+      {#if form.textProvider === 'mimo'}
+        Renseigne ta clé <strong>MiMo</strong> pour activer la génération.
+        <a href="https://platform.xiaomimimo.com/#/console/api-keys" target="_blank" rel="noopener">Obtenir une clé</a>
+      {:else}
+        L'app utilise <strong>OpenRouter</strong>. Colle ta clé pour donner vie au Maître du Jeu.
+      {/if}
+    </p>
+
+    <label class="label" for="key">
+      {#if form.textProvider === 'mimo'}Clé API MiMo{:else}Clé API OpenRouter{/if}
+    </label>
+    <input
+      id="key"
+      class="input"
+      type="password"
+      autocomplete="off"
+      placeholder={form.textProvider === 'mimo' ? 'sk-…' : 'sk-or-…'}
+      bind:value={form.textApiKey}
+    />
+
     <label class="label mt" for="model">Modèle</label>
-    <input id="model" class="input" placeholder="ex : qwen/qwen3.5-9b" bind:value={form.textModel} />
-    <p class="hint">Identifiant de modèle OpenRouter (provider/modèle).</p>
+
+    {#if providerModels.length}
+      <!-- MiMo: clickable model chips -->
+      <div class="model-chips">
+        {#each providerModels as m}
+          <button
+            type="button"
+            class="chip"
+            class:active={form.textModel === m}
+            on:click={() => (form.textModel = m)}
+          >
+            {getModelDisplayName(m)}
+          </button>
+        {/each}
+      </div>
+    {:else}
+      <!-- OpenRouter: free-form text input -->
+      <input
+        id="model"
+        class="input"
+        placeholder={getModelPlaceholder(form.textProvider)}
+        bind:value={form.textModel}
+      />
+      <p class="hint">Identifiant de modèle OpenRouter (provider/modèle).</p>
+    {/if}
+
     {#if form.textModel && contextLimit && contextBudget}
       <div class="model-info-badge">
         <span>Limite de Contexte : <strong>{contextLimit.toLocaleString()}</strong> tokens</span>
         <span>Budget Écrivain ({Math.round(TRANSCRIPT_SHARE * 100)}%) : <strong>{contextBudget.toLocaleString()}</strong> tokens</span>
       </div>
-    {:else if form.textModel}
+    {:else if form.textModel && form.textProvider !== 'mimo'}
       <p class="hint">Fenêtre de contexte détectée automatiquement via OpenRouter une fois la clé renseignée.</p>
     {/if}
   </section>
 
+  <!-- ─── Language + theme ────────────────────────── -->
   <section class="card">
     <h2>Langue & thème</h2>
     <div class="row">
@@ -133,6 +223,7 @@
     </div>
   </section>
 
+  <!-- ─── Advanced ────────────────────────────────── -->
   <section class="card">
     <button type="button" class="disclosure" on:click={() => (showAdvanced = !showAdvanced)} aria-expanded={showAdvanced}>
       <span>Réglages avancés</span><span>{showAdvanced ? '−' : '+'}</span>
@@ -172,6 +263,7 @@
   .card { display: flex; flex-direction: column; }
   .card h2 { font-size: 1.1rem; margin-bottom: var(--space-sm); }
   .hint { font-size: 0.82rem; color: var(--color-text-muted); margin-bottom: var(--space-sm); }
+  .hint a { color: var(--color-gold); text-decoration: underline; }
   .model-info-badge {
     margin-top: var(--space-xs);
     padding: var(--space-xs) var(--space-sm);
@@ -185,9 +277,7 @@
     flex-wrap: wrap;
     font-family: var(--font-mono);
   }
-  .model-info-badge strong {
-    color: var(--color-gold);
-  }
+  .model-info-badge strong { color: var(--color-gold); }
   .label.mt, .field.mt { margin-top: var(--space-md); }
   .row { display: flex; gap: var(--space-md); flex-wrap: wrap; }
   .field { flex: 1; min-width: 200px; }
@@ -200,6 +290,40 @@
   .disclosure { display: flex; align-items: center; justify-content: space-between; width: 100%; font-family: var(--font-display); font-size: 0.78rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-text-secondary); background: none; cursor: pointer; }
   .disclosure:hover { color: var(--color-text-primary); }
 
+  /* ── Provider grid ──────────────────────────────── */
+  .provider-grid { display: flex; gap: var(--space-sm); }
+  .provider-card {
+    flex: 1; display: flex; flex-direction: column; gap: 2px;
+    padding: var(--space-md) var(--space-sm);
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .provider-card:hover { border-color: rgba(255,255,255,0.12); }
+  .provider-card.selected { border-color: var(--color-gold); background: rgba(216,185,119,0.08); }
+  .provider-name { font-family: var(--font-display); font-size: 0.82rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-text-primary); }
+  .provider-card.selected .provider-name { color: var(--color-gold); }
+  .provider-hint { font-size: 0.72rem; color: var(--color-text-muted); line-height: 1.35; }
+
+  /* ── Model chips (MiMo) ─────────────────────────── */
+  .model-chips { display: flex; gap: var(--space-xs); flex-wrap: wrap; margin-bottom: var(--space-sm); }
+  .chip {
+    padding: 8px 14px;
+    font-family: var(--font-mono); font-size: 0.78rem;
+    color: var(--color-text-secondary);
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, color 0.15s;
+  }
+  .chip:hover { border-color: rgba(255,255,255,0.12); color: var(--color-text-primary); }
+  .chip.active { border-color: var(--color-gold); background: rgba(216,185,119,0.08); color: var(--color-gold); }
+
+  /* ── Save bar ───────────────────────────────────── */
   .savebar {
     position: fixed; inset: auto 0 0 0; z-index: 40;
     display: flex; align-items: center; justify-content: flex-end; gap: var(--space-md);
