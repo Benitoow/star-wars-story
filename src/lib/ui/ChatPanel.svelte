@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tick } from 'svelte';
+  import { afterUpdate } from 'svelte';
   import { play } from '$lib/stores/play';
 
   let draft = '';
@@ -8,11 +8,11 @@
   $: chat = $play.chat;
 
   // Auto-scroll to the latest message / streaming token.
-  $: {
-    void chat.turns;
-    void chat.partial;
-    if (threadEl) void tick().then(() => (threadEl.scrollTop = threadEl.scrollHeight));
-  }
+  afterUpdate(() => {
+    if (threadEl) {
+      threadEl.scrollTop = threadEl.scrollHeight;
+    }
+  });
 
   async function send() {
     const text = draft.trim();
