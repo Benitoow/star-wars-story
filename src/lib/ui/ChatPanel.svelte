@@ -67,6 +67,7 @@
     display: flex;
     flex-direction: column;
     height: calc(100vh - 2 * var(--header-height));
+    height: calc(100dvh - 2 * var(--header-height));
     padding: var(--space-md) var(--space-lg) var(--space-lg);
     animation: fadeIn var(--transition-normal) ease;
   }
@@ -102,6 +103,17 @@
 
   .chat-error { color: var(--color-red); font-size: 0.85rem; text-align: center; }
 
-  .composer { display: flex; gap: var(--space-sm); padding-top: var(--space-md); border-top: 1px solid var(--border-subtle); }
+  .composer { display: flex; gap: var(--space-sm); padding-top: var(--space-md); padding-bottom: var(--sab); border-top: 1px solid var(--border-subtle); }
+
+  @media (max-width: 768px) {
+    .chat { padding: var(--space-sm) var(--space-md) var(--space-md); height: calc(100dvh - var(--header-height)); }
+    .chat-head { flex-wrap: wrap; gap: var(--space-sm); }
+    .bubble { max-width: 90%; font-size: 0.95rem; }
+    .composer { flex-direction: column; }
+    .composer .input { width: 100%; }
+    .composer .btn { width: 100%; }
+    .avatar { width: 34px; height: 34px; font-size: 0.75rem; }
+    .name { font-size: 0.95rem; }
+  }
   .composer .input { flex: 1; }
 </style>

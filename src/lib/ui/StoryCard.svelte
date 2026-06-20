@@ -54,4 +54,12 @@
   .title { font-family: var(--font-display); font-size: 1.05rem; color: var(--color-text-primary); line-height: 1.2; text-wrap: balance; }
   .sub { font-size: 0.76rem; color: var(--color-text-secondary); }
   .badge-gold { align-self: flex-start; }
+
+  @media (max-width: 768px) {
+    .meta { padding: var(--space-sm); }
+    .title { font-size: 0.92rem; }
+    .sub { font-size: 0.7rem; }
+    .del { width: 32px; height: 32px; opacity: 0.7; top: 6px; right: 6px; }
+    .card { border-radius: var(--radius-sm); }
+  }
 </style>

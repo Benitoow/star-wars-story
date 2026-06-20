@@ -147,7 +147,7 @@
 </div>
 
 <style>
-  .play { position: relative; min-height: 100vh; display: flex; flex-direction: column; }
+  .play { position: relative; height: 100vh; height: 100dvh; overflow-y: auto; display: flex; flex-direction: column; }
 
   .topbar {
     position: relative;
@@ -156,12 +156,12 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: var(--space-md);
-    padding: var(--space-md) var(--space-lg);
+    padding: calc(var(--space-md) + var(--sat)) calc(var(--space-lg) + var(--sar)) var(--space-md) calc(var(--space-lg) + var(--sal));
   }
   .topbar-actions { display: flex; gap: var(--space-sm); }
   .topbar-hud { width: min(360px, 60vw); }
   .icon-btn {
-    width: 40px; height: 40px;
+    width: 44px; height: 44px;
     display: flex; align-items: center; justify-content: center;
     font-size: 1.2rem; color: var(--color-text-primary);
     background: var(--surface-glass-strong); backdrop-filter: blur(10px);
@@ -204,6 +204,7 @@
   .choice {
     text-align: left;
     padding: 14px 18px;
+    min-height: 48px;
     font-family: var(--font-body);
     font-size: 0.98rem;
     color: var(--color-text-primary);
@@ -251,7 +252,16 @@
   @keyframes spin { to { transform: rotate(360deg); } }
 
   @media (max-width: 768px) {
-    .topbar-hud { width: 70vw; }
-    .scene { padding: var(--space-md) var(--space-md) var(--space-2xl); }
+    .topbar { padding: calc(var(--space-sm) + var(--sat)) calc(var(--space-md) + var(--sar)) var(--space-sm) calc(var(--space-md) + var(--sal)); gap: var(--space-sm); }
+    .topbar-hud { width: 75vw; }
+    .icon-btn { width: 44px; height: 44px; font-size: 1.1rem; }
+    .scene { padding: var(--space-md) calc(var(--space-md) + var(--sal)) calc(var(--space-2xl) + var(--sab)) calc(var(--space-md) + var(--sar)); }
+    .scene-title { font-size: clamp(1.3rem, 1rem + 1.2vw, 1.8rem); }
+    .prose { font-size: 0.98rem; line-height: 1.75; }
+    .choice { padding: 16px 16px; font-size: 0.95rem; }
+    .free { flex-direction: column; }
+    .free .input { width: 100%; }
+    .talk-actions { flex-direction: column; }
+    .talk-btn { width: 100%; justify-content: center; padding: 14px; }
   }
 </style>

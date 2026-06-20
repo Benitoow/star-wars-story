@@ -258,7 +258,7 @@
 </div>
 
 <style>
-  .settings { max-width: 720px; margin: 0 auto; padding: calc(var(--header-height) + var(--space-xl)) var(--space-lg) calc(var(--space-2xl) + 64px); display: flex; flex-direction: column; gap: var(--space-lg); }
+  .settings { max-width: 720px; margin: 0 auto; padding: calc(var(--header-height) + var(--space-xl)) var(--space-lg) calc(var(--space-2xl) + 64px + var(--sab)); display: flex; flex-direction: column; gap: var(--space-lg); }
   .head h1 { font-size: 2rem; }
   .card { display: flex; flex-direction: column; }
   .card h2 { font-size: 1.1rem; margin-bottom: var(--space-sm); }
@@ -328,9 +328,22 @@
     position: fixed; inset: auto 0 0 0; z-index: 40;
     display: flex; align-items: center; justify-content: flex-end; gap: var(--space-md);
     padding: var(--space-md) var(--space-lg);
+    padding-bottom: calc(var(--space-md) + var(--sab));
     background: var(--surface-glass-strong); backdrop-filter: blur(14px);
     border-top: 1px solid var(--color-border);
   }
   .save-status { font-size: 0.82rem; color: var(--color-text-muted); }
   .version { text-align: center; font-size: 0.74rem; letter-spacing: 0.1em; color: var(--color-text-muted); }
+
+  @media (max-width: 768px) {
+    .settings { padding: calc(var(--header-height) + var(--space-md)) var(--space-md) calc(var(--space-2xl) + 64px + var(--sab)); gap: var(--space-md); }
+    .head h1 { font-size: 1.6rem; }
+    .row { flex-direction: column; }
+    .field { min-width: 100%; }
+    .provider-grid { flex-direction: column; }
+    .toggle button { padding: 14px; }
+    .savebar { padding: var(--space-sm) var(--space-md); padding-bottom: calc(var(--space-sm) + var(--sab)); }
+    .savebar .btn { flex: 1; }
+    .save-status { font-size: 0.75rem; }
+  }
 </style>

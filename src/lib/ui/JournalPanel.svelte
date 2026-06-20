@@ -115,6 +115,7 @@
     align-items: center;
     justify-content: center;
     padding: var(--space-lg);
+    padding: calc(var(--space-lg) + var(--sat)) calc(var(--space-lg) + var(--sar)) calc(var(--space-lg) + var(--sab)) calc(var(--space-lg) + var(--sal));
     background: rgba(0, 0, 0, 0.55);
     backdrop-filter: blur(6px);
     animation: fadeIn var(--transition-fast) ease;
@@ -199,4 +200,14 @@
   .affinity { font-size: 0.8rem; color: var(--color-text-muted); }
   .entry-meta { margin-top: 4px; font-size: 0.78rem; color: var(--color-text-muted); }
   .entry-text { margin-top: 6px; font-family: var(--font-narrative); font-size: 0.92rem; line-height: 1.5; color: var(--color-text-secondary); }
+
+  @media (max-width: 768px) {
+    .overlay { padding: 0; }
+    .journal { width: 100%; max-height: 100dvh; max-height: 100vh; border-radius: 0; }
+    .head { padding: calc(var(--space-md) + var(--sat)) var(--space-md) var(--space-md); }
+    .tabs { padding: var(--space-xs) var(--space-md) 0; overflow-x: auto; white-space: nowrap; }
+    .tab { padding: 10px 12px; font-size: 0.75rem; }
+    .body { padding: var(--space-md); }
+    .icon-btn { width: 44px; height: 44px; }
+  }
 </style>

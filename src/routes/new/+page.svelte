@@ -223,4 +223,23 @@
   .spacer { flex: 1; }
 
   @media (max-width: 600px) { .names { flex-direction: column; } }
+
+  @media (max-width: 768px) {
+    .wizard { padding: var(--space-sm); align-items: flex-start; }
+    .panel { max-height: calc(100dvh - var(--space-sm)); max-height: calc(100vh - var(--space-sm)); border-radius: var(--radius-md); }
+    .head { padding: calc(var(--space-sm) + var(--sat)) var(--space-md) var(--space-sm); flex-wrap: wrap; gap: var(--space-sm); }
+    .steps { gap: var(--space-sm); font-size: 0.55rem; overflow-x: auto; white-space: nowrap; }
+    .body { padding: var(--space-md); }
+    .body h1 { font-size: 1.3rem; margin-bottom: var(--space-md); }
+    .grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+    .grid.compact { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+    .tile { padding: 10px 12px; min-height: 44px; }
+    .tile-name { font-size: 0.82rem; }
+    .tile-sub { font-size: 0.68rem; }
+    .foot { padding: calc(var(--space-md) + var(--sab)) var(--space-md) var(--space-md); }
+    .foot .btn { flex: 1; }
+    .names { flex-direction: column; }
+    .avatar { width: 40px; height: 40px; }
+    .premise { font-size: 16px; /* prevents iOS zoom */ }
+  }
 </style>

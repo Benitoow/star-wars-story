@@ -13,7 +13,7 @@
 
 <style>
   .backdrop {
-    position: absolute;
+    position: fixed;
     inset: 0;
     overflow: hidden;
     z-index: 0;

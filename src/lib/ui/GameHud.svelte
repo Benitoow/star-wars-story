@@ -203,4 +203,15 @@
   .chip-sub { font-size: 0.62rem; color: var(--color-text-muted); }
   .chip.injury.moderate { border-color: rgba(216,185,119,0.4); }
   .chip.injury.severe { border-color: rgba(215,107,107,0.5); color: var(--color-text-primary); }
+
+  @media (max-width: 768px) {
+    .hud { padding: var(--space-sm); font-size: 0.8rem; }
+    .hud-top { gap: var(--space-sm); }
+    .npc { grid-template-columns: 28px 1fr; gap: 6px; }
+    .rel { display: none; }
+    .faction { grid-template-columns: 1fr auto; }
+    .warmth { display: none; }
+    .hud-detail { max-height: 60vh; }
+    .hud-toggle { padding: 8px 14px; min-height: 44px; }
+  }
 </style>

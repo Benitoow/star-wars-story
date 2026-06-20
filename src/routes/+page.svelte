@@ -80,4 +80,16 @@
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: var(--space-lg); }
 
   @media (max-width: 600px) { .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } }
+
+  @media (max-width: 768px) {
+    .hero { min-height: 50vh; }
+    .hero.full { min-height: 100vh; min-height: 100dvh; }
+    .hero-content { padding: calc(var(--space-2xl) + var(--sat)) var(--space-md) var(--space-2xl); }
+    .hero-title { font-size: clamp(2rem, 1.2rem + 4vw, 3.5rem); }
+    .hero-sub { font-size: 0.95rem; margin-bottom: var(--space-lg); }
+    .hero-cta { width: 100%; min-height: 48px; font-size: 0.82rem; }
+    .library { padding: var(--space-lg) var(--space-md); }
+    .lib-title { font-size: 1.2rem; }
+    .grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--space-md); }
+  }
 </style>

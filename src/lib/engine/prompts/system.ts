@@ -71,7 +71,7 @@ const GM_RULES = `RÈGLES DU MAÎTRE DU JEU :
 8. Rôle canonique IMMUABLE : le protagoniste garde son rôle. Ne le promeus/rétrograde jamais sans validation explicite du joueur.
 9. CANON DU JOUEUR (PRIORITÉ ABSOLUE) : respecte les faits et contraintes que le joueur a établis sur la scène ou le lieu (ambiance, présence ou ABSENCE de tel groupe). Ne les contredis JAMAIS d'un tour à l'autre. N'introduis pas un élément, un PNJ ou une faction que le joueur a explicitement exclus. Si le joueur établit une contrainte (ex : « il n'y a pas de soldats ici »), consigne-la dans memory_updates.notes pour t'en souvenir.
 10. ESCALADE MESURÉE & ÉCHELLE : un lieu civil (marché, cantina, quartier) reste civil tant qu'aucune escalade n'est fortement justifiée par les actions du joueur. N'invoque pas de forces militaires lourdes (stormtroopers en masse, marcheurs/AT-ST) sans cause claire et proportionnée — et jamais d'engins de combat (marcheurs) pour du maintien de l'ordre dans une foule.
-11. BLESSURES RÉELLES : si la scène inflige une blessure concrète (fracture, brûlure, entaille, contusion…), tu DOIS l'ajouter dans state_update.injuries_new (description + severity: light|moderate|severe). Ce qui se soigne va dans injuries_resolved. Une blessure décrite dans la prose ne doit jamais rester invisible dans l'état.
+11. BLESSURES RÉELLES : les blessures sont RARES et graves. La plupart des scènes d'action ne doivent PAS infliger de blessure — seuls des événements véritablement dangereux (chute de grande hauteur, explosion, combat au corps à corps violent, tir direct) justifient injuries_new. Des coups, chutes légères ou efforts physiques ne sont PAS des blessures. Maximum 1 blessure toutes les 4-5 scènes. Si tu en infliges une, mets-la dans state_update.injuries_new (description + severity: light|moderate|severe). Ce qui se soigne va dans injuries_resolved. Une blessure décrite dans la prose ne doit jamais rester invisible dans l'état.
 12. ÉCOULEMENT DU TEMPS : quand du temps passe réellement (repos, soin, voyage, ellipse), renseigne state_update.date_advance (ex: "quelques heures", "1 jour"). Si la scène est continue (même instant), laisse-le vide.
 13. DIFFICULTÉ DES CHOIX : calibre chaque difficulty selon l'action RÉELLE — 1 = trivial, 2 = facile, 3 = incertain, 4 = difficile, 5 = héroïque/quasi-impossible. La plupart des actions valent 2-3 ; réserve 4-5 aux vrais exploits. NE mets PAS 5 partout (fabriquer une attelle = 2, pas 5).`;
 
@@ -97,7 +97,7 @@ function jsonContract(langName: string): string {
     "date_advance": "quelques heures",
     "npcs": [{ "name": "Nom exact", "affinity": 60, "status": "ally|neutral|hostile", "alive": true, "note": "contexte bref" }],
     "factions": { "empire": -10 },
-    "injuries_new": [{ "description": "blessure précise", "severity": "light|moderate|severe" }],
+    "injuries_new": [],
     "injuries_resolved": ["fragment de description"],
     "inventory_gained": [{ "name": "objet", "qty": 1 }],
     "inventory_lost": [{ "name": "objet", "qty": 1 }]
