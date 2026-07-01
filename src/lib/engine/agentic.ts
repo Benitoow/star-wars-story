@@ -102,8 +102,8 @@ Réponds en JSON strict :
   "chapter_title": "Titre évocateur — jamais Chapitre N",
   "section_type": "${cleanText(brief.section_type, 40) || 'action'}",
   "narrative": { "atmosphere": "${cleanText(brief.atmosphere, 40) || 'tense'}" },
-  "state_update": { "hp": -15, "credits": 0, "location": "", "date_advance": "", "npcs": [], "factions": {}, "injuries_new": [], "injuries_resolved": [], "inventory_gained": [] },
-  "memory_updates": { "relations": [], "places": [], "notes": [] },
+  "state_update": { "hp": -15, "credits": 0, "location": "", "date_advance": "", "npcs": [], "factions": {}, "injuries_new": [], "injuries_resolved": [], "inventory_gained": [], "inventory_lost": [], "rumors_new": [], "environment_status": "" },
+  "memory_updates": { "relations": [], "places": [], "injuries": [], "resources": [], "notes": [] },
   "choices": [ { "text": "", "attribute": "combat|diplomacy|stealth|tech|force|survival", "difficulty": 2, "faction_impact": {} } ],
   "npcs_present": []
 }`;
@@ -121,15 +121,16 @@ ${cleanText(draft, 3000)}
 Livre la version finale : mêmes faits, même issue, meilleure écriture (et vocabulaire varié si des mots récurrents sont signalés ci-dessus).`;
 }
 
+const SPEAKER_RE = /^[A-Za-zÀ-ÖØ-öø-ÿ0-9'’ .-]{2,40}\s*:\s+\S/;
+
 /** Split mixed writer prose into action vs "Nom : réplique" dialogue lines. */
 function splitProse(prose: string): { action: string; dialogue: string } {
-  const speaker = /^[A-Za-zÀ-ÖØ-öø-ÿ0-9'’ .-]{2,40}\s*:\s+\S/;
   const action: string[] = [];
   const dialogue: string[] = [];
   for (const block of prose.split(/\n{2,}/)) {
     const trimmed = block.trim();
     if (!trimmed) continue;
-    (speaker.test(trimmed) ? dialogue : action).push(trimmed);
+    (SPEAKER_RE.test(trimmed) ? dialogue : action).push(trimmed);
   }
   return { action: action.join('\n\n'), dialogue: dialogue.join('\n') };
 }
