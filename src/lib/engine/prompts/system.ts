@@ -1,5 +1,6 @@
+import { foldArchive, renderMemoryBlock } from '../memory';
 import { cleanText } from '../text';
-import type { StorySetup, StoryChapter, WorldState } from '../types';
+import type { MemoryFact, StorySetup, StoryChapter, WorldState } from '../types';
 import { languageInstruction, languageName } from './language';
 import { ERA_COHERENCE, styleDirective, contentModeDirective } from './style';
 
@@ -109,14 +110,14 @@ function jsonContract(langName: string): string {
 }
 
 export function renderPlayerCanon(playerDirectives: string[] = []): string {
-  const recent = playerDirectives.map((d) => d.trim()).filter(Boolean).slice(-6);
+  const recent = playerDirectives.map((d) => d.trim()).filter(Boolean).slice(-8);
   if (!recent.length) return '';
   return `\nCANON DU JOUEUR — ce qu'il a fait/établi récemment (à respecter, ne jamais contredire) :\n${recent.map((d) => `- ${d}`).join('\n')}`;
 }
 
 export function buildSystemPrompt(
   setup: StorySetup,
-  memoryFacts: string[] = [],
+  memory: MemoryFact[] = [],
   worldState?: WorldState,
   turnNumber?: number,
   playerDirectives: string[] = [],
@@ -126,9 +127,10 @@ export function buildSystemPrompt(
   const lang = setup.language || 'fr';
   const langName = languageName(lang);
   const worldBlock = worldState ? renderWorldBlock(worldState, protagonist) : '';
-  const memory = memoryFacts.length ? `\nMÉMOIRE NARRATIVE (faits établis) :\n${memoryFacts.map((f) => `- ${f}`).join('\n')}` : '';
-  const archive = campaignArchive.length
-    ? `\nRÉSUMÉ DES TOURS ANCIENS (condensés pour la continuité — ne pas répéter mot à mot) :\n${campaignArchive.map((a) => `- ${a}`).join('\n')}`
+  const memoryBlock = renderMemoryBlock(memory);
+  const foldedArchive = foldArchive(campaignArchive);
+  const archive = foldedArchive.length
+    ? `\nRÉSUMÉ DES TOURS ANCIENS (condensés pour la continuité — ne pas répéter mot à mot) :\n${foldedArchive.map((a) => `- ${a}`).join('\n')}`
     : '';
   const canon = renderPlayerCanon(playerDirectives);
   const isTurn1 = turnNumber === 1 || !worldState || worldState.chronology.length === 0;
@@ -143,7 +145,7 @@ Tu es un Maître du Jeu Star Wars d'élite. Tu écris avec précision et cinéma
 Protagoniste : ${protagonist} | Ère : ${setup.era} | Faction : ${setup.faction} | Rôle : ${setup.role}
 Prémisse : ${setup.premise || 'Libre'}
 Style : ${setup.writingStyle || 'cinématique'} · Ton : ${setup.writingTone || 'aventure'} · POV : ${setup.writingPov || 'première personne'} · Longueur : ${setup.writingLength || 'moyen'} · Contenu : ${setup.contentMode || 'cinematic'}
-${worldBlock}${memory}${archive}${canon}
+${worldBlock}${memoryBlock}${archive}${canon}
 
 ${GM_RULES}
 14. DIRECTIVE STYLISTIQUE : ${styleDirective(setup.writingStyle, setup.writingTone)}

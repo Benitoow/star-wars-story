@@ -117,6 +117,22 @@
           </div>
         </section>
       {/if}
+
+      {#if world.rumors?.length}
+        <section>
+          <h4 class="eyebrow">Rumeurs</h4>
+          <ul class="rumors">
+            {#each world.rumors as rumor}<li class="rumor">{rumor}</li>{/each}
+          </ul>
+        </section>
+      {/if}
+
+      {#if world.environment_status}
+        <section>
+          <h4 class="eyebrow">Environnement</h4>
+          <p class="env">{world.environment_status}</p>
+        </section>
+      {/if}
     </div>
   {/if}
 </aside>
@@ -203,6 +219,12 @@
   .chip-sub { font-size: 0.62rem; color: var(--color-text-muted); }
   .chip.injury.moderate { border-color: rgba(216,185,119,0.4); }
   .chip.injury.severe { border-color: rgba(215,107,107,0.5); color: var(--color-text-primary); }
+
+  /* Rumors & environment — quiet italics, like overheard whispers */
+  .rumors { list-style: none; display: flex; flex-direction: column; gap: 5px; }
+  .rumor { font-family: var(--font-narrative); font-style: italic; font-size: 0.8rem; line-height: 1.45; color: var(--color-text-secondary); padding-left: 12px; position: relative; }
+  .rumor::before { content: '»'; position: absolute; left: 0; color: var(--color-gold-dim); }
+  .env { font-family: var(--font-narrative); font-style: italic; font-size: 0.8rem; line-height: 1.45; color: var(--color-text-secondary); }
 
   @media (max-width: 768px) {
     .hud { padding: var(--space-sm); font-size: 0.8rem; }

@@ -5,7 +5,7 @@
 import Dexie, { type Table } from 'dexie';
 import type { UiLanguageCode } from '$lib/content/languages';
 import { DEFAULT_TEXT_MODEL_ID, DEFAULT_TEXT_PROVIDER_ID } from '$lib/content/providers';
-import type { ChatSession, StoryChapter, StoryGenerationMode, StorySetup, WorldState } from '$lib/engine/types';
+import type { ChatSession, MemoryFact, StoryChapter, StoryGenerationMode, StorySetup, WorldState } from '$lib/engine/types';
 
 export interface StoredStory {
   id: string;
@@ -18,7 +18,7 @@ export interface StoredStory {
   deletedAt?: number; // soft delete (undo-able)
 }
 
-export const SESSION_VERSION = 1;
+export const SESSION_VERSION = 2;
 
 export interface StoredSession {
   storyId: string;
@@ -28,7 +28,8 @@ export interface StoredSession {
   currentChapter: StoryChapter | null;
   chapterHistory: StoryChapter[];
   actionHistory: string[];
-  memoryFacts: string[];
+  memoryFacts: string[];  // legacy flat facts — kept in sync for older readers
+  memory?: MemoryFact[];  // structured narrative memory (v2)
   trameId?: string | null;
   chat?: ChatSession; // an in-progress live conversation, if any
 }

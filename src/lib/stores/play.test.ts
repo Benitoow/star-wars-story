@@ -13,7 +13,12 @@ const engine = vi.hoisted(() => ({
   resolveContextBudget: vi.fn(),
   rollForChoice: vi.fn()
 }));
-vi.mock('$lib/engine', () => engine);
+// Generation entry points are mocked; the pure memory/prompt helpers stay real.
+vi.mock('$lib/engine', async () => {
+  const memory = await vi.importActual<typeof import('$lib/engine/memory')>('$lib/engine/memory');
+  const system = await vi.importActual<typeof import('$lib/engine/prompts/system')>('$lib/engine/prompts/system');
+  return { ...memory, summarizeChapterForPrompt: system.summarizeChapterForPrompt, ...engine };
+});
 
 const persistence = vi.hoisted(() => ({
   SESSION_VERSION: 1,

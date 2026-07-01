@@ -5,15 +5,20 @@
 ══════════════════════════════════════════════ */
 import { writable } from 'svelte/store';
 import {
+  fromLegacyFacts,
   generateOpening,
   generateTurn,
+  memoryFactLines,
+  mergeMemoryFacts,
   npcReply,
   resolveConversation,
   rebuildWorldState,
   resolveContextBudget,
   rollForChoice,
+  summarizeChapterForPrompt,
   type ChatTurn,
   type GeneratePartial,
+  type MemoryFact,
   type NpcRelation,
   type StoryChapter,
   type StoryChoice,
@@ -48,7 +53,7 @@ export interface PlayState {
   worldState: WorldState | null;
   currentChapter: StoryChapter | null;
   chapterHistory: StoryChapter[];
-  memoryFacts: string[];
+  memory: MemoryFact[];
   actionHistory: string[];
   turnNumber: number;
   error: string | null;
@@ -60,7 +65,7 @@ const initialChat: ChatState = { active: false, npcName: '', sceneSummary: '', t
 
 const initial: PlayState = {
   storyId: null, setup: null, status: 'idle', worldState: null, currentChapter: null,
-  chapterHistory: [], memoryFacts: [], actionHistory: [], turnNumber: 0, error: null,
+  chapterHistory: [], memory: [], actionHistory: [], turnNumber: 0, error: null,
   partialChapter: null,
   chat: { ...initialChat }
 };
@@ -82,10 +87,9 @@ async function loadProvider(): Promise<{ config: StoryProviderConfig; mode: Stor
   };
 }
 
-function mergeMemory(existing: string[], chapter: StoryChapter): string[] {
-  const m = chapter.memory_updates;
-  const additions = [...m.relations, ...m.places, ...m.injuries, ...m.resources, ...m.notes];
-  return Array.from(new Set([...existing, ...additions])).slice(-40);
+/** Condensed recaps of the last few chapters — shared context for NPC chats. */
+function recentEvents(): string[] {
+  return snap.chapterHistory.slice(-3).map(summarizeChapterForPrompt);
 }
 
 async function persist(): Promise<void> {
@@ -94,7 +98,8 @@ async function persist(): Promise<void> {
     storyId: snap.storyId, version: SESSION_VERSION, turnNumber: snap.turnNumber,
     worldState: snap.worldState, currentChapter: snap.currentChapter,
     chapterHistory: snap.chapterHistory, actionHistory: snap.actionHistory,
-    memoryFacts: snap.memoryFacts, trameId: null,
+    // memoryFacts stays in sync as a flat rendition so v1 readers keep working.
+    memory: snap.memory, memoryFacts: memoryFactLines(snap.memory, 58), trameId: null,
     // Persist an in-progress conversation so it can be resumed; cleared on exit.
     chat: snap.chat.active ? { npcName: snap.chat.npcName, sceneSummary: snap.chat.sceneSummary, turns: snap.chat.turns } : undefined
   });
@@ -109,7 +114,7 @@ function applyResult(result: StoryTurnResult, actionText: string): void {
     worldState: result.worldState,
     currentChapter: chapter,
     chapterHistory: [...s.chapterHistory, chapter],
-    memoryFacts: mergeMemory(s.memoryFacts, chapter),
+    memory: mergeMemoryFacts(s.memory, chapter),
     actionHistory: actionText ? [...s.actionHistory, actionText] : s.actionHistory,
     turnNumber: chapter.chapter_number,
     error: null,
@@ -158,11 +163,11 @@ async function submit(actionText: string, outcomeDirective = ''): Promise<void> 
         worldState,
         turnNumber: snap.turnNumber + 1,
         actionText: action,
-        memoryFacts: snap.memoryFacts,
+        memory: snap.memory,
         chapterHistory: snap.chapterHistory,
         actionHistory: snap.actionHistory,
         contextBudget,
-        playerDirectives: snap.actionHistory.slice(-6),
+        playerDirectives: snap.actionHistory.slice(-10),
         outcomeDirective
       },
       config,
@@ -201,7 +206,10 @@ async function chatSend(text: string): Promise<void> {
   try {
     const { config, language } = await loadProvider();
     const reply = await npcReply(
-      { setup: { ...setup, language }, worldState: world, npc: currentNpc(), sceneSummary: snap.chat.sceneSummary, turns, playerDirectives: snap.actionHistory.slice(-6) },
+      {
+        setup: { ...setup, language }, worldState: world, npc: currentNpc(), sceneSummary: snap.chat.sceneSummary, turns,
+        playerDirectives: snap.actionHistory.slice(-10), memory: snap.memory, recentEvents: recentEvents()
+      },
       config,
       (delta) => update((s) => ({ ...s, chat: { ...s.chat, partial: s.chat.partial + delta } })),
       chatAbort.signal
@@ -242,7 +250,7 @@ async function chatEnd(): Promise<void> {
   try {
     const { config, language } = await loadProvider();
     const result = await resolveConversation(
-      { setup: { ...setup, language }, worldState: world, npc, sceneSummary, turns, turnNumber: snap.turnNumber + 1 },
+      { setup: { ...setup, language }, worldState: world, npc, sceneSummary, turns, turnNumber: snap.turnNumber + 1, memory: snap.memory },
       config,
       signal
     );
@@ -281,7 +289,8 @@ export const play = {
       set({
         storyId, setup: story.setup, status: 'ready', worldState,
         currentChapter: session.currentChapter ?? session.chapterHistory[session.chapterHistory.length - 1] ?? null,
-        chapterHistory: session.chapterHistory, memoryFacts: session.memoryFacts,
+        chapterHistory: session.chapterHistory,
+        memory: session.memory ?? fromLegacyFacts(session.memoryFacts),
         actionHistory: session.actionHistory, turnNumber: session.turnNumber, error: null,
         partialChapter: null,
         chat: session.chat

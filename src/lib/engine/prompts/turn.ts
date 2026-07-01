@@ -59,7 +59,7 @@ export function buildContinuePrompt(
   // History is carried by the raw transcript messages now — this prompt only
   // adds the current action, the player canon, choice de-dup and pacing.
   const outcome = outcomeDirective ? `${outcomeDirective}\n` : '';
-  const recentDirectives = playerDirectives.map((d) => d.trim()).filter(Boolean).slice(-6);
+  const recentDirectives = playerDirectives.map((d) => d.trim()).filter(Boolean).slice(-8);
   const canon = recentDirectives.length
     ? `\nCANON DU JOUEUR (à respecter absolument, ne jamais contredire — ex: ne pas faire apparaître un groupe qu'il a exclu) :\n${recentDirectives.map((d) => `- ${d}`).join('\n')}`
     : '';

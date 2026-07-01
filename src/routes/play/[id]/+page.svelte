@@ -29,6 +29,22 @@
     }
   }
 
+  // Section types and attributes → French display labels.
+  const SECTION_LABELS: Record<string, string> = {
+    action: 'Action', dialogue: 'Dialogue', exploration: 'Exploration', tension: 'Tension',
+    revelation: 'Révélation', repos: 'Repos', interlude: 'Interlude', confrontation: 'Confrontation'
+  };
+  const ATTR_LABELS: Record<string, string> = {
+    combat: 'Combat', diplomacy: 'Diplomatie', stealth: 'Furtivité',
+    tech: 'Technologie', force: 'Force', survival: 'Survie'
+  };
+
+  /** "Nom : réplique" → speaker + text, so the speaker can be typographically set apart. */
+  function splitDialogueLine(line: string): { speaker: string; text: string } | null {
+    const m = line.match(/^([A-Za-zÀ-ÖØ-öø-ÿ0-9'’ .-]{2,40})\s*:\s+(.+)$/);
+    return m ? { speaker: m[1].trim(), text: m[2].trim() } : null;
+  }
+
   $: generating = $play.status === 'generating';
   $: chapter = $play.currentChapter;
   $: partial = $play.partialChapter;
@@ -37,6 +53,8 @@
   $: actionParagraphs = (chapter?.narrative.action || '').split(/\n{2,}/).map((s) => s.trim()).filter(Boolean);
   $: dialogueLines = (chapter?.narrative.dialogue || '').split(/\n+/).map((s) => s.trim()).filter(Boolean);
   $: reflection = chapter?.narrative.reflection?.trim() || '';
+  $: atmosphere = chapter?.narrative.atmosphere || 'tense';
+  $: sectionLabel = chapter ? (SECTION_LABELS[chapter.section_type] ?? chapter.section_type) : '';
   // Who can the player talk to? The model lists who's still on site at the end
   // of the scene (npcs_present); without it (old saves), fall back to every
   // living NPC known. Dead NPCs are never offered.
@@ -84,8 +102,10 @@
     {:else if generating && partial}
       <!-- The scene streams in as the model writes it. -->
       <article class="scene">
+        <p class="scene-eyebrow eyebrow">Chapitre {$play.turnNumber + 1}</p>
         <h1 class="scene-title">{partial.title || '…'}</h1>
-        {#each partialParagraphs as para}<p class="prose">{para}</p>{/each}
+        <div class="scene-rule" data-atmosphere="tense"></div>
+        {#each partialParagraphs as para, i}<p class="prose" class:first={i === 0}>{para}</p>{/each}
         <p class="prose"><span class="stream-caret">▍</span></p>
       </article>
     {:else if !chapter && generating}
@@ -103,17 +123,34 @@
       </div>
     {:else if chapter}
       <article class="scene" class:dim={generating}>
+        <p class="scene-eyebrow eyebrow">Chapitre {chapter.chapter_number}{sectionLabel ? ` · ${sectionLabel}` : ''}</p>
         <h1 class="scene-title">{chapter.chapter_title}</h1>
-        {#each actionParagraphs as para}<p class="prose">{para}</p>{/each}
+        <div class="scene-rule" data-atmosphere={atmosphere}></div>
+        {#each actionParagraphs as para, i}<p class="prose" class:first={i === 0}>{para}</p>{/each}
         {#if dialogueLines.length}
-          <div class="dialogue">{#each dialogueLines as line}<p class="line">{line}</p>{/each}</div>
+          <div class="dialogue">
+            {#each dialogueLines as line}
+              {@const parsed = splitDialogueLine(line)}
+              {#if parsed}
+                <p class="line"><span class="speaker">{parsed.speaker}</span><span class="line-text">{parsed.text}</span></p>
+              {:else}
+                <p class="line"><span class="line-text">{line}</span></p>
+              {/if}
+            {/each}
+          </div>
         {/if}
         {#if reflection}<p class="reflection">{reflection}</p>{/if}
 
         <div class="choices">
           {#each chapter.choices as choice}
             <button type="button" class="choice" on:click={() => play.chooseChoice(choice)} disabled={generating}>
-              {choice.text}
+              <span class="choice-text">{choice.text}</span>
+              <span class="choice-meta">
+                <span class="choice-attr">{ATTR_LABELS[choice.attribute] ?? choice.attribute}</span>
+                <span class="pips" title="Difficulté {choice.difficulty}/5" aria-label="Difficulté {choice.difficulty} sur 5">
+                  {#each Array.from({ length: 5 }) as _, i}<i class="pip" class:on={i < choice.difficulty}></i>{/each}
+                </span>
+              </span>
             </button>
           {/each}
         </div>
@@ -142,7 +179,7 @@
   </div>
 
   {#if showJournal && $play.worldState}
-    <JournalPanel world={$play.worldState} chapters={$play.chapterHistory} onClose={() => (showJournal = false)} />
+    <JournalPanel world={$play.worldState} chapters={$play.chapterHistory} memory={$play.memory} onClose={() => (showJournal = false)} />
   {/if}
 </div>
 
@@ -181,14 +218,23 @@
   }
   .scene.dim { opacity: 0.4; pointer-events: none; }
 
+  .scene-eyebrow { margin-bottom: var(--space-sm); color: var(--color-text-muted); }
   .scene-title {
     font-family: var(--font-display);
     color: var(--color-gold);
     font-size: clamp(1.6rem, 1.2rem + 1.6vw, 2.4rem);
     letter-spacing: 0.04em;
-    margin-bottom: var(--space-lg);
+    margin-bottom: var(--space-md);
     text-wrap: balance;
   }
+  /* Thin atmosphere-tinted rule under the title — a quiet mood signal. */
+  .scene-rule { width: 56px; height: 2px; margin-bottom: var(--space-lg); background: var(--color-gold-dim); }
+  .scene-rule[data-atmosphere='tense'] { background: var(--color-red); }
+  .scene-rule[data-atmosphere='calm'] { background: var(--color-blue); }
+  .scene-rule[data-atmosphere='mysterious'] { background: var(--color-purple); }
+  .scene-rule[data-atmosphere='eerie'] { background: var(--color-green); }
+  .scene-rule[data-atmosphere='heroic'] { background: var(--color-gold); }
+
   .prose {
     font-family: var(--font-narrative);
     font-size: var(--narrative-size);
@@ -196,12 +242,36 @@
     color: var(--color-text-primary);
     margin-bottom: 1.1rem;
   }
+  /* Museum-cinema drop cap on the opening paragraph. */
+  .prose.first::first-letter {
+    font-family: var(--font-display);
+    font-size: 3.1em;
+    line-height: 0.82;
+    float: left;
+    padding: 0.06em 0.12em 0 0;
+    color: var(--color-gold);
+  }
   .dialogue { margin: var(--space-md) 0; padding-left: var(--space-md); border-left: 2px solid var(--color-gold-dim); }
-  .line { font-family: var(--font-narrative); color: var(--color-text-secondary); font-style: italic; margin-bottom: 0.6rem; }
+  .line { font-family: var(--font-narrative); color: var(--color-text-secondary); margin-bottom: 0.6rem; }
+  .line .speaker {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-gold);
+    margin-bottom: 2px;
+  }
+  .line .line-text { font-style: italic; }
   .reflection { font-style: italic; color: var(--color-text-muted); margin: var(--space-md) 0; }
 
   .choices { display: flex; flex-direction: column; gap: var(--space-sm); margin-top: var(--space-xl); }
   .choice {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-md);
     text-align: left;
     padding: 14px 18px;
     min-height: 48px;
@@ -216,6 +286,21 @@
   }
   .choice:hover:not(:disabled) { border-color: var(--color-gold-dim); background: rgba(255, 255, 255, 0.06); transform: translateX(3px); }
   .choice:disabled { opacity: 0.5; cursor: not-allowed; }
+  .choice-text { flex: 1; }
+  .choice-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex: 0 0 auto; }
+  .choice-attr {
+    font-family: var(--font-display);
+    font-size: 0.58rem;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+  }
+  .pips { display: inline-flex; gap: 3px; }
+  .pip { width: 5px; height: 5px; border-radius: 50%; background: rgba(255, 255, 255, 0.14); }
+  .pip.on { background: var(--color-gold-dim); }
+  .choice:hover:not(:disabled) .pip.on { background: var(--color-gold); }
 
   .free { display: flex; gap: var(--space-sm); margin-top: var(--space-md); }
   .free .input { flex: 1; }
@@ -258,7 +343,9 @@
     .scene { padding: var(--space-md) calc(var(--space-md) + var(--sal)) calc(var(--space-2xl) + var(--sab)) calc(var(--space-md) + var(--sar)); }
     .scene-title { font-size: clamp(1.3rem, 1rem + 1.2vw, 1.8rem); }
     .prose { font-size: 0.98rem; line-height: 1.75; }
-    .choice { padding: 16px 16px; font-size: 0.95rem; }
+    .prose.first::first-letter { font-size: 2.7em; }
+    .choice { padding: 16px 16px; font-size: 0.95rem; flex-direction: column; align-items: flex-start; gap: var(--space-sm); }
+    .choice-meta { flex-direction: row; align-items: center; gap: var(--space-sm); }
     .free { flex-direction: column; }
     .free .input { width: 100%; }
     .talk-actions { flex-direction: column; }

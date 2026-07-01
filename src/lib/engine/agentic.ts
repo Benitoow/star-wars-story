@@ -4,13 +4,14 @@
    Director → Writer → Brain. Richer, slower than one-shot
    structured-json; same StoryChapter contract out.
 ══════════════════════════════════════════════ */
+import { foldArchive, renderMemoryBlock } from './memory';
 import { cleanText, isRecord } from './text';
 import { parseStoryResponse, sanitizeProse } from './parsing';
 import { callTextModel, callTextModelStream } from './provider';
 import { languageInstruction, languageName } from './prompts/language';
 import { ERA_COHERENCE, styleDirective, contentModeDirective } from './prompts/style';
 import { renderWorldBlock, renderWorldDigest } from './prompts/system';
-import type { ChatMessage, StoryChapter, StoryProviderConfig, StorySetup, WorldState } from './types';
+import type { ChatMessage, MemoryFact, StoryChapter, StoryProviderConfig, StorySetup, WorldState } from './types';
 
 const DIRECTOR_SYSTEM = `Tu es le DIRECTEUR de scène d'une campagne Star Wars. Tu transformes l'action du joueur en brief de scène concret et court. Réponds UNIQUEMENT en JSON valide, aucune prose autour.`;
 
@@ -25,20 +26,21 @@ Règles ABSOLUES :
 - Dialogues : chaque réplique sur sa ligne, format "Nom : réplique" (INTERDICTION du tiret cadratin '—' ou de tout tiret en début de ligne).
 - Réponds UNIQUEMENT avec la scène finale réécrite.`;
 
-function writerSystem(setup: StorySetup, turnNumber: number, world: WorldState, canon: string, archive: string[], overusedTerms: string[]): string {
+function writerSystem(setup: StorySetup, turnNumber: number, world: WorldState, canon: string, archive: string[], overusedTerms: string[], memory: MemoryFact[]): string {
   const protagonist = [setup.protagonistFirstName, setup.protagonistLastName].filter(Boolean).join(' ').trim() || 'Le protagoniste';
   const prologue = turnNumber <= 1
     ? `\n- TOUR 1 : commence par une riche introduction du protagoniste (${protagonist}) — origines liées à son rôle (${setup.role}) et sa faction (${setup.faction}), situation actuelle, tension immédiate — avant l'action.`
     : '';
-  const archiveBlock = archive.length
-    ? `\nRÉSUMÉ DES TOURS ANCIENS (continuité, ne pas répéter mot à mot) :\n${archive.map((a) => `- ${a}`).join('\n')}`
+  const foldedArchive = foldArchive(archive);
+  const archiveBlock = foldedArchive.length
+    ? `\nRÉSUMÉ DES TOURS ANCIENS (continuité, ne pas répéter mot à mot) :\n${foldedArchive.map((a) => `- ${a}`).join('\n')}`
     : '';
   return `${languageInstruction(setup.language)}
 
 Tu es l'ÉCRIVAIN d'une campagne Star Wars d'élite : prose cinématique, immersive, soignée. Les messages précédents sont la scène déjà jouée — écris la SUITE en continuité.
 Protagoniste : ${protagonist} | Ère : ${setup.era} | Faction : ${setup.faction} | Rôle : ${setup.role}
 Style : ${setup.writingStyle || 'cinématique'} · Ton : ${setup.writingTone || 'aventure'} · Contenu : ${setup.contentMode || 'cinematic'}
-${renderWorldBlock(world, protagonist)}${archiveBlock}
+${renderWorldBlock(world, protagonist)}${renderMemoryBlock(memory)}${archiveBlock}
 
 RÈGLES :
 1. Écris 2 à 3 paragraphes. Aucune sortie technique (ni JSON, ni markdown, ni liste).
@@ -53,7 +55,7 @@ RÈGLES :
 }
 
 function directorUser(summary: string, action: string, turnNumber: number, digest: string, canon: string): string {
-  return `Tour ${turnNumber}. Situation : ${cleanText(summary, 1200) || '(ouverture)'}
+  return `Tour ${turnNumber}. Situation : ${cleanText(summary, 2600) || '(ouverture)'}
 
 ÉTAT DU MONDE :
 ${digest}${canon}
@@ -140,6 +142,7 @@ export interface AgenticContext {
   situation: string;            // compressed story-so-far for the Director
   transcript: ChatMessage[];    // raw recent scenes (conversation) for the Writer
   archive: string[];            // older turns, condensed (into the Writer's system)
+  memory?: MemoryFact[];        // structured narrative memory (into the Writer's system)
   outcomeDirective?: string;
   playerDirectives?: string[];
   overusedTerms?: string[];     // words the model has leaned on across recent scenes
@@ -153,7 +156,7 @@ function varietyNote(overusedTerms: string[] = []): string {
 }
 
 function playerCanonBlock(playerDirectives: string[] = []): string {
-  const recent = playerDirectives.map((d) => d.trim()).filter(Boolean).slice(-6);
+  const recent = playerDirectives.map((d) => d.trim()).filter(Boolean).slice(-8);
   if (!recent.length) return '';
   return `\nCANON DU JOUEUR (à respecter absolument, ne jamais contredire ; n'introduis pas un groupe/élément qu'il a exclu) :\n${recent.map((d) => `- ${d}`).join('\n')}`;
 }
@@ -187,7 +190,7 @@ export async function runAgenticTurn(
   // With onPartial the draft STREAMS to the player while Reviewer/Brain run;
   // any stream failure falls back to the plain (retried) call.
   const writerMessages: ChatMessage[] = [
-    { role: 'system', content: writerSystem(ctx.setup, ctx.turnNumber, ctx.worldState, canon, ctx.archive, ctx.overusedTerms ?? []) },
+    { role: 'system', content: writerSystem(ctx.setup, ctx.turnNumber, ctx.worldState, canon, ctx.archive, ctx.overusedTerms ?? [], ctx.memory ?? []) },
     ...ctx.transcript,
     { role: 'user', content: writerUser(brief, ctx.actionText, ctx.outcomeDirective ?? '') }
   ];

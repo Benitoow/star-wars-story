@@ -3,6 +3,7 @@
    npcReply(): one light, streamed, in-character reply per message.
    resolveConversation(): on exit, distill consequences + a recap chapter.
 ══════════════════════════════════════════════ */
+import { memoryFactLines } from './memory';
 import { parseStoryResponse } from './parsing';
 import { buildNpcSystemPrompt, RESOLVE_SYSTEM, buildResolveUser } from './prompts/chat';
 import { languageInstruction, languageName } from './prompts/language';
@@ -11,6 +12,7 @@ import { callTextModel, callTextModelStream } from './provider';
 import type {
   ChatMessage,
   ChatTurn,
+  MemoryFact,
   NpcRelation,
   StoryProviderConfig,
   StorySetup,
@@ -31,6 +33,8 @@ export interface NpcReplyInput {
   sceneSummary: string;
   turns: ChatTurn[]; // the whole conversation so far, ending with the player's new message
   playerDirectives?: string[];
+  memory?: MemoryFact[];    // campaign memory the NPC must not contradict
+  recentEvents?: string[];  // condensed recaps of the last few chapters
 }
 
 /** Stream one in-character NPC reply. Returns the full text (also fed via onToken). */
@@ -45,7 +49,9 @@ export async function npcReply(
     input.worldState,
     input.npc,
     input.sceneSummary,
-    renderPlayerCanon(input.playerDirectives)
+    renderPlayerCanon(input.playerDirectives),
+    memoryFactLines(input.memory ?? [], 16),
+    (input.recentEvents ?? []).slice(-3)
   );
   const messages: ChatMessage[] = [
     { role: 'system', content: system },
@@ -63,6 +69,7 @@ export interface ResolveConversationInput {
   sceneSummary: string;
   turns: ChatTurn[];
   turnNumber: number;
+  memory?: MemoryFact[]; // established facts the debrief must not contradict
 }
 
 /** Exit debrief — turns the conversation into a recap chapter + applied consequences. */
@@ -74,7 +81,7 @@ export async function resolveConversation(
   const lang = input.setup.language || 'fr';
   const messages: ChatMessage[] = [
     { role: 'system', content: `${languageInstruction(lang)}\n\n${RESOLVE_SYSTEM}` },
-    { role: 'user', content: buildResolveUser(input.setup, input.worldState, input.npc, input.sceneSummary, input.turns.slice(-RESOLVE_CONTEXT_TURNS), languageName(lang)) }
+    { role: 'user', content: buildResolveUser(input.setup, input.worldState, input.npc, input.sceneSummary, input.turns.slice(-RESOLVE_CONTEXT_TURNS), languageName(lang), memoryFactLines(input.memory ?? [], 12)) }
   ];
   const rawResponse = await callTextModel(messages, provider, { jsonMode: true, signal });
   const chapter = parseStoryResponse(rawResponse, input.turnNumber);

@@ -39,6 +39,17 @@ export interface StoryMemoryUpdates {
   notes: string[];
 }
 
+// ── Structured narrative memory ───────────────────────
+export const MEMORY_CATEGORIES = ['relations', 'places', 'injuries', 'resources', 'notes'] as const;
+export type MemoryCategory = (typeof MEMORY_CATEGORIES)[number];
+
+/** One remembered fact, stamped with the turn that established (or last re-confirmed) it. */
+export interface MemoryFact {
+  text: string;
+  category: MemoryCategory;
+  turn: number;
+}
+
 // ── Living world state ────────────────────────────────
 export type Severity = 'light' | 'moderate' | 'severe';
 export type PlayerCondition = 'active' | 'critical'; // critical = downed at 0 HP → next scene is survival/rescue

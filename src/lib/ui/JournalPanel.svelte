@@ -1,11 +1,12 @@
 <script lang="ts">
-  import type { StoryChapter, WorldState } from '$lib/engine';
+  import { memoryCategoryLabel, MEMORY_CATEGORIES, type MemoryFact, type StoryChapter, type WorldState } from '$lib/engine';
 
   export let world: WorldState;
   export let chapters: StoryChapter[] = [];
+  export let memory: MemoryFact[] = [];
   export let onClose: () => void;
 
-  type Tab = 'chapitres' | 'chronologie' | 'personnages';
+  type Tab = 'chapitres' | 'chronologie' | 'personnages' | 'memoire';
   let tab: Tab = 'chapitres';
 
   $: pastChapters = [...chapters].reverse();
@@ -14,6 +15,14 @@
     if ((a.alive !== false) !== (b.alive !== false)) return a.alive !== false ? -1 : 1;
     return Math.abs(b.affinity) - Math.abs(a.affinity);
   });
+  // The AI's structured memory, grouped by category (newest facts first).
+  $: memoryGroups = MEMORY_CATEGORIES
+    .map((category) => ({
+      category,
+      label: memoryCategoryLabel(category),
+      facts: memory.filter((f) => f.category === category).slice().sort((a, b) => b.turn - a.turn)
+    }))
+    .filter((g) => g.facts.length > 0);
 
   function excerpt(chapter: StoryChapter): string {
     const text = chapter.narrative.action.split(/\n{2,}/)[0]?.trim() ?? '';
@@ -52,6 +61,7 @@
       <button type="button" class="tab" class:active={tab === 'chapitres'} on:click={() => (tab = 'chapitres')}>Chapitres</button>
       <button type="button" class="tab" class:active={tab === 'chronologie'} on:click={() => (tab = 'chronologie')}>Chronologie</button>
       <button type="button" class="tab" class:active={tab === 'personnages'} on:click={() => (tab = 'personnages')}>Personnages</button>
+      <button type="button" class="tab" class:active={tab === 'memoire'} on:click={() => (tab = 'memoire')}>Mémoire</button>
     </nav>
 
     <div class="body">
@@ -80,6 +90,26 @@
               <h3 class="entry-title">{event.summary}</h3>
             </header>
             <p class="entry-meta">{event.date} · {event.location}</p>
+          </article>
+        {/each}
+      {:else if tab === 'memoire'}
+        {#if !memoryGroups.length}
+          <p class="empty">La mémoire de la campagne est encore vierge.</p>
+        {/if}
+        {#each memoryGroups as group (group.category)}
+          <article class="entry">
+            <header class="entry-head">
+              <h3 class="entry-title">{group.label}</h3>
+              <span class="chip">{group.facts.length}</span>
+            </header>
+            <ul class="facts">
+              {#each group.facts as fact (fact.text)}
+                <li class="fact">
+                  {#if fact.turn > 0}<span class="fact-turn">T{fact.turn}</span>{/if}
+                  <span class="fact-text">{fact.text}</span>
+                </li>
+              {/each}
+            </ul>
           </article>
         {/each}
       {:else}
@@ -200,6 +230,18 @@
   .affinity { font-size: 0.8rem; color: var(--color-text-muted); }
   .entry-meta { margin-top: 4px; font-size: 0.78rem; color: var(--color-text-muted); }
   .entry-text { margin-top: 6px; font-family: var(--font-narrative); font-size: 0.92rem; line-height: 1.5; color: var(--color-text-secondary); }
+
+  .facts { list-style: none; margin-top: var(--space-sm); display: flex; flex-direction: column; gap: 6px; }
+  .fact { display: flex; align-items: baseline; gap: var(--space-sm); }
+  .fact-turn {
+    flex: 0 0 auto;
+    font-family: var(--font-display);
+    font-size: 0.62rem;
+    letter-spacing: 0.1em;
+    color: var(--color-gold-dim);
+    min-width: 2.2em;
+  }
+  .fact-text { font-family: var(--font-narrative); font-size: 0.9rem; line-height: 1.5; color: var(--color-text-secondary); }
 
   @media (max-width: 768px) {
     .overlay { padding: 0; }

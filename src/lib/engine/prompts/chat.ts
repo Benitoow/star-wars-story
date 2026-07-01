@@ -23,9 +23,17 @@ export function buildNpcSystemPrompt(
   world: WorldState,
   npc: NpcRelation,
   sceneSummary: string,
-  canon: string
+  canon: string,
+  memoryLines: string[] = [],
+  recentEvents: string[] = []
 ): string {
   const protagonist = protagonistName(setup);
+  const events = recentEvents.length
+    ? `\nDERNIERS ÉVÉNEMENTS (ce qui vient de se passer dans la campagne) :\n${recentEvents.map((e) => `- ${cleanText(e, 420)}`).join('\n')}`
+    : '';
+  const memory = memoryLines.length
+    ? `\nFAITS ÉTABLIS DE LA CAMPAGNE (mémoire — ne jamais les contredire ; n'en parle que si ton personnage peut les connaître) :\n${memoryLines.map((f) => `- ${cleanText(f, 280)}`).join('\n')}`
+    : '';
   return `${languageInstruction(setup.language)}
 
 Tu INCARNES un personnage d'une campagne Star Wars — tu n'es PAS le narrateur. Tu réponds en dialogue direct, à la première personne, comme dans une vraie conversation.
@@ -34,7 +42,7 @@ PERSONNAGE : ${npc.name}${npc.faction ? ` · ${npc.faction}` : ''}
 ${npc.note ? `Profil : ${npc.note}\n` : ''}Disposition envers ${protagonist} : ${disposition(npc)}.
 
 SCÈNE : ${cleanText(sceneSummary, 800) || '—'}
-${renderWorldDigest(world)}${canon}
+${renderWorldDigest(world)}${events}${memory}${canon}
 
 RÈGLES :
 - Parle UNIQUEMENT comme ${npc.name}, en 1 à 3 phrases (conversation, pas monologue). Aucune narration à la 3e personne, aucune description d'ambiance — seulement tes paroles, et au plus une brève action entre *astérisques*.
@@ -57,15 +65,19 @@ export function buildResolveUser(
   npc: NpcRelation,
   sceneSummary: string,
   turns: ChatTurn[],
-  langName: string
+  langName: string,
+  memoryLines: string[] = []
 ): string {
   const protagonist = protagonistName(setup);
+  const memory = memoryLines.length
+    ? `\nFAITS ÉTABLIS (à ne pas contredire dans les conséquences) :\n${memoryLines.map((f) => `- ${cleanText(f, 280)}`).join('\n')}`
+    : '';
   return `Conversation entre ${protagonist} et ${npc.name}${sceneSummary ? ` (contexte : ${cleanText(sceneSummary, 300)})` : ''} :
 ${transcriptText(protagonist, npc.name, turns)}
 
 ÉTAT DU MONDE :
 ${renderWorldDigest(world)}
-Affinité actuelle de ${npc.name} envers ${protagonist} : ${npc.affinity} (−100 hostile … +100 loyal).
+Affinité actuelle de ${npc.name} envers ${protagonist} : ${npc.affinity} (−100 hostile … +100 loyal).${memory}
 ${ERA_COHERENCE}
 
 Déduis les conséquences de cette conversation (COHÉRENTES avec l'état) et écris un court récap jouable de l'issue. Réponds en JSON strict, TOUT en ${langName} :

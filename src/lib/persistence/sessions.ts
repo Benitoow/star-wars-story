@@ -1,3 +1,4 @@
+import { fromLegacyFacts, sanitizeMemory } from '$lib/engine/memory';
 import type { ChatSession, ChatTurn, StoryChapter } from '$lib/engine/types';
 import { db, SESSION_VERSION, type StoredSession } from './db';
 
@@ -22,6 +23,9 @@ function sanitizeChat(raw: unknown): ChatSession | undefined {
 /** Light shape repair — IndexedDB data may predate the current code. */
 function sanitize(raw: StoredSession): StoredSession {
   const chapterHistory = asArray<StoryChapter>(raw.chapterHistory);
+  const memoryFacts = asArray<string>(raw.memoryFacts);
+  // v1 saves only have the flat fact list — upgrade it to structured memory.
+  const memory = sanitizeMemory(raw.memory);
   return {
     storyId: raw.storyId,
     version: SESSION_VERSION,
@@ -30,7 +34,8 @@ function sanitize(raw: StoredSession): StoredSession {
     currentChapter: raw.currentChapter ?? chapterHistory[chapterHistory.length - 1] ?? null,
     chapterHistory,
     actionHistory: asArray<string>(raw.actionHistory),
-    memoryFacts: asArray<string>(raw.memoryFacts),
+    memoryFacts,
+    memory: memory.length ? memory : fromLegacyFacts(memoryFacts),
     trameId: raw.trameId ?? null,
     chat: sanitizeChat(raw.chat)
   };

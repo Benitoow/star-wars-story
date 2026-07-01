@@ -13,6 +13,7 @@ import { callTextModel, callTextModelStream } from './provider';
 import { cleanText } from './text';
 import type {
   ChatMessage,
+  MemoryFact,
   StoryChapter,
   StoryGenerationMode,
   StoryProviderConfig,
@@ -71,7 +72,7 @@ export interface TurnInput {
   worldState: WorldState;
   turnNumber: number;
   actionText: string;
-  memoryFacts?: string[];
+  memory?: MemoryFact[];           // structured narrative memory (categorized, turn-stamped)
   chapterHistory?: StoryChapter[]; // full history — kept raw up to the budget
   actionHistory?: string[];        // player actions paired with the chapters
   contextBudget?: number;          // token budget for the raw transcript
@@ -131,8 +132,12 @@ export async function generateTurn(
   let mode: StoryGenerationMode;
 
   if (options.mode === 'agentic-subagents') {
-    // The Director plans from a condensed story-so-far containing the summaries of all chapters in history
-    const situation = history.map(summarizeChapterForPrompt).join('\n');
+    // The Director plans from the MOST RECENT chapter summaries. Dropping the
+    // oldest lines when over budget (instead of tail-truncating the joined
+    // text) keeps the freshest situation in view on long campaigns.
+    const situationLines = history.slice(-10).map(summarizeChapterForPrompt);
+    while (situationLines.length > 1 && situationLines.join('\n').length > 2400) situationLines.shift();
+    const situation = situationLines.join('\n');
     const r = await runAgenticTurn(
       {
         setup: input.setup,
@@ -142,6 +147,7 @@ export async function generateTurn(
         situation,
         transcript,
         archive,
+        memory: input.memory,
         outcomeDirective: input.outcomeDirective,
         playerDirectives: input.playerDirectives,
         overusedTerms,
@@ -154,7 +160,7 @@ export async function generateTurn(
     mode = 'agentic-subagents';
   } else {
     const messages = [
-      { role: 'system' as const, content: buildSystemPrompt(input.setup, input.memoryFacts ?? [], input.worldState, input.turnNumber, input.playerDirectives ?? [], archive) },
+      { role: 'system' as const, content: buildSystemPrompt(input.setup, input.memory ?? [], input.worldState, input.turnNumber, input.playerDirectives ?? [], archive) },
       ...transcript,
       {
         role: 'user' as const,
