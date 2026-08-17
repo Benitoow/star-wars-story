@@ -13,8 +13,11 @@ import {
   npcReply,
   resolveConversation,
   rebuildWorldState,
+  cloneWorldState,
   resolveContextBudget,
   rollForChoice,
+  hasRequiredItems,
+  applyChoiceInventoryCost,
   summarizeChapterForPrompt,
   type ChatTurn,
   type GeneratePartial,
@@ -36,6 +39,12 @@ import { toasts } from './ui';
 export type PlayStatus = 'idle' | 'loading' | 'generating' | 'ready' | 'error';
 
 /** "Mode Direct" — live chat sub-state nested in a play session. */
+export interface ChatReview {
+  npcName: string;
+  turns: ChatTurn[];
+  result: StoryTurnResult;
+}
+
 export interface ChatState {
   active: boolean;
   npcName: string;
@@ -44,6 +53,13 @@ export interface ChatState {
   partial: string;   // NPC reply currently streaming in
   busy: boolean;     // a reply is streaming or the exit debrief is running
   error: string | null;
+  review: ChatReview | null;
+}
+
+export interface PendingAction {
+  text: string;
+  outcomeDirective: string;
+  choice?: StoryChoice;
 }
 
 export interface PlayState {
@@ -57,15 +73,17 @@ export interface PlayState {
   actionHistory: string[];
   turnNumber: number;
   error: string | null;
+  pendingAction: PendingAction | null;
   partialChapter: GeneratePartial | null; // the scene streaming in while status === 'generating'
   chat: ChatState;
 }
 
-const initialChat: ChatState = { active: false, npcName: '', sceneSummary: '', turns: [], partial: '', busy: false, error: null };
+const initialChat: ChatState = { active: false, npcName: '', sceneSummary: '', turns: [], partial: '', busy: false, error: null, review: null };
 
 const initial: PlayState = {
   storyId: null, setup: null, status: 'idle', worldState: null, currentChapter: null,
   chapterHistory: [], memory: [], actionHistory: [], turnNumber: 0, error: null,
+  pendingAction: null,
   partialChapter: null,
   chat: { ...initialChat }
 };
@@ -106,18 +124,20 @@ async function persist(): Promise<void> {
   await touchStory(snap.storyId, snap.turnNumber);
 }
 
-function applyResult(result: StoryTurnResult, actionText: string): void {
+function applyResult(result: StoryTurnResult, actionText: string, choice?: StoryChoice, baseline?: WorldState): void {
   const chapter = result.chapter;
+  const worldState = choice ? applyChoiceInventoryCost(result.worldState, choice, baseline) : result.worldState;
   update((s) => ({
     ...s,
     status: 'ready',
-    worldState: result.worldState,
+    worldState,
     currentChapter: chapter,
     chapterHistory: [...s.chapterHistory, chapter],
     memory: mergeMemoryFacts(s.memory, chapter),
     actionHistory: actionText ? [...s.actionHistory, actionText] : s.actionHistory,
     turnNumber: chapter.chapter_number,
     error: null,
+    pendingAction: null,
     partialChapter: null
   }));
   void persist();
@@ -137,7 +157,7 @@ function onPartial(partial: GeneratePartial): void {
 async function startOpening(): Promise<void> {
   const setup = snap.setup;
   if (!setup) return;
-  update((s) => ({ ...s, status: 'generating', error: null, partialChapter: null }));
+  update((s) => ({ ...s, status: 'generating', error: null, pendingAction: null, partialChapter: null }));
   try {
     const { config, mode, language } = await loadProvider();
     const result = await generateOpening({ ...setup, language }, config, { mode, onPartial });
@@ -148,13 +168,19 @@ async function startOpening(): Promise<void> {
   }
 }
 
-async function submit(actionText: string, outcomeDirective = ''): Promise<void> {
+async function submit(actionText: string, outcomeDirective = '', choice?: StoryChoice): Promise<void> {
   const setup = snap.setup;
   const worldState = snap.worldState;
   const action = actionText.trim();
-  if (!setup || !worldState || !action || snap.status === 'generating') return;
+  if (!setup || !worldState || worldState.ending || !action || snap.status === 'generating') return;
 
-  update((s) => ({ ...s, status: 'generating', error: null, partialChapter: null }));
+  update((s) => ({
+    ...s,
+    status: 'generating',
+    error: null,
+    pendingAction: { text: action, outcomeDirective, choice },
+    partialChapter: null
+  }));
   try {
     const { config, mode, language, contextBudget } = await loadProvider();
     const result = await generateTurn(
@@ -174,10 +200,17 @@ async function submit(actionText: string, outcomeDirective = ''): Promise<void> 
       { mode, onPartial }
     );
     recordDiag(`tour ${result.chapter.chapter_number} (${result.mode}, ${config.model})`, { action, rawResponse: result.rawResponse });
-    applyResult(result, action);
+    applyResult(result, action, choice, worldState);
   } catch (error) {
     fail(error);
   }
+}
+
+function editPendingAction(): string {
+  const action = snap.pendingAction?.text ?? '';
+  if (!action) return '';
+  update((s) => ({ ...s, status: 'ready', error: null, pendingAction: null, partialChapter: null }));
+  return action;
 }
 
 // ── Mode Direct (live chat) ───────────────────────────
@@ -188,9 +221,9 @@ function currentNpc(): NpcRelation {
 
 function chatEnter(npcName: string): void {
   const chapter = snap.currentChapter;
-  if (!snap.worldState || !npcName.trim() || snap.chat.active) return;
+  if (!snap.worldState || snap.worldState.ending || !npcName.trim() || snap.chat.active) return;
   const sceneSummary = chapter ? `${chapter.chapter_title}. ${chapter.narrative.action}`.slice(0, 600) : '';
-  update((s) => ({ ...s, chat: { active: true, npcName: npcName.trim(), sceneSummary, turns: [], partial: '', busy: false, error: null } }));
+  update((s) => ({ ...s, chat: { active: true, npcName: npcName.trim(), sceneSummary, turns: [], partial: '', busy: false, error: null, review: null } }));
   void persist();
 }
 
@@ -198,7 +231,7 @@ async function chatSend(text: string): Promise<void> {
   const setup = snap.setup;
   const world = snap.worldState;
   const content = text.trim();
-  if (!setup || !world || !content || !snap.chat.active || snap.chat.busy) return;
+  if (!setup || !world || world.ending || !content || !snap.chat.active || snap.chat.review || snap.chat.busy) return;
 
   const turns: ChatTurn[] = [...snap.chat.turns, { speaker: 'player', content }];
   update((s) => ({ ...s, chat: { ...s.chat, turns, partial: '', busy: true, error: null } }));
@@ -235,7 +268,7 @@ async function chatSend(text: string): Promise<void> {
 async function chatEnd(): Promise<void> {
   const setup = snap.setup;
   const world = snap.worldState;
-  if (!setup || !world || !snap.chat.active) return;
+  if (!setup || !world || world.ending || !snap.chat.active || snap.chat.review) return;
   if (!snap.chat.turns.length) {
     update((s) => ({ ...s, chat: { ...initialChat } })); // nothing said → just close
     void persist();
@@ -254,15 +287,32 @@ async function chatEnd(): Promise<void> {
       config,
       signal
     );
-    recordDiag(`conversation avec ${npc.name} résolue`, { messages: turns.length, rawResponse: result.rawResponse });
-    update((s) => ({ ...s, chat: { ...initialChat } })); // close before applyResult so the saved session drops the chat
-    applyResult(result, `[Conversation avec ${npc.name}]`);
+    recordDiag(`conversation avec ${npc.name} préparée pour validation`, { messages: turns.length, rawResponse: result.rawResponse });
+    update((s) => ({
+      ...s,
+      chat: { ...s.chat, busy: false, error: null, review: { npcName: npc.name, turns, result } }
+    }));
+    void persist();
   } catch (error) {
     // User-cancelled debrief → simply stay in the conversation, no error banner.
     const aborted = signal.aborted;
     update((s) => ({ ...s, chat: { ...s.chat, busy: false, error: aborted ? null : error instanceof Error ? error.message : String(error) } }));
   }
 }
+
+function confirmChatReview(): void {
+  const review = snap.chat.review;
+  if (!review) return;
+  update((s) => ({ ...s, chat: { ...initialChat } }));
+  applyResult(review.result, `[Conversation avec ${review.npcName}]`);
+}
+
+function discardChatReview(): void {
+  if (!snap.chat.review) return;
+  update((s) => ({ ...s, chat: { ...initialChat } }));
+  void persist();
+}
+
 
 export const play = {
   subscribe,
@@ -284,7 +334,7 @@ export const play = {
     const session = await loadSession(storyId);
     if (session && session.chapterHistory.length) {
       const worldState = session.worldState?.player
-        ? session.worldState
+        ? cloneWorldState(session.worldState)
         : rebuildWorldState(story.setup, session.chapterHistory);
       set({
         storyId, setup: story.setup, status: 'ready', worldState,
@@ -292,9 +342,10 @@ export const play = {
         chapterHistory: session.chapterHistory,
         memory: session.memory ?? fromLegacyFacts(session.memoryFacts),
         actionHistory: session.actionHistory, turnNumber: session.turnNumber, error: null,
+        pendingAction: null,
         partialChapter: null,
         chat: session.chat
-          ? { active: true, npcName: session.chat.npcName, sceneSummary: session.chat.sceneSummary, turns: session.chat.turns, partial: '', busy: false, error: null }
+          ? { active: true, npcName: session.chat.npcName, sceneSummary: session.chat.sceneSummary, turns: session.chat.turns, partial: '', busy: false, error: null, review: null }
           : { ...initialChat }
       });
     } else {
@@ -303,15 +354,29 @@ export const play = {
     }
   },
   retry(): Promise<void> {
+    if (snap.pendingAction) {
+      const pending = snap.pendingAction;
+      return submit(pending.text, pending.outcomeDirective, pending.choice);
+    }
     return snap.turnNumber === 0 || !snap.currentChapter ? startOpening() : Promise.resolve();
   },
   chooseChoice(choice: StoryChoice): Promise<void> {
-    const roll = rollForChoice(choice);
-    recordDiag(`jet caché : ${roll.outcome} (d20=${roll.roll} vs DC ${roll.dc}, difficulté ${choice.difficulty})`, { choix: choice.text });
-    return submit(choice.text, roll.directive);
+    const world = snap.worldState;
+    if (!world || world.ending) return Promise.resolve();
+    if (!hasRequiredItems(world, choice)) {
+      toasts.show(`Objet requis indisponible : ${(choice.requires_items ?? []).join(', ')}`, 'error', 4500);
+      return Promise.resolve();
+    }
+    const skillScore = world.player.skills?.[choice.attribute] ?? 2;
+    const roll = rollForChoice(choice, skillScore - 1);
+    recordDiag(`jet caché : ${roll.outcome} (d20=${roll.roll} + aptitude ${skillScore - 1} vs DC ${roll.dc}, difficulté ${choice.difficulty})`, { choix: choice.text, attribute: choice.attribute });
+    return submit(choice.text, roll.directive, choice);
   },
   freeAction(text: string): Promise<void> {
     return submit(text, '');
+  },
+  editPendingAction(): string {
+    return editPendingAction();
   },
   // Mode Direct
   enterChat(npcName: string): void {
@@ -322,6 +387,12 @@ export const play = {
   },
   endChat(): Promise<void> {
     return chatEnd();
+  },
+  confirmChatReview(): void {
+    confirmChatReview();
+  },
+  discardChatReview(): void {
+    discardChatReview();
   },
   cancelChatReply(): void {
     chatAbort?.abort();

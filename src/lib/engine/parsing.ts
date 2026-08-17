@@ -219,6 +219,18 @@ function sanitizeChoiceText(value: unknown): string {
   return text.replace(/^["'«»\s]+|["'«»\s]+$/g, '').trim().slice(0, 220);
 }
 
+function sanitizeStringList(value: unknown, max = 6): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => {
+      if (typeof entry === 'string' || typeof entry === 'number') return cleanText(entry, 80);
+      if (isRecord(entry)) return cleanText(entry.name || entry.text || entry.item || '', 80);
+      return '';
+    })
+    .filter(Boolean)
+    .slice(0, max);
+}
+
 function normalizeChoice(raw: unknown): StoryChoice | null {
   const text = sanitizeChoiceText(typeof raw === 'string' ? raw : isRecord(raw) ? raw.text : '');
   if (!text) return null;
@@ -237,13 +249,31 @@ function normalizeChoice(raw: unknown): StoryChoice | null {
       if (Number.isFinite(n)) faction_impact[k] = n;
     }
   }
-  return { text, attribute, difficulty, faction_impact };
+  const risk = String(rec.risk || '').toLowerCase();
+  return {
+    text,
+    attribute,
+    difficulty,
+    faction_impact,
+    ...(typeof rec.tradeoff === 'string' && rec.tradeoff.trim() ? { tradeoff: cleanText(rec.tradeoff, 180) } : {}),
+    ...(typeof rec.stakes === 'string' && rec.stakes.trim() ? { stakes: cleanText(rec.stakes, 180) } : {}),
+    ...(risk === 'low' || risk === 'medium' || risk === 'high' ? { risk } : {}),
+    requires_items: sanitizeStringList(rec.requires_items ?? rec.required_items ?? rec.requires ?? rec.item_required),
+    consumes_items: sanitizeStringList(rec.consumes_items ?? rec.consumed_items ?? rec.items_consumed)
+  };
 }
 
 function extractChoices(source: unknown): StoryChoice[] {
   const list = Array.isArray(source) ? source : [];
   const normalized = list.map(normalizeChoice).filter((c): c is StoryChoice => Boolean(c));
-  return Array.from(new Map(normalized.map((c) => [foldText(c.text), c])).values()).slice(0, 4);
+  const deduped = new Map<string, StoryChoice>();
+  for (const choice of normalized) {
+    const key = foldText(choice.text);
+    const existing = deduped.get(key);
+    const richness = (c: StoryChoice) => Number(Boolean(c.tradeoff)) + Number(Boolean(c.stakes)) + (c.requires_items?.length ?? 0) + (c.consumes_items?.length ?? 0);
+    if (!existing || richness(choice) > richness(existing)) deduped.set(key, choice);
+  }
+  return Array.from(deduped.values()).slice(0, 4);
 }
 
 function defaultChoices(): StoryChoice[] {
@@ -259,12 +289,48 @@ function coerceStateUpdate(source: unknown): StateUpdate | undefined {
   if (!isRecord(source)) return undefined;
   const d = source;
   const u: StateUpdate = {};
+  const numeric = (value: unknown): number | undefined => {
+    const n = typeof value === 'number' ? value : typeof value === 'string' && value.trim() ? Number(value) : NaN;
+    return Number.isFinite(n) ? n : undefined;
+  };
 
-  if (typeof d.hp === 'number' && Number.isFinite(d.hp)) u.hp = Math.max(-100, Math.min(100, d.hp));
-  if (typeof d.credits === 'number' && Number.isFinite(d.credits)) u.credits = Math.round(d.credits);
+  const hp = numeric(d.hp);
+  const credits = numeric(d.credits);
+  const experience = numeric(d.experience ?? d.xp);
+  if (hp !== undefined) u.hp = Math.max(-100, Math.min(100, hp));
+  if (credits !== undefined) u.credits = Math.round(credits);
+  if (experience !== undefined) u.experience = Math.max(-100, Math.min(100, Math.round(experience)));
+  if (isRecord(d.skill_gains ?? d.skills)) {
+    const gains: Record<string, number> = {};
+    for (const [key, value] of Object.entries((d.skill_gains ?? d.skills) as Record<string, unknown>)) {
+      const n = numeric(value);
+      if (n !== undefined && STORY_ATTRIBUTES.includes(key as StoryAttribute)) gains[key] = Math.max(-2, Math.min(2, Math.round(n)));
+    }
+    if (Object.keys(gains).length) u.skill_gains = gains as StateUpdate['skill_gains'];
+  }
   if (typeof d.location === 'string' && d.location.trim()) u.location = cleanText(d.location, 80);
-  if (typeof d.date_advance === 'string' && d.date_advance.trim()) u.date_advance = cleanText(d.date_advance, 60);
+  if (typeof d.date_advance === 'string' && d.date_advance.trim()) u.date_advance = cleanText(d.date_advance, 80);
   if (typeof d.environment_status === 'string') u.environment_status = cleanText(d.environment_status, 120);
+  if (isRecord(d.campaign_update ?? d.campaign)) {
+    const campaign = (d.campaign_update ?? d.campaign) as Record<string, unknown>;
+    const status = String(campaign.status || '').toLowerCase();
+    u.campaign_update = {
+      ...(typeof campaign.title === 'string' ? { title: cleanText(campaign.title, 120) } : {}),
+      ...(typeof campaign.objective === 'string' ? { objective: cleanText(campaign.objective, 300) } : {}),
+      ...(typeof campaign.progress === 'string' ? { progress: cleanText(campaign.progress, 300) } : {}),
+      ...(status === 'active' || status === 'completed' || status === 'failed' ? { status } : {})
+    };
+  }
+  if (Array.isArray(d.world_events_new ?? d.offscreen_events)) {
+    u.world_events_new = sanitizeStringList(d.world_events_new ?? d.offscreen_events, 2).map((event) => clip(event, 240));
+  }
+  if (isRecord(d.ending) && ['victory', 'death', 'retirement', 'defeat'].includes(String(d.ending.type || '').toLowerCase())) {
+    u.ending = {
+      type: String(d.ending.type).toLowerCase() as 'victory' | 'death' | 'retirement' | 'defeat',
+      title: cleanText(d.ending.title, 120),
+      epilogue: cleanText(d.ending.epilogue, 1200)
+    };
+  }
 
   if (isRecord(d.factions)) {
     const f: Record<string, number> = {};
@@ -280,7 +346,8 @@ function coerceStateUpdate(source: unknown): StateUpdate | undefined {
       const name = cleanText(n.name, 60);
       if (!name) return [];
       const entry: NpcUpdate = { name };
-      if (typeof n.affinity === 'number') entry.affinity = Math.max(-100, Math.min(100, n.affinity));
+      const affinity = Number(n.affinity);
+      if (Number.isFinite(affinity)) entry.affinity = Math.max(-100, Math.min(100, affinity));
       const status = String(n.status || '').toLowerCase();
       if (status === 'ally' || status === 'neutral' || status === 'hostile' || status === 'dead') entry.status = status;
       if (typeof n.faction === 'string') entry.faction = cleanText(n.faction, 40);
@@ -323,7 +390,9 @@ function coerceMemoryUpdates(source: unknown): StoryMemoryUpdates {
   const coerceToString = (value: unknown): string => {
     if (value === null || value === undefined) return '';
     if (isRecord(value)) {
-      const name = String(value.name || value.target || value.label || value.place || value.note || '').trim();
+      // Models sometimes wrap a fact as {"text": "…"} — unwrap it before
+      // falling back to JSON.stringify (which leaks raw JSON into the journal).
+      const name = String(value.text || value.name || value.target || value.label || value.place || value.note || '').trim();
       const detail = String(value.relation || value.type || value.status || value.role || '').trim();
       if (name && detail) return `${name} (${detail})`;
       if (name) return name;
@@ -369,7 +438,6 @@ export function parseStoryResponse(rawText: string, turnNumber: number): StoryCh
   const rawTitle = cleanText(parsed?.chapter_title, 80);
   const chapter_title = rawTitle && !isGenericTitle(rawTitle) ? rawTitle : deriveTitle(narrative, turnNumber);
 
-  const chapterNum = Number(parsed?.chapter_number);
   const choices = extractChoices(parsed?.choices);
   const npcsPresent = Array.isArray(parsed?.npcs_present)
     ? (parsed.npcs_present as unknown[]).map((s) => cleanText(s, 60)).filter(Boolean).slice(0, 8)
@@ -377,7 +445,8 @@ export function parseStoryResponse(rawText: string, turnNumber: number): StoryCh
 
   return {
     chapter_title,
-    chapter_number: Number.isFinite(chapterNum) && chapterNum > 0 ? chapterNum : turnNumber,
+    // The orchestration layer owns turn numbering; model output cannot corrupt chronology.
+    chapter_number: turnNumber,
     section_type: cleanText(parsed?.section_type, 40) || 'action',
     narrative,
     choices: choices.length ? choices : defaultChoices(),

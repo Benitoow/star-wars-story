@@ -31,7 +31,9 @@
         <span class="sub">Conversation en direct</span>
       </div>
     </div>
-    {#if chat.busy}
+    {#if chat.review}
+      <span class="review-badge">Résumé prêt</span>
+    {:else if chat.busy}
       <button type="button" class="btn btn-secondary" on:click={() => play.cancelChatReply()}>Interrompre</button>
     {:else}
       <button type="button" class="btn btn-secondary" on:click={() => play.endChat()}>Terminer</button>
@@ -50,13 +52,35 @@
     {:else if chat.busy}
       <div class="bubble npc typing"><span></span><span></span><span></span></div>
     {/if}
+    {#if chat.review}
+      <article class="review-card">
+        <span class="eyebrow">Résumé de conversation à valider</span>
+        <h3>{chat.review.result.chapter.chapter_title}</h3>
+        <p>{chat.review.result.chapter.narrative.action}</p>
+        {#if chat.review.result.chapter.memory_updates.notes.length}
+          <h4>Faits retenus</h4>
+          <ul>{#each chat.review.result.chapter.memory_updates.notes as note}<li>{note}</li>{/each}</ul>
+        {/if}
+        {#if chat.review.result.chapter.state_update?.campaign_update?.progress}
+          <p class="review-progress"><strong>Fil rouge :</strong> {chat.review.result.chapter.state_update.campaign_update.progress}</p>
+        {/if}
+        <p class="review-hint">Rien n'est gravé dans le monde avant ta validation.</p>
+      </article>
+    {/if}
     {#if chat.error}<p class="chat-error">{chat.error}</p>{/if}
   </div>
 
-  <form class="composer" on:submit|preventDefault={send}>
-    <input class="input" bind:value={draft} placeholder={`Réponds à ${chat.npcName}…`} disabled={chat.busy} />
-    <button type="submit" class="btn btn-primary" disabled={chat.busy || !draft.trim()}>Envoyer</button>
-  </form>
+  {#if chat.review}
+    <div class="review-actions">
+      <button type="button" class="btn btn-secondary" on:click={() => play.discardChatReview()}>Annuler les conséquences</button>
+      <button type="button" class="btn btn-primary" on:click={() => play.confirmChatReview()}>Valider le résumé</button>
+    </div>
+  {:else}
+    <form class="composer" on:submit|preventDefault={send}>
+      <input class="input" bind:value={draft} placeholder={`Réponds à ${chat.npcName}…`} disabled={chat.busy} />
+      <button type="submit" class="btn btn-primary" disabled={chat.busy || !draft.trim()}>Envoyer</button>
+    </form>
+  {/if}
 </section>
 
 <style>
@@ -78,7 +102,7 @@
   .who-text { display: flex; flex-direction: column; min-width: 0; }
   .name { font-family: var(--font-display); font-size: 1.05rem; color: var(--color-text-primary); }
   .sub { font-size: 0.68rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--color-text-muted); }
-
+  .review-badge { color: var(--color-gold); font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; }
   .thread { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-sm); padding: var(--space-lg) 0; }
   .opener { color: var(--color-text-muted); font-style: italic; text-align: center; margin: auto 0; }
 
@@ -102,9 +126,15 @@
   .typing span:nth-child(3) { animation-delay: 0.4s; }
 
   .chat-error { color: var(--color-red); font-size: 0.85rem; text-align: center; }
-
+  .review-card { margin: auto 0; padding: var(--space-lg); border: 1px solid rgba(216,185,119,0.4); border-radius: var(--radius-md); background: rgba(216,185,119,0.06); }
+  .review-card h3 { margin: 6px 0 8px; font-family: var(--font-display); color: var(--color-text-primary); }
+  .review-card p { color: var(--color-text-secondary); line-height: 1.5; }
+  .review-card h4 { margin: var(--space-md) 0 5px; color: var(--color-gold); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.1em; }
+  .review-card ul { margin: 0; padding-left: 1.1rem; color: var(--color-text-secondary); font-family: var(--font-narrative); }
+  .review-progress { border-left: 2px solid var(--color-gold-dim); padding-left: 9px; }
+  .review-hint { font-size: 0.78rem; font-style: italic; color: var(--color-gold) !important; }
+  .review-actions { display: flex; justify-content: flex-end; gap: var(--space-sm); padding-top: var(--space-md); padding-bottom: var(--sab); border-top: 1px solid var(--border-subtle); }
   .composer { display: flex; gap: var(--space-sm); padding-top: var(--space-md); padding-bottom: var(--sab); border-top: 1px solid var(--border-subtle); }
-
   @media (max-width: 768px) {
     .chat { padding: var(--space-sm) var(--space-md) var(--space-md); height: calc(100dvh - var(--header-height)); }
     .chat-head { flex-wrap: wrap; gap: var(--space-sm); }

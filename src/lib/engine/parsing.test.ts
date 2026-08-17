@@ -78,7 +78,7 @@ describe('parseStoryResponse', () => {
     section_type: 'action',
     narrative: { action: 'Les blasters crépitent.', dialogue: '— Han : Cours !', reflection: '', atmosphere: 'tense' },
     choices: [
-      { text: 'Tirer sur le garde', attribute: 'combat', difficulty: 3 },
+      { text: 'Tirer sur le garde', attribute: 'combat', difficulty: 3, tradeoff: 'abandonner la diplomatie', stakes: 'la patrouille alerte le quartier', requires_items: ['Blaster'], consumes_items: ['Blaster'] },
       { text: 'Tirer sur le garde', attribute: 'combat', difficulty: 3 }, // dup
       { text: 'Négocier', attribute: 'diplomacy', difficulty: 2 }
     ],
@@ -96,6 +96,9 @@ describe('parseStoryResponse', () => {
     const c = parseStoryResponse(full, 3);
     expect(c.choices).toHaveLength(2);
     expect(c.choices[0].attribute).toBe('combat');
+    expect(c.choices[0].tradeoff).toBe('abandonner la diplomatie');
+    expect(c.choices[0].requires_items).toEqual(['Blaster']);
+    expect(c.choices[0].consumes_items).toEqual(['Blaster']);
   });
 
   it('coerces and clamps the state_update (faction delta capped at ±50)', () => {
@@ -135,6 +138,11 @@ describe('parseStoryResponse', () => {
     expect(without.npcs_present).toBeUndefined();
   });
 
+  it('trusts the engine turn number over a model chapter number', () => {
+    const chapter = parseStoryResponse('{"chapter_number":3,"narrative":{"action":"Bla"}}', 8);
+    expect(chapter.chapter_number).toBe(8);
+  });
+
   it('clips an over-long memory note at a word boundary (no mid-word cut)', () => {
     const long = 'A survécu à l effondrement du temple de Lothal en y laissant sa cheville gauche mais a récupéré un artefact ancien dont la puissance brute dépasse tout entendement et menace de le consumer entièrement avant la fin';
     const c = parseStoryResponse(`{"narrative":{"action":"Bla"},"memory_updates":{"notes":["${long}"]}}`, 1);
@@ -142,5 +150,13 @@ describe('parseStoryResponse', () => {
     expect(note.endsWith('…')).toBe(true);
     expect(note.length).toBeLessThanOrEqual(181);
     expect(long.startsWith(note.slice(0, -1))).toBe(true); // clean prefix, not mangled
+  });
+
+  it('unwraps an object-shaped memory note ({"text": "…"}) instead of leaking raw JSON', () => {
+    const c = parseStoryResponse(
+      '{"narrative":{"action":"Bla"},"memory_updates":{"notes":[{"text":"La patrouille marche en cadence et suspend le feu."}]}}',
+      4
+    );
+    expect(c.memory_updates.notes).toEqual(['La patrouille marche en cadence et suspend le feu.']);
   });
 });

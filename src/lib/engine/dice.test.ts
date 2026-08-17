@@ -14,9 +14,9 @@ describe('rollForChoice', () => {
     expect(r.outcome).toBe('failure');
   });
 
-  it('a mid roll clears an easy DC but misses a hard one', () => {
-    expect(rollForChoice({ difficulty: 1 }, () => 0.5).outcome).toBe('success'); // roll 11 vs DC 9
-    expect(rollForChoice({ difficulty: 5 }, () => 0.5).outcome).toBe('failure'); // roll 11 vs DC 17
+  it('a mid roll clears an easy DC but is only a partial on a heroic task', () => {
+    expect(rollForChoice({ difficulty: 1 }, () => 0.5).outcome).toBe('success');
+    expect(rollForChoice({ difficulty: 5 }, () => 0.5).outcome).toBe('partial');
   });
 
   it('difficulty 5 is hard but reachable with a strong roll (no longer near-unwinnable)', () => {
@@ -25,5 +25,13 @@ describe('rollForChoice', () => {
 
   it('always carries a hidden directive the player never sees', () => {
     expect(rollForChoice({ difficulty: 2 }, () => 0.5).directive).toMatch(/caché/i);
+  });
+
+  it('uses the selected attribute bonus instead of treating every character alike', () => {
+    const untrained = rollForChoice({ difficulty: 4 }, 0, () => 0.5);
+    const specialist = rollForChoice({ difficulty: 4 }, 4, () => 0.5);
+    expect(specialist.outcome).not.toBe('failure');
+    expect(specialist.bonus).toBe(4);
+    expect(untrained.bonus).toBe(0);
   });
 });

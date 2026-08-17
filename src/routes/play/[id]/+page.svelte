@@ -3,6 +3,7 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { play } from '$lib/stores/play';
+  import { choiceRisk, hasRequiredItems, type StoryChoice } from '$lib/engine';
   import { foldText } from '$lib/engine/text';
   import { eraBackdrop } from '$lib/content/catalog';
   import { exportStoryDiagnostics } from '$lib/diagnostics';
@@ -38,8 +39,19 @@
     combat: 'Combat', diplomacy: 'Diplomatie', stealth: 'Furtivité',
     tech: 'Technologie', force: 'Force', survival: 'Survie'
   };
+  const RISK_LABELS: Record<string, string> = { low: 'Risque faible', medium: 'Risque modéré', high: 'Risque élevé' };
 
-  /** "Nom : réplique" → speaker + text, so the speaker can be typographically set apart. */
+  function choiceRiskFor(choice: StoryChoice): 'low' | 'medium' | 'high' {
+    const world = $play.worldState;
+    const skill = world?.player.skills?.[choice.attribute] ?? 2;
+    const available = world ? hasRequiredItems(world, choice) : false;
+    return choiceRisk(choice, skill, available);
+  }
+
+  function editPendingAction(): void {
+    freeText = play.editPendingAction();
+  }
+
   function splitDialogueLine(line: string): { speaker: string; text: string } | null {
     const m = line.match(/^([A-Za-zÀ-ÖØ-öø-ÿ0-9'’ .-]{2,40})\s*:\s+(.+)$/);
     return m ? { speaker: m[1].trim(), text: m[2].trim() } : null;
@@ -141,36 +153,61 @@
         {/if}
         {#if reflection}<p class="reflection">{reflection}</p>{/if}
 
-        <div class="choices">
-          {#each chapter.choices as choice}
-            <button type="button" class="choice" on:click={() => play.chooseChoice(choice)} disabled={generating}>
-              <span class="choice-text">{choice.text}</span>
-              <span class="choice-meta">
-                <span class="choice-attr">{ATTR_LABELS[choice.attribute] ?? choice.attribute}</span>
-                <span class="pips" title="Difficulté {choice.difficulty}/5" aria-label="Difficulté {choice.difficulty} sur 5">
-                  {#each Array.from({ length: 5 }) as _, i}<i class="pip" class:on={i < choice.difficulty}></i>{/each}
-                </span>
-              </span>
-            </button>
-          {/each}
-        </div>
-
-        <form class="free" on:submit|preventDefault={onFreeAction}>
-          <input class="input" bind:value={freeText} placeholder="Ou écris ta propre action…" disabled={generating} />
-          <button type="submit" class="btn btn-secondary" disabled={generating || !freeText.trim()}>Agir</button>
-        </form>
-
-        {#if talkTargets.length}
-          <div class="talk" class:prominent={interactive}>
-            {#if interactive}<p class="talk-cue eyebrow">Engage la conversation</p>{/if}
-            <div class="talk-actions">
-              {#each talkTargets as name (name)}
-                <button type="button" class="talk-btn" on:click={() => play.enterChat(name)} disabled={generating}>
-                  💬 Parler à {name}
-                </button>
-              {/each}
+        {#if $play.worldState?.ending}
+          <section class="ending-card">
+            <span class="eyebrow">Fin de campagne</span>
+            <h2>{$play.worldState.ending.title}</h2>
+            <p>{$play.worldState.ending.epilogue}</p>
+            <button type="button" class="btn btn-secondary" on:click={() => goto('/')}>Retour à la bibliothèque</button>
+          </section>
+        {:else}
+          {#if $play.status === 'error'}
+            <div class="turn-error">
+              <strong>La scène n'a pas avancé.</strong>
+              <span>{$play.error}</span>
+              {#if $play.pendingAction}<small>Action conservée : « {$play.pendingAction.text} »</small>{/if}
+              <div class="error-actions">
+                <button type="button" class="btn btn-secondary" on:click={editPendingAction}>Modifier l'action</button>
+                <button type="button" class="btn btn-primary" on:click={() => play.retry()}>Réessayer</button>
+              </div>
             </div>
+          {/if}
+          <div class="choices">
+            {#each chapter.choices as choice}
+              {@const risk = choiceRiskFor(choice)}
+              {@const available = $play.worldState ? hasRequiredItems($play.worldState, choice) : false}
+              {@const skill = $play.worldState?.player.skills?.[choice.attribute] ?? 2}
+              <button type="button" class="choice" class:unavailable={!available} on:click={() => play.chooseChoice(choice)} disabled={generating || $play.status === 'error' || !available}>
+                <span class="choice-text">
+                  {choice.text}
+                  {#if choice.tradeoff}<span class="choice-tradeoff">Arbitrage : {choice.tradeoff}</span>{/if}
+                  {#if choice.requires_items?.length}<span class="choice-item">Objet : {choice.requires_items.join(', ')}{choice.consumes_items?.length ? ' · consommé' : ''}</span>{/if}
+                </span>
+                <span class="choice-meta">
+                  <span class="choice-attr">{ATTR_LABELS[choice.attribute] ?? choice.attribute} · {skill}/5</span>
+                  <span class="risk {risk}">{RISK_LABELS[risk]}</span>
+                </span>
+              </button>
+            {/each}
           </div>
+
+          <form class="free" on:submit|preventDefault={onFreeAction}>
+            <input class="input" bind:value={freeText} placeholder="Ou écris ta propre action…" disabled={generating} />
+            <button type="submit" class="btn btn-secondary" disabled={generating || !freeText.trim()}>Agir</button>
+          </form>
+
+          {#if talkTargets.length}
+            <div class="talk" class:prominent={interactive}>
+              {#if interactive}<p class="talk-cue eyebrow">Engage la conversation</p>{/if}
+              <div class="talk-actions">
+                {#each talkTargets as name (name)}
+                  <button type="button" class="talk-btn" on:click={() => play.enterChat(name)} disabled={generating || $play.status === 'error'}>
+                    💬 Parler à {name}
+                  </button>
+                {/each}
+              </div>
+            </div>
+          {/if}
         {/if}
       </article>
 
@@ -286,21 +323,25 @@
   }
   .choice:hover:not(:disabled) { border-color: var(--color-gold-dim); background: rgba(255, 255, 255, 0.06); transform: translateX(3px); }
   .choice:disabled { opacity: 0.5; cursor: not-allowed; }
-  .choice-text { flex: 1; }
-  .choice-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex: 0 0 auto; }
+  .choice-text { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+  .choice-tradeoff, .choice-item { display: block; font-size: 0.76rem; color: var(--color-text-muted); line-height: 1.35; }
+  .choice-tradeoff { color: var(--color-gold); }
+  .choice-item { color: var(--color-blue); }
+  .choice.unavailable { opacity: 0.42; cursor: not-allowed; }
+  .choice-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; flex: 0 0 auto; }
   .choice-attr {
     font-family: var(--font-display);
     font-size: 0.58rem;
     font-weight: 500;
-    letter-spacing: 0.16em;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--color-text-muted);
     white-space: nowrap;
   }
-  .pips { display: inline-flex; gap: 3px; }
-  .pip { width: 5px; height: 5px; border-radius: 50%; background: rgba(255, 255, 255, 0.14); }
-  .pip.on { background: var(--color-gold-dim); }
-  .choice:hover:not(:disabled) .pip.on { background: var(--color-gold); }
+  .risk { font-size: 0.66rem; padding: 3px 7px; border-radius: 99px; white-space: nowrap; border: 1px solid var(--color-border); color: var(--color-text-secondary); }
+  .risk.low { color: var(--color-green); border-color: rgba(143,206,154,0.45); background: rgba(143,206,154,0.08); }
+  .risk.medium { color: var(--color-gold); border-color: rgba(216,185,119,0.45); background: rgba(216,185,119,0.08); }
+  .risk.high { color: var(--color-red); border-color: rgba(215,107,107,0.45); background: rgba(215,107,107,0.08); }
 
   .free { display: flex; gap: var(--space-sm); margin-top: var(--space-md); }
   .free .input { flex: 1; }
@@ -320,6 +361,12 @@
   .talk.prominent .talk-btn { border-style: solid; border-color: var(--color-gold-dim); background: rgba(216,185,119,0.08); color: var(--color-text-primary); }
 
   .center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-lg); text-align: center; padding: var(--space-xl); }
+  .ending-card, .turn-error { margin-top: var(--space-xl); padding: var(--space-lg); border-radius: var(--radius-md); border: 1px solid rgba(216,185,119,0.35); background: rgba(216,185,119,0.06); display: flex; flex-direction: column; gap: var(--space-sm); }
+  .ending-card h2 { margin: 4px 0; color: var(--color-gold); font-family: var(--font-display); }
+  .ending-card p { color: var(--color-text-secondary); font-family: var(--font-narrative); line-height: 1.6; }
+  .turn-error { border-color: rgba(215,107,107,0.45); background: rgba(215,107,107,0.06); color: var(--color-text-secondary); }
+  .turn-error strong { color: var(--color-red); }
+  .turn-error small { color: var(--color-text-muted); font-style: italic; }
   .overlay { position: absolute; inset: 0; }
   .error-card { max-width: 460px; }
   .error-msg { color: var(--color-text-secondary); }

@@ -1,4 +1,4 @@
-# Star Wars Story — v3.0 « Lite »
+# Star Wars Story — v3.1 « Lite »
 
 > Écris ta légende — une aventure interactive Star Wars où chaque choix façonne un monde vivant, guidée par une IA Maître du Jeu.
 
@@ -6,7 +6,7 @@
 [![Svelte](https://img.shields.io/badge/Svelte-5-FF3E00)](https://svelte.dev)
 [![OpenRouter](https://img.shields.io/badge/OpenRouter-fetch%20direct-7C3AED)](https://openrouter.ai)
 
-> **v3.0 « Lite »** est une **réécriture complète depuis zéro** de la 2.x, devenue trop lourde à maintenir. Base propre, modulaire et testée — voir le [CHANGELOG](./CHANGELOG.md).
+> **v3.1 « Gameplay »** enrichit la 3.0 : aptitudes réelles, jets recalibrés et risques lisibles, fil rouge de campagne, événements hors champ, inventaire utile, choix opposés, conversations validées et fins réelles. Voir le [CHANGELOG](./CHANGELOG.md).
 
 ---
 
@@ -21,7 +21,10 @@ PWA **local-first** : tu crées un protagoniste (ère, faction, rôle, trame) et
 - **Maître du Jeu IA** avec deux moteurs au choix dans les réglages :
   - **Direct** — un seul appel, rapide.
   - **Agentique** — pipeline **Directeur → Écrivain → Relecteur → Cerveau** (4 appels). Les sous-agents **partagent l'état du monde** : prose cohérente (pas de PNJ ressuscité ni de lieu erroné), deltas mécaniques sains, et un Relecteur qui peaufine la scène avant affichage.
-- **Jet de dé caché** : chaque choix (attribut + difficulté) déclenche un jet invisible qui oriente la narration — pas de fiche de perso à l'écran.
+- **Jet de dé caché** : chaque choix (attribut + difficulté) déclenche un jet invisible qui oriente la narration. Depuis la 3.1, les **aptitudes** du personnage (profil 1–5 dérivé du rôle et de la faction) modifient réellement les jets, la **difficulté est recalibrée** (DC 7–15) et chaque choix affiche son **risque** (faible / modéré / élevé) et son **arbitrage** (tradeoff/stakes). XP, niveaux et gains d'aptitude après les actions significatives.
+- **Fil rouge de campagne** : titre, objectif, progression et statut persistants ; **événements hors champ** visibles dans le HUD et le journal ; ressources ennemies **finies** (pas de vague identique sans cause) ; **fins réelles** — victoire, défaite, retraite ou mort après une dernière chance de survie.
+- **Inventaire utile** : un choix peut exiger un objet (`requires_items`) et le consommer (`consumes_items`) — les objets du sac ouvrent de vraies options.
+- **Conversations validées** : à la fin d'un échange, le résumé (faits retenus, progression, conséquences) est affiché et doit être **validé ou annulé** avant d'être gravé dans le monde et la mémoire.
 - **Monde vivant** : relations PNJ et réputation des factions affichées en **paliers lisibles** (Loyal, Allié, Neutre, Hostile…) plutôt qu'en nombres bruts.
 - **Création en 4 étapes** : ère → personnage → trame → style.
 - **Bibliothèque** d'histoires (grille « affiches »), suppression **annulable**.

@@ -19,7 +19,15 @@ export function renderWorldDigest(world: WorldState): string {
   const factions = Object.entries(world.factions).filter(([, v]) => v !== 0)
     .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 4)
     .map(([id, s]) => `${id} ${s > 0 ? '+' : ''}${s}`).join(', ') || 'neutre';
-  return `Lieu : ${p.location} | PV : ${p.hp}/100 (${hpLabel}) | Crédits : ₡${p.credits}
+  const env = world.environment_status ? ` | Environnement : ${world.environment_status}` : '';
+  const campaign = world.campaign
+    ? `\nFIL ROUGE : ${world.campaign.title} | Objectif : ${world.campaign.objective} | Progression : ${world.campaign.progress}`
+    : '';
+  const events = world.world_events?.length
+    ? `\nÉVÉNEMENTS HORS CHAMP RÉCENTS : ${world.world_events.slice(0, 3).map((e) => e.summary).join(' ; ')}`
+    : '';
+  return `Lieu : ${p.location} | PV : ${p.hp}/100 (${hpLabel}) | Crédits : ₡${p.credits}${env}${campaign}${events}
+Aptitudes : ${Object.entries(p.skills ?? {}).map(([id, score]) => `${id} ${score}/5`).join(', ') || 'profil à établir'}
 PNJ présents : ${alive}${deadLine}
 Factions : ${factions}`;
 }
@@ -42,15 +50,23 @@ export function renderWorldBlock(world: WorldState, protagonist: string): string
     .map(([id, s]) => `  • ${id} : ${s > 0 ? '+' : ''}${s}`).join('\n') || '  (neutre partout)';
   const env = world.environment_status ? `\nEnvironnement : ${world.environment_status}` : '';
   const rumors = world.rumors?.length ? `\nRumeurs locales :\n${world.rumors.map((r) => `  • ${r}`).join('\n')}` : '';
+  const skills = `\nAptitudes du protagoniste (1–5, le jet utilise l'aptitude du choix) : ${Object.entries(p.skills ?? {}).map(([id, score]) => `${id}=${score}`).join(' · ')}`;
+  const campaign = world.campaign
+    ? `\n\nFIL ROUGE / OBJECTIF DE CAMPAGNE :\nTitre : ${world.campaign.title}\nObjectif : ${world.campaign.objective}\nProgression : ${world.campaign.progress}\nStatut : ${world.campaign.status}`
+    : '';
+  const events = world.world_events?.length
+    ? `\nÉvénements hors champ récents :\n${world.world_events.slice(0, 5).map((e) => `  • T${e.turn} — ${e.summary}`).join('\n')}`
+    : '';
+  const ending = world.ending ? `\n\nCAMPAGNE TERMINÉE : ${world.ending.type} — ne propose plus de choix jouables.` : '';
   const critical = p.condition === 'critical'
-    ? `\n\nÉTAT CRITIQUE (OBLIGATOIRE) : le protagoniste est tombé à 0 PV — mourant ou capturé. Ce tour est une tentative de survie/sauvetage, PAS une mort définitive. Montre le danger immédiat et une porte de sortie crédible (secours, soin, reddition, fuite). S'il survit, hp doit redevenir > 0.`
+    ? `\n\nÉTAT CRITIQUE (OBLIGATOIRE) : le protagoniste est tombé à 0 PV — mourant ou capturé. Montre le danger immédiat et une porte de sortie crédible (secours, soin, reddition, fuite). C'est la dernière chance : si la scène suivante ne le remet pas au-dessus de 0 PV, la campagne se termine. S'il survit, hp doit redevenir > 0.`
     : '';
 
   return `
 ÉTAT DU MONDE ACTUEL :
 Protagoniste : ${protagonist}
-HP : ${p.hp}/100 (${hpLabel}) | Crédits : ₡${p.credits}
-Lieu : ${p.location} | Date : ${p.date}
+HP : ${p.hp}/100 (${hpLabel}) | Crédits : ₡${p.credits} | Niveau : ${p.level} | XP : ${p.experience}
+Lieu : ${p.location} | Date : ${p.date}${skills}
 Blessures :
 ${injuries}
 Inventaire :
@@ -58,7 +74,7 @@ ${inventory}
 PNJs connus :
 ${npcs}${deadLine}
 Réputation par faction :
-${factions}${env}${rumors}${critical}`;
+${factions}${env}${rumors}${campaign}${events}${ending}${critical}`;
 }
 
 const GM_RULES = `RÈGLES DU MAÎTRE DU JEU :
@@ -74,8 +90,15 @@ const GM_RULES = `RÈGLES DU MAÎTRE DU JEU :
 10. ESCALADE MESURÉE & ÉCHELLE : un lieu civil (marché, cantina, quartier) reste civil tant qu'aucune escalade n'est fortement justifiée par les actions du joueur. N'invoque pas de forces militaires lourdes (stormtroopers en masse, marcheurs/AT-ST) sans cause claire et proportionnée — et jamais d'engins de combat (marcheurs) pour du maintien de l'ordre dans une foule.
 11. BLESSURES RÉELLES : les blessures sont RARES et graves. La plupart des scènes d'action ne doivent PAS infliger de blessure — seuls des événements véritablement dangereux (chute de grande hauteur, explosion, combat au corps à corps violent, tir direct) justifient injuries_new. Des coups, chutes légères ou efforts physiques ne sont PAS des blessures. Maximum 1 blessure toutes les 4-5 scènes. Si tu en infliges une, mets-la dans state_update.injuries_new (description + severity: light|moderate|severe). Ce qui se soigne va dans injuries_resolved. Une blessure décrite dans la prose ne doit jamais rester invisible dans l'état.
 12. ÉCOULEMENT DU TEMPS : quand du temps passe réellement (repos, soin, voyage, ellipse), renseigne state_update.date_advance (ex: "quelques heures", "1 jour"). Si la scène est continue (même instant), laisse-le vide.
-13. DIFFICULTÉ DES CHOIX : calibre chaque difficulty selon l'action RÉELLE — 1 = trivial, 2 = facile, 3 = incertain, 4 = difficile, 5 = héroïque/quasi-impossible. La plupart des actions valent 2-3 ; réserve 4-5 aux vrais exploits. NE mets PAS 5 partout (fabriquer une attelle = 2, pas 5).`;
-
+13. DIFFICULTÉ DES CHOIX : calibre chaque difficulty selon l'action RÉELLE — 1 = trivial, 2 = facile, 3 = incertain, 4 = difficile, 5 = héroïque/quasi-impossible. La plupart des actions valent 2-3 ; réserve 4-5 aux vrais exploits. NE mets PAS 5 partout (fabriquer une attelle = 2, pas 5).
+14. CONSÉQUENCES DURABLES & RESSOURCES FINIES : les forces ennemies ne sont pas infinies. Une troupe décimée, une patrouille anéantie ou une armée vaincue RESTE vaincue : pas de vague suivante identique au tour d'après, pas de renforts surgis de nulle part. Après une victoire majeure, montre ses effets durables (silence, fuite des survivants, répit crédible) et consigne-les dans state_update.environment_status (ex: « la cour est jonchée de débris, plus un soldat debout ») et dans memory_updates.notes (ex: « l'armée de X est décimée »). Un retour ennemi n'est permis qu'avec une cause visible et proportionnée (vaisseau qui atterrit, appel radio, renforts annoncés), jamais comme un réflexe. INVERSE : ne consigne JAMAIS une prédiction de menace non réalisée comme un fait établi (« la prochaine vague ne tardera pas » n'est pas un fait, c'est une supposition du narrateur — ne la mets pas dans memory_updates).
+15. APTITUDES & AGENCE : l'attribut de chaque choix est mécanique. Le joueur est meilleur dans ses aptitudes affichées ; respecte ces forces et faiblesses dans la fiction. Ne rends pas une action facile artificiellement difficile, et ne transforme pas une spécialité en échec arbitraire.
+16. FIL ROUGE : fais progresser l'objectif de campagne à chaque scène ou explique concrètement pourquoi il est retardé. N'abandonne pas l'objectif pour une suite de rencontres aléatoires. Mets à jour campaign_update.progress et ne marque completed que si l'objectif est réellement résolu.
+17. CHOIX & ARBITRAGES : propose 3 à 4 options vraiment distinctes et mutuellement exclusives. Au moins deux choix doivent sacrifier quelque chose d'important l'un par rapport à l'autre (temps, sécurité, allié, argent, information, réputation). Chaque choix doit remplir tradeoff et stakes en une phrase concrète. Évite les variantes cosmétiques d'une même attaque.
+18. INVENTAIRE UTILE : si un objet pertinent est disponible, propose au moins un choix qui l'utilise et renseigne requires_items/consumes_items. Ne fais jamais apparaître un objet dans une scène si l'état ne le contient pas.
+19. MONDE HORS CHAMP : lorsqu'un voyage, un repos, une ellipse ou une action du joueur laisse du temps au monde, fais évoluer au maximum 1 ou 2 événements externes plausibles via world_events_new. Ils doivent découler des faits établis, pas créer une nouvelle armée sans cause.
+20. ENJEUX : à 0 PV, donne une dernière scène de survie crédible. Si le protagoniste reste à 0 PV après cette chance, renseigne ending.type = death et ne propose plus de choix jouables. Une campagne peut aussi se terminer par victory, defeat ou une retraite explicitement choisie.
+21. PROGRESSION : attribue de l'expérience seulement pour une action significative (en général 5 à 25 XP), et un skill_gains uniquement pour un entraînement ou une révélation exceptionnelle.`;
 function jsonContract(langName: string): string {
   return `Réponds UNIQUEMENT en JSON valide, sans markdown ni texte autour. TOUT le texte des champs est rédigé ENTIÈREMENT EN ${langName}. Priorité : prose riche dans "action" (2 à 4 paragraphes). Remplis state_update avec toutes les conséquences.
 
@@ -90,12 +113,15 @@ function jsonContract(langName: string): string {
     "atmosphere": "tense|calm|mysterious|eerie|heroic"
   },
   "choices": [
-    { "text": "Action concrète, immédiate et unique à cette scène (PAS d'abstraction générique comme 'Observer' ou 'Méditer')", "attribute": "combat|diplomacy|stealth|tech|force|survival", "difficulty": 3, "faction_impact": {} }
+    { "text": "Action concrète, immédiate et unique à cette scène (PAS d'abstraction générique comme 'Observer' ou 'Méditer')", "attribute": "combat|diplomacy|stealth|tech|force|survival", "difficulty": 3, "tradeoff": "ce que ce choix sacrifie", "stakes": "conséquence concrète en cas de revers", "requires_items": [], "consumes_items": [], "faction_impact": {} }
   ],
   "state_update": {
-    "hp": -15, "credits": -300,
+    "hp": -15, "credits": -300, "experience": 10, "skill_gains": {},
     "location": "Lieu actuel (obligatoire au tour 1)",
-    "date_advance": "quelques heures",
+    "date_advance": "quelques heures (durée courte uniquement)",
+    "campaign_update": { "title": "", "objective": "", "progress": "", "status": "active|completed|failed" },
+    "world_events_new": [],
+    "ending": null,
     "npcs": [{ "name": "Nom exact", "affinity": 60, "status": "ally|neutral|hostile", "alive": true, "note": "contexte bref" }],
     "factions": { "empire": -10 },
     "injuries_new": [],
@@ -135,7 +161,7 @@ export function buildSystemPrompt(
   const canon = renderPlayerCanon(playerDirectives);
   const isTurn1 = turnNumber === 1 || !worldState || worldState.chronology.length === 0;
   const prologue = isTurn1
-    ? `\n16. PROLOGUE (TOUR 1) : commence par une riche introduction du protagoniste (${protagonist}) — apparence, origines liées à son rôle (${setup.role}) et sa faction (${setup.faction}), situation actuelle et tension immédiate. Pose le décor (state_update.location) avec soin avant l'action.`
+    ? `\n17. PROLOGUE (TOUR 1) : commence par une riche introduction du protagoniste (${protagonist}) — apparence, origines liées à son rôle (${setup.role}) et sa faction (${setup.faction}), situation actuelle et tension immédiate. Pose le décor (state_update.location) avec soin avant l'action.`
     : '';
 
   return `${languageInstruction(lang)}
@@ -148,8 +174,8 @@ Style : ${setup.writingStyle || 'cinématique'} · Ton : ${setup.writingTone || 
 ${worldBlock}${memoryBlock}${archive}${canon}
 
 ${GM_RULES}
-14. DIRECTIVE STYLISTIQUE : ${styleDirective(setup.writingStyle, setup.writingTone)}
-15. DIRECTIVE DE CONTENU : ${contentModeDirective(setup.contentMode)}
+15. DIRECTIVE STYLISTIQUE : ${styleDirective(setup.writingStyle, setup.writingTone)}
+16. DIRECTIVE DE CONTENU : ${contentModeDirective(setup.contentMode)}
 ${ERA_COHERENCE}${prologue}
 
 ${jsonContract(langName)}`;

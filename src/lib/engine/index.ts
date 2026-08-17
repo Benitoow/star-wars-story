@@ -4,6 +4,8 @@ export {
   initWorldState,
   cloneWorldState,
   applyStateUpdate,
+  applyChoiceInventoryCost,
+  hasRequiredItems,
   rebuildWorldState,
   advanceNarrativeDate,
   isUnknownLocation,
@@ -24,7 +26,7 @@ export {
   foldArchive
 } from './memory';
 export { resolveContextBudget, fetchContextLengths, fetchModelCatalog, supportsReasoningParam, TRANSCRIPT_SHARE, type ModelCapabilities } from './models';
-export { rollForChoice, type Outcome, type RollResult } from './dice';
+export { rollForChoice, choiceRisk, type Outcome, type RollResult, type ChoiceRisk } from './dice';
 export {
   buildSystemPrompt,
   buildStartPrompt,

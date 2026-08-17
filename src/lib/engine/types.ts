@@ -16,12 +16,20 @@ export type SectionType = (typeof SECTION_TYPES)[number];
 
 export const STORY_ATTRIBUTES = ['combat', 'diplomacy', 'stealth', 'tech', 'force', 'survival'] as const;
 export type StoryAttribute = (typeof STORY_ATTRIBUTES)[number];
+export type RiskLevel = 'low' | 'medium' | 'high';
+
+export type SkillProfile = Record<StoryAttribute, number>;
 
 export interface StoryChoice {
   text: string;
   attribute: StoryAttribute;
   difficulty: number;            // 1–5
   faction_impact: Record<string, number>;
+  tradeoff?: string;             // what this choice sacrifices or risks
+  stakes?: string;               // visible consequence if things go badly
+  requires_items?: string[];     // exact/fuzzy inventory names needed to attempt it
+  consumes_items?: string[];     // inventory names consumed when selected
+  risk?: RiskLevel;              // optional model hint; UI recalculates from the player
 }
 
 export interface StoryNarrative {
@@ -70,6 +78,10 @@ export interface PlayerState {
   date: string;        // in-universe narrative date
   injuries: Injury[];
   inventory: InventoryItem[];
+  skills: SkillProfile; // 1–5, derived from role/faction and improved by training
+  experience: number;
+  level: number;
+  criticalTurns: number; // consecutive turns spent at 0 HP
   condition: PlayerCondition;
 }
 
@@ -92,21 +104,50 @@ export interface ChronologyEntry {
   summary: string;
 }
 
+export interface CampaignState {
+  title: string;
+  objective: string;
+  progress: string;
+  status: 'active' | 'completed' | 'failed';
+}
+
+export interface WorldEvent {
+  turn: number;
+  date: string;
+  summary: string;
+}
+
+export type EndingType = 'victory' | 'death' | 'retirement' | 'defeat';
+
+export interface GameEnding {
+  type: EndingType;
+  title: string;
+  epilogue: string;
+}
+
 export interface WorldState {
   player: PlayerState;
   npcs: NpcRelation[];
   factions: Record<string, number>;  // faction_id → -100…100
   chronology: ChronologyEntry[];
+  campaign: CampaignState;
+  world_events: WorldEvent[];
   rumors?: string[];
   environment_status?: string;
+  ending?: GameEnding;
 }
 
 // What the model emits each turn to mutate the world. hp/credits are signed deltas.
 export interface StateUpdate {
   hp?: number;            // delta (negative = damage, positive = heal)
   credits?: number;       // delta
+  experience?: number;     // delta; 100 XP = one level
+  skill_gains?: Partial<SkillProfile>;
   location?: string;      // replaces current location
   date_advance?: string;  // e.g. "quelques heures", "2 jours"
+  campaign_update?: Partial<CampaignState>;
+  world_events_new?: string[];
+  ending?: Partial<GameEnding>;
   npcs?: Array<Partial<NpcRelation> & { name: string }>;  // upsert by name
   factions?: Record<string, number>;  // faction_id → delta
   injuries_new?: Injury[];

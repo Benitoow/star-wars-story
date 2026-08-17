@@ -51,21 +51,32 @@ RÈGLES :
 6. ${ERA_COHERENCE}
 7. RÔLE CANONIQUE IMMUABLE : garde le rôle "${setup.role}".
 8. Dialogues : chaque réplique sur sa ligne, format "Nom : réplique" (INTERDICTION du tiret cadratin '—' ou de tout tiret en début de ligne).
-9. CANON DU JOUEUR & ESCALADE : respecte les faits que le joueur a établis (ci-dessous) ; ne les contredis jamais et n'introduis pas un groupe/élément qu'il a exclu. Un lieu civil (marché, cantina) reste civil sans escalade fortement justifiée — pas de stormtroopers en masse ni de marcheurs/AT-ST surgissant sans cause proportionnée.${prologue}${canon}${varietyNote(overusedTerms)}`;
+9. CANON DU JOUEUR & ESCALADE : respecte les faits que le joueur a établis (ci-dessous) ; ne les contredis jamais et n'introduis pas un groupe/élément qu'il a exclu. Un lieu civil (marché, cantina) reste civil sans escalade fortement justifiée — pas de stormtroopers en masse ni de marcheurs/AT-ST surgissant sans cause proportionnée. CONSÉQUENCES DURABLES : les forces ennemies sont FINIES — une troupe décimée ou une armée vaincue reste vaincue, pas de vague identique au tour suivant ni de renforts surgis de nulle part ; montre les effets durables d'une victoire (silence, survivants en fuite, répit crédible) et ne ressuscite jamais un ennemi vaincu sans cause visible (vaisseau, appel radio).
+10. FIL ROUGE & PROGRESSION : cette scène doit faire avancer l'objectif de campagne ou montrer clairement le prix d'un retard. Le monde ne remplace pas la quête principale par une succession de rencontres aléatoires.
+11. INVENTAIRE : l'état contient les seuls objets disponibles. Si un objet est pertinent, le Cerveau devra proposer une option qui l'utilise ; n'en invente aucun.
+12. RYTHME : si le contexte indique deux scènes action/confrontation consécutives, écris une accalmie, un dialogue ou une exploration. Ne rajoute pas un combat par réflexe.${prologue}${canon}${varietyNote(overusedTerms)}`;
 }
 
-function directorUser(summary: string, action: string, turnNumber: number, digest: string, canon: string): string {
+function directorUser(summary: string, action: string, turnNumber: number, digest: string, canon: string, recentSectionTypes: string[] = []): string {
+  let consecutiveIntense = 0;
+  for (let i = recentSectionTypes.length - 1; i >= 0; i -= 1) {
+    if (['action', 'confrontation'].includes(recentSectionTypes[i])) consecutiveIntense += 1;
+    else break;
+  }
+  const pacing = consecutiveIntense >= 2
+    ? `\nRYTHME OBLIGATOIRE : ${consecutiveIntense} scènes intenses viennent de s'enchaîner. Planifie une scène de repos, dialogue ou exploration ; aucune nouvelle bataille sans nécessité exceptionnelle.`
+    : '';
   return `Tour ${turnNumber}. Situation : ${cleanText(summary, 2600) || '(ouverture)'}
 
 ÉTAT DU MONDE :
-${digest}${canon}
+${digest}${canon}${pacing}
 
 Action joueur : ${cleanText(action, 240)}
 
 Réponds en JSON strict :
 {
-  "scene_goal": "but dramatique immédiat",
-  "tension": "pression ou menace immédiate",
+  "scene_goal": "but dramatique immédiat relié au FIL ROUGE",
+  "tension": "pression ou menace immédiate proportionnée",
   "must_include": ["2 à 4 éléments concrets à montrer"],
   "section_type": "action|dialogue|exploration|tension|revelation|repos|interlude|confrontation",
   "atmosphere": "tense|calm|mysterious|eerie|heroic"
@@ -83,18 +94,25 @@ ACTION À RENDRE : ${cleanText(action, 240)}
 ${outcomeDirective ? `${outcomeDirective}\n` : ''}Écris la suite immédiate (2 à 3 paragraphes), en continuité directe de la scène précédente ci-dessus. La première impulsion montre la conséquence de l'action.`;
 }
 
-function brainUser(prose: string, brief: Record<string, unknown>, digest: string): string {
+function brainUser(prose: string, brief: Record<string, unknown>, digest: string, memory: MemoryFact[] = []): string {
   return `ÉTAT ACTUEL DU MONDE (avant cette scène) :
 ${digest}
+${renderMemoryBlock(memory)}
 
 Voici la scène qui vient de se dérouler :
 ${cleanText(prose, 2800)}
 
 Déduis-en les conséquences mécaniques, COHÉRENTES avec l'état ci-dessus :
 - hp et credits sont des DELTAS signés (ex: hp:-15) ; ne ressuscite jamais un mort ; réutilise les PNJ existants par leur nom EXACT (pas de doublon).
+- APTITUDES : les choix utilisent l'aptitude correspondante ; le profil affiché est mécanique et ne change pas sans entraînement explicite.
+- FIL ROUGE : mets à jour campaign_update.progress pour relier la scène à l'objectif ; completed uniquement si l'objectif est accompli.
+- MONDE HORS CHAMP : world_events_new contient 0 à 2 événements externes plausibles seulement si le temps ou l'action le justifie.
+- CHOIX : 3 à 4 options réellement différentes et mutuellement exclusives ; au moins deux ont des coûts opposés et remplissent tradeoff/stakes. Si un objet est pertinent, une option doit le consommer via requires_items/consumes_items.
+- ENJEUX : si le protagoniste est critique, hp doit redevenir > 0 ; s'il reste à 0 après cette dernière chance, ending peut être death. Un échec d'objectif explicite peut utiliser defeat.
 - BLESSURES : les blessures sont RARES — seuls des événements véritablement dangereux (chute de grande hauteur, explosion, combat violent, tir direct) justifient injuries_new. Des coups, chutes légères ou efforts physiques ne comptent pas. Maximum 1 blessure toutes les 4-5 scènes. Si justifié, remplis injuries_new (description + severity light|moderate|severe). Ce qui se soigne va dans injuries_resolved.
 - TEMPS : si du temps passe (repos, soin, voyage, ellipse), renseigne date_advance (ex: "quelques heures").
 - CHOIX : 3 à 4, concrets et uniques à cette scène (INTERDIT : "Observer", "Méditer"). difficulty calibrée selon l'action réelle (1 trivial … 5 héroïque) — la plupart valent 2-3, réserve 4-5 aux exploits, NE mets PAS 5 partout (une attelle = 2).
+- CONSÉQUENCES DURABLES : les forces ennemies sont FINIES. Une victoire majeure (armée décimée, patrouille anéantie) doit laisser une trace : renseigne environment_status (ex: « plus un soldat debout, la cour est jonchée de débris ») et consigne le fait dans memory_updates.notes (ex: « l'armée de X est décimée »). Ne consigne JAMAIS une prédiction de menace non réalisée (« la prochaine vague ne tardera pas ») dans memory_updates — une supposition du narrateur n'est pas un fait établi.
 - PRÉSENCE : npcs_present = noms EXACTS des PNJ nommés encore physiquement présents à la FIN de la scène (pas ceux partis, morts ou ailleurs) — c'est ce qui détermine à qui le joueur peut parler. Vide si le protagoniste est seul.
 
 Réponds en JSON strict :
@@ -102,9 +120,9 @@ Réponds en JSON strict :
   "chapter_title": "Titre évocateur — jamais Chapitre N",
   "section_type": "${cleanText(brief.section_type, 40) || 'action'}",
   "narrative": { "atmosphere": "${cleanText(brief.atmosphere, 40) || 'tense'}" },
-  "state_update": { "hp": -15, "credits": 0, "location": "", "date_advance": "", "npcs": [], "factions": {}, "injuries_new": [], "injuries_resolved": [], "inventory_gained": [], "inventory_lost": [], "rumors_new": [], "environment_status": "" },
+  "state_update": { "hp": -15, "credits": 0, "experience": 10, "skill_gains": {}, "location": "", "date_advance": "", "campaign_update": {}, "world_events_new": [], "ending": null, "npcs": [], "factions": {}, "injuries_new": [], "injuries_resolved": [], "inventory_gained": [], "inventory_lost": [], "rumors_new": [], "environment_status": "" },
   "memory_updates": { "relations": [], "places": [], "injuries": [], "resources": [], "notes": [] },
-  "choices": [ { "text": "", "attribute": "combat|diplomacy|stealth|tech|force|survival", "difficulty": 2, "faction_impact": {} } ],
+  "choices": [ { "text": "", "attribute": "combat|diplomacy|stealth|tech|force|survival", "difficulty": 2, "tradeoff": "", "stakes": "", "requires_items": [], "consumes_items": [], "faction_impact": {} } ],
   "npcs_present": []
 }`;
 }
@@ -144,6 +162,7 @@ export interface AgenticContext {
   transcript: ChatMessage[];    // raw recent scenes (conversation) for the Writer
   archive: string[];            // older turns, condensed (into the Writer's system)
   memory?: MemoryFact[];        // structured narrative memory (into the Writer's system)
+  recentSectionTypes?: string[]; // pacing signal shared with Director and Writer
   outcomeDirective?: string;
   playerDirectives?: string[];
   overusedTerms?: string[];     // words the model has leaned on across recent scenes
@@ -173,7 +192,7 @@ export async function runAgenticTurn(
 
   // 1. Director — scene brief (JSON), planned from the condensed story-so-far
   const briefRaw = await callTextModel(
-    [{ role: 'system', content: `${languageInstruction(lang)}\n\n${DIRECTOR_SYSTEM}` }, { role: 'user', content: directorUser(ctx.situation, ctx.actionText, ctx.turnNumber, digest, canon) }],
+    [{ role: 'system', content: `${languageInstruction(lang)}\n\n${DIRECTOR_SYSTEM}` }, { role: 'user', content: directorUser(ctx.situation, ctx.actionText, ctx.turnNumber, digest, canon, ctx.recentSectionTypes ?? []) }],
     provider,
     { jsonMode: true, skipReasoning: true }
   );
@@ -224,7 +243,7 @@ export async function runAgenticTurn(
 
   // 4. Brain — mechanical consequences + choices (JSON) from the final prose
   const brainRaw = await callTextModel(
-    [{ role: 'system', content: `${languageInstruction(lang)} TOUT le texte est en ${languageName(lang)}.\n\n${BRAIN_SYSTEM}` }, { role: 'user', content: brainUser(prose, brief, digest) }],
+    [{ role: 'system', content: `${languageInstruction(lang)} TOUT le texte est en ${languageName(lang)}.\n\n${BRAIN_SYSTEM}` }, { role: 'user', content: brainUser(prose, brief, digest, ctx.memory ?? []) }],
     provider,
     { jsonMode: true }
   );

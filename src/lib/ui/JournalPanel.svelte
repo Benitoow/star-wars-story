@@ -6,7 +6,7 @@
   export let memory: MemoryFact[] = [];
   export let onClose: () => void;
 
-  type Tab = 'chapitres' | 'chronologie' | 'personnages' | 'memoire';
+  type Tab = 'chapitres' | 'chronologie' | 'personnages' | 'monde' | 'memoire';
   let tab: Tab = 'chapitres';
 
   $: pastChapters = [...chapters].reverse();
@@ -61,6 +61,7 @@
       <button type="button" class="tab" class:active={tab === 'chapitres'} on:click={() => (tab = 'chapitres')}>Chapitres</button>
       <button type="button" class="tab" class:active={tab === 'chronologie'} on:click={() => (tab = 'chronologie')}>Chronologie</button>
       <button type="button" class="tab" class:active={tab === 'personnages'} on:click={() => (tab = 'personnages')}>Personnages</button>
+      <button type="button" class="tab" class:active={tab === 'monde'} on:click={() => (tab = 'monde')}>Monde</button>
       <button type="button" class="tab" class:active={tab === 'memoire'} on:click={() => (tab = 'memoire')}>Mémoire</button>
     </nav>
 
@@ -90,6 +91,31 @@
               <h3 class="entry-title">{event.summary}</h3>
             </header>
             <p class="entry-meta">{event.date} · {event.location}</p>
+          </article>
+        {/each}
+      {:else if tab === 'monde'}
+        {#if world.campaign}
+          <article class="entry campaign-entry">
+            <p class="eyebrow">Fil rouge</p>
+            <h3 class="entry-title">{world.campaign.title}</h3>
+            <p class="entry-text"><strong>Objectif :</strong> {world.campaign.objective}</p>
+            <p class="entry-text"><strong>Progression :</strong> {world.campaign.progress}</p>
+            <span class="chip">{world.campaign.status}</span>
+          </article>
+        {/if}
+        {#if world.environment_status}
+          <article class="entry">
+            <p class="eyebrow">État de l'environnement</p>
+            <p class="entry-text">{world.environment_status}</p>
+          </article>
+        {/if}
+        {#if !world.world_events?.length}
+          <p class="empty">Le monde n'a pas encore bougé hors champ.</p>
+        {/if}
+        {#each world.world_events ?? [] as event (event.turn + event.summary)}
+          <article class="entry">
+            <header class="entry-head"><span class="num">T{event.turn}</span><h3 class="entry-title">{event.summary}</h3></header>
+            <p class="entry-meta">{event.date}</p>
           </article>
         {/each}
       {:else if tab === 'memoire'}

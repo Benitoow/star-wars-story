@@ -1,5 +1,44 @@
 # Changelog
 
+## v3.1.0 — « Gameplay » — 2026-08-17
+
+**Passe d'amélioration du jeu** : les attributs comptent vraiment, les jets sont lisibles et mieux calibrés, la campagne a un fil rouge, l'inventaire sert à jouer, les choix sont des dilemmes, les conversations sont validées avant d'être gravées et les fins sont réelles.
+
+### 🎲 Compétences, jets et risques
+- **Aptitudes réelles** : profil 1–5 dérivé du rôle et de la faction (`catalog.ts` → `deriveSkillProfile`), persisté dans l'état joueur. Les choix utilisent l'aptitude correspondante dans le jet (`dice.ts`).
+- **Recalibrage des jets** : DC = 5 + 2 × difficulté (7–15 au lieu de 9–17) ; bonus d'aptitude (0–4) ajouté au dé ; les actions simples réussissent fiablement, les exploits restent risqués.
+- **Risque lisible** : chaque choix affiche son niveau (faible/modéré/élevé) calculé depuis l'aptitude du joueur, l'aptitude mobilisée et son score ; le jet caché lui-même reste invisible.
+- **Progression** : XP (100 = niveau), niveaux et gains d'aptitude (`skill_gains`) gérés par `applyStateUpdate` ; le HUD affiche le niveau et la barre d'XP ; le journal liste les aptitudes.
+
+### 🎯 Campagne, fil rouge et monde vivant
+- **Campagne persistante** : titre, objectif, progression et statut (`CampaignState`) dans l'état du monde, initialisée au tour 1, mise à jour chaque tour via `campaign_update` (prompts Direct et Agentique) ; visible dans le HUD et dans le journal (onglet « Monde »).
+- **Événements hors champ** : `world_events_new` (0–2 par tour justifié), horodatés par tour et date, dédupliqués, visibles dans le HUD et le journal.
+- **Ressources ennemies finies** : règles de prompts renforcées (pas de vague identique, pas de renforts sans cause, victoire qui laisse `environment_status` et mémoire durables) — appliquées aux deux moteurs.
+- **Noms propres préservés** : `detectOverusedTerms` ne signale plus le lieu courant et les PNJ connus comme tics stylistiques ; budget de contexte par défaut ramené à 32 k tokens (jouable sur les fenêtres courantes).
+
+### ⚖️ Choix et inventaire
+- **Choix opposés** : chaque choix peut porter `tradeoff` (ce qu'il sacrifie) et `stakes` (ce qu'il risque) ; les prompts imposent des dilemmes mutuellement exclusifs à coûts différents (temps, sécurité, allié, argent, information).
+- **Déduplication enrichie** : en cas de doublon, la variante la plus riche en informations est conservée.
+- **Inventaire mécanique** : `requires_items` (option désactivée si l'objet manque, quantités vérifiées) et `consumes_items` (retiré de façon déterministe après le tour, sans double consommation si le modèle l'a déjà déclaré via `inventory_lost`).
+- **Numéro de chapitre verrouillé** : `chapter_number` est toujours celui du moteur, jamais celui du modèle.
+
+### ☠️ Enjeux réels et fins
+- **Dernière chance** : une scène à 0 PV ouvre une scène de survie critique (`criticalTurns`) ; une fin `death` ne peut ni sauter cette chance ni être écrasée ensuite.
+- **Fins explicites** : `victory`, `defeat`, `retirement` et `death` — un objectif accompli clôt la campagne, un statut `failed` produit une fin `defeat` visible, l'interface bloque choix et conversations après la fin.
+- **Échec de génération récupérable** : l'action en attente est conservée, « Modifier l'action » réactive le formulaire et « Réessayer » relance exactement la même action (avec son jet).
+
+### 💬 Conversations validées
+- Le débrief d'une conversation (Mode Direct) produit un **résumé à valider** : récap jouable, faits retenus, progression du fil rouge et conséquences. Rien n'est appliqué (monde, mémoire, historique) avant **Valider** ; « Annuler les conséquences » referme l'échange sans effet.
+- Le contrat de débrief intègre XP, `campaign_update`, `world_events_new`, `ending` et la règle anti-canonisation des prédictions ; les choix du débrief portent `tradeoff`/`stakes`.
+
+### 🗄️ Compatibilité
+- Les anciennes sauvegardes (sans aptitudes, XP, campagne ni événements) sont **réparées au chargement** (`cloneWorldState` à l'ouverture de session).
+- Dates narratives sans accumulation de fragments redondants ; mémoire des notes objets (`{"text":…}`) lue correctement (déjà en place, consolidée par les tests).
+
+### 🧪 Qualité
+- 113 tests Vitest verts (nouveaux tests : jets/aptitudes, risque, inventaire, campagne, fins, migration de sauvegarde, reprise après erreur, débrief validé, noms propres).
+- `svelte-check` : 0 erreur / 0 warning · ESLint : 0 erreur · build Cloudflare OK.
+
 ## v3.0.0 — « Lite » — 2026-05-26
 
 **Réécriture complète, depuis zéro.** La 2.x était devenue trop lourde et impossible à maintenir — le désordre était concentré dans 3 fichiers de 1 600 à 2 400 lignes (settings, écran de jeu, assistant). La 3.0 « Lite » repart sur une base **propre, modulaire et testée**, sans rien perdre du cœur du jeu. ~21 500 lignes supprimées, reconstruites proprement.

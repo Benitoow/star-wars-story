@@ -2,7 +2,7 @@
    Star Wars content catalog — eras, factions, roles,
    story seeds (trames), writing axes, presets.
 ══════════════════════════════════════════════ */
-import type { StorySetup } from '$lib/engine/types';
+import type { SkillProfile, StoryAttribute, StorySetup } from '$lib/engine/types';
 
 export interface CatalogItem {
   id: string;
@@ -74,6 +74,49 @@ export const FACTION_CREDITS: Record<string, number> = {
   scavenger: 300, stormtrooper: 300, clone_trooper: 300, jedi_exile: 300,
   padawan: 250, default: 1000
 };
+
+const ALL_ATTRIBUTES: StoryAttribute[] = ['combat', 'diplomacy', 'stealth', 'tech', 'force', 'survival'];
+const BASE_SKILLS: SkillProfile = {
+  combat: 2, diplomacy: 2, stealth: 2, tech: 2, force: 2, survival: 2
+};
+
+const ROLE_SKILL_BONUSES: Record<string, Partial<SkillProfile>> = {
+  jedi_knight: { combat: 1, force: 2, survival: 1 },
+  jedi_master: { diplomacy: 1, combat: 1, force: 3 },
+  padawan: { tech: 1, force: 2, survival: 1 },
+  sith_lord: { combat: 2, force: 3, diplomacy: 1 },
+  sith_apprentice: { combat: 1, stealth: 1, force: 2 },
+  imperial_officer: { diplomacy: 2, tech: 1, survival: 1 },
+  stormtrooper: { combat: 2, survival: 2 },
+  rebel_pilot: { combat: 1, tech: 2, stealth: 1 },
+  rebel_leader: { diplomacy: 3, survival: 1 },
+  senator: { diplomacy: 3, tech: 1 },
+  clone_trooper: { combat: 2, survival: 2 },
+  mandalorian_warrior: { combat: 2, tech: 1, survival: 2 },
+  bounty_hunter: { combat: 1, stealth: 2, tech: 1 },
+  smuggler: { diplomacy: 1, stealth: 2, tech: 1 },
+  scavenger: { stealth: 1, tech: 2, survival: 2 },
+  jedi_exile: { combat: 1, stealth: 1, force: 2, survival: 1 }
+};
+
+const FACTION_SKILL_BONUSES: Record<string, Partial<SkillProfile>> = {
+  jedi: { force: 1 }, sith: { force: 1 }, rebels: { stealth: 1 },
+  empire: { diplomacy: 1 }, republic: { diplomacy: 1 }, mandalore: { combat: 1 },
+  hutt: { diplomacy: 1 }
+};
+
+/** Derive a visible but compact aptitude profile from the chosen role and faction. */
+export function deriveSkillProfile(setup: Pick<StorySetup, 'role' | 'faction'>): SkillProfile {
+  const result = { ...BASE_SKILLS };
+  for (const [attribute, bonus] of Object.entries(ROLE_SKILL_BONUSES[setup.role] ?? {})) {
+    result[attribute as StoryAttribute] += bonus as number;
+  }
+  for (const [attribute, bonus] of Object.entries(FACTION_SKILL_BONUSES[setup.faction] ?? {})) {
+    result[attribute as StoryAttribute] += bonus as number;
+  }
+  for (const attribute of ALL_ATTRIBUTES) result[attribute] = Math.max(1, Math.min(5, result[attribute]));
+  return result;
+}
 
 export const TRAMES: Array<CatalogItem & { premise: string }> = [
   { id: 'solo', name: 'Le Solitaire', icon: '🚀', premise: "Un contrat de routine aux confins de la Bordure Extérieure tourne au désastre lorsqu'un conteneur scellé révèle un secret convoité par les plus dangereuses puissances de la galaxie." },

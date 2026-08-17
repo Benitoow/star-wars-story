@@ -125,7 +125,9 @@ export async function generateTurn(
   const { transcript, archive } = buildNarrativeContext(history, input.actionHistory ?? [], budget);
   const recentSectionTypes = history.slice(-6).map((c) => c.section_type);
   const recentChoiceTexts = history.slice(-4).flatMap((c) => c.choices.map((ch) => ch.text));
-  const overusedTerms = detectOverusedTerms(history);
+  const overusedTerms = detectOverusedTerms(history, {
+    excludeTerms: [input.worldState.player.location, ...input.worldState.npcs.map((npc) => npc.name)]
+  });
 
   let chapter: StoryChapter;
   let rawResponse: string;
@@ -148,6 +150,7 @@ export async function generateTurn(
         transcript,
         archive,
         memory: input.memory,
+        recentSectionTypes,
         outcomeDirective: input.outcomeDirective,
         playerDirectives: input.playerDirectives,
         overusedTerms,

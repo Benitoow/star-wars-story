@@ -49,8 +49,13 @@ describe('detectOverusedTerms', () => {
     expect(detectOverusedTerms(chapters)).not.toContain('blaster');
   });
 
+  it('does not flag known locations or character names as stylistic tics', () => {
+    const chapters = Array.from({ length: 5 }, (_, i) => ch(i + 1, `Chandrila accueille Vela dans la salle ${i}.`));
+    expect(detectOverusedTerms(chapters, { excludeTerms: ['Chandrila', 'Vela'] })).not.toContain('chandrila');
+    expect(detectOverusedTerms(chapters, { excludeTerms: ['Chandrila', 'Vela'] })).not.toContain('vela');
+  });
+
   it('returns nothing without enough history', () => {
     expect(detectOverusedTerms([ch(1, 'pourpre pourpre pourpre')])).toEqual([]);
   });
 });
-

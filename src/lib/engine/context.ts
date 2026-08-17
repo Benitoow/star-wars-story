@@ -11,7 +11,7 @@ import type { ChatMessage, StoryChapter } from './types';
 
 // Token budget for the RAW transcript (≈ chars / 4). Tuned in settings; this
 // default is safe for common models while already far richer than summaries.
-export const DEFAULT_CONTEXT_BUDGET = 200000;
+export const DEFAULT_CONTEXT_BUDGET = 32000;
 
 export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
@@ -86,17 +86,18 @@ const TERM_RE = /[a-zà-öø-ÿ]{6,}/gi;
  */
 export function detectOverusedTerms(
   chapters: StoryChapter[],
-  { scenes = 8, minScenes = 3, max = 6 } = {}
+  { scenes = 8, minScenes = 3, max = 6, excludeTerms = [] }: { scenes?: number; minScenes?: number; max?: number; excludeTerms?: string[] } = {}
 ): string[] {
   const recent = chapters.slice(-scenes);
   if (recent.length < minScenes) return [];
+  const excluded = new Set(excludeTerms.flatMap((term) => term.toLowerCase().match(TERM_RE) ?? []));
 
   const scenesPerWord = new Map<string, number>();
   for (const chapter of recent) {
     const text = `${chapter.narrative.action}\n${chapter.narrative.dialogue}\n${chapter.narrative.reflection}`.toLowerCase();
     const seen = new Set(text.match(TERM_RE) ?? []);
     for (const word of seen) {
-      if (!STOP_TERMS.has(word)) scenesPerWord.set(word, (scenesPerWord.get(word) ?? 0) + 1);
+      if (!STOP_TERMS.has(word) && !excluded.has(word)) scenesPerWord.set(word, (scenesPerWord.get(word) ?? 0) + 1);
     }
   }
 

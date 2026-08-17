@@ -32,8 +32,11 @@ CADRE D'OUVERTURE :
 EXIGENCES DU PREMIER TOUR (rédige ENTIÈREMENT EN ${langName}) :
 - Ouvre par une vraie introduction cinématique du protagoniste : qui il est, son background immédiat lié à son rôle (${setup.role}) et sa trame, pourquoi il est là, la tension qui pèse.
 - Choisis un lieu de départ cohérent avec le protagoniste et sa trame, et renseigne-le dans state_update.location.
-- Donne une tension claire, un lieu vivant, un objectif, et au moins 1 PNJ mémorable avec un agenda propre.
-- 3 à 4 choix concrets et contrastés, ancrés dans la scène.
+- Donne une tension claire, un lieu vivant, un objectif de campagne et au moins 1 PNJ mémorable avec un agenda propre.
+- Initialise campaign_update avec un titre, un objectif concret et une première progression vérifiable.
+- 3 à 4 choix concrets et contrastés, dont au moins deux avec des coûts opposés ; chaque choix renseigne tradeoff et stakes.
+- Si un objet de départ est pertinent, une option le référence via requires_items/consumes_items.
+- Attribue 5 à 15 XP pour le lancement, pas davantage.
 - Respecte strictement le rôle canonique (${setup.role}) — pas de promotion au lancement.
 - Dialogues isolés sur leur ligne au format "Nom : réplique" (INTERDICTION du tiret cadratin '—' ou de tout tiret en début de ligne).
 - chapter_number = 1.`;
@@ -84,7 +87,9 @@ Tour ${turnNumber}.${canon}${choicesBlock}${pacing}${variety}
 Écris une scène forte et précise — conséquences réelles, PNJs avec mémoire et intention propre.
 Aucun markdown, aucun titre interne, aucun bloc de choix dans le récit.
 Dialogues : chaque réplique sur sa ligne au format "Nom : réplique" (INTERDICTION du tiret cadratin '—' ou de tout tiret en début de ligne).
-Propose 3 à 4 choix physiques, verbaux ou tactiques très précis et ancrés dans cette scène exacte (INTERDIT : "Observer les alentours", "Méditer", "Négocier", "Préparer un plan").
+Propose 3 à 4 choix physiques, verbaux ou tactiques très précis et ancrés dans cette scène exacte (INTERDIT : "Observer les alentours", "Méditer", "Négocier", "Préparer un plan"). Les choix doivent être mutuellement exclusifs : au moins deux sacrifient des ressources différentes (temps, sécurité, allié, argent ou information) et remplissent tradeoff/stakes.
+Si un objet pertinent figure dans l'inventaire, propose une option qui l'utilise avec requires_items/consumes_items ; ne crée jamais d'objet absent.
+Mets à jour campaign_update.progress pour dire comment cette scène rapproche ou éloigne l'objectif de campagne. Si du temps passe, ajoute au maximum 1 ou 2 world_events_new plausibles ; ne transforme pas une prédiction en fait.
 Fournis au moins un signal monde (location ou PNJ nommé).
 chapter_number = ${turnNumber}.`;
 }

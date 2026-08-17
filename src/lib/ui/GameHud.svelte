@@ -14,6 +14,8 @@
     .filter(([, v]) => v !== 0)
     .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
     .slice(0, 6);
+  $: xpPct = Math.max(0, Math.min(100, (p.experience % 100)));
+  const skillLabels: Record<string, string> = { combat: 'Combat', diplomacy: 'Diplomatie', stealth: 'Furtivité', tech: 'Technique', force: 'Force', survival: 'Survie' };
 
   function factionName(id: string): string {
     return FACTIONS.find((f) => f.id === id)?.name || id;
@@ -50,6 +52,7 @@
       <span class="hp-label">{p.hp}<span class="muted">/100</span></span>
     </div>
     <div class="stat"><span class="stat-key">₡</span>{p.credits.toLocaleString('fr-FR')}</div>
+    <div class="level">Niv. {p.level}</div>
     <button type="button" class="hud-toggle" on:click={() => (expanded = !expanded)} aria-expanded={expanded}>
       {expanded ? 'Fermer' : 'État'}
     </button>
@@ -60,8 +63,30 @@
     <span class="muted date">{p.date}</span>
   </div>
 
+  {#if world.campaign}
+    <section class="campaign-card">
+      <div class="campaign-heading"><span class="eyebrow">Fil rouge</span><span class="campaign-status">{world.campaign.status === 'active' ? 'En cours' : world.campaign.status === 'completed' ? 'Accompli' : 'Échoué'}</span></div>
+      <strong>{world.campaign.title}</strong>
+      <p>{world.campaign.objective}</p>
+      <span class="campaign-progress">{world.campaign.progress}</span>
+    </section>
+  {/if}
+  <div class="xp-line"><span>XP {p.experience}</span><div class="xp-bar"><span style="width:{xpPct}%"></span></div></div>
+
+  {#if p.condition === 'critical'}
+    <div class="critical-alert">État critique · une dernière chance de survie</div>
+  {/if}
+
   {#if expanded}
     <div class="hud-detail">
+      <section>
+        <h4 class="eyebrow">Aptitudes</h4>
+        <div class="skills">
+          {#each Object.entries(p.skills ?? {}) as [id, score]}
+            <div class="skill"><span>{skillLabels[id] ?? id}</span><span class="skill-dots">{'●'.repeat(score)}<i>{'●'.repeat(Math.max(0, 5 - score))}</i></span></div>
+          {/each}
+        </div>
+      </section>
       {#if livingNpcs.length}
         <section>
           <h4 class="eyebrow">Personnages <span class="count">{livingNpcs.length}</span></h4>
@@ -127,6 +152,15 @@
         </section>
       {/if}
 
+      {#if world.world_events?.length}
+        <section>
+          <h4 class="eyebrow">Le monde bouge</h4>
+          <ul class="rumors">
+            {#each world.world_events.slice(0, 4) as event}<li class="rumor"><span class="event-turn">T{event.turn}</span>{event.summary}</li>{/each}
+          </ul>
+        </section>
+      {/if}
+
       {#if world.environment_status}
         <section>
           <h4 class="eyebrow">Environnement</h4>
@@ -155,6 +189,7 @@
   .hp-fill { height: 100%; border-radius: 99px; transition: width var(--transition-normal); }
   .hp-label { font-variant-numeric: tabular-nums; }
   .stat { font-variant-numeric: tabular-nums; }
+  .level { font-size: 0.72rem; color: var(--color-gold); white-space: nowrap; }
   .stat-key { color: var(--color-gold); margin-right: 2px; }
   .muted { color: var(--color-text-muted); }
 
@@ -168,6 +203,16 @@
   .hud-place { margin-top: var(--space-sm); display: flex; flex-direction: column; gap: 2px; }
   .loc { color: var(--color-text-primary); }
   .date { font-size: 0.75rem; }
+  .campaign-card { margin-top: var(--space-md); padding: 10px 12px; border: 1px solid rgba(216,185,119,0.28); border-radius: var(--radius-sm); background: rgba(216,185,119,0.05); }
+  .campaign-heading { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .campaign-card strong { display: block; color: var(--color-text-primary); font-size: 0.84rem; }
+  .campaign-card p, .campaign-progress { display: block; margin: 4px 0 0; color: var(--color-text-secondary); font-size: 0.76rem; line-height: 1.4; }
+  .campaign-progress { color: var(--color-gold); font-family: var(--font-narrative); font-style: italic; }
+  .campaign-status { font-size: 0.62rem; color: var(--color-gold); text-transform: uppercase; letter-spacing: 0.08em; }
+  .xp-line { display: flex; align-items: center; gap: 8px; margin-top: 9px; font-size: 0.68rem; color: var(--color-text-muted); }
+  .xp-bar { flex: 1; height: 3px; border-radius: 99px; background: rgba(255,255,255,0.1); overflow: hidden; }
+  .xp-bar span { display: block; height: 100%; background: var(--color-gold-dim); border-radius: inherit; }
+  .critical-alert { margin-top: 10px; padding: 7px 9px; border-radius: var(--radius-sm); color: var(--color-red); background: rgba(215,107,107,0.1); font-size: 0.74rem; }
 
   .hud-detail {
     margin-top: var(--space-md); padding-top: var(--space-md);
@@ -178,6 +223,10 @@
   }
   section h4 { display: flex; align-items: center; gap: 6px; margin-bottom: var(--space-sm); }
   .count { font-family: var(--font-body); font-size: 0.62rem; letter-spacing: normal; color: var(--color-text-muted); background: rgba(255,255,255,0.06); border-radius: 99px; padding: 0 6px; }
+  .skills { display: grid; gap: 5px; }
+  .skill { display: flex; justify-content: space-between; gap: 8px; font-size: 0.75rem; color: var(--color-text-secondary); }
+  .skill-dots { color: var(--color-gold); letter-spacing: 1px; font-size: 0.58rem; white-space: nowrap; }
+  .skill-dots i { color: rgba(255,255,255,0.15); font-style: normal; }
 
   .rows { list-style: none; display: flex; flex-direction: column; gap: var(--space-sm); }
   .name { color: var(--color-text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -224,6 +273,7 @@
   .rumors { list-style: none; display: flex; flex-direction: column; gap: 5px; }
   .rumor { font-family: var(--font-narrative); font-style: italic; font-size: 0.8rem; line-height: 1.45; color: var(--color-text-secondary); padding-left: 12px; position: relative; }
   .rumor::before { content: '»'; position: absolute; left: 0; color: var(--color-gold-dim); }
+  .event-turn { display: inline-block; margin-right: 5px; font-family: var(--font-body); font-size: 0.62rem; color: var(--color-gold-dim); font-style: normal; }
   .env { font-family: var(--font-narrative); font-style: italic; font-size: 0.8rem; line-height: 1.45; color: var(--color-text-secondary); }
 
   @media (max-width: 768px) {

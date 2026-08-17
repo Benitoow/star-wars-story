@@ -10,6 +10,9 @@ const engine = vi.hoisted(() => ({
   npcReply: vi.fn(),
   resolveConversation: vi.fn(),
   rebuildWorldState: vi.fn(),
+  cloneWorldState: vi.fn((state: WorldState) => state),
+  hasRequiredItems: vi.fn(() => true),
+  applyChoiceInventoryCost: vi.fn((state: WorldState) => state),
   resolveContextBudget: vi.fn(),
   rollForChoice: vi.fn()
 }));
@@ -42,10 +45,12 @@ const setup = { era: 'imperial', faction: 'rebels', role: 'smuggler', premise: '
 
 function world(): WorldState {
   return {
-    player: { hp: 100, credits: 100, location: 'Cantina', date: 'Jour 1', injuries: [], inventory: [], condition: 'active' },
+    player: { hp: 100, credits: 100, location: 'Cantina', date: 'Jour 1', injuries: [], inventory: [], condition: 'active', skills: { combat: 2, diplomacy: 2, stealth: 2, tech: 2, force: 2, survival: 2 }, experience: 0, level: 1, criticalTurns: 0 },
     npcs: [{ name: 'Vela', affinity: 10, status: 'neutral', alive: true }],
     factions: {},
     chronology: [{ chapter: 1, date: 'Jour 1', location: 'Cantina', summary: 'Chap 1' }],
+    campaign: { title: 'Fil rouge', objective: 'x', progress: 'Départ', status: 'active' },
+    world_events: [],
     rumors: []
   };
 }
@@ -122,6 +127,21 @@ describe('play.open', () => {
   });
 });
 
+describe('failed action recovery', () => {
+  it('re-enables editing and clears the stale pending action', async () => {
+    await openReadySession();
+    engine.generateTurn.mockRejectedValue(new Error('provider indisponible'));
+
+    await play.freeAction('Forcer le sas');
+    expect(get(play).status).toBe('error');
+    expect(get(play).pendingAction?.text).toBe('Forcer le sas');
+
+    expect(play.editPendingAction()).toBe('Forcer le sas');
+    expect(get(play).status).toBe('ready');
+    expect(get(play).error).toBeNull();
+    expect(get(play).pendingAction).toBeNull();
+  });
+});
 describe('chat — sendChatMessage', () => {
   it('streams a reply and commits it as an npc turn (persisted with the chat)', async () => {
     await openReadySession();
@@ -163,7 +183,7 @@ describe('chat — sendChatMessage', () => {
 });
 
 describe('chat — endChat (debrief)', () => {
-  it('resolves the conversation into a chapter and closes the chat', async () => {
+  it('prepares a conversation summary before applying any world consequence', async () => {
     await openReadySession();
     play.enterChat('Vela');
     engine.npcReply.mockImplementation(async (_i: unknown, _c: unknown, onToken: (d: string) => void) => {
@@ -175,10 +195,19 @@ describe('chat — endChat (debrief)', () => {
 
     await play.endChat();
     const s = get(play);
-    expect(s.chat.active).toBe(false);
-    expect(s.currentChapter?.chapter_number).toBe(2);
-    expect(s.turnNumber).toBe(2);
-    expect(s.actionHistory.at(-1)).toBe('[Conversation avec Vela]');
+    expect(s.chat.active).toBe(true);
+    expect(s.chat.review?.npcName).toBe('Vela');
+    expect(s.chat.review?.result.chapter.chapter_number).toBe(2);
+    expect(s.currentChapter?.chapter_number).toBe(1);
+    expect(s.turnNumber).toBe(1);
+    expect(s.actionHistory.at(-1)).not.toBe('[Conversation avec Vela]');
+
+    play.confirmChatReview();
+    const confirmed = get(play);
+    expect(confirmed.chat.active).toBe(false);
+    expect(confirmed.currentChapter?.chapter_number).toBe(2);
+    expect(confirmed.turnNumber).toBe(2);
+    expect(confirmed.actionHistory.at(-1)).toBe('[Conversation avec Vela]');
     // The saved session must have dropped the closed conversation.
     const lastSave = persistence.saveSession.mock.calls.at(-1)?.[0];
     expect(lastSave.chat).toBeUndefined();
