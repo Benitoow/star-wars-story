@@ -12,6 +12,7 @@ import { buildContinuePrompt, buildStartPrompt, buildStableSystemPrompt, buildTu
 import { callTextModel, callTextModelStream } from './provider';
 import { cleanText } from './text';
 import { buildMemoryQuery, retrieveMemory } from './memoryRetrieval';
+import { retrieveCodex } from './codex';
 import { embeddingCache } from '$lib/persistence';
 import type {
   ChatMessage,
@@ -35,6 +36,7 @@ export interface GenerateOptions {
   trameLabel?: string | null;
   mode?: StoryGenerationMode;
   onPartial?: (partial: GeneratePartial) => void; // stream the scene as it writes itself
+  campaignDossier?: string; // one-shot factual campaign bible (stable system block)
 }
 
 /**
@@ -76,6 +78,7 @@ export interface TurnInput {
   actionText: string;
   memory?: MemoryFact[];           // structured narrative memory (categorized, turn-stamped)
   memoryEmbeddings?: boolean;      // semantic retrieval via embeddings (falls back to lexical)
+  campaignDossier?: string;        // one-shot factual campaign bible (stable system block)
   chapterHistory?: StoryChapter[]; // full history — kept raw up to the budget
   actionHistory?: string[];        // player actions paired with the chapters
   contextBudget?: number;          // token budget for the raw transcript
@@ -92,13 +95,14 @@ export async function generateOpening(
   options: GenerateOptions = {}
 ): Promise<StoryTurnResult> {
   const world = initWorldState(setup);
+  if (options.campaignDossier) world.campaign.dossier = options.campaignDossier;
   let chapter: StoryChapter;
   let rawResponse: string;
   let mode: StoryGenerationMode;
 
   if (options.mode === 'agentic-subagents') {
     const r = await runAgenticTurn(
-      { setup, worldState: world, turnNumber: 1, actionText: OPENING_ACTION, situation: cleanText(setup.premise, 800), transcript: [], archive: [], onPartial: options.onPartial },
+      { setup, worldState: world, turnNumber: 1, actionText: OPENING_ACTION, situation: cleanText(setup.premise, 800), transcript: [], archive: [], onPartial: options.onPartial, campaignDossier: options.campaignDossier },
       provider
     );
     chapter = r.chapter;
@@ -106,9 +110,9 @@ export async function generateOpening(
     mode = 'agentic-subagents';
   } else {
     // Opening turn: fresh world, no history — the stable prompt (with the
-    // turn-1 prologue) is all the GM needs.
+    // turn-1 prologue and the campaign dossier) is all the GM needs.
     const messages = [
-      { role: 'system' as const, content: buildStableSystemPrompt(setup, 1) },
+      { role: 'system' as const, content: buildStableSystemPrompt(setup, 1, options.campaignDossier) },
       { role: 'user' as const, content: buildStartPrompt(setup, options.trameLabel) }
     ];
     rawResponse = await callStructuredJson(messages, provider, options.onPartial);
@@ -147,6 +151,9 @@ export async function generateTurn(
     currentTurn: input.turnNumber,
     cache: embeddingCache
   });
+  // Era codex: factual references relevant to the current scene, injected as
+  // OPTIONAL context — helps the model build the world without steering it.
+  const codex = retrieveCodex(input.setup.era, memoryQuery, 4);
 
   let chapter: StoryChapter;
   let rawResponse: string;
@@ -173,6 +180,8 @@ export async function generateTurn(
         outcomeDirective: input.outcomeDirective,
         playerDirectives: input.playerDirectives,
         overusedTerms,
+        campaignDossier: input.campaignDossier,
+        codex,
         onPartial: options.onPartial
       },
       provider
@@ -182,10 +191,11 @@ export async function generateTurn(
     mode = 'agentic-subagents';
   } else {
     // Stable prefix for the provider's input cache: the system prompt carries
-    // only instructions; world/memory/archive live in the final user message.
-    const contextBlock = buildTurnContextBlock(input.setup, input.worldState, memory, archive);
+    // only instructions (+ the campaign dossier, stable per campaign);
+    // world/memory/archive/codex live in the final user message.
+    const contextBlock = buildTurnContextBlock(input.setup, input.worldState, memory, archive, codex);
     const messages = [
-      { role: 'system' as const, content: buildStableSystemPrompt(input.setup, input.turnNumber) },
+      { role: 'system' as const, content: buildStableSystemPrompt(input.setup, input.turnNumber, input.campaignDossier) },
       ...transcript,
       {
         role: 'user' as const,

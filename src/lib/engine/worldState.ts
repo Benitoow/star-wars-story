@@ -115,7 +115,10 @@ function validCampaign(raw: Partial<CampaignState> | undefined, fallback: Campai
     title: typeof raw?.title === 'string' && raw.title.trim() ? raw.title.trim().slice(0, 120) : fallback.title,
     objective: typeof raw?.objective === 'string' && raw.objective.trim() ? raw.objective.trim().slice(0, 300) : fallback.objective,
     progress: typeof raw?.progress === 'string' && raw.progress.trim() ? raw.progress.trim().slice(0, 300) : fallback.progress,
-    status
+    status,
+    // The dossier is engine-owned (generated once at turn 1); the model never
+    // emits it, so it must ALWAYS fall back to the existing one.
+    dossier: typeof raw?.dossier === 'string' && raw.dossier.trim() ? raw.dossier.trim().slice(0, 2400) : fallback.dossier
   };
 }
 
@@ -398,7 +401,9 @@ export function applyStateUpdate(source: WorldState, chapter: StoryChapter): Wor
   return state;
 }
 
-/** Replay every chapter from a fresh init — used to repair a corrupted saved state. */
+/** Replay every chapter from a fresh init — used to repair a corrupted saved state.
+ * Note: the campaign dossier is engine-owned and not stored in chapters, so a
+ * rebuilt world starts without it (the campaign simply continues dossier-less). */
 export function rebuildWorldState(setup: StorySetup, chapters: StoryChapter[]): WorldState {
   return [...chapters]
     .sort((a, b) => (a.chapter_number || 0) - (b.chapter_number || 0))

@@ -42,7 +42,7 @@ PERSONNAGE : ${npc.name}${npc.faction ? ` · ${npc.faction}` : ''}
 ${npc.note ? `Profil : ${npc.note}\n` : ''}Disposition envers ${protagonist} : ${disposition(npc)}.
 
 SCÈNE : ${cleanText(sceneSummary, 800) || '—'}
-${renderWorldDigest(world)}${events}${memory}${canon}
+${renderWorldDigest(world)}${world.campaign?.dossier ? `\nDOSSIER DE CAMPAGNE (contexte factuel que ton personnage peut connaître selon sa position) :\n${cleanText(world.campaign.dossier, 1200)}` : ''}${events}${memory}${canon}
 
 RÈGLES :
 - Parle UNIQUEMENT comme ${npc.name}, en 1 à 3 phrases (conversation, pas monologue). Aucune narration à la 3e personne, aucune description d'ambiance — seulement tes paroles, et au plus une brève action entre *astérisques*.

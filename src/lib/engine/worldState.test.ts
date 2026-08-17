@@ -93,6 +93,16 @@ describe('applyStateUpdate — vitals', () => {
     expect(failed.ending?.type).toBe('defeat');
     expect(failed.campaign.status).toBe('failed');
   });
+
+  it('keeps the engine-owned campaign dossier across model campaign_updates', () => {
+    const world = initWorldState(setup);
+    world.campaign.dossier = 'Sous l\'Empire, la Bordure Extérieure vit sous la loi martiale.';
+    const next = applyStateUpdate(world, chapter({ campaign_update: { progress: 'La piste mène à Lothal.' } }, 1));
+    expect(next.campaign.dossier).toBe(world.campaign.dossier);
+    const legacy = applyStateUpdate(world, chapter({}, 1)); // model sent no campaign_update at all
+    expect(legacy.campaign.dossier).toBe(world.campaign.dossier);
+  });
+
   it('applies experience, skill gains and off-screen world events', () => {
     const next = applyStateUpdate(initWorldState(setup), chapter({
       experience: 120,

@@ -1,5 +1,27 @@
 # Changelog
 
+## v3.2.1 — « Codex » — 2026-08-17
+
+**Repères d'époque pour le Maître du Jeu** : les modèles connaissent mal certaines ères (Ancienne République…). Le Codex leur fournit des **références factuelles, optionnelles et non contraignantes** pour mieux construire l'histoire — sans la piloter.
+
+### 📚 Codex par époque (toujours actif)
+- **25 entrées factuelles** rédigées en français et vérifiées (Wookieepedia / timelines canon) pour les 5 ères du jeu : factions, lieux notables, figures, technologies, événements clés, ambiance (ex. : Guerre Civile Jedi 3959-3956 AVBY, Ère Impériale 19 AVBY-4 APBY, Nouvelle République 4-28 APBY, Premier Ordre 28-35 APBY).
+- **Injection à la demande** : 4 entrées maximum, choisies par le scoring de pertinence existant selon la scène (action, lieu, PNJ), dans le **message final** — le préfixe stable du cache d'input est préservé.
+- **Marquées « contexte optionnel — utilise-le seulement si pertinent, ne le force jamais »** : le modèle garde toute sa liberté créative.
+
+### 📄 Dossier de campagne (1 appel unique, tour 1)
+- À l'ouverture d'une partie, un **appel unique** génère une « bible » factuelle (300-450 mots) : situation politique, factions actives, lieux plausibles, types de personnages secondaires, réalités du quotidien — à partir du codex de l'ère + la prémisse.
+- **Cadrée** : « ne rédige AUCUNE intrigue, ne décide AUCUN événement futur, aucun ennemi ou objectif imposé ».
+- Stockée dans la campagne (persistante), injectée dans le **system prompt stable** (ne casse pas le cache d'input) ; les PNJ du Mode Direct peuvent la connaître « selon leur position ».
+- **Jamais bloquante** : échec de génération → la partie démarre sans dossier.
+
+### 🧭 Règle d'honnêteté (règles du GM)
+- « Si un lieu, personnage ou technologie de l'époque te semble incertain, **invente un équivalent cohérent** au lieu d'importer un nom célèbre d'une autre époque. Ne prétends jamais connaître un fait que tu ne connais pas. » — réduit les anachronismes sans contraindre.
+
+### 🗄️ Technique
+- Nouveau module `codex.ts` (contenu + retrieval + génération), `CampaignState.dossier`, règle 22 dans `GM_RULES`.
+- **144 tests Vitest verts** · `svelte-check` 0 erreur / 0 warning · ESLint 0 erreur · build Cloudflare OK.
+
 ## v3.2.0 — « Mémoire » — 2026-08-17
 
 **Mémoire inspirée de Mnemosyne** : fini le bloc plat de faits injecté tel quel — la mémoire est désormais **récupérée par pertinence** à chaque scène, **consolidée** périodiquement, et peut utiliser des **embeddings sémantiques** (optionnels) pour rappeler les bons faits au bon moment.

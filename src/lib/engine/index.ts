@@ -41,6 +41,7 @@ export {
 } from './retrieval';
 export { DEFAULT_EMBEDDING_MODEL, embedTexts, getOrCreateVectors, type EmbeddingCache } from './embedding';
 export { retrieveMemory, type MemoryRetrievalInput } from './memoryRetrieval';
+export { retrieveCodex, generateCampaignDossier, CODEX, CODEX_DOSSIER_TOP, type CodexEntry } from './codex';
 export {
   planConsolidation,
   consolidateInto,

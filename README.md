@@ -26,6 +26,7 @@ PWA **local-first** : tu crées un protagoniste (ère, faction, rôle, trame) et
 - **Inventaire utile** : un choix peut exiger un objet (`requires_items`) et le consommer (`consumes_items`) — les objets du sac ouvrent de vraies options.
 - **Conversations validées** : à la fin d'un échange, le résumé (faits retenus, progression, conséquences) est affiché et doit être **validé ou annulé** avant d'être gravé dans le monde et la mémoire.
 - **Mémoire par pertinence** (inspirée de Mnemosyne) : seuls les faits liés à la scène courante sont injectés (scoring mots-clés + récence), les vieilles notes sont **consolidées** en synthèses tous les 10 tours, et des **embeddings sémantiques** optionnels (Réglages → Avancés) améliorent le rappel avec repli automatique.
+- **Codex d'époque** : références factuelles par ère (factions, lieux, figures, technologies, événements) injectées à la demande en contexte optionnel, plus un **dossier de campagne** généré une fois au tour 1 — le modèle construit l'histoire avec de vrais repères, sans être piloté.
 - **Monde vivant** : relations PNJ et réputation des factions affichées en **paliers lisibles** (Loyal, Allié, Neutre, Hostile…) plutôt qu'en nombres bruts.
 - **Création en 4 étapes** : ère → personnage → trame → style.
 - **Bibliothèque** d'histoires (grille « affiches »), suppression **annulable**.

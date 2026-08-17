@@ -98,7 +98,9 @@ const GM_RULES = `RÈGLES DU MAÎTRE DU JEU :
 18. INVENTAIRE UTILE : si un objet pertinent est disponible, propose au moins un choix qui l'utilise et renseigne requires_items/consumes_items. Ne fais jamais apparaître un objet dans une scène si l'état ne le contient pas.
 19. MONDE HORS CHAMP : lorsqu'un voyage, un repos, une ellipse ou une action du joueur laisse du temps au monde, fais évoluer au maximum 1 ou 2 événements externes plausibles via world_events_new. Ils doivent découler des faits établis, pas créer une nouvelle armée sans cause.
 20. ENJEUX : à 0 PV, donne une dernière scène de survie crédible. Si le protagoniste reste à 0 PV après cette chance, renseigne ending.type = death et ne propose plus de choix jouables. Une campagne peut aussi se terminer par victory, defeat ou une retraite explicitement choisie.
-21. PROGRESSION : attribue de l'expérience seulement pour une action significative (en général 5 à 25 XP), et un skill_gains uniquement pour un entraînement ou une révélation exceptionnelle.`;
+21. PROGRESSION : attribue de l'expérience seulement pour une action significative (en général 5 à 25 XP), et un skill_gains uniquement pour un entraînement ou une révélation exceptionnelle.
+22. HONNÊTETÉ HISTORIQUE : tu connais bien les époques des films mais moins d'autres ères (Ancienne République, etc.). Si un lieu, un personnage ou une technologie de l'époque te semble incertain, INVENTE un équivalent cohérent avec l'ère au lieu d'importer un nom célèbre d'une autre époque. Ne prétends jamais connaître un fait que tu ne connais pas.`;
+
 function jsonContract(langName: string): string {
   return `Réponds UNIQUEMENT en JSON valide, sans markdown ni texte autour. TOUT le texte des champs est rédigé ENTIÈREMENT EN ${langName}. Priorité : prose riche dans "action" (2 à 4 paragraphes). Remplis state_update avec toutes les conséquences.
 
@@ -173,10 +175,14 @@ ${jsonContract(langName)}`;
  * System prompt with a STABLE prefix for the OpenRouter/OpenAI input cache:
  * every variable block (world state, retrieved memory, archive, player canon)
  * lives in the final user message, so the system + raw transcript prefix stays
- * byte-identical between turns and the provider serves it from cache.
+ * byte-identical between turns and the provider serves it from cache. The
+ * campaign dossier is generated once per campaign, so it keeps the prefix stable.
  */
-export function buildStableSystemPrompt(setup: StorySetup, turnNumber?: number): string {
-  return `${buildStableHeader(setup)}
+export function buildStableSystemPrompt(setup: StorySetup, turnNumber?: number, campaignDossier?: string): string {
+  const dossier = campaignDossier
+    ? `\n\nDOSSIER DE CAMPAGNE (contexte factuel — repères d'époque à respecter, mais ne décide AUCUN événement au-delà de ce cadre) :\n${campaignDossier}`
+    : '';
+  return `${buildStableHeader(setup)}${dossier}
 
 ${buildRulesTail(setup, turnNumber === 1)}`;
 }

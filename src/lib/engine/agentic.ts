@@ -11,6 +11,7 @@ import { callTextModel, callTextModelStream } from './provider';
 import { languageInstruction, languageName } from './prompts/language';
 import { ERA_COHERENCE, styleDirective, contentModeDirective } from './prompts/style';
 import { renderWorldBlock, renderWorldDigest } from './prompts/system';
+import type { CodexEntry } from './codex';
 import type { ChatMessage, MemoryFact, StoryChapter, StoryProviderConfig, StorySetup, WorldState } from './types';
 
 const DIRECTOR_SYSTEM = `Tu es le DIRECTEUR de scène d'une campagne Star Wars. Tu transformes l'action du joueur en brief de scène concret et court. Réponds UNIQUEMENT en JSON valide, aucune prose autour.`;
@@ -26,18 +27,21 @@ Règles ABSOLUES :
 - Dialogues : chaque réplique sur sa ligne, format "Nom : réplique" (INTERDICTION du tiret cadratin '—' ou de tout tiret en début de ligne).
 - Réponds UNIQUEMENT avec la scène finale réécrite.`;
 
-function writerSystem(setup: StorySetup, turnNumber: number, overusedTerms: string[]): string {
+function writerSystem(setup: StorySetup, turnNumber: number, overusedTerms: string[], campaignDossier?: string): string {
   const protagonist = [setup.protagonistFirstName, setup.protagonistLastName].filter(Boolean).join(' ').trim() || 'Le protagoniste';
   const prologue = turnNumber <= 1
     ? `\n- TOUR 1 : commence par une riche introduction du protagoniste (${protagonist}) — origines liées à son rôle (${setup.role}) et sa faction (${setup.faction}), situation actuelle, tension immédiate — avant l'action.`
     : '';
-  // STABLE by design: world state, retrieved memory, archive and player canon
-  // travel in the final user message so the input cache covers this prefix.
+  const dossier = campaignDossier
+    ? `\n\nDOSSIER DE CAMPAGNE (contexte factuel — repères d'époque à respecter, mais ne décide AUCUN événement au-delà de ce cadre) :\n${campaignDossier}`
+    : '';
+  // STABLE by design: world state, retrieved memory, archive, codex and player
+  // canon travel in the final user message so the input cache covers this prefix.
   return `${languageInstruction(setup.language)}
 
 Tu es l'ÉCRIVAIN d'une campagne Star Wars d'élite : prose cinématique, immersive, soignée. Les messages précédents sont la scène déjà jouée — écris la SUITE en continuité.
 Protagoniste : ${protagonist} | Ère : ${setup.era} | Faction : ${setup.faction} | Rôle : ${setup.role}
-Style : ${setup.writingStyle || 'cinématique'} · Ton : ${setup.writingTone || 'aventure'} · Contenu : ${setup.contentMode || 'cinematic'}
+Style : ${setup.writingStyle || 'cinématique'} · Ton : ${setup.writingTone || 'aventure'} · Contenu : ${setup.contentMode || 'cinematic'}${dossier}
 
 RÈGLES :
 1. Écris 2 à 3 paragraphes. Aucune sortie technique (ni JSON, ni markdown, ni liste).
@@ -88,14 +92,18 @@ function writerUser(
   canon: string,
   archive: string[],
   memory: MemoryFact[],
-  setup: StorySetup
+  setup: StorySetup,
+  codex: CodexEntry[] = []
 ): string {
   const protagonist = [setup.protagonistFirstName, setup.protagonistLastName].filter(Boolean).join(' ').trim() || 'Le protagoniste';
   const foldedArchive = foldArchive(archive);
   const archiveBlock = foldedArchive.length
     ? `\nRÉSUMÉ DES TOURS ANCIENS (continuité, ne pas répéter mot à mot) :\n${foldedArchive.map((a) => `- ${a}`).join('\n')}`
     : '';
-  const context = `${renderWorldBlock(world, protagonist)}${renderMemoryBlock(memory)}${archiveBlock}${canon}\n\n`;
+  const codexBlock = codex.length
+    ? `\nCODEX DE L'ÉPOQUE (contexte optionnel — utilise-le seulement si pertinent, ne le force jamais) :\n${codex.map((e) => `- ${e.text}`).join('\n')}`
+    : '';
+  const context = `${renderWorldBlock(world, protagonist)}${renderMemoryBlock(memory)}${archiveBlock}${codexBlock}${canon}\n\n`;
   const mustInclude = Array.isArray(brief.must_include) ? brief.must_include.map((m) => `- ${cleanText(m, 100)}`).join('\n') : '- Conséquence directe de l\'action';
   return `${context}But de scène : ${cleanText(brief.scene_goal, 200)}
 Tension : ${cleanText(brief.tension, 200)}
@@ -178,6 +186,8 @@ export interface AgenticContext {
   outcomeDirective?: string;
   playerDirectives?: string[];
   overusedTerms?: string[];     // words the model has leaned on across recent scenes
+  campaignDossier?: string;     // one-shot factual campaign bible (stable Writer system block)
+  codex?: CodexEntry[];         // era references for this scene (optional context)
   onPartial?: (partial: { title: string; text: string }) => void; // live preview of the Writer's draft
 }
 
@@ -224,9 +234,9 @@ export async function runAgenticTurn(
   // With onPartial the draft STREAMS to the player while Reviewer/Brain run;
   // any stream failure falls back to the plain (retried) call.
   const writerMessages: ChatMessage[] = [
-    { role: 'system', content: writerSystem(ctx.setup, ctx.turnNumber, ctx.overusedTerms ?? []) },
+    { role: 'system', content: writerSystem(ctx.setup, ctx.turnNumber, ctx.overusedTerms ?? [], ctx.campaignDossier) },
     ...ctx.transcript,
-    { role: 'user', content: writerUser(brief, ctx.actionText, ctx.outcomeDirective ?? '', ctx.worldState, canon, ctx.archive, ctx.memory ?? [], ctx.setup) }
+    { role: 'user', content: writerUser(brief, ctx.actionText, ctx.outcomeDirective ?? '', ctx.worldState, canon, ctx.archive, ctx.memory ?? [], ctx.setup, ctx.codex ?? []) }
   ];
   let draft = '';
   if (ctx.onPartial) {

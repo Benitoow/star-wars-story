@@ -53,7 +53,8 @@ export function buildTurnContextBlock(
   setup: StorySetup,
   world: WorldState,
   memory: MemoryFact[],
-  archive: string[] = []
+  archive: string[] = [],
+  codex: import('../codex').CodexEntry[] = []
 ): string {
   const protagonist = displayName(setup);
   const blocks: string[] = [renderWorldBlock(world, protagonist)];
@@ -62,6 +63,9 @@ export function buildTurnContextBlock(
   const foldedArchive = foldArchive(archive);
   if (foldedArchive.length) {
     blocks.push(`RÉSUMÉ DES TOURS ANCIENS (condensés pour la continuité — ne pas répéter mot à mot) :\n${foldedArchive.map((a) => `- ${a}`).join('\n')}`);
+  }
+  if (codex.length) {
+    blocks.push(`CODEX DE L'ÉPOQUE (contexte optionnel — utilise-le seulement si pertinent, ne le force jamais) :\n${codex.map((e) => `- ${e.text}`).join('\n')}`);
   }
   return blocks.filter(Boolean).join('\n');
 }

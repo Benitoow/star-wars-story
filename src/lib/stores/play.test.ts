@@ -16,6 +16,8 @@ const engine = vi.hoisted(() => ({
   buildMemoryQuery: vi.fn((parts: Array<string | undefined>) => parts.filter(Boolean).join(' ')),
   retrieveMemory: vi.fn(async (facts: MemoryFact[]) => facts),
   runConsolidation: vi.fn(async (facts: MemoryFact[]) => facts),
+  retrieveCodex: vi.fn(() => []),
+  generateCampaignDossier: vi.fn(async () => ''),
   resolveContextBudget: vi.fn(),
   rollForChoice: vi.fn()
 }));

@@ -71,4 +71,17 @@ describe('stable prompt prefix (provider input cache)', () => {
     const prompt = buildContinuePrompt('Je négocie', 3, [], [], 'fr', '', [], [], block);
     expect(prompt.indexOf('Mos Eisley')).toBeLessThan(prompt.indexOf('ACTION JOUEUR CANONIQUE'));
   });
+
+  it('the campaign dossier rides the stable system prompt and codex rides the turn block', () => {
+    const dossier = 'Sous l\'Empire, la Bordure Extérieure vit sous la loi martiale.';
+    const stable = buildStableSystemPrompt(setup, 4, dossier);
+    expect(stable).toContain('Bordure Extérieure');
+    expect(stable).toContain('DOSSIER DE CAMPAGNE');
+    const world = initWorldState(setup);
+    const codexEntry = { id: 't', eras: ['imperial'], keywords: 'x', text: 'Taris est un monde-cité à étages.' };
+    const block = buildTurnContextBlock(setup, world, [], [], [codexEntry]);
+    expect(block).toContain('CODEX DE L\'ÉPOQUE');
+    expect(block).toContain('contexte optionnel');
+    expect(block).toContain('monde-cité');
+  });
 });

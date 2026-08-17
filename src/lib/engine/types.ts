@@ -109,6 +109,7 @@ export interface CampaignState {
   objective: string;
   progress: string;
   status: 'active' | 'completed' | 'failed';
+  dossier?: string; // one-shot factual campaign bible (generated at turn 1)
 }
 
 export interface WorldEvent {

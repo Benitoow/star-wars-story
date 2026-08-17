@@ -22,6 +22,9 @@ import {
   buildMemoryQuery,
   retrieveMemory,
   runConsolidation,
+  retrieveCodex,
+  generateCampaignDossier,
+  CODEX_DOSSIER_TOP,
   type ChatTurn,
   type GeneratePartial,
   type MemoryFact,
@@ -164,8 +167,17 @@ async function startOpening(): Promise<void> {
   update((s) => ({ ...s, status: 'generating', error: null, pendingAction: null, partialChapter: null }));
   try {
     const { config, mode, language } = await loadProvider();
-    const result = await generateOpening({ ...setup, language }, config, { mode, onPartial });
-    recordDiag(`ouverture générée (${result.mode}, ${config.model})`, { rawResponse: result.rawResponse });
+    // One-shot campaign dossier: factual era context generated from the codex
+    // + the premise. Never blocks the opening when it fails.
+    let dossier = '';
+    try {
+      const codex = retrieveCodex(setup.era, buildMemoryQuery([setup.premise, setup.faction]), CODEX_DOSSIER_TOP);
+      dossier = await generateCampaignDossier(setup, config, codex);
+    } catch {
+      /* no dossier → the game runs without it */
+    }
+    const result = await generateOpening({ ...setup, language }, config, { mode, onPartial, campaignDossier: dossier });
+    recordDiag(`ouverture générée (${result.mode}, ${config.model})${dossier ? ' · avec dossier de campagne' : ''}`, { rawResponse: result.rawResponse });
     applyResult(result, '');
   } catch (error) {
     fail(error);
@@ -195,6 +207,7 @@ async function submit(actionText: string, outcomeDirective = '', choice?: StoryC
         actionText: action,
         memory: snap.memory,
         memoryEmbeddings,
+        campaignDossier: worldState.campaign.dossier,
         chapterHistory: snap.chapterHistory,
         actionHistory: snap.actionHistory,
         contextBudget,
