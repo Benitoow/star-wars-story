@@ -26,35 +26,32 @@ Règles ABSOLUES :
 - Dialogues : chaque réplique sur sa ligne, format "Nom : réplique" (INTERDICTION du tiret cadratin '—' ou de tout tiret en début de ligne).
 - Réponds UNIQUEMENT avec la scène finale réécrite.`;
 
-function writerSystem(setup: StorySetup, turnNumber: number, world: WorldState, canon: string, archive: string[], overusedTerms: string[], memory: MemoryFact[]): string {
+function writerSystem(setup: StorySetup, turnNumber: number, overusedTerms: string[]): string {
   const protagonist = [setup.protagonistFirstName, setup.protagonistLastName].filter(Boolean).join(' ').trim() || 'Le protagoniste';
   const prologue = turnNumber <= 1
     ? `\n- TOUR 1 : commence par une riche introduction du protagoniste (${protagonist}) — origines liées à son rôle (${setup.role}) et sa faction (${setup.faction}), situation actuelle, tension immédiate — avant l'action.`
     : '';
-  const foldedArchive = foldArchive(archive);
-  const archiveBlock = foldedArchive.length
-    ? `\nRÉSUMÉ DES TOURS ANCIENS (continuité, ne pas répéter mot à mot) :\n${foldedArchive.map((a) => `- ${a}`).join('\n')}`
-    : '';
+  // STABLE by design: world state, retrieved memory, archive and player canon
+  // travel in the final user message so the input cache covers this prefix.
   return `${languageInstruction(setup.language)}
 
 Tu es l'ÉCRIVAIN d'une campagne Star Wars d'élite : prose cinématique, immersive, soignée. Les messages précédents sont la scène déjà jouée — écris la SUITE en continuité.
 Protagoniste : ${protagonist} | Ère : ${setup.era} | Faction : ${setup.faction} | Rôle : ${setup.role}
 Style : ${setup.writingStyle || 'cinématique'} · Ton : ${setup.writingTone || 'aventure'} · Contenu : ${setup.contentMode || 'cinematic'}
-${renderWorldBlock(world, protagonist)}${renderMemoryBlock(memory)}${archiveBlock}
 
 RÈGLES :
 1. Écris 2 à 3 paragraphes. Aucune sortie technique (ni JSON, ni markdown, ni liste).
 2. Ne propose AUCUN choix.
-3. COHÉRENCE MONDE : respecte scrupuleusement l'état ci-dessus — lieu actuel, PV/blessures, et surtout les PNJ (n'utilise QUE des personnages vivants connus ou nouvellement introduits ; ne fais jamais réapparaître un mort).
+3. COHÉRENCE MONDE : respecte scrupuleusement l'état fourni dans le message utilisateur — lieu actuel, PV/blessures, et surtout les PNJ (n'utilise QUE des personnages vivants connus ou nouvellement introduits ; ne fais jamais réapparaître un mort).
 4. DIRECTIVE STYLE : ${styleDirective(setup.writingStyle, setup.writingTone)}
 5. DIRECTIVE CONTENU : ${contentModeDirective(setup.contentMode)}
 6. ${ERA_COHERENCE}
 7. RÔLE CANONIQUE IMMUABLE : garde le rôle "${setup.role}".
 8. Dialogues : chaque réplique sur sa ligne, format "Nom : réplique" (INTERDICTION du tiret cadratin '—' ou de tout tiret en début de ligne).
-9. CANON DU JOUEUR & ESCALADE : respecte les faits que le joueur a établis (ci-dessous) ; ne les contredis jamais et n'introduis pas un groupe/élément qu'il a exclu. Un lieu civil (marché, cantina) reste civil sans escalade fortement justifiée — pas de stormtroopers en masse ni de marcheurs/AT-ST surgissant sans cause proportionnée. CONSÉQUENCES DURABLES : les forces ennemies sont FINIES — une troupe décimée ou une armée vaincue reste vaincue, pas de vague identique au tour suivant ni de renforts surgis de nulle part ; montre les effets durables d'une victoire (silence, survivants en fuite, répit crédible) et ne ressuscite jamais un ennemi vaincu sans cause visible (vaisseau, appel radio).
+9. CANON DU JOUEUR & ESCALADE : respecte les faits que le joueur a établis (fournis dans le message utilisateur) ; ne les contredis jamais et n'introduis pas un groupe/élément qu'il a exclu. Un lieu civil (marché, cantina) reste civil sans escalade fortement justifiée — pas de stormtroopers en masse ni de marcheurs/AT-ST surgissant sans cause proportionnée. CONSÉQUENCES DURABLES : les forces ennemies sont FINIES — une troupe décimée ou une armée vaincue reste vaincue, pas de vague identique au tour suivant ni de renforts surgis de nulle part ; montre les effets durables d'une victoire (silence, survivants en fuite, répit crédible) et ne ressuscite jamais un ennemi vaincu sans cause visible (vaisseau, appel radio).
 10. FIL ROUGE & PROGRESSION : cette scène doit faire avancer l'objectif de campagne ou montrer clairement le prix d'un retard. Le monde ne remplace pas la quête principale par une succession de rencontres aléatoires.
 11. INVENTAIRE : l'état contient les seuls objets disponibles. Si un objet est pertinent, le Cerveau devra proposer une option qui l'utilise ; n'en invente aucun.
-12. RYTHME : si le contexte indique deux scènes action/confrontation consécutives, écris une accalmie, un dialogue ou une exploration. Ne rajoute pas un combat par réflexe.${prologue}${canon}${varietyNote(overusedTerms)}`;
+12. RYTHME : si le contexte indique deux scènes action/confrontation consécutives, écris une accalmie, un dialogue ou une exploration. Ne rajoute pas un combat par réflexe.${prologue}${varietyNote(overusedTerms)}`;
 }
 
 function directorUser(summary: string, action: string, turnNumber: number, digest: string, canon: string, recentSectionTypes: string[] = []): string {
@@ -83,9 +80,24 @@ Réponds en JSON strict :
 }`;
 }
 
-function writerUser(brief: Record<string, unknown>, action: string, outcomeDirective: string): string {
+function writerUser(
+  brief: Record<string, unknown>,
+  action: string,
+  outcomeDirective: string,
+  world: WorldState,
+  canon: string,
+  archive: string[],
+  memory: MemoryFact[],
+  setup: StorySetup
+): string {
+  const protagonist = [setup.protagonistFirstName, setup.protagonistLastName].filter(Boolean).join(' ').trim() || 'Le protagoniste';
+  const foldedArchive = foldArchive(archive);
+  const archiveBlock = foldedArchive.length
+    ? `\nRÉSUMÉ DES TOURS ANCIENS (continuité, ne pas répéter mot à mot) :\n${foldedArchive.map((a) => `- ${a}`).join('\n')}`
+    : '';
+  const context = `${renderWorldBlock(world, protagonist)}${renderMemoryBlock(memory)}${archiveBlock}${canon}\n\n`;
   const mustInclude = Array.isArray(brief.must_include) ? brief.must_include.map((m) => `- ${cleanText(m, 100)}`).join('\n') : '- Conséquence directe de l\'action';
-  return `But de scène : ${cleanText(brief.scene_goal, 200)}
+  return `${context}But de scène : ${cleanText(brief.scene_goal, 200)}
 Tension : ${cleanText(brief.tension, 200)}
 Éléments obligatoires :
 ${mustInclude}
@@ -160,8 +172,8 @@ export interface AgenticContext {
   actionText: string;
   situation: string;            // compressed story-so-far for the Director
   transcript: ChatMessage[];    // raw recent scenes (conversation) for the Writer
-  archive: string[];            // older turns, condensed (into the Writer's system)
-  memory?: MemoryFact[];        // structured narrative memory (into the Writer's system)
+  archive: string[];            // older turns, condensed (into the Writer's user message)
+  memory?: MemoryFact[];        // structured narrative memory (into the Writer's user message)
   recentSectionTypes?: string[]; // pacing signal shared with Director and Writer
   outcomeDirective?: string;
   playerDirectives?: string[];
@@ -207,12 +219,14 @@ export async function runAgenticTurn(
 
   // 2. Writer — cinematic prose, grounded in the world block + archive and
   // reading the RAW recent scenes (transcript) as the conversation so far.
+  // The variable context (world/memory/archive/canon) travels in the USER
+  // message so the system prompt stays stable for the provider input cache.
   // With onPartial the draft STREAMS to the player while Reviewer/Brain run;
   // any stream failure falls back to the plain (retried) call.
   const writerMessages: ChatMessage[] = [
-    { role: 'system', content: writerSystem(ctx.setup, ctx.turnNumber, ctx.worldState, canon, ctx.archive, ctx.overusedTerms ?? [], ctx.memory ?? []) },
+    { role: 'system', content: writerSystem(ctx.setup, ctx.turnNumber, ctx.overusedTerms ?? []) },
     ...ctx.transcript,
-    { role: 'user', content: writerUser(brief, ctx.actionText, ctx.outcomeDirective ?? '') }
+    { role: 'user', content: writerUser(brief, ctx.actionText, ctx.outcomeDirective ?? '', ctx.worldState, canon, ctx.archive, ctx.memory ?? [], ctx.setup) }
   ];
   let draft = '';
   if (ctx.onPartial) {

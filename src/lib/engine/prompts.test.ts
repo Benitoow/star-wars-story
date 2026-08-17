@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { buildContinuePrompt, buildSystemPrompt, renderWorldDigest } from './prompts';
+import { buildContinuePrompt, buildStableSystemPrompt, buildSystemPrompt, buildTurnContextBlock, renderWorldDigest } from './prompts';
 import { initWorldState } from './worldState';
-import type { StorySetup } from './types';
+import type { MemoryFact, StorySetup } from './types';
 
 const setup: StorySetup = { era: 'imperial', faction: 'jedi', role: 'padawan', premise: 'x', language: 'fr' };
 
@@ -43,5 +43,32 @@ describe('player canon — keeps the player\'s stated constraints in context', (
 
   it('no canon block when the player has stated nothing', () => {
     expect(buildContinuePrompt('Je cours', 2)).not.toContain('CANON DU JOUEUR');
+  });
+});
+
+describe('stable prompt prefix (provider input cache)', () => {
+  it('the stable system prompt does not vary with world state or memory', () => {
+    const base = buildStableSystemPrompt(setup, 3);
+    expect(base).toBe(buildStableSystemPrompt(setup, 5)); // same setup → identical prefix
+    expect(base).toContain('RÈGLES');
+    // Variable context blocks never leak into the stable prefix.
+    expect(base).not.toContain('ÉTAT DU MONDE');
+    expect(base).not.toContain('MÉMOIRE NARRATIVE');
+    // The legacy wrapper still carries them (used by older callers/tests).
+    const full = buildSystemPrompt(setup, [{ text: 'Vela alliée', category: 'relations', turn: 2 }], initWorldState(setup), 3);
+    expect(full).toContain('Vela alliée');
+  });
+
+  it('the turn context block carries world, memory and archive into the final message', () => {
+    const world = initWorldState(setup);
+    world.player.location = 'Mos Eisley';
+    const memory: MemoryFact[] = [{ text: 'Vela est une contrebandière', category: 'relations', turn: 2 }];
+    const block = buildTurnContextBlock(setup, world, memory, ['Tour 1 : Ouverture']);
+    expect(block).toContain('Mos Eisley');
+    expect(block).toContain('contrebandière');
+    expect(block).toContain('RÉSUMÉ DES TOURS ANCIENS');
+    // The continue prompt embeds the context block before the action.
+    const prompt = buildContinuePrompt('Je négocie', 3, [], [], 'fr', '', [], [], block);
+    expect(prompt.indexOf('Mos Eisley')).toBeLessThan(prompt.indexOf('ACTION JOUEUR CANONIQUE'));
   });
 });

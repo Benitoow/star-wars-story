@@ -8,7 +8,7 @@
 import { runAgenticTurn } from './agentic';
 import { buildNarrativeContext, detectOverusedTerms, DEFAULT_CONTEXT_BUDGET } from './context';
 import { extractStreamingJsonField, parseStoryResponse } from './parsing';
-import { buildContinuePrompt, buildStartPrompt, buildSystemPrompt, summarizeChapterForPrompt } from './prompts';
+import { buildContinuePrompt, buildStartPrompt, buildStableSystemPrompt, buildTurnContextBlock, summarizeChapterForPrompt } from './prompts';
 import { callTextModel, callTextModelStream } from './provider';
 import { cleanText } from './text';
 import { buildMemoryQuery, retrieveMemory } from './memoryRetrieval';
@@ -105,8 +105,10 @@ export async function generateOpening(
     rawResponse = r.raw;
     mode = 'agentic-subagents';
   } else {
+    // Opening turn: fresh world, no history — the stable prompt (with the
+    // turn-1 prologue) is all the GM needs.
     const messages = [
-      { role: 'system' as const, content: buildSystemPrompt(setup, [], world, 1) },
+      { role: 'system' as const, content: buildStableSystemPrompt(setup, 1) },
       { role: 'user' as const, content: buildStartPrompt(setup, options.trameLabel) }
     ];
     rawResponse = await callStructuredJson(messages, provider, options.onPartial);
@@ -179,8 +181,11 @@ export async function generateTurn(
     rawResponse = r.raw;
     mode = 'agentic-subagents';
   } else {
+    // Stable prefix for the provider's input cache: the system prompt carries
+    // only instructions; world/memory/archive live in the final user message.
+    const contextBlock = buildTurnContextBlock(input.setup, input.worldState, memory, archive);
     const messages = [
-      { role: 'system' as const, content: buildSystemPrompt(input.setup, memory, input.worldState, input.turnNumber, input.playerDirectives ?? [], archive) },
+      { role: 'system' as const, content: buildStableSystemPrompt(input.setup, input.turnNumber) },
       ...transcript,
       {
         role: 'user' as const,
@@ -192,7 +197,8 @@ export async function generateTurn(
           input.setup.language,
           input.outcomeDirective ?? '',
           input.playerDirectives ?? [],
-          overusedTerms
+          overusedTerms,
+          contextBlock
         )
       }
     ];

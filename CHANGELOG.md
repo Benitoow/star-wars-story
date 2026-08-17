@@ -19,10 +19,15 @@
 - Les **notes anciennes** (≥ 8 tours, à partir de 4 faits, max 8 par passe) sont condensées par le modèle en une **synthèse datée** unique — les relations ne sont jamais consolidées.
 - **Sans risque** : en cas d'échec de l'appel, la mémoire reste strictement inchangée (aucune perte) ; une garde de concurrence abandonne la passe si un tour est soumis pendant la synthèse (pas d'écrasement des faits récents).
 
+### ⚡ Préfixe stable (input cache OpenRouter)
+- Le system prompt (Direct et Écrivain agentique) ne porte plus que des **instructions stables** ; le monde, la mémoire, l'archive et le canon voyagent dans le **message utilisateur final**.
+- Le préfixe [system + historique] reste donc identique entre les tours → le **cache d'input du provider** s'applique à tout le début du prompt (tokens d'historique servis au tarif réduit, souvent −50 % à −90 % selon le provider).
+- `buildSystemPrompt` (ancien format tout-en-un) reste disponible pour la compatibilité.
+
 ### 🗄️ Technique
 - Nouveaux modules purs et testés : `retrieval.ts`, `embedding.ts`, `consolidate.ts`, `memoryRetrieval.ts` (assemblage) + cache `persistence/embeddings.ts`.
 - Préférence `memoryEmbeddings` (défaut : désactivé) — les anciennes sauvegardes de réglages restent valides.
-- **134 tests Vitest verts** (21 nouveaux) · `svelte-check` 0 erreur / 0 warning · ESLint 0 erreur · build Cloudflare OK.
+- **136 tests Vitest verts** (23 nouveaux) · `svelte-check` 0 erreur / 0 warning · ESLint 0 erreur · build Cloudflare OK.
 
 ## v3.1.0 — « Gameplay » — 2026-08-17
 

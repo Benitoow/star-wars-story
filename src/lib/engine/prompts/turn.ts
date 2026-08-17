@@ -1,8 +1,10 @@
 import { ERA_CONTEXT } from '$lib/content/catalog';
 import { cleanText } from '../text';
-import type { SectionType, StorySetup } from '../types';
+import type { MemoryFact, SectionType, StorySetup, WorldState } from '../types';
 import { languageName } from './language';
 import { styleDirective } from './style';
+import { renderWorldBlock } from './system';
+import { foldArchive, renderMemoryBlock } from '../memory';
 
 const ACTION_HEAVY: SectionType[] = ['action', 'confrontation'];
 
@@ -42,6 +44,28 @@ EXIGENCES DU PREMIER TOUR (rédige ENTIÈREMENT EN ${langName}) :
 - chapter_number = 1.`;
 }
 
+/**
+ * The variable context of a turn (world state, retrieved memory, archive) —
+ * injected into the FINAL user message so the system prompt stays stable and
+ * the provider's input cache keeps covering the system + transcript prefix.
+ */
+export function buildTurnContextBlock(
+  setup: StorySetup,
+  world: WorldState,
+  memory: MemoryFact[],
+  archive: string[] = []
+): string {
+  const protagonist = displayName(setup);
+  const blocks: string[] = [renderWorldBlock(world, protagonist)];
+  const memoryBlock = renderMemoryBlock(memory);
+  if (memoryBlock) blocks.push(memoryBlock);
+  const foldedArchive = foldArchive(archive);
+  if (foldedArchive.length) {
+    blocks.push(`RÉSUMÉ DES TOURS ANCIENS (condensés pour la continuité — ne pas répéter mot à mot) :\n${foldedArchive.map((a) => `- ${a}`).join('\n')}`);
+  }
+  return blocks.filter(Boolean).join('\n');
+}
+
 /** Subsequent turns — react to the player's action with real consequences. */
 export function buildContinuePrompt(
   actionText: string,
@@ -51,7 +75,8 @@ export function buildContinuePrompt(
   languageCode?: string,
   outcomeDirective = '',
   playerDirectives: string[] = [],
-  overusedTerms: string[] = []
+  overusedTerms: string[] = [],
+  contextBlock = ''
 ): string {
   const langName = languageName(languageCode || 'fr');
   const action = cleanText(actionText, 280);
@@ -79,7 +104,8 @@ export function buildContinuePrompt(
     ? `\nRYTHME : ${consecutiveIntense} scènes intenses d'affilée — ce tour DOIT être repos, dialogue ou exploration.`
     : '';
 
-  return `ACTION JOUEUR CANONIQUE : ${action}
+  const context = contextBlock ? `${contextBlock}\n\n` : '';
+  return `${context}ACTION JOUEUR CANONIQUE : ${action}
 ${outcome}OBLIGATION : la scène suivante traite cette action comme cause immédiate (ou tentative avec conséquence concrète), rédigée ENTIÈREMENT EN ${langName}.
 
 Tour ${turnNumber}.${canon}${choicesBlock}${pacing}${variety}

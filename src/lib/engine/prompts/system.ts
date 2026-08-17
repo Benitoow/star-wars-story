@@ -141,6 +141,46 @@ export function renderPlayerCanon(playerDirectives: string[] = []): string {
   return `\nCANON DU JOUEUR — ce qu'il a fait/établi récemment (à respecter, ne jamais contredire) :\n${recent.map((d) => `- ${d}`).join('\n')}`;
 }
 
+/** Stable header: language + GM identity + protagonist line. Never varies across turns. */
+function buildStableHeader(setup: StorySetup): string {
+  const protagonist = protagonistName(setup);
+  const lang = setup.language || 'fr';
+  return `${languageInstruction(lang)}
+
+Tu es un Maître du Jeu Star Wars d'élite. Tu écris avec précision et cinéma — chaque ligne crée tension, émotion ou révélation. Zéro remplissage.
+
+Protagoniste : ${protagonist} | Ère : ${setup.era} | Faction : ${setup.faction} | Rôle : ${setup.role}
+Prémisse : ${setup.premise || 'Libre'}
+Style : ${setup.writingStyle || 'cinématique'} · Ton : ${setup.writingTone || 'aventure'} · POV : ${setup.writingPov || 'première personne'} · Longueur : ${setup.writingLength || 'moyen'} · Contenu : ${setup.contentMode || 'cinematic'}`;
+}
+
+/** Stable tail: rules, style directives, era coherence, JSON contract. Never varies across turns. */
+function buildRulesTail(setup: StorySetup, isTurn1: boolean): string {
+  const protagonist = protagonistName(setup);
+  const langName = languageName(setup.language || 'fr');
+  const prologue = isTurn1
+    ? `\n17. PROLOGUE (TOUR 1) : commence par une riche introduction du protagoniste (${protagonist}) — apparence, origines liées à son rôle (${setup.role}) et sa faction (${setup.faction}), situation actuelle et tension immédiate. Pose le décor (state_update.location) avec soin avant l'action.`
+    : '';
+  return `${GM_RULES}
+15. DIRECTIVE STYLISTIQUE : ${styleDirective(setup.writingStyle, setup.writingTone)}
+16. DIRECTIVE DE CONTENU : ${contentModeDirective(setup.contentMode)}
+${ERA_COHERENCE}${prologue}
+
+${jsonContract(langName)}`;
+}
+
+/**
+ * System prompt with a STABLE prefix for the OpenRouter/OpenAI input cache:
+ * every variable block (world state, retrieved memory, archive, player canon)
+ * lives in the final user message, so the system + raw transcript prefix stays
+ * byte-identical between turns and the provider serves it from cache.
+ */
+export function buildStableSystemPrompt(setup: StorySetup, turnNumber?: number): string {
+  return `${buildStableHeader(setup)}
+
+${buildRulesTail(setup, turnNumber === 1)}`;
+}
+
 export function buildSystemPrompt(
   setup: StorySetup,
   memory: MemoryFact[] = [],
@@ -150,8 +190,6 @@ export function buildSystemPrompt(
   campaignArchive: string[] = []
 ): string {
   const protagonist = protagonistName(setup);
-  const lang = setup.language || 'fr';
-  const langName = languageName(lang);
   const worldBlock = worldState ? renderWorldBlock(worldState, protagonist) : '';
   const memoryBlock = renderMemoryBlock(memory);
   const foldedArchive = foldArchive(campaignArchive);
@@ -160,25 +198,10 @@ export function buildSystemPrompt(
     : '';
   const canon = renderPlayerCanon(playerDirectives);
   const isTurn1 = turnNumber === 1 || !worldState || worldState.chronology.length === 0;
-  const prologue = isTurn1
-    ? `\n17. PROLOGUE (TOUR 1) : commence par une riche introduction du protagoniste (${protagonist}) — apparence, origines liées à son rôle (${setup.role}) et sa faction (${setup.faction}), situation actuelle et tension immédiate. Pose le décor (state_update.location) avec soin avant l'action.`
-    : '';
 
-  return `${languageInstruction(lang)}
+  return `${buildStableHeader(setup)}${worldBlock}${memoryBlock}${archive}${canon}
 
-Tu es un Maître du Jeu Star Wars d'élite. Tu écris avec précision et cinéma — chaque ligne crée tension, émotion ou révélation. Zéro remplissage.
-
-Protagoniste : ${protagonist} | Ère : ${setup.era} | Faction : ${setup.faction} | Rôle : ${setup.role}
-Prémisse : ${setup.premise || 'Libre'}
-Style : ${setup.writingStyle || 'cinématique'} · Ton : ${setup.writingTone || 'aventure'} · POV : ${setup.writingPov || 'première personne'} · Longueur : ${setup.writingLength || 'moyen'} · Contenu : ${setup.contentMode || 'cinematic'}
-${worldBlock}${memoryBlock}${archive}${canon}
-
-${GM_RULES}
-15. DIRECTIVE STYLISTIQUE : ${styleDirective(setup.writingStyle, setup.writingTone)}
-16. DIRECTIVE DE CONTENU : ${contentModeDirective(setup.contentMode)}
-${ERA_COHERENCE}${prologue}
-
-${jsonContract(langName)}`;
+${buildRulesTail(setup, isTurn1)}`;
 }
 
 /** Condense a played chapter into one recap line for the prompt history. */
