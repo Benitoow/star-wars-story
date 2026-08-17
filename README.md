@@ -1,4 +1,4 @@
-# Star Wars Story — v3.1 « Lite »
+# Star Wars Story — v3.2 « Lite »
 
 > Écris ta légende — une aventure interactive Star Wars où chaque choix façonne un monde vivant, guidée par une IA Maître du Jeu.
 
@@ -6,7 +6,7 @@
 [![Svelte](https://img.shields.io/badge/Svelte-5-FF3E00)](https://svelte.dev)
 [![OpenRouter](https://img.shields.io/badge/OpenRouter-fetch%20direct-7C3AED)](https://openrouter.ai)
 
-> **v3.1 « Gameplay »** enrichit la 3.0 : aptitudes réelles, jets recalibrés et risques lisibles, fil rouge de campagne, événements hors champ, inventaire utile, choix opposés, conversations validées et fins réelles. Voir le [CHANGELOG](./CHANGELOG.md).
+> **v3.2 « Mémoire »** ajoute une mémoire inspirée de Mnemosyne : récupération par pertinence à chaque scène, consolidation périodique des vieux faits, et embeddings sémantiques optionnels (Réglages → Avancés). Voir le [CHANGELOG](./CHANGELOG.md).
 
 ---
 
@@ -25,6 +25,7 @@ PWA **local-first** : tu crées un protagoniste (ère, faction, rôle, trame) et
 - **Fil rouge de campagne** : titre, objectif, progression et statut persistants ; **événements hors champ** visibles dans le HUD et le journal ; ressources ennemies **finies** (pas de vague identique sans cause) ; **fins réelles** — victoire, défaite, retraite ou mort après une dernière chance de survie.
 - **Inventaire utile** : un choix peut exiger un objet (`requires_items`) et le consommer (`consumes_items`) — les objets du sac ouvrent de vraies options.
 - **Conversations validées** : à la fin d'un échange, le résumé (faits retenus, progression, conséquences) est affiché et doit être **validé ou annulé** avant d'être gravé dans le monde et la mémoire.
+- **Mémoire par pertinence** (inspirée de Mnemosyne) : seuls les faits liés à la scène courante sont injectés (scoring mots-clés + récence), les vieilles notes sont **consolidées** en synthèses tous les 10 tours, et des **embeddings sémantiques** optionnels (Réglages → Avancés) améliorent le rappel avec repli automatique.
 - **Monde vivant** : relations PNJ et réputation des factions affichées en **paliers lisibles** (Loyal, Allié, Neutre, Hostile…) plutôt qu'en nombres bruts.
 - **Création en 4 étapes** : ère → personnage → trame → style.
 - **Bibliothèque** d'histoires (grille « affiches »), suppression **annulable**.

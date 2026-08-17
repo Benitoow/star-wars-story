@@ -2,7 +2,7 @@
    session resume, error paths) exercised against a fully mocked engine. */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { get } from 'svelte/store';
-import type { StoryChapter, StoryTurnResult, WorldState } from '$lib/engine/types';
+import type { MemoryFact, StoryChapter, StoryTurnResult, WorldState } from '$lib/engine/types';
 
 const engine = vi.hoisted(() => ({
   generateOpening: vi.fn(),
@@ -13,6 +13,9 @@ const engine = vi.hoisted(() => ({
   cloneWorldState: vi.fn((state: WorldState) => state),
   hasRequiredItems: vi.fn(() => true),
   applyChoiceInventoryCost: vi.fn((state: WorldState) => state),
+  buildMemoryQuery: vi.fn((parts: Array<string | undefined>) => parts.filter(Boolean).join(' ')),
+  retrieveMemory: vi.fn(async (facts: MemoryFact[]) => facts),
+  runConsolidation: vi.fn(async (facts: MemoryFact[]) => facts),
   resolveContextBudget: vi.fn(),
   rollForChoice: vi.fn()
 }));
@@ -29,7 +32,8 @@ const persistence = vi.hoisted(() => ({
   getStory: vi.fn(),
   loadSession: vi.fn(),
   saveSession: vi.fn(),
-  touchStory: vi.fn()
+  touchStory: vi.fn(),
+  embeddingCache: { get: vi.fn(async () => null), set: vi.fn(async () => undefined) }
 }));
 vi.mock('$lib/persistence', () => persistence);
 

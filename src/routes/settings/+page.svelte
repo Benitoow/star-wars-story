@@ -16,9 +16,12 @@
 
   const REASONING = [
     { id: 'auto', name: 'Auto (le modèle décide)' },
-    { id: 'low', name: 'Faible' },
-    { id: 'medium', name: 'Moyen' },
-    { id: 'high', name: 'Élevé' }
+    { id: 'minimal', name: 'Minimal' },
+    { id: 'low', name: 'Low' },
+    { id: 'medium', name: 'Medium' },
+    { id: 'high', name: 'High' },
+    { id: 'extra-high', name: 'Extra High' },
+    { id: 'max', name: 'Max' }
   ];
 
   const PROVIDERS = [
@@ -33,7 +36,8 @@
     textModel: '',
     uiLanguage: 'auto' as Preferences['uiLanguage'],
     runtimeMode: 'agentic-subagents' as Preferences['runtimeMode'],
-    reasoningEffort: 'auto'
+    reasoningEffort: 'auto',
+    memoryEmbeddings: false
   };
   let showAdvanced = false;
   let saving = false;
@@ -68,7 +72,8 @@
       textModel: p.textModel,
       uiLanguage: p.uiLanguage,
       runtimeMode: p.runtimeMode,
-      reasoningEffort: p.reasoningEffort
+      reasoningEffort: p.reasoningEffort,
+      memoryEmbeddings: p.memoryEmbeddings === true
     };
   });
 
@@ -78,7 +83,8 @@
     form.textModel.trim() !== $preferences.textModel ||
     form.uiLanguage !== $preferences.uiLanguage ||
     form.runtimeMode !== $preferences.runtimeMode ||
-    form.reasoningEffort !== $preferences.reasoningEffort;
+    form.reasoningEffort !== $preferences.reasoningEffort ||
+    form.memoryEmbeddings !== ($preferences.memoryEmbeddings === true);
 
   /** When the user switches provider, pre-fill a sensible default model. */
   function onProviderChange(providerId: string) {
@@ -100,7 +106,8 @@
         textModel: form.textModel.trim(),
         uiLanguage: form.uiLanguage,
         runtimeMode: form.runtimeMode,
-        reasoningEffort: form.reasoningEffort
+        reasoningEffort: form.reasoningEffort,
+        memoryEmbeddings: form.memoryEmbeddings
       });
       toasts.show('Réglages enregistrés.', 'success', 2000);
     } catch {
@@ -242,7 +249,17 @@
         <select id="reason" class="input" bind:value={form.reasoningEffort}>
           {#each REASONING as o}<option value={o.id}>{o.name}</option>{/each}
         </select>
-        <p class="hint">« Auto » laisse chaque modèle gérer son raisonnement (recommandé).</p>
+        <p class="hint">« Auto » laisse chaque modèle gérer son raisonnement (recommandé). Les autres niveaux (Minimal → Max) transmettent l'effort demandé aux modèles qui le supportent.</p>
+      </div>
+      <div class="field mt">
+        <label class="check">
+          <input type="checkbox" bind:checked={form.memoryEmbeddings} disabled={form.textProvider === 'mimo'} />
+          <span>
+            <strong>Mémoire sémantique</strong>
+            <span class="hint">Embeddings OpenRouter pour rappeler les faits pertinents à la scène (repli automatique sur la recherche par mots-clés en cas d'échec).</span>
+          </span>
+        </label>
+        <p class="hint">Coûte un petit appel d'embedding par tour ; les vecteurs sont mis en cache localement.</p>
       </div>
     {/if}
   </section>
@@ -289,6 +306,10 @@
   .toggle button.on { color: var(--color-text-primary); border-color: var(--color-gold); background: rgba(216,185,119,0.08); }
   .disclosure { display: flex; align-items: center; justify-content: space-between; width: 100%; font-family: var(--font-display); font-size: 0.78rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-text-secondary); background: none; cursor: pointer; }
   .disclosure:hover { color: var(--color-text-primary); }
+  .check { display: flex; gap: var(--space-sm); align-items: flex-start; cursor: pointer; }
+  .check input { margin-top: 3px; accent-color: var(--color-gold); }
+  .check span { display: flex; flex-direction: column; gap: 2px; }
+  .check strong { color: var(--color-text-primary); font-family: var(--font-body); font-size: 0.9rem; }
 
   /* ── Provider grid ──────────────────────────────── */
   .provider-grid { display: flex; gap: var(--space-sm); }

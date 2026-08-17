@@ -1,5 +1,29 @@
 # Changelog
 
+## v3.2.0 — « Mémoire » — 2026-08-17
+
+**Mémoire inspirée de Mnemosyne** : fini le bloc plat de faits injecté tel quel — la mémoire est désormais **récupérée par pertinence** à chaque scène, **consolidée** périodiquement, et peut utiliser des **embeddings sémantiques** (optionnels) pour rappeler les bons faits au bon moment.
+
+### 🔍 Récupération par pertinence (toujours active)
+- **Scoring lexical** (`retrieval.ts`) : chaque fait est noté selon son chevauchement de mots-clés avec la scène courante (pondération IDF), la **récence** (demi-vie de 8 tours) et sa catégorie.
+- **Sélection bornée** : seuls les ~24 faits les plus pertinents sont injectés dans les prompts, plus les faits des 3 derniers tours pour la continuité de scène — les longues campagnes ne saturent plus le contexte.
+- La requête est construite depuis l'action du joueur, le lieu, le titre et la prose du dernier chapitre ; les conversations (Mode Direct) utilisent la scène, le dernier message et le PNJ.
+- Appliqué aux trois canaux : Direct (`buildSystemPrompt`), Agentique (Écrivain + Cerveau) et Mode Direct (répliques + débrief).
+
+### 🧠 Embeddings sémantiques (option dans Réglages → Avancés)
+- **« Mémoire sémantique »** : embeddings OpenRouter (`qwen/qwen3-embedding-8b`) pour la requête et les faits ; similarité cosinus fusionnée avec le scoring lexical.
+- **Cache IndexedDB** (table `embeddings`, DB v2) : chaque fait n'est encodé qu'une fois, les vecteurs persistent entre sessions ; la requête (unique à chaque tour) n'est jamais persistée — la table ne grossit pas indéfiniment.
+- **Repli automatique** : panne réseau, erreur de cache IndexedDB, provider MiMo (sans endpoint embeddings) ou réponse vide → retour silencieux au scoring lexical. La mémoire sémantique ne bloque jamais un tour.
+
+### 🧹 Consolidation épisodique (tous les 10 tours)
+- Les **notes anciennes** (≥ 8 tours, à partir de 4 faits, max 8 par passe) sont condensées par le modèle en une **synthèse datée** unique — les relations ne sont jamais consolidées.
+- **Sans risque** : en cas d'échec de l'appel, la mémoire reste strictement inchangée (aucune perte) ; une garde de concurrence abandonne la passe si un tour est soumis pendant la synthèse (pas d'écrasement des faits récents).
+
+### 🗄️ Technique
+- Nouveaux modules purs et testés : `retrieval.ts`, `embedding.ts`, `consolidate.ts`, `memoryRetrieval.ts` (assemblage) + cache `persistence/embeddings.ts`.
+- Préférence `memoryEmbeddings` (défaut : désactivé) — les anciennes sauvegardes de réglages restent valides.
+- **134 tests Vitest verts** (21 nouveaux) · `svelte-check` 0 erreur / 0 warning · ESLint 0 erreur · build Cloudflare OK.
+
 ## v3.1.0 — « Gameplay » — 2026-08-17
 
 **Passe d'amélioration du jeu** : les attributs comptent vraiment, les jets sont lisibles et mieux calibrés, la campagne a un fil rouge, l'inventaire sert à jouer, les choix sont des dilemmes, les conversations sont validées avant d'être gravées et les fins sont réelles.

@@ -19,6 +19,9 @@ import {
   hasRequiredItems,
   applyChoiceInventoryCost,
   summarizeChapterForPrompt,
+  buildMemoryQuery,
+  retrieveMemory,
+  runConsolidation,
   type ChatTurn,
   type GeneratePartial,
   type MemoryFact,
@@ -31,7 +34,7 @@ import {
   type StoryTurnResult,
   type WorldState
 } from '$lib/engine';
-import { SESSION_VERSION, getPreferences, getStory, loadSession, saveSession, touchStory } from '$lib/persistence';
+import { SESSION_VERSION, getPreferences, getStory, loadSession, saveSession, touchStory, embeddingCache } from '$lib/persistence';
 import { resolveUiLanguage } from '$lib/content/languages';
 import { logger, recordDiag } from '$lib/logger';
 import { toasts } from './ui';
@@ -94,14 +97,15 @@ subscribe((s) => (snap = s));
 
 let chatAbort: AbortController | null = null;
 
-async function loadProvider(): Promise<{ config: StoryProviderConfig; mode: StoryGenerationMode; language: string; contextBudget: number }> {
+async function loadProvider(): Promise<{ config: StoryProviderConfig; mode: StoryGenerationMode; language: string; contextBudget: number; memoryEmbeddings: boolean }> {
   const p = await getPreferences();
   const config: StoryProviderConfig = { providerId: p.textProvider, model: p.textModel, apiKey: p.textApiKey, reasoningEffort: p.reasoningEffort };
   return {
     config,
     mode: p.runtimeMode,
     language: resolveUiLanguage(p.uiLanguage),
-    contextBudget: await resolveContextBudget(config) // auto-detected from the model's window
+    contextBudget: await resolveContextBudget(config), // auto-detected from the model's window
+    memoryEmbeddings: p.memoryEmbeddings === true
   };
 }
 
@@ -182,7 +186,7 @@ async function submit(actionText: string, outcomeDirective = '', choice?: StoryC
     partialChapter: null
   }));
   try {
-    const { config, mode, language, contextBudget } = await loadProvider();
+    const { config, mode, language, contextBudget, memoryEmbeddings } = await loadProvider();
     const result = await generateTurn(
       {
         setup: { ...setup, language },
@@ -190,6 +194,7 @@ async function submit(actionText: string, outcomeDirective = '', choice?: StoryC
         turnNumber: snap.turnNumber + 1,
         actionText: action,
         memory: snap.memory,
+        memoryEmbeddings,
         chapterHistory: snap.chapterHistory,
         actionHistory: snap.actionHistory,
         contextBudget,
@@ -201,6 +206,7 @@ async function submit(actionText: string, outcomeDirective = '', choice?: StoryC
     );
     recordDiag(`tour ${result.chapter.chapter_number} (${result.mode}, ${config.model})`, { action, rawResponse: result.rawResponse });
     applyResult(result, action, choice, worldState);
+    void maybeConsolidate(config);
   } catch (error) {
     fail(error);
   }
@@ -211,6 +217,42 @@ function editPendingAction(): string {
   if (!action) return '';
   update((s) => ({ ...s, status: 'ready', error: null, pendingAction: null, partialChapter: null }));
   return action;
+}
+
+const CONSOLIDATION_EVERY_TURNS = 10;
+
+/** Mnemosyne-style episodic compression: every 10 turns the oldest notes are
+ * condensed into a synthesis by the model. Fire-and-forget — the memory is
+ * only ever replaced when the call succeeds, and a guard drops the pass if
+ * the campaign advanced while the model was summarizing (no clobbering of
+ * facts added by an intermediate turn). */
+function maybeConsolidate(config: StoryProviderConfig): void {
+  const { turnNumber, memory, storyId } = snap;
+  if (!storyId || !memory?.length || turnNumber <= 0 || turnNumber % CONSOLIDATION_EVERY_TURNS !== 0) return;
+  const snapshotTurn = turnNumber;
+  const snapshotMemory = memory;
+  void runConsolidation(snapshotMemory, snapshotTurn, config).then((next) => {
+    if (next === snapshotMemory) return; // nothing changed (or consolidation failed)
+    if (snap.turnNumber !== snapshotTurn || snap.memory !== snapshotMemory) return; // race guard
+    update((s) => ({ ...s, memory: next }));
+    void persist();
+  });
+}
+
+/** Keep only the facts relevant to the current conversation. */
+async function memoryForChat(enableEmbeddings: boolean, config: StoryProviderConfig): Promise<MemoryFact[]> {
+  const query = buildMemoryQuery([
+    snap.chat.sceneSummary,
+    snap.chat.turns.at(-1)?.content,
+    snap.chat.npcName,
+    snap.worldState?.player.location
+  ]);
+  return retrieveMemory(snap.memory ?? [], query, {
+    provider: config,
+    enableEmbeddings,
+    currentTurn: snap.turnNumber,
+    cache: embeddingCache
+  });
 }
 
 // ── Mode Direct (live chat) ───────────────────────────
@@ -237,11 +279,12 @@ async function chatSend(text: string): Promise<void> {
   update((s) => ({ ...s, chat: { ...s.chat, turns, partial: '', busy: true, error: null } }));
   chatAbort = new AbortController();
   try {
-    const { config, language } = await loadProvider();
+    const { config, language, memoryEmbeddings } = await loadProvider();
+    const memory = await memoryForChat(memoryEmbeddings, config);
     const reply = await npcReply(
       {
         setup: { ...setup, language }, worldState: world, npc: currentNpc(), sceneSummary: snap.chat.sceneSummary, turns,
-        playerDirectives: snap.actionHistory.slice(-10), memory: snap.memory, recentEvents: recentEvents()
+        playerDirectives: snap.actionHistory.slice(-10), memory, recentEvents: recentEvents()
       },
       config,
       (delta) => update((s) => ({ ...s, chat: { ...s.chat, partial: s.chat.partial + delta } })),
@@ -281,9 +324,10 @@ async function chatEnd(): Promise<void> {
   chatAbort = new AbortController();
   const signal = chatAbort.signal;
   try {
-    const { config, language } = await loadProvider();
+    const { config, language, memoryEmbeddings } = await loadProvider();
+    const memory = await memoryForChat(memoryEmbeddings, config);
     const result = await resolveConversation(
-      { setup: { ...setup, language }, worldState: world, npc, sceneSummary, turns, turnNumber: snap.turnNumber + 1, memory: snap.memory },
+      { setup: { ...setup, language }, worldState: world, npc, sceneSummary, turns, turnNumber: snap.turnNumber + 1, memory },
       config,
       signal
     );

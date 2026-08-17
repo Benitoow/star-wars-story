@@ -42,6 +42,7 @@ export interface Preferences {
   textApiKey: string;
   reasoningEffort: string;
   runtimeMode: StoryGenerationMode;
+  memoryEmbeddings: boolean; // semantic memory retrieval via OpenRouter embeddings
   // appearance
   uiLanguage: UiLanguageCode;
   theme: 'dark' | 'light';
@@ -60,6 +61,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   textApiKey: '',
   reasoningEffort: 'auto',
   runtimeMode: 'agentic-subagents', // richer multi-agent pipeline by default
+  memoryEmbeddings: false,
   uiLanguage: 'auto',
   theme: 'dark',
   writingStyle: 'cinematique',
@@ -69,10 +71,17 @@ export const DEFAULT_PREFERENCES: Preferences = {
   contentMode: 'cinematic'
 };
 
+export interface StoredEmbedding {
+  key: string;        // `${model}::${foldText(text)}`
+  vector: number[];
+  createdAt: number;
+}
+
 class StarWarsStoryDB extends Dexie {
   stories!: Table<StoredStory, string>;
   sessions!: Table<StoredSession, string>;
   preferences!: Table<Preferences, string>;
+  embeddings!: Table<StoredEmbedding, string>;
 
   constructor() {
     super('StarWarsStory');
@@ -80,6 +89,12 @@ class StarWarsStoryDB extends Dexie {
       stories: 'id, updatedAt, deletedAt',
       sessions: 'storyId',
       preferences: 'id'
+    });
+    this.version(2).stores({
+      stories: 'id, updatedAt, deletedAt',
+      sessions: 'storyId',
+      preferences: 'id',
+      embeddings: 'key'
     });
   }
 }

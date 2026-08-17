@@ -28,6 +28,28 @@ export {
 export { resolveContextBudget, fetchContextLengths, fetchModelCatalog, supportsReasoningParam, TRANSCRIPT_SHARE, type ModelCapabilities } from './models';
 export { rollForChoice, choiceRisk, type Outcome, type RollResult, type ChoiceRisk } from './dice';
 export {
+  tokenize,
+  cosineSimilarity,
+  scoreFacts,
+  semanticScores,
+  mergeScores,
+  selectTopFacts,
+  selectFromScores,
+  buildMemoryQuery,
+  type ScoredFact,
+  type RetrievalOptions
+} from './retrieval';
+export { DEFAULT_EMBEDDING_MODEL, embedTexts, getOrCreateVectors, type EmbeddingCache } from './embedding';
+export { retrieveMemory, type MemoryRetrievalInput } from './memoryRetrieval';
+export {
+  planConsolidation,
+  consolidateInto,
+  summarizeFacts,
+  runConsolidation,
+  type ConsolidationPlan,
+  type ConsolidationOptions
+} from './consolidate';
+export {
   buildSystemPrompt,
   buildStartPrompt,
   buildContinuePrompt,

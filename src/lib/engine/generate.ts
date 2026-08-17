@@ -11,6 +11,8 @@ import { extractStreamingJsonField, parseStoryResponse } from './parsing';
 import { buildContinuePrompt, buildStartPrompt, buildSystemPrompt, summarizeChapterForPrompt } from './prompts';
 import { callTextModel, callTextModelStream } from './provider';
 import { cleanText } from './text';
+import { buildMemoryQuery, retrieveMemory } from './memoryRetrieval';
+import { embeddingCache } from '$lib/persistence';
 import type {
   ChatMessage,
   MemoryFact,
@@ -73,6 +75,7 @@ export interface TurnInput {
   turnNumber: number;
   actionText: string;
   memory?: MemoryFact[];           // structured narrative memory (categorized, turn-stamped)
+  memoryEmbeddings?: boolean;      // semantic retrieval via embeddings (falls back to lexical)
   chapterHistory?: StoryChapter[]; // full history — kept raw up to the budget
   actionHistory?: string[];        // player actions paired with the chapters
   contextBudget?: number;          // token budget for the raw transcript
@@ -128,6 +131,20 @@ export async function generateTurn(
   const overusedTerms = detectOverusedTerms(history, {
     excludeTerms: [input.worldState.player.location, ...input.worldState.npcs.map((npc) => npc.name)]
   });
+  // Mnemosyne-style retrieval: only the facts relevant to the current scene
+  // are injected, so long campaigns stay focused instead of flooding the prompt.
+  const memoryQuery = buildMemoryQuery([
+    input.actionText,
+    input.worldState.player.location,
+    history.at(-1)?.chapter_title,
+    history.at(-1)?.narrative.action
+  ]);
+  const memory = await retrieveMemory(input.memory ?? [], memoryQuery, {
+    provider,
+    enableEmbeddings: input.memoryEmbeddings === true,
+    currentTurn: input.turnNumber,
+    cache: embeddingCache
+  });
 
   let chapter: StoryChapter;
   let rawResponse: string;
@@ -149,7 +166,7 @@ export async function generateTurn(
         situation,
         transcript,
         archive,
-        memory: input.memory,
+        memory,
         recentSectionTypes,
         outcomeDirective: input.outcomeDirective,
         playerDirectives: input.playerDirectives,
@@ -163,7 +180,7 @@ export async function generateTurn(
     mode = 'agentic-subagents';
   } else {
     const messages = [
-      { role: 'system' as const, content: buildSystemPrompt(input.setup, input.memory ?? [], input.worldState, input.turnNumber, input.playerDirectives ?? [], archive) },
+      { role: 'system' as const, content: buildSystemPrompt(input.setup, memory, input.worldState, input.turnNumber, input.playerDirectives ?? [], archive) },
       ...transcript,
       {
         role: 'user' as const,
