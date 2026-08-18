@@ -14,6 +14,7 @@
 - **Cadrée** : « ne rédige AUCUNE intrigue, ne décide AUCUN événement futur, aucun ennemi ou objectif imposé ».
 - Stockée dans la campagne (persistante), injectée dans le **system prompt stable** (ne casse pas le cache d'input) ; les PNJ du Mode Direct peuvent la connaître « selon leur position ».
 - **Jamais bloquante** : échec de génération → la partie démarre sans dossier.
+- **Hors du chemin critique** : le dossier est généré **en parallèle** de la scène d'ouverture, plus avant elle — le joueur n'attend plus deux appels modèle successifs (ni leurs relances réseau) avant de voir le premier mot. Il est rattaché à la campagne dès qu'il arrive et sert donc à partir du **tour 2**.
 
 ### 🧭 Règle d'honnêteté (les deux moteurs)
 - « Si un lieu, personnage ou technologie de l'époque te semble incertain, **invente un équivalent cohérent** au lieu d'importer un nom célèbre d'une autre époque. Ne prétends jamais connaître un fait que tu ne connais pas. » — réduit les anachronismes sans contraindre.
@@ -23,7 +24,7 @@
 ### 🗄️ Technique
 - Nouveau module `codex.ts` (contenu + retrieval + génération), `CampaignState.dossier`, garde-fou `ERA_HONESTY` partagé par les deux moteurs (règle 22 de `GM_RULES` + règles Directeur/Écrivain).
 - **Numérotation des règles corrigée** : `GM_RULES` s'arrête à 22, les directives de style/contenu/prologue continuent en 23-25 au lieu de rejouer 15-17. Un test garantit désormais que les numéros restent uniques et croissants.
-- **148 tests Vitest verts** · `svelte-check` 0 erreur / 0 warning · ESLint 0 erreur · build Cloudflare OK.
+- **151 tests Vitest verts** · `svelte-check` 0 erreur / 0 warning · ESLint 0 erreur · build Cloudflare OK.
 
 ## v3.2.0 — « Mémoire » — 2026-08-17
 

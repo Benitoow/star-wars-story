@@ -161,24 +161,47 @@ function onPartial(partial: GeneratePartial): void {
   update((s) => ({ ...s, partialChapter: partial }));
 }
 
+/** Fold the parallel-generated dossier into the live campaign, once. Guarded:
+ * a dossier that resolves after the player switched story, or after one was
+ * already recorded, is dropped rather than applied to the wrong campaign. */
+function adoptDossier(storyId: string | null, dossier: string): void {
+  if (!dossier || !storyId || snap.storyId !== storyId) return;
+  if (!snap.worldState || snap.worldState.campaign.dossier) return;
+  update((s) => (s.worldState
+    ? { ...s, worldState: { ...s.worldState, campaign: { ...s.worldState.campaign, dossier } } }
+    : s));
+  recordDiag('dossier de campagne rattaché');
+  void persist();
+}
+
 async function startOpening(): Promise<void> {
   const setup = snap.setup;
   if (!setup) return;
   update((s) => ({ ...s, status: 'generating', error: null, pendingAction: null, partialChapter: null }));
   try {
     const { config, mode, language } = await loadProvider();
-    // One-shot campaign dossier: factual era context generated from the codex
-    // + the premise. Never blocks the opening when it fails.
-    let dossier = '';
-    try {
-      const codex = retrieveCodex(setup.era, buildMemoryQuery([setup.premise, setup.faction]), CODEX_DOSSIER_TOP);
-      dossier = await generateCampaignDossier(setup, config, codex);
-    } catch {
-      /* no dossier → the game runs without it */
-    }
-    const result = await generateOpening({ ...setup, language }, config, { mode, onPartial, campaignDossier: dossier });
-    recordDiag(`ouverture générée (${result.mode}, ${config.model})${dossier ? ' · avec dossier de campagne' : ''}`, { rawResponse: result.rawResponse });
+    const storyId = snap.storyId;
+    // The dossier is factual context for the campaign, not a prerequisite of the
+    // opening. Generating it first meant TWO sequential model calls before the
+    // player saw a single word (and its retries stacked on top). It now runs
+    // ALONGSIDE the opening and is folded in once the scene is on screen, so it
+    // costs no perceived latency — the trade-off is that it informs turn 2
+    // onwards rather than the opening scene itself.
+    const dossierPromise = (async () => {
+      try {
+        const codex = retrieveCodex(setup.era, buildMemoryQuery([setup.premise, setup.faction]), CODEX_DOSSIER_TOP);
+        return await generateCampaignDossier(setup, config, codex);
+      } catch {
+        return ''; /* no dossier -> the game runs without it */
+      }
+    })();
+
+    const result = await generateOpening({ ...setup, language }, config, { mode, onPartial });
+    recordDiag(`ouverture générée (${result.mode}, ${config.model})`, { rawResponse: result.rawResponse });
     applyResult(result, '');
+    // Attached AFTER applyResult so the dossier can never land in a world state
+    // that is about to be replaced by the opening.
+    void dossierPromise.then((dossier) => adoptDossier(storyId, dossier));
   } catch (error) {
     fail(error);
   }
