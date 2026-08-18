@@ -109,7 +109,11 @@ export async function runConsolidation(
   try {
     const summary = await summarizeFacts(plan.toConsolidate, provider);
     if (!summary) return facts;
-    return consolidateInto(facts, plan.toConsolidate, summary, currentTurn);
+    // Stamp the synthesis with the age of what it replaces, not the current
+    // turn. Stamping it "now" made a digest of old notes score as maximally
+    // recent forever, so it crowded genuinely fresh facts out of every prompt.
+    const inheritedTurn = Math.max(1, ...plan.toConsolidate.map((f) => f.turn));
+    return consolidateInto(facts, plan.toConsolidate, summary, inheritedTurn);
   } catch {
     return facts;
   }

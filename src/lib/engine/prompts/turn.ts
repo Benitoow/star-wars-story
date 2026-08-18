@@ -12,11 +12,29 @@ function displayName(setup: StorySetup): string {
   return [setup.protagonistFirstName, setup.protagonistLastName].filter(Boolean).join(' ').trim() || 'le protagoniste';
 }
 
-/** Turn 1 — open the adventure with an immediately playable prologue. */
+/**
+ * Turn 1. When the story carries a genesis, the protagonist already exists —
+ * this asks the model to STAGE them (and to use the seeded items and ally),
+ * not to invent them mid-scene while also doing five other jobs. Without a
+ * genesis it falls back to the previous behaviour and introduces them here.
+ */
 export function buildStartPrompt(setup: StorySetup, trameLabel?: string | null): string {
   const lang = setup.language || 'fr';
   const langName = languageName(lang);
   const eraContext = ERA_CONTEXT[setup.era] || 'Galaxie lointaine — une époque de conflits et de destins qui basculent.';
+  const g = setup.genesis;
+  const name = displayName(setup);
+
+  const opening = g
+    ? `- Le protagoniste est DÉJÀ défini (voir « LE PROTAGONISTE » dans les règles) : ne réinvente ni son passé, ni sa faille, ni son lien. Montre-le EN ACTION — la scène doit faire ressentir qui il est sans le résumer.
+- Ouvre à « ${g.location || 'un lieu cohérent'} » et renseigne state_update.location avec ce lieu.
+- ${g.ally?.name ? `${g.ally.name} est déjà dans le monde. Fais-le exister dans cette scène ou explique en une ligne pourquoi il est absent.` : 'Introduis au moins 1 PNJ mémorable avec un agenda propre.'}
+- ${g.items.length ? `Le protagoniste possède déjà : ${g.items.map((i) => i.name).join(', ')}. AU MOINS UN CHOIX doit l'utiliser via requires_items/consumes_items.` : "N'invente aucun objet absent de l'inventaire."}
+- Sa faille doit peser sur la scène ou sur au moins un des choix.`
+    : `- Ouvre par une vraie introduction cinématique du protagoniste : qui il est, son background immédiat lié à son rôle (${setup.role}) et sa trame, pourquoi il est là, la tension qui pèse.
+- Choisis un lieu de départ cohérent avec le protagoniste et sa trame, et renseigne-le dans state_update.location.
+- Introduis au moins 1 PNJ mémorable avec un agenda propre.
+- N'invente aucun objet absent de l'inventaire.`;
 
   return `Lance une histoire interactive Star Wars avec un prologue immédiatement jouable.
 
@@ -25,19 +43,17 @@ ACTION JOUEUR CANONIQUE : entrer dans la scène d'ouverture et survivre aux prem
 DIRECTIVE STYLISTIQUE : ${styleDirective(setup.writingStyle, setup.writingTone)}
 
 CADRE D'OUVERTURE :
-- Protagoniste : ${displayName(setup)}
+- Protagoniste : ${name}
 - Ère : ${setup.era} — ${eraContext}
 - Faction : ${setup.faction || 'libre'} · Rôle : ${setup.role || 'aventurier'}
 - Trame : ${trameLabel || 'Libre'}
-- Prémisse : ${setup.premise || 'Crée une situation tendue et immédiatement jouable.'}
+- Situation : ${g?.premise || setup.premise || 'Crée une situation tendue et immédiatement jouable.'}
 
 EXIGENCES DU PREMIER TOUR (rédige ENTIÈREMENT EN ${langName}) :
-- Ouvre par une vraie introduction cinématique du protagoniste : qui il est, son background immédiat lié à son rôle (${setup.role}) et sa trame, pourquoi il est là, la tension qui pèse.
-- Choisis un lieu de départ cohérent avec le protagoniste et sa trame, et renseigne-le dans state_update.location.
-- Donne une tension claire, un lieu vivant, un objectif de campagne et au moins 1 PNJ mémorable avec un agenda propre.
+${opening}
+- Donne une tension claire, un lieu vivant et un objectif de campagne.
 - Initialise campaign_update avec un titre, un objectif concret et une première progression vérifiable.
 - 3 à 4 choix concrets et contrastés, dont au moins deux avec des coûts opposés ; chaque choix renseigne tradeoff et stakes.
-- Si un objet de départ est pertinent, une option le référence via requires_items/consumes_items.
 - Attribue 5 à 15 XP pour le lancement, pas davantage.
 - Respecte strictement le rôle canonique (${setup.role}) — pas de promotion au lancement.
 - Dialogues isolés sur leur ligne au format "Nom : réplique" (INTERDICTION du tiret cadratin '—' ou de tout tiret en début de ligne).

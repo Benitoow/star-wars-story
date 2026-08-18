@@ -96,13 +96,16 @@ export async function generateOpening(
 ): Promise<StoryTurnResult> {
   const world = initWorldState(setup);
   if (options.campaignDossier) world.campaign.dossier = options.campaignDossier;
+  // The turn-1 staging spec. It used to be built only for structured-json, so
+  // the DEFAULT agentic mode opened with a single bullet and no spec at all.
+  const openingBrief = buildStartPrompt(setup, options.trameLabel);
   let chapter: StoryChapter;
   let rawResponse: string;
   let mode: StoryGenerationMode;
 
   if (options.mode === 'agentic-subagents') {
     const r = await runAgenticTurn(
-      { setup, worldState: world, turnNumber: 1, actionText: OPENING_ACTION, situation: cleanText(setup.premise, 800), transcript: [], archive: [], onPartial: options.onPartial, campaignDossier: options.campaignDossier },
+      { setup, worldState: world, turnNumber: 1, actionText: OPENING_ACTION, situation: cleanText(setup.premise, 800), transcript: [], archive: [], onPartial: options.onPartial, campaignDossier: options.campaignDossier, openingBrief },
       provider
     );
     chapter = r.chapter;
@@ -113,7 +116,7 @@ export async function generateOpening(
     // turn-1 prologue and the campaign dossier) is all the GM needs.
     const messages = [
       { role: 'system' as const, content: buildStableSystemPrompt(setup, 1, options.campaignDossier) },
-      { role: 'user' as const, content: buildStartPrompt(setup, options.trameLabel) }
+      { role: 'user' as const, content: openingBrief }
     ];
     rawResponse = await callStructuredJson(messages, provider, options.onPartial);
     chapter = parseStoryResponse(rawResponse, 1);

@@ -3,6 +3,7 @@
    a session, calls the engine, applies the hidden roll,
    and persists after every turn.
 ══════════════════════════════════════════════ */
+import { TRAMES } from '$lib/content/catalog';
 import {
   fromLegacyFacts,
   generateOpening,
@@ -73,7 +74,8 @@ async function startOpening(): Promise<void> {
       }
     })();
 
-    const result = await generateOpening({ ...setup, language }, config, { mode, onPartial });
+    const trameLabel = TRAMES.find((t) => t.id === setup.trameId)?.name ?? null;
+    const result = await generateOpening({ ...setup, language }, config, { mode, onPartial, trameLabel });
     recordDiag(`ouverture générée (${result.mode}, ${config.model})`, { rawResponse: result.rawResponse });
     applyResult(result, '');
     // Attached AFTER applyResult so the dossier can never land in a world state

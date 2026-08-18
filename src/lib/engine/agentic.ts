@@ -9,7 +9,7 @@ import { cleanText, isRecord } from './text';
 import { parseStoryResponse, sanitizeProse } from './parsing';
 import { callTextModel, callTextModelStream } from './provider';
 import { languageInstruction, languageName } from './prompts/language';
-import { ERA_COHERENCE, ERA_HONESTY, styleDirective, contentModeDirective } from './prompts/style';
+import { ERA_COHERENCE, ERA_HONESTY, styleDirective, contentModeDirective, lengthDirective, povDirective, renderGenesis } from './prompts/style';
 import { renderWorldBlock, renderWorldDigest } from './prompts/system';
 import type { CodexEntry } from './codex';
 import type { ChatMessage, MemoryFact, StoryChapter, StoryProviderConfig, StorySetup, WorldState } from './types';
@@ -41,22 +41,23 @@ function writerSystem(setup: StorySetup, turnNumber: number, overusedTerms: stri
 
 Tu es l'ÉCRIVAIN d'une campagne Star Wars d'élite : prose cinématique, immersive, soignée. Les messages précédents sont la scène déjà jouée — écris la SUITE en continuité.
 Protagoniste : ${protagonist} | Ère : ${setup.era} | Faction : ${setup.faction} | Rôle : ${setup.role}
-Style : ${setup.writingStyle || 'cinématique'} · Ton : ${setup.writingTone || 'aventure'} · Contenu : ${setup.contentMode || 'cinematic'}${dossier}
+Style : ${setup.writingStyle || 'cinématique'} · Ton : ${setup.writingTone || 'aventure'} · Contenu : ${setup.contentMode || 'cinematic'}${renderGenesis(setup.genesis)}${dossier}
 
 RÈGLES :
-1. Écris 2 à 3 paragraphes. Aucune sortie technique (ni JSON, ni markdown, ni liste).
-2. Ne propose AUCUN choix.
-3. COHÉRENCE MONDE : respecte scrupuleusement l'état fourni dans le message utilisateur — lieu actuel, PV/blessures, et surtout les PNJ (n'utilise QUE des personnages vivants connus ou nouvellement introduits ; ne fais jamais réapparaître un mort).
-4. DIRECTIVE STYLE : ${styleDirective(setup.writingStyle, setup.writingTone)}
-5. DIRECTIVE CONTENU : ${contentModeDirective(setup.contentMode)}
-6. ${ERA_COHERENCE}
-7. RÔLE CANONIQUE IMMUABLE : garde le rôle "${setup.role}".
-8. Dialogues : chaque réplique sur sa ligne, format "Nom : réplique" (INTERDICTION du tiret cadratin '—' ou de tout tiret en début de ligne).
-9. CANON DU JOUEUR & ESCALADE : respecte les faits que le joueur a établis (fournis dans le message utilisateur) ; ne les contredis jamais et n'introduis pas un groupe/élément qu'il a exclu. Un lieu civil (marché, cantina) reste civil sans escalade fortement justifiée — pas de stormtroopers en masse ni de marcheurs/AT-ST surgissant sans cause proportionnée. CONSÉQUENCES DURABLES : les forces ennemies sont FINIES — une troupe décimée ou une armée vaincue reste vaincue, pas de vague identique au tour suivant ni de renforts surgis de nulle part ; montre les effets durables d'une victoire (silence, survivants en fuite, répit crédible) et ne ressuscite jamais un ennemi vaincu sans cause visible (vaisseau, appel radio).
-10. FIL ROUGE & PROGRESSION : cette scène doit faire avancer l'objectif de campagne ou montrer clairement le prix d'un retard. Le monde ne remplace pas la quête principale par une succession de rencontres aléatoires.
-11. INVENTAIRE : l'état contient les seuls objets disponibles. Si un objet est pertinent, le Cerveau devra proposer une option qui l'utilise ; n'en invente aucun.
-12. RYTHME : si le contexte indique deux scènes action/confrontation consécutives, écris une accalmie, un dialogue ou une exploration. Ne rajoute pas un combat par réflexe.
-13. ${ERA_HONESTY}${prologue}${varietyNote(overusedTerms)}`;
+1. LONGUEUR : ${lengthDirective(setup.writingLength)} Aucune sortie technique (ni JSON, ni markdown, ni liste).
+2. ${povDirective(setup.writingPov)}
+3. Ne propose AUCUN choix.
+4. COHÉRENCE MONDE : respecte scrupuleusement l'état fourni dans le message utilisateur — lieu actuel, PV/blessures, et surtout les PNJ (n'utilise QUE des personnages vivants connus ou nouvellement introduits ; ne fais jamais réapparaître un mort).
+5. DIRECTIVE STYLE : ${styleDirective(setup.writingStyle, setup.writingTone)}
+6. DIRECTIVE CONTENU : ${contentModeDirective(setup.contentMode)}
+7. ${ERA_COHERENCE}
+8. RÔLE CANONIQUE IMMUABLE : garde le rôle "${setup.role}".
+9. Dialogues : chaque réplique sur sa ligne, format "Nom : réplique" (INTERDICTION du tiret cadratin '—' ou de tout tiret en début de ligne).
+10. CANON DU JOUEUR & ESCALADE : respecte les faits que le joueur a établis (fournis dans le message utilisateur) ; ne les contredis jamais et n'introduis pas un groupe/élément qu'il a exclu. Un lieu civil (marché, cantina) reste civil sans escalade fortement justifiée — pas de stormtroopers en masse ni de marcheurs/AT-ST surgissant sans cause proportionnée. CONSÉQUENCES DURABLES : les forces ennemies sont FINIES — une troupe décimée ou une armée vaincue reste vaincue, pas de vague identique au tour suivant ni de renforts surgis de nulle part ; montre les effets durables d'une victoire (silence, survivants en fuite, répit crédible) et ne ressuscite jamais un ennemi vaincu sans cause visible (vaisseau, appel radio).
+11. FIL ROUGE & PROGRESSION : cette scène doit faire avancer l'objectif de campagne ou montrer clairement le prix d'un retard. Le monde ne remplace pas la quête principale par une succession de rencontres aléatoires.
+12. INVENTAIRE : l'état contient les seuls objets disponibles. Si un objet est pertinent, le Cerveau devra proposer une option qui l'utilise ; n'en invente aucun.
+13. RYTHME : si le contexte indique deux scènes action/confrontation consécutives, écris une accalmie, un dialogue ou une exploration. Ne rajoute pas un combat par réflexe.
+14. ${ERA_HONESTY}${prologue}${varietyNote(overusedTerms)}`;
 }
 
 /** Era references, marked OPTIONAL so they inform the scene without steering it. */
@@ -66,7 +67,7 @@ function codexBlock(codex: CodexEntry[] = []): string {
     : '';
 }
 
-function directorUser(summary: string, action: string, turnNumber: number, digest: string, canon: string, recentSectionTypes: string[] = [], codex: CodexEntry[] = []): string {
+function directorUser(summary: string, action: string, turnNumber: number, digest: string, canon: string, recentSectionTypes: string[] = [], codex: CodexEntry[] = [], opening = ''): string {
   let consecutiveIntense = 0;
   for (let i = recentSectionTypes.length - 1; i >= 0; i -= 1) {
     if (['action', 'confrontation'].includes(recentSectionTypes[i])) consecutiveIntense += 1;
@@ -75,7 +76,7 @@ function directorUser(summary: string, action: string, turnNumber: number, diges
   const pacing = consecutiveIntense >= 2
     ? `\nRYTHME OBLIGATOIRE : ${consecutiveIntense} scènes intenses viennent de s'enchaîner. Planifie une scène de repos, dialogue ou exploration ; aucune nouvelle bataille sans nécessité exceptionnelle.`
     : '';
-  return `Tour ${turnNumber}. Situation : ${cleanText(summary, 2600) || '(ouverture)'}
+  return `${opening ? `${opening}\n\n` : ''}Tour ${turnNumber}. Situation : ${cleanText(summary, 2600) || '(ouverture)'}
 
 ÉTAT DU MONDE :
 ${digest}${canon}${codexBlock(codex)}${pacing}
@@ -101,7 +102,8 @@ function writerUser(
   archive: string[],
   memory: MemoryFact[],
   setup: StorySetup,
-  codex: CodexEntry[] = []
+  codex: CodexEntry[] = [],
+  openingBrief = ''
 ): string {
   const protagonist = [setup.protagonistFirstName, setup.protagonistLastName].filter(Boolean).join(' ').trim() || 'Le protagoniste';
   const foldedArchive = foldArchive(archive);
@@ -109,8 +111,9 @@ function writerUser(
     ? `\nRÉSUMÉ DES TOURS ANCIENS (continuité, ne pas répéter mot à mot) :\n${foldedArchive.map((a) => `- ${a}`).join('\n')}`
     : '';
   const context = `${renderWorldBlock(world, protagonist)}${renderMemoryBlock(memory)}${archiveBlock}${codexBlock(codex)}${canon}\n\n`;
+  const opening = openingBrief ? `${openingBrief}\n\n` : '';
   const mustInclude = Array.isArray(brief.must_include) ? brief.must_include.map((m) => `- ${cleanText(m, 100)}`).join('\n') : '- Conséquence directe de l\'action';
-  return `${context}But de scène : ${cleanText(brief.scene_goal, 200)}
+  return `${context}${opening}But de scène : ${cleanText(brief.scene_goal, 200)}
 Tension : ${cleanText(brief.tension, 200)}
 Éléments obligatoires :
 ${mustInclude}
@@ -192,6 +195,7 @@ export interface AgenticContext {
   playerDirectives?: string[];
   overusedTerms?: string[];     // words the model has leaned on across recent scenes
   campaignDossier?: string;     // one-shot factual campaign bible (stable Writer system block)
+  openingBrief?: string;        // turn-1 staging spec — agentic mode ignored it entirely before
   codex?: CodexEntry[];         // era references for this scene (optional context)
   onPartial?: (partial: { title: string; text: string }) => void; // live preview of the Writer's draft
 }
@@ -219,7 +223,7 @@ export async function runAgenticTurn(
 
   // 1. Director — scene brief (JSON), planned from the condensed story-so-far
   const briefRaw = await callTextModel(
-    [{ role: 'system', content: `${languageInstruction(lang)}\n\n${DIRECTOR_SYSTEM}` }, { role: 'user', content: directorUser(ctx.situation, ctx.actionText, ctx.turnNumber, digest, canon, ctx.recentSectionTypes ?? [], ctx.codex ?? []) }],
+    [{ role: 'system', content: `${languageInstruction(lang)}\n\n${DIRECTOR_SYSTEM}` }, { role: 'user', content: directorUser(ctx.situation, ctx.actionText, ctx.turnNumber, digest, canon, ctx.recentSectionTypes ?? [], ctx.codex ?? [], ctx.openingBrief ?? '') }],
     provider,
     { jsonMode: true, skipReasoning: true, label: 'directeur' }
   );
@@ -241,7 +245,7 @@ export async function runAgenticTurn(
   const writerMessages: ChatMessage[] = [
     { role: 'system', content: writerSystem(ctx.setup, ctx.turnNumber, ctx.overusedTerms ?? [], ctx.campaignDossier) },
     ...ctx.transcript,
-    { role: 'user', content: writerUser(brief, ctx.actionText, ctx.outcomeDirective ?? '', ctx.worldState, canon, ctx.archive, ctx.memory ?? [], ctx.setup, ctx.codex ?? []) }
+    { role: 'user', content: writerUser(brief, ctx.actionText, ctx.outcomeDirective ?? '', ctx.worldState, canon, ctx.archive, ctx.memory ?? [], ctx.setup, ctx.codex ?? [], ctx.openingBrief ?? '') }
   ];
   let draft = '';
   if (ctx.onPartial) {

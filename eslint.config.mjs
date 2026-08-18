@@ -53,5 +53,20 @@ export default tseslint.config(
       'svelte/infinite-reactive-loop': 'off',
       'svelte/no-at-html-tags': 'off'
     }
+  },
+  {
+    // Dead imports slipped through for months because the rule above is off
+    // wholesale. Re-enable it for TypeScript, narrowed to what actually rots:
+    // unused variables and unused imports. Arguments and caught errors stay
+    // exempt so signatures can keep documenting their shape.
+    files: ['**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-unused-vars': ['error', {
+        args: 'none',
+        caughtErrors: 'none',
+        ignoreRestSiblings: true,
+        varsIgnorePattern: '^_'
+      }]
+    }
   }
 );

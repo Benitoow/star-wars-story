@@ -9,5 +9,5 @@ export {
 } from './db';
 export { createStory, getStory, listStories, updateStory, touchStory, softDeleteStory, restoreStory, hardDeleteStory } from './stories';
 export { saveSession, loadSession, clearSession } from './sessions';
-export { embeddingCache } from './embeddings';
+export { embeddingCache, pruneEmbeddings, EMBEDDING_CACHE_MAX } from './embeddings';
 export { getPreferences, savePreferences } from './preferences';

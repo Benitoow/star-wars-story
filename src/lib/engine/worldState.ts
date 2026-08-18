@@ -11,8 +11,6 @@ import {
   defaultCampaign,
   defaultSkills,
   factionKeyForSetup,
-  isLikelyNpcName,
-  isUnknownLocation,
   validCampaign,
   validEnding,
   validSkills,
@@ -31,26 +29,34 @@ import type {
 // Re-exported so the world module stays a single entry point for callers.
 export { advanceNarrativeDate, isUnknownLocation, isLikelyNpcName } from './worldNormalize';
 
+/**
+ * A fresh world. When the story was created with a character genesis, the world
+ * opens seeded — starting items, the tied NPC and the real location — so turn 1
+ * has concrete matter to offer choices about instead of an empty stage.
+ */
 export function initWorldState(setup: StorySetup): WorldState {
   const factions: Record<string, number> = {};
   const playerFaction = factionKeyForSetup(setup.faction);
   if (playerFaction) factions[playerFaction] = 50;
 
+  const genesis = setup.genesis;
+  const ally = genesis?.ally?.name ? [{ ...genesis.ally }] : [];
+
   return {
     player: {
       hp: 100,
       credits: FACTION_CREDITS[setup.role] ?? FACTION_CREDITS.default,
-      location: INITIAL_LOCATION,
+      location: genesis?.location || INITIAL_LOCATION,
       date: ERA_START_DATES[setup.era] ?? 'Ère inconnue, Jour 1',
       injuries: [],
-      inventory: [],
+      inventory: (genesis?.items ?? []).map((item) => ({ ...item })),
       skills: defaultSkills(setup),
       experience: 0,
       level: 1,
       criticalTurns: 0,
       condition: 'active'
     },
-    npcs: [],
+    npcs: ally,
     factions,
     chronology: [],
     campaign: defaultCampaign(setup),

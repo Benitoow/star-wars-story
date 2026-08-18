@@ -83,7 +83,6 @@ export const { subscribe, set, update } = writable<PlayState>({ ...initial });
 export let snap: PlayState = { ...initial };
 subscribe((s) => (snap = s));
 
-let chatAbort: AbortController | null = null;
 
 export async function loadProvider(): Promise<{ config: StoryProviderConfig; mode: StoryGenerationMode; language: string; contextBudget: number; memoryEmbeddings: boolean }> {
   const p = await getPreferences();

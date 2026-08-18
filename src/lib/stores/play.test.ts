@@ -2,7 +2,7 @@
    session resume, error paths) exercised against a fully mocked engine. */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { get } from 'svelte/store';
-import type { MemoryFact, StoryChapter, StoryTurnResult, WorldState } from '$lib/engine/types';
+import type { MemoryFact, StoryTurnResult, WorldState } from '$lib/engine/types';
 
 const engine = vi.hoisted(() => ({
   generateOpening: vi.fn(),

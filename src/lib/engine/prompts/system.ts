@@ -2,7 +2,7 @@ import { foldArchive, renderMemoryBlock } from '../memory';
 import { cleanText } from '../text';
 import type { MemoryFact, StorySetup, StoryChapter, WorldState } from '../types';
 import { languageInstruction, languageName } from './language';
-import { ERA_COHERENCE, ERA_HONESTY, styleDirective, contentModeDirective } from './style';
+import { ERA_COHERENCE, ERA_HONESTY, styleDirective, contentModeDirective, lengthDirective, povDirective, renderGenesis } from './style';
 
 function protagonistName(setup: StorySetup): string {
   return [setup.protagonistFirstName, setup.protagonistLastName].filter(Boolean).join(' ').trim() || 'Le protagoniste';
@@ -101,15 +101,15 @@ const GM_RULES = `RÈGLES DU MAÎTRE DU JEU :
 21. PROGRESSION : attribue de l'expérience seulement pour une action significative (en général 5 à 25 XP), et un skill_gains uniquement pour un entraînement ou une révélation exceptionnelle.
 22. ${ERA_HONESTY}`;
 
-function jsonContract(langName: string): string {
-  return `Réponds UNIQUEMENT en JSON valide, sans markdown ni texte autour. TOUT le texte des champs est rédigé ENTIÈREMENT EN ${langName}. Priorité : prose riche dans "action" (2 à 4 paragraphes). Remplis state_update avec toutes les conséquences.
+function jsonContract(langName: string, setup: StorySetup): string {
+  return `Réponds UNIQUEMENT en JSON valide, sans markdown ni texte autour. TOUT le texte des champs est rédigé ENTIÈREMENT EN ${langName}. Priorité : prose riche dans "action" — ${lengthDirective(setup.writingLength)} ${povDirective(setup.writingPov)} Remplis state_update avec toutes les conséquences.
 
 {
   "chapter_title": "Titre de scène évocateur — jamais Chapitre N",
   "chapter_number": 0,
   "section_type": "action|dialogue|exploration|tension|revelation|repos|interlude|confrontation",
   "narrative": {
-    "action": "Narration pure — actions, descriptions, sensations. AUCUN dialogue ici. Max 3 paragraphes.",
+    "action": "Narration pure — actions, descriptions, sensations. AUCUN dialogue ici. Longueur : voir la directive ci-dessus.",
     "dialogue": "Échanges verbaux — chaque réplique sur sa ligne au format 'Nom : réplique' (INTERDICTION ABSOLUE d'un tiret cadratin '—' ou de tout tiret en début de ligne).",
     "reflection": "Pensées internes du protagoniste (optionnel)",
     "atmosphere": "tense|calm|mysterious|eerie|heroic"
@@ -153,7 +153,7 @@ Tu es un Maître du Jeu Star Wars d'élite. Tu écris avec précision et cinéma
 
 Protagoniste : ${protagonist} | Ère : ${setup.era} | Faction : ${setup.faction} | Rôle : ${setup.role}
 Prémisse : ${setup.premise || 'Libre'}
-Style : ${setup.writingStyle || 'cinématique'} · Ton : ${setup.writingTone || 'aventure'} · POV : ${setup.writingPov || 'première personne'} · Longueur : ${setup.writingLength || 'moyen'} · Contenu : ${setup.contentMode || 'cinematic'}`;
+Style : ${setup.writingStyle || 'cinématique'} · Ton : ${setup.writingTone || 'aventure'} · Contenu : ${setup.contentMode || 'cinematic'}${renderGenesis(setup.genesis)}`;
 }
 
 /** Stable tail: rules, style directives, era coherence, JSON contract. Never varies across turns. */
@@ -166,11 +166,11 @@ function buildRulesTail(setup: StorySetup, isTurn1: boolean): string {
   // GM_RULES ends at 22 — these continue that same list so the numbering
   // the model reads stays strictly increasing (no duplicate rule numbers).
   return `${GM_RULES}
-23. DIRECTIVE STYLISTIQUE : ${styleDirective(setup.writingStyle, setup.writingTone)}
+23. DIRECTIVE STYLISTIQUE : ${styleDirective(setup.writingStyle, setup.writingTone)} ${povDirective(setup.writingPov)}
 24. DIRECTIVE DE CONTENU : ${contentModeDirective(setup.contentMode)}
 ${ERA_COHERENCE}${prologue}
 
-${jsonContract(langName)}`;
+${jsonContract(langName, setup)}`;
 }
 
 /**

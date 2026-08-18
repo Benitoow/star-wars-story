@@ -212,6 +212,7 @@ export function withSetupDefaults(setup: Partial<StorySetup>, trameId?: string |
     faction,
     role: setup.role || defaultRoleForFaction(faction),
     premise: setup.premise || trame?.premise || DEFAULT_PREMISE,
+    trameId: setup.trameId ?? trameId ?? undefined,
     protagonistFirstName: setup.protagonistFirstName || '',
     protagonistLastName: setup.protagonistLastName || '',
     protagonistAvatar: setup.protagonistAvatar || AVATARS[0],

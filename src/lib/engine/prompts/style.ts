@@ -26,6 +26,22 @@ export const ERA_COHERENCE = `COHÉRENCE D'ÈRE (CRITIQUE) : ne confonds JAMAIS 
    and a half-remembered famous name is worse than a coherent invention. */
 export const ERA_HONESTY = `HONNÊTETÉ HISTORIQUE : tu connais bien les époques des films mais moins d'autres ères (Ancienne République, etc.). Si un lieu, un personnage ou une technologie de l'époque te semble incertain, INVENTE un équivalent cohérent avec l'ère au lieu d'importer un nom célèbre d'une autre époque. Ne prétends jamais connaître un fait que tu ne connais pas.`;
 
+/** The protagonist as a real person — rendered into BOTH engines' stable prefix. */
+export function renderGenesis(genesis?: {
+  background: string; motivation: string; flaw: string; location: string; premise: string;
+  items: Array<{ name: string; qty: number }>; ally: { name: string; note?: string };
+}): string {
+  if (!genesis?.background) return '';
+  const lines = [`Passé : ${genesis.background}`];
+  if (genesis.motivation) lines.push(`Ce qui le pousse : ${genesis.motivation}`);
+  if (genesis.flaw) lines.push(`Faille (à jouer contre lui, jamais à ignorer) : ${genesis.flaw}`);
+  if (genesis.ally?.name) lines.push(`Lien : ${genesis.ally.name}${genesis.ally.note ? ` — ${genesis.ally.note}` : ''}`);
+  if (genesis.items.length) lines.push(`Objets de départ : ${genesis.items.map((i) => i.name).join(', ')}`);
+  if (genesis.location) lines.push(`Point de départ : ${genesis.location}`);
+  const body = lines.map((l) => `- ${l}`).join('\n');
+  return `\n\nLE PROTAGONISTE (établi à la création — respecte-le, ne le réinvente pas) :\n${body}`;
+}
+
 export function contentModeDirective(contentMode?: string): string {
   const mode = (contentMode || '').toLowerCase();
   if (mode === 'dark') {
@@ -38,4 +54,23 @@ export function contentModeDirective(contentMode?: string): string {
     return "DIRECTIVE DE CONTENU (BRUT / SANS FILTRE / NSFW) : Récit totalement sans filtre et sans concession. Autorise les descriptions explicites et frontales de combats sanglants, de violence physique viscérale, de romance intime et charnelle explicite (NSFW), et de thèmes adultes non censurés.";
   }
   return "DIRECTIVE DE CONTENU (CINÉMA) : Action intense et cinématique, adaptée à un public large. Pas de violence gratuite, de sang excessif ou de thèmes matures explicites.";
+}
+
+/** Scene length as an actual instruction — the preset axis was inert before. */
+export function lengthDirective(writingLength?: string): string {
+  switch ((writingLength || '').toLowerCase()) {
+    case 'court':
+      return "2 paragraphes serrés. Coupe tout ce qui n'est pas nécessaire.";
+    case 'long':
+      return '4 à 5 paragraphes. Prends le temps des lieux, des sensations et des silences.';
+    default:
+      return '3 paragraphes. Assez pour installer la scène, sans délayer.';
+  }
+}
+
+/** Narrative person as an actual instruction — likewise inert before. */
+export function povDirective(writingPov?: string): string {
+  return (writingPov || '').toLowerCase().startsWith('prem')
+    ? "PREMIÈRE PERSONNE : le protagoniste dit « je ». Ne bascule jamais en « il/elle » pour lui."
+    : "TROISIÈME PERSONNE : le protagoniste est « il » ou « elle ». Ne bascule jamais en « je » pour lui.";
 }

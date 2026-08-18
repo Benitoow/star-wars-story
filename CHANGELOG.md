@@ -1,5 +1,36 @@
 # Changelog
 
+## v3.3.0 — « Genèse » — 2026-08-18
+
+**La création de personnage produisait des identifiants, pas un personnage.** Le tour 1 devait donc inventer le protagoniste tout en ouvrant la scène, fixant l'objectif, créant un PNJ et proposant des choix — six métiers en un appel. D'où une introduction bâclée et des choix génériques.
+
+### 🧬 Genèse du personnage (nouvelle étape de l'assistant)
+- Un **appel dédié à la création** croise vraiment ère × faction × rôle × trame × nom et produit : un **passé** concret, une **motivation**, une **faille jouable contre toi**, **1-2 objets utilisables**, **un allié nommé** et un **lieu de départ**.
+- **Tu le vois avant de lancer** : nouvelle étape « Genèse » avec fiche complète et bouton **Régénérer**.
+- **Jamais bloquante** : échec de génération → « Commencer l'aventure » reste actif et le tour 1 reprend l'ancien comportement d'introduction.
+
+### 🎯 Le monde s'ouvre peuplé
+- L'inventaire, le PNJ lié et le lieu réel sont **semés dans l'état initial**. Avant, le tour 1 devait proposer des choix « ancrés dans cette scène exacte » avec un inventaire vide, aucun PNJ et aucun lieu — d'où leur généricité.
+- Le tour 1 impose désormais **au moins un choix utilisant un objet de départ**, et la faille doit peser sur la scène ou sur un choix.
+
+### 🔧 Trois causes racines corrigées
+- **Le mode agentique n'exécutait jamais la spec du tour 1.** `buildStartPrompt` n'était appelé qu'en mode Direct ; le mode par défaut ouvrait sur une seule puce. Le brief descend maintenant jusqu'au **Directeur et à l'Écrivain**.
+- **La trame choisie était jetée** : `trameLabel` n'était passé par personne et `trameId` n'était pas persisté. Le moteur ne voyait qu'une prémisse figée, identique pour tous. Les deux circulent désormais.
+- **L'Écrivain ignorait qui était le protagoniste.** La genèse voyage dans le **préfixe stable** des deux moteurs (donc sans casser le cache d'input).
+
+### ✍️ Réglages d'écriture enfin actifs
+- **`writingLength`** (court/moyen/long) était un mot décoratif : aucune directive n'en découlait, et le contrat imposait « 2 à 4 paragraphes » pendant que l'Écrivain plafonnait à « 2 à 3 ». C'est maintenant une vraie instruction, honorée par les deux moteurs.
+- **`writingPov`** (1ʳᵉ/3ᵉ personne) idem — directive explicite, avec interdiction de basculer.
+- Contradiction supprimée dans le contrat JSON (« 2 à 4 » vs « Max 3 »).
+
+### 🧹 Entretien
+- **Consolidation mémoire** : la synthèse hérite de l'âge des faits qu'elle remplace. Estampillée au tour courant, elle était éternellement « récente » et évinçait les faits réellement frais.
+- **Cache d'embeddings borné** (400 vecteurs, éviction des plus anciens) : ~32 Ko par fait, il grossissait sans limite sur toutes les histoires.
+- **ESLint détecte enfin les imports morts** — la règle était désactivée en bloc. Réactivée sur TypeScript, elle a immédiatement trouvé 7 cas réels, dont un résidu du découpage de `play.ts`.
+
+### 🗄️ Technique
+- Nouveaux modules `genesis.ts` (pur, testé) et `GenesisStep.svelte` · `CharacterGenesis` et `StorySetup.trameId`.
+- **167 tests Vitest verts** (10 nouveaux) · `svelte-check` 0 erreur / 0 warning · ESLint 0 erreur · build Cloudflare OK · aucun fichier > 300 lignes.
 ## v3.2.2 — « Comptabilité » — 2026-08-18
 
 **Mesurer au lieu de supposer.** Le préfixe stable de la v3.2.0 n'a de valeur que si le provider sert réellement des tokens depuis son cache — ce que l'app ne regardait pas.

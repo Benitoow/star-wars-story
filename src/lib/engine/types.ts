@@ -205,11 +205,29 @@ export interface ChatSession {
 }
 
 // ── Story setup (player's choices at creation) ────────
+/**
+ * The character as an actual character, not a tuple of catalog ids: generated
+ * once at creation from era x faction x role x trame x name, validated by the
+ * player, then persisted with the story. Turn 1 stages this instead of
+ * inventing it on the fly.
+ */
+export interface CharacterGenesis {
+  background: string;        // 2-3 sentences of past
+  motivation: string;        // what drives them now
+  flaw: string;              // a real weakness, playable against them
+  items: InventoryItem[];    // 1-2 starting objects, so turn-1 choices have matter
+  ally: NpcRelation;         // one tied NPC: mentor, contact or rival
+  location: string;          // where the story opens
+  premise: string;           // the trame, rewritten for THIS character
+}
+
 export interface StorySetup {
   era: string;
   faction: string;
   role: string;
   premise: string;
+  trameId?: string;          // the chosen trame, kept so the engine knows it
+  genesis?: CharacterGenesis;
   protagonistFirstName?: string;
   protagonistLastName?: string;
   protagonistAvatar?: string;

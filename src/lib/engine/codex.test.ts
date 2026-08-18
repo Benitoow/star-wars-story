@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { retrieveCodex, generateCampaignDossier, CODEX } from './codex';
+import { retrieveCodex, generateCampaignDossier } from './codex';
 import type { StoryProviderConfig } from './types';
 
 const provider: StoryProviderConfig = { providerId: 'openrouter', model: 'x', apiKey: 'k' };

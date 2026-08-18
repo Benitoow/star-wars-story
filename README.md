@@ -74,7 +74,7 @@ npm run build
 src/
 ├── lib/
 │   ├── engine/        # moteur pur (zéro dépendance UI, testé)
-│   │   ├── types · text · dice · codex
+│   │   ├── types · text · dice · codex · genesis · usage
 │   │   ├── worldState · worldNormalize · worldMutations
 │   │   ├── parsing · jsonScan · sanitize · stateUpdate
 │   │   ├── memory · retrieval · embedding · consolidate
@@ -84,13 +84,13 @@ src/
 │   ├── content/       # catalogue SW, config provider, langues
 │   ├── persistence/   # Dexie : stories · sessions · preferences · embeddings
 │   ├── stores/        # ui · preferences · playSession · play · playChat
-│   ├── ui/            # SceneBackdrop · GameHud · SceneActions · ChatPanel
+│   ├── ui/            # SceneBackdrop · GameHud · SceneActions · ChatPanel · GenesisStep
 │   │                  # JournalPanel · ProviderSettings · StoryCard · TopNav · Toast
 │   └── version.ts
 └── routes/
     ├── +layout.svelte
     ├── +page.svelte           # bibliothèque
-    ├── new/+page.svelte       # assistant de création
+    ├── new/+page.svelte       # assistant de création (5 étapes, dont la genèse)
     ├── play/[id]/+page.svelte # écran de jeu
     └── settings/+page.svelte  # réglages
 ```

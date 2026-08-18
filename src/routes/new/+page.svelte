@@ -10,10 +10,13 @@
   import { createStory } from '$lib/persistence';
   import { toasts } from '$lib/stores/ui';
   import SceneBackdrop from '$lib/ui/SceneBackdrop.svelte';
+  import GenesisStep from '$lib/ui/GenesisStep.svelte';
+  import type { CharacterGenesis, StorySetup } from '$lib/engine';
 
-  const STEPS = ['Ère', 'Personnage', 'Trame', 'Style'];
+  const STEPS = ['Ère', 'Personnage', 'Trame', 'Style', 'Genèse'];
   let step = 0;
   let creating = false;
+  let genesis: CharacterGenesis | null = null;
 
   let era = ERAS[0].id;
   let faction = FACTIONS[0].id;
@@ -54,20 +57,24 @@
 
   const canNext = () => (step === 0 ? !!era : step === 1 ? !!faction && !!role : step === 2 ? !!premise.trim() : true);
 
+  $: draftSetup = withSetupDefaults(
+    {
+      era, faction, role, premise: premise.trim(),
+      protagonistFirstName: firstName.trim(), protagonistLastName: lastName.trim(), protagonistAvatar: avatar,
+      writingStyle: preset.writingStyle, writingTone: preset.writingTone,
+      writingPov: preset.writingPov, writingLength: preset.writingLength, contentMode
+    },
+    trameId
+  ) as StorySetup;
+  $: trameLabel = TRAMES.find((t) => t.id === trameId)?.name ?? null;
+
   async function launch() {
     if (creating) return;
     creating = true;
     try {
-      const setup = withSetupDefaults(
-        {
-          era, faction, role, premise: premise.trim(),
-          protagonistFirstName: firstName.trim(), protagonistLastName: lastName.trim(), protagonistAvatar: avatar,
-          writingStyle: preset.writingStyle, writingTone: preset.writingTone,
-          writingPov: preset.writingPov, writingLength: preset.writingLength, contentMode
-        },
-        trameId
-      );
-      const story = await createStory(setup);
+      // The validated genesis travels with the setup: the engine seeds the
+      // world from it and turn 1 stages the character instead of inventing one.
+      const story = await createStory({ ...draftSetup, genesis: genesis ?? undefined });
       await goto(`/play/${story.id}`);
     } catch (error) {
       creating = false;
@@ -127,7 +134,7 @@
         </div>
         <label class="label mt" for="premise">Prémisse</label>
         <textarea id="premise" class="input premise" bind:value={premise} rows="3" placeholder="Décris le point de départ de ton aventure…"></textarea>
-      {:else}
+      {:else if step === 3}
         <h1>Ton style & ton héros</h1>
         <p class="eyebrow">Ambiance narrative</p>
         <div class="grid">
@@ -158,6 +165,8 @@
             <input class="input" bind:value={lastName} placeholder="Nom (optionnel)" maxlength="40" />
           </div>
         </div>
+      {:else if step === 4}
+        <GenesisStep bind:genesis setup={draftSetup} {trameLabel} />
       {/if}
     </div>
 
