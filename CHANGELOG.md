@@ -21,6 +21,16 @@
 - Appliquée aux **deux moteurs** : règle 22 du Maître du Jeu en mode Direct, et règles du **Directeur** + de l'**Écrivain** en mode Agentique (le mode par défaut).
 - Le codex de l'époque descend lui aussi jusqu'au **Directeur**, qui décide les éléments imposés de la scène — c'est là que naissaient les noms anachroniques.
 
+### 🧹 Modularité rétablie
+- La discipline « aucun fichier > ~300 lignes » avait cédé sur **5 fichiers** (jusqu'à 480). Elle est de nouveau tenue **partout**, sans changement de comportement :
+  * `parsing.ts` 457 → 170 (+ `jsonScan.ts`, `sanitize.ts`, `stateUpdate.ts`)
+  * `play.ts` 480 → 238 (+ `playSession.ts` pour le socle partagé, `playChat.ts` pour le Mode Direct)
+  * `worldState.ts` 411 → 229 (+ `worldNormalize.ts`, `worldMutations.ts`)
+  * `play/[id]/+page.svelte` 401 → 249 (+ `SceneActions.svelte`)
+  * `settings/+page.svelte` 370 → 279 (+ `ProviderSettings.svelte`)
+- `play.test.ts` suit le découpage source (`playChat.test.ts` + fixtures partagées) ; seul le câblage `vi.mock` reste dupliqué, Vitest le hoistant par fichier.
+- Imports morts supprimés au passage — ESLint ne les signale pas ici.
+
 ### 🗄️ Technique
 - Nouveau module `codex.ts` (contenu + retrieval + génération), `CampaignState.dossier`, garde-fou `ERA_HONESTY` partagé par les deux moteurs (règle 22 de `GM_RULES` + règles Directeur/Écrivain).
 - **Numérotation des règles corrigée** : `GM_RULES` s'arrête à 22, les directives de style/contenu/prologue continuent en 23-25 au lieu de rejouer 15-17. Un test garantit désormais que les numéros restent uniques et croissants.

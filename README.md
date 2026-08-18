@@ -74,14 +74,18 @@ npm run build
 src/
 ├── lib/
 │   ├── engine/        # moteur pur (zéro dépendance UI, testé)
-│   │   ├── types · text · worldState · parsing · dice
-│   │   ├── provider   # transport OpenRouter (fetch direct)
+│   │   ├── types · text · dice · codex
+│   │   ├── worldState · worldNormalize · worldMutations
+│   │   ├── parsing · jsonScan · sanitize · stateUpdate
+│   │   ├── memory · retrieval · embedding · consolidate
+│   │   ├── provider   # transport OpenRouter / MiMo (fetch direct)
 │   │   ├── generate · agentic   # orchestration d'un tour
 │   │   └── prompts/   # system · turn · style · language
 │   ├── content/       # catalogue SW, config provider, langues
-│   ├── persistence/   # Dexie : stories · sessions · preferences
-│   ├── stores/        # ui · preferences · play (runtime)
-│   ├── ui/            # SceneBackdrop · GameHud · StoryCard · TopNav · Toast
+│   ├── persistence/   # Dexie : stories · sessions · preferences · embeddings
+│   ├── stores/        # ui · preferences · playSession · play · playChat
+│   ├── ui/            # SceneBackdrop · GameHud · SceneActions · ChatPanel
+│   │                  # JournalPanel · ProviderSettings · StoryCard · TopNav · Toast
 │   └── version.ts
 └── routes/
     ├── +layout.svelte
@@ -91,7 +95,7 @@ src/
     └── settings/+page.svelte  # réglages
 ```
 
-**Discipline :** aucun fichier > ~300 lignes, zéro logique métier dans les composants.
+**Discipline :** aucun fichier > ~300 lignes (vérifié : le plus gros est à 295), zéro logique métier dans les composants.
 
 ### Données & vie privée
 

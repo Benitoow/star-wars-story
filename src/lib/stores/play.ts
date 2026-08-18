@@ -3,163 +3,40 @@
    a session, calls the engine, applies the hidden roll,
    and persists after every turn.
 ══════════════════════════════════════════════ */
-import { writable } from 'svelte/store';
 import {
   fromLegacyFacts,
   generateOpening,
   generateTurn,
-  memoryFactLines,
-  mergeMemoryFacts,
-  npcReply,
-  resolveConversation,
   rebuildWorldState,
   cloneWorldState,
-  resolveContextBudget,
   rollForChoice,
   hasRequiredItems,
-  applyChoiceInventoryCost,
-  summarizeChapterForPrompt,
   buildMemoryQuery,
-  retrieveMemory,
   runConsolidation,
   retrieveCodex,
   generateCampaignDossier,
   CODEX_DOSSIER_TOP,
-  type ChatTurn,
-  type GeneratePartial,
-  type MemoryFact,
-  type NpcRelation,
-  type StoryChapter,
   type StoryChoice,
-  type StoryGenerationMode,
   type StoryProviderConfig,
-  type StorySetup,
-  type StoryTurnResult,
-  type WorldState
 } from '$lib/engine';
-import { SESSION_VERSION, getPreferences, getStory, loadSession, saveSession, touchStory, embeddingCache } from '$lib/persistence';
-import { resolveUiLanguage } from '$lib/content/languages';
-import { logger, recordDiag } from '$lib/logger';
+import { recordDiag } from '$lib/logger';
+import { getStory, loadSession } from '$lib/persistence';
 import { toasts } from './ui';
-
-export type PlayStatus = 'idle' | 'loading' | 'generating' | 'ready' | 'error';
-
-/** "Mode Direct" — live chat sub-state nested in a play session. */
-export interface ChatReview {
-  npcName: string;
-  turns: ChatTurn[];
-  result: StoryTurnResult;
-}
-
-export interface ChatState {
-  active: boolean;
-  npcName: string;
-  sceneSummary: string;
-  turns: ChatTurn[];
-  partial: string;   // NPC reply currently streaming in
-  busy: boolean;     // a reply is streaming or the exit debrief is running
-  error: string | null;
-  review: ChatReview | null;
-}
-
-export interface PendingAction {
-  text: string;
-  outcomeDirective: string;
-  choice?: StoryChoice;
-}
-
-export interface PlayState {
-  storyId: string | null;
-  setup: StorySetup | null;
-  status: PlayStatus;
-  worldState: WorldState | null;
-  currentChapter: StoryChapter | null;
-  chapterHistory: StoryChapter[];
-  memory: MemoryFact[];
-  actionHistory: string[];
-  turnNumber: number;
-  error: string | null;
-  pendingAction: PendingAction | null;
-  partialChapter: GeneratePartial | null; // the scene streaming in while status === 'generating'
-  chat: ChatState;
-}
-
-const initialChat: ChatState = { active: false, npcName: '', sceneSummary: '', turns: [], partial: '', busy: false, error: null, review: null };
-
-const initial: PlayState = {
-  storyId: null, setup: null, status: 'idle', worldState: null, currentChapter: null,
-  chapterHistory: [], memory: [], actionHistory: [], turnNumber: 0, error: null,
-  pendingAction: null,
-  partialChapter: null,
-  chat: { ...initialChat }
-};
-
-const { subscribe, set, update } = writable<PlayState>({ ...initial });
-let snap: PlayState = { ...initial };
-subscribe((s) => (snap = s));
-
-let chatAbort: AbortController | null = null;
-
-async function loadProvider(): Promise<{ config: StoryProviderConfig; mode: StoryGenerationMode; language: string; contextBudget: number; memoryEmbeddings: boolean }> {
-  const p = await getPreferences();
-  const config: StoryProviderConfig = { providerId: p.textProvider, model: p.textModel, apiKey: p.textApiKey, reasoningEffort: p.reasoningEffort };
-  return {
-    config,
-    mode: p.runtimeMode,
-    language: resolveUiLanguage(p.uiLanguage),
-    contextBudget: await resolveContextBudget(config), // auto-detected from the model's window
-    memoryEmbeddings: p.memoryEmbeddings === true
-  };
-}
-
-/** Condensed recaps of the last few chapters — shared context for NPC chats. */
-function recentEvents(): string[] {
-  return snap.chapterHistory.slice(-3).map(summarizeChapterForPrompt);
-}
-
-async function persist(): Promise<void> {
-  if (!snap.storyId || !snap.worldState) return;
-  await saveSession({
-    storyId: snap.storyId, version: SESSION_VERSION, turnNumber: snap.turnNumber,
-    worldState: snap.worldState, currentChapter: snap.currentChapter,
-    chapterHistory: snap.chapterHistory, actionHistory: snap.actionHistory,
-    // memoryFacts stays in sync as a flat rendition so v1 readers keep working.
-    memory: snap.memory, memoryFacts: memoryFactLines(snap.memory, 58), trameId: null,
-    // Persist an in-progress conversation so it can be resumed; cleared on exit.
-    chat: snap.chat.active ? { npcName: snap.chat.npcName, sceneSummary: snap.chat.sceneSummary, turns: snap.chat.turns } : undefined
-  });
-  await touchStory(snap.storyId, snap.turnNumber);
-}
-
-function applyResult(result: StoryTurnResult, actionText: string, choice?: StoryChoice, baseline?: WorldState): void {
-  const chapter = result.chapter;
-  const worldState = choice ? applyChoiceInventoryCost(result.worldState, choice, baseline) : result.worldState;
-  update((s) => ({
-    ...s,
-    status: 'ready',
-    worldState,
-    currentChapter: chapter,
-    chapterHistory: [...s.chapterHistory, chapter],
-    memory: mergeMemoryFacts(s.memory, chapter),
-    actionHistory: actionText ? [...s.actionHistory, actionText] : s.actionHistory,
-    turnNumber: chapter.chapter_number,
-    error: null,
-    pendingAction: null,
-    partialChapter: null
-  }));
-  void persist();
-}
-
-function fail(error: unknown): void {
-  const message = error instanceof Error ? error.message : String(error);
-  logger.error('génération échouée', error);
-  update((s) => ({ ...s, status: 'error', error: message, partialChapter: null }));
-  toasts.show(message, 'error', 6000);
-}
-
-function onPartial(partial: GeneratePartial): void {
-  update((s) => ({ ...s, partialChapter: partial }));
-}
+import {
+  initial,
+  initialChat,
+  applyResult,
+  fail,
+  loadProvider,
+  onPartial,
+  persist,
+  set,
+  snap,
+  subscribe,
+  update,
+} from './playSession';
+import { abortChat, chatEnd, chatEnter, chatSend, confirmChatReview, discardChatReview } from './playChat';
+export type { PlayStatus, PlayState, ChatState, ChatReview, PendingAction } from './playSession';
 
 /** Fold the parallel-generated dossier into the live campaign, once. Guarded:
  * a dossier that resolves after the player switched story, or after one was
@@ -275,129 +152,10 @@ function maybeConsolidate(config: StoryProviderConfig): void {
   });
 }
 
-/** Keep only the facts relevant to the current conversation. */
-async function memoryForChat(enableEmbeddings: boolean, config: StoryProviderConfig): Promise<MemoryFact[]> {
-  const query = buildMemoryQuery([
-    snap.chat.sceneSummary,
-    snap.chat.turns.at(-1)?.content,
-    snap.chat.npcName,
-    snap.worldState?.player.location
-  ]);
-  return retrieveMemory(snap.memory ?? [], query, {
-    provider: config,
-    enableEmbeddings,
-    currentTurn: snap.turnNumber,
-    cache: embeddingCache
-  });
-}
-
-// ── Mode Direct (live chat) ───────────────────────────
-function currentNpc(): NpcRelation {
-  const found = snap.worldState?.npcs.find((n) => n.name === snap.chat.npcName);
-  return found ?? { name: snap.chat.npcName || 'Inconnu', affinity: 0, status: 'neutral', alive: true };
-}
-
-function chatEnter(npcName: string): void {
-  const chapter = snap.currentChapter;
-  if (!snap.worldState || snap.worldState.ending || !npcName.trim() || snap.chat.active) return;
-  const sceneSummary = chapter ? `${chapter.chapter_title}. ${chapter.narrative.action}`.slice(0, 600) : '';
-  update((s) => ({ ...s, chat: { active: true, npcName: npcName.trim(), sceneSummary, turns: [], partial: '', busy: false, error: null, review: null } }));
-  void persist();
-}
-
-async function chatSend(text: string): Promise<void> {
-  const setup = snap.setup;
-  const world = snap.worldState;
-  const content = text.trim();
-  if (!setup || !world || world.ending || !content || !snap.chat.active || snap.chat.review || snap.chat.busy) return;
-
-  const turns: ChatTurn[] = [...snap.chat.turns, { speaker: 'player', content }];
-  update((s) => ({ ...s, chat: { ...s.chat, turns, partial: '', busy: true, error: null } }));
-  chatAbort = new AbortController();
-  try {
-    const { config, language, memoryEmbeddings } = await loadProvider();
-    const memory = await memoryForChat(memoryEmbeddings, config);
-    const reply = await npcReply(
-      {
-        setup: { ...setup, language }, worldState: world, npc: currentNpc(), sceneSummary: snap.chat.sceneSummary, turns,
-        playerDirectives: snap.actionHistory.slice(-10), memory, recentEvents: recentEvents()
-      },
-      config,
-      (delta) => update((s) => ({ ...s, chat: { ...s.chat, partial: s.chat.partial + delta } })),
-      chatAbort.signal
-    );
-    update((s) => {
-      const content = (reply || s.chat.partial).trim();
-      // An empty reply (model returned nothing, or instant cancel) must not push a blank bubble.
-      if (!content) return { ...s, chat: { ...s.chat, partial: '', busy: false, error: 'Réponse vide du modèle.' } };
-      return { ...s, chat: { ...s.chat, turns: [...s.chat.turns, { speaker: 'npc', content }], partial: '', busy: false, error: null } };
-    });
-    void persist();
-  } catch (error) {
-    // A reply that died mid-stream is still a reply the player read — keep it.
-    update((s) => {
-      const partial = s.chat.partial.trim();
-      const turns = partial ? [...s.chat.turns, { speaker: 'npc' as const, content: partial }] : s.chat.turns;
-      return { ...s, chat: { ...s.chat, turns, partial: '', busy: false, error: error instanceof Error ? error.message : String(error) } };
-    });
-    void persist();
-  }
-}
-
-async function chatEnd(): Promise<void> {
-  const setup = snap.setup;
-  const world = snap.worldState;
-  if (!setup || !world || world.ending || !snap.chat.active || snap.chat.review) return;
-  if (!snap.chat.turns.length) {
-    update((s) => ({ ...s, chat: { ...initialChat } })); // nothing said → just close
-    void persist();
-    return;
-  }
-  const npc = currentNpc();
-  const turns = snap.chat.turns;
-  const sceneSummary = snap.chat.sceneSummary;
-  update((s) => ({ ...s, chat: { ...s.chat, busy: true, error: null } }));
-  chatAbort = new AbortController();
-  const signal = chatAbort.signal;
-  try {
-    const { config, language, memoryEmbeddings } = await loadProvider();
-    const memory = await memoryForChat(memoryEmbeddings, config);
-    const result = await resolveConversation(
-      { setup: { ...setup, language }, worldState: world, npc, sceneSummary, turns, turnNumber: snap.turnNumber + 1, memory },
-      config,
-      signal
-    );
-    recordDiag(`conversation avec ${npc.name} préparée pour validation`, { messages: turns.length, rawResponse: result.rawResponse });
-    update((s) => ({
-      ...s,
-      chat: { ...s.chat, busy: false, error: null, review: { npcName: npc.name, turns, result } }
-    }));
-    void persist();
-  } catch (error) {
-    // User-cancelled debrief → simply stay in the conversation, no error banner.
-    const aborted = signal.aborted;
-    update((s) => ({ ...s, chat: { ...s.chat, busy: false, error: aborted ? null : error instanceof Error ? error.message : String(error) } }));
-  }
-}
-
-function confirmChatReview(): void {
-  const review = snap.chat.review;
-  if (!review) return;
-  update((s) => ({ ...s, chat: { ...initialChat } }));
-  applyResult(review.result, `[Conversation avec ${review.npcName}]`);
-}
-
-function discardChatReview(): void {
-  if (!snap.chat.review) return;
-  update((s) => ({ ...s, chat: { ...initialChat } }));
-  void persist();
-}
-
-
 export const play = {
   subscribe,
   reset(): void {
-    chatAbort?.abort();
+    abortChat();
     set({ ...initial });
   },
   /** Load a story + its session; auto-generates the opening for a fresh story. */
@@ -475,6 +233,6 @@ export const play = {
     discardChatReview();
   },
   cancelChatReply(): void {
-    chatAbort?.abort();
+    abortChat();
   }
 };
