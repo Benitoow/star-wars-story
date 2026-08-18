@@ -13,7 +13,8 @@ import {
   getProviderDisplayName,
   normalizeTextProviderId
 } from '$lib/content/providers';
-import { logger } from '$lib/logger';
+import { logger, recordDiag } from '$lib/logger';
+import { extractUsage, formatUsage } from './usage';
 import { supportsReasoningParam } from './models';
 import { cleanText } from './text';
 import type { ChatMessage, StoryProviderConfig } from './types';
@@ -23,6 +24,7 @@ export interface TextGenOptions {
   jsonMode?: boolean;
   skipReasoning?: boolean;
   signal?: AbortSignal;
+  label?: string; // names this call in the diagnostics export
 }
 
 export interface StreamOptions {
@@ -30,6 +32,7 @@ export interface StreamOptions {
   jsonMode?: boolean;
   skipReasoning?: boolean;
   signal?: AbortSignal;
+  label?: string; // names this call in the diagnostics export
 }
 
 const MAX_RETRIES = 3;
@@ -87,6 +90,12 @@ function extractContent(payload: unknown): string {
   if (!Array.isArray(choices) || !choices.length) return '';
   const message = (choices[0] as Record<string, unknown>)?.message as Record<string, unknown> | undefined;
   return cleanText(message?.content, 16000);
+}
+
+/** Log what a call consumed — notably how much of the prompt hit the cache. */
+function reportUsage(payload: unknown, model: string, label?: string): void {
+  const usage = extractUsage(payload);
+  if (usage) recordDiag(formatUsage(usage, label ?? 'appel', model), usage);
 }
 
 function parseError(rawBody: string, fallback: string): string {
@@ -151,8 +160,12 @@ export async function callTextModel(
       });
 
       if (response.ok) {
-        const content = extractContent(await response.json().catch(() => null));
-        if (content) return content;
+        const payload = await response.json().catch(() => null);
+        const content = extractContent(payload);
+        if (content) {
+          reportUsage(payload, cfg.model, options.label);
+          return content;
+        }
         lastError = new Error(`${getProviderDisplayName(cfg.providerId)} : réponse vide.`);
         break;
       }
@@ -225,6 +238,7 @@ export async function callTextModelStream(
   }
 
   let full = '';
+  let usagePayload: unknown = null;
   try {
     const response = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
@@ -254,7 +268,8 @@ export async function callTextModelStream(
         const data = trimmed.slice(5).trim();
         if (!data || data === '[DONE]') continue;
         try {
-          const json = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string } }> };
+          const json = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string } }>; usage?: unknown };
+          if (json.usage) usagePayload = json; // the closing frame carries the accounting
           const delta = json.choices?.[0]?.delta?.content;
           if (typeof delta === 'string' && delta) {
             full += delta;
@@ -264,6 +279,7 @@ export async function callTextModelStream(
       }
     }
     clearTimeout(timer);
+    reportUsage(usagePayload, cfg.model, options.label);
     return cleanText(full, 16000);
   } catch (error) {
     clearTimeout(timer);

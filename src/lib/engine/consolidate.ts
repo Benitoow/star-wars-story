@@ -84,7 +84,7 @@ export async function summarizeFacts(
       { role: 'user', content: user }
     ],
     provider,
-    { jsonMode: true, skipReasoning: true, signal }
+    { jsonMode: true, skipReasoning: true, signal, label: 'consolidation mémoire' }
   );
   try {
     const parsed = JSON.parse(raw) as { summary?: unknown };

@@ -61,14 +61,14 @@ async function callStructuredJson(
           const text = extractStreamingJsonField(buffer, 'action') ?? '';
           if (title || text) onPartial({ title, text });
         },
-        { jsonMode: true }
+        { jsonMode: true, label: 'tour (flux)' }
       );
       if (raw.trim()) return raw;
     } catch {
       /* stream failed — retry below over the sturdier non-streaming path */
     }
   }
-  return callTextModel(messages, provider, { jsonMode: true });
+  return callTextModel(messages, provider, { jsonMode: true, label: 'tour' });
 }
 
 export interface TurnInput {

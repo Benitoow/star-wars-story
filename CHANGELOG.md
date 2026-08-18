@@ -1,5 +1,19 @@
 # Changelog
 
+## v3.2.2 — « Comptabilité » — 2026-08-18
+
+**Mesurer au lieu de supposer.** Le préfixe stable de la v3.2.0 n'a de valeur que si le provider sert réellement des tokens depuis son cache — ce que l'app ne regardait pas.
+
+### 📊 Usage réel par appel
+- Le bloc `usage` de chaque réponse (tokens envoyés, **servis en cache**, écrits en cache, générés, raisonnement, coût) est désormais lu et consigné dans l'export de diagnostic. Il était jusqu'ici purement jeté.
+- Chaque appel est **nommé** : directeur · écrivain · relecteur · cerveau · tour · réplique PNJ · débrief conversation · dossier de campagne · consolidation mémoire. On voit donc quelle étape du pipeline coûte quoi.
+- Quand le cache ne mord pas, la ligne le dit explicitement (« cache inactif ») — c'est le signal qu'un modèle exige `cache_control` (Qwen, Anthropic) et que le préfixe stable ne rapporte rien.
+- Les deux transports sont couverts : réponse classique **et** flux SSE (l'usage voyage dans la trame de clôture).
+- Nouveau module pur `usage.ts` (extraction + formatage), 6 tests.
+
+### 🗄️ Technique
+- **157 tests Vitest verts** · `svelte-check` 0 erreur / 0 warning · ESLint 0 erreur · build Cloudflare OK.
+
 ## v3.2.1 — « Codex » — 2026-08-17
 
 **Repères d'époque pour le Maître du Jeu** : les modèles connaissent mal certaines ères (Ancienne République…). Le Codex leur fournit des **références factuelles, optionnelles et non contraignantes** pour mieux construire l'histoire — sans la piloter.

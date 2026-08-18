@@ -13,6 +13,7 @@ export {
 } from './worldState';
 export { parseStoryResponse, parseJsonSafely, sanitizeProse, extractStreamingJsonField } from './parsing';
 export { callTextModel, callTextModelStream, normalizeProviderConfig, type TextGenOptions, type StreamOptions } from './provider';
+export { extractUsage, cacheHitRate, formatUsage, type TokenUsage } from './usage';
 export { generateOpening, generateTurn, type TurnInput, type GenerateOptions, type GeneratePartial } from './generate';
 export { npcReply, resolveConversation, type NpcReplyInput, type ResolveConversationInput } from './chat';
 export { buildNarrativeContext, DEFAULT_CONTEXT_BUDGET, type NarrativeContext } from './context';

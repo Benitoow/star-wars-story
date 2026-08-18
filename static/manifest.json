@@ -1,7 +1,7 @@
 {
   "name": "Star Wars Story",
   "short_name": "Star Wars",
-  "version": "3.2.1",
+  "version": "3.2.2",
   "description": "Écris ta légende — une aventure interactive Star Wars où chaque choix façonne un monde vivant.",
   "start_url": "/",
   "scope": "/",

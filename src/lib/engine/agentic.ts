@@ -221,7 +221,7 @@ export async function runAgenticTurn(
   const briefRaw = await callTextModel(
     [{ role: 'system', content: `${languageInstruction(lang)}\n\n${DIRECTOR_SYSTEM}` }, { role: 'user', content: directorUser(ctx.situation, ctx.actionText, ctx.turnNumber, digest, canon, ctx.recentSectionTypes ?? [], ctx.codex ?? []) }],
     provider,
-    { jsonMode: true, skipReasoning: true }
+    { jsonMode: true, skipReasoning: true, label: 'directeur' }
   );
   const brief = (function () {
     try {
@@ -250,12 +250,12 @@ export async function runAgenticTurn(
       draft = await callTextModelStream(writerMessages, provider, (delta) => {
         acc += delta;
         ctx.onPartial!({ title: '', text: acc });
-      });
+      }, { label: 'écrivain (flux)' });
     } catch {
       /* stream failed — retry below over the sturdier non-streaming path */
     }
   }
-  if (!draft.trim()) draft = await callTextModel(writerMessages, provider);
+  if (!draft.trim()) draft = await callTextModel(writerMessages, provider, { label: 'écrivain' });
 
   // 3. Reviewer — polish the scene (same facts, sharper writing). Falls back to the
   // draft if it returns nothing usable.
@@ -263,7 +263,8 @@ export async function runAgenticTurn(
   try {
     const reviewed = await callTextModel(
       [{ role: 'system', content: `${languageInstruction(lang)}\n\n${REVIEWER_SYSTEM}` }, { role: 'user', content: reviewerUser(draft, brief, digest, ctx.overusedTerms ?? []) }],
-      provider
+      provider,
+      { label: 'relecteur' }
     );
     if (reviewed.trim().length >= 40) prose = reviewed;
   } catch {
@@ -274,7 +275,7 @@ export async function runAgenticTurn(
   const brainRaw = await callTextModel(
     [{ role: 'system', content: `${languageInstruction(lang)} TOUT le texte est en ${languageName(lang)}.\n\n${BRAIN_SYSTEM}` }, { role: 'user', content: brainUser(prose, brief, digest, ctx.memory ?? []) }],
     provider,
-    { jsonMode: true }
+    { jsonMode: true, label: 'cerveau' }
   );
 
   // Assemble: final prose into narrative, brain JSON for mechanics — then reuse

@@ -231,7 +231,7 @@ RÈGLES ABSOLUES : ne rédige AUCUNE intrigue, ne décide AUCUN événement futu
         { role: 'user', content: user }
       ],
       provider,
-      { jsonMode: true, skipReasoning: true, signal }
+      { jsonMode: true, skipReasoning: true, signal, label: 'dossier de campagne' }
     );
     const parsed = JSON.parse(raw) as { dossier?: unknown };
     // 300-450 words ≈ up to ~2400 chars; keep a hard cap as an injection guard.

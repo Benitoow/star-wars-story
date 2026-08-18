@@ -59,7 +59,7 @@ export async function npcReply(
       .slice(-REPLY_CONTEXT_TURNS)
       .map((t): ChatMessage => ({ role: t.speaker === 'player' ? 'user' : 'assistant', content: t.content }))
   ];
-  return callTextModelStream(messages, provider, onToken, { skipReasoning: true, signal });
+  return callTextModelStream(messages, provider, onToken, { skipReasoning: true, signal, label: 'réplique PNJ' });
 }
 
 export interface ResolveConversationInput {
@@ -83,7 +83,7 @@ export async function resolveConversation(
     { role: 'system', content: `${languageInstruction(lang)}\n\n${RESOLVE_SYSTEM}` },
     { role: 'user', content: buildResolveUser(input.setup, input.worldState, input.npc, input.sceneSummary, input.turns.slice(-RESOLVE_CONTEXT_TURNS), languageName(lang), memoryFactLines(input.memory ?? [], 12)) }
   ];
-  const rawResponse = await callTextModel(messages, provider, { jsonMode: true, signal });
+  const rawResponse = await callTextModel(messages, provider, { jsonMode: true, signal, label: 'débrief conversation' });
   const chapter = parseStoryResponse(rawResponse, input.turnNumber);
   return { chapter, worldState: applyStateUpdate(input.worldState, chapter), rawResponse, mode: 'structured-json' };
 }
