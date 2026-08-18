@@ -54,4 +54,28 @@ describe('agentic pipeline (mocked transport)', () => {
     expect(result.worldState.player.hp).toBe(90);
     expect(result.worldState.player.location).toBe('Coursive du cargo');
   });
+
+  it('gives the Director AND the Writer the era codex + the honesty guardrail', async () => {
+    const director = JSON.stringify({ scene_goal: 'g', tension: 't', must_include: ['x'], section_type: 'action', atmosphere: 'tense' });
+    const brain = JSON.stringify({ chapter_title: 'T', section_type: 'action', narrative: {}, state_update: {}, choices: [], memory_updates: {} });
+    const mock = stubSequence([director, 'prose', 'prose relue', brain]);
+
+    await generateTurn(
+      { setup, worldState: initWorldState(setup), turnNumber: 2, actionText: 'Fouiller le destroyer stellaire' },
+      provider,
+      { mode: 'agentic-subagents' }
+    );
+
+    const bodies = mock.mock.calls
+      .filter((c) => String(c[0]).includes('/chat/completions'))
+      .map((c) => JSON.parse((c[1] as { body: string }).body) as { messages: Array<{ role: string; content: string }> });
+    const [directorCall, writerCall] = bodies;
+
+    // The Director invents the must_include elements — it needs both.
+    expect(directorCall.messages[0].content).toContain('HONNÊTETÉ HISTORIQUE');
+    expect(directorCall.messages.at(-1)!.content).toContain("CODEX DE L'ÉPOQUE");
+    // The Writer renders them — it needs both too.
+    expect(writerCall.messages[0].content).toContain('HONNÊTETÉ HISTORIQUE');
+    expect(writerCall.messages.at(-1)!.content).toContain("CODEX DE L'ÉPOQUE");
+  });
 });

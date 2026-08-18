@@ -9,12 +9,12 @@ import { cleanText, isRecord } from './text';
 import { parseStoryResponse, sanitizeProse } from './parsing';
 import { callTextModel, callTextModelStream } from './provider';
 import { languageInstruction, languageName } from './prompts/language';
-import { ERA_COHERENCE, styleDirective, contentModeDirective } from './prompts/style';
+import { ERA_COHERENCE, ERA_HONESTY, styleDirective, contentModeDirective } from './prompts/style';
 import { renderWorldBlock, renderWorldDigest } from './prompts/system';
 import type { CodexEntry } from './codex';
 import type { ChatMessage, MemoryFact, StoryChapter, StoryProviderConfig, StorySetup, WorldState } from './types';
 
-const DIRECTOR_SYSTEM = `Tu es le DIRECTEUR de scène d'une campagne Star Wars. Tu transformes l'action du joueur en brief de scène concret et court. Réponds UNIQUEMENT en JSON valide, aucune prose autour.`;
+const DIRECTOR_SYSTEM = `Tu es le DIRECTEUR de scène d'une campagne Star Wars. Tu transformes l'action du joueur en brief de scène concret et court. Réponds UNIQUEMENT en JSON valide, aucune prose autour.\n\n${ERA_HONESTY}`;
 
 const BRAIN_SYSTEM = `Tu es le CERVEAU mécanique d'une campagne Star Wars. Tu extrais les conséquences d'une scène déjà écrite. Réponds UNIQUEMENT en JSON valide, aucune prose autour.`;
 
@@ -55,10 +55,18 @@ RÈGLES :
 9. CANON DU JOUEUR & ESCALADE : respecte les faits que le joueur a établis (fournis dans le message utilisateur) ; ne les contredis jamais et n'introduis pas un groupe/élément qu'il a exclu. Un lieu civil (marché, cantina) reste civil sans escalade fortement justifiée — pas de stormtroopers en masse ni de marcheurs/AT-ST surgissant sans cause proportionnée. CONSÉQUENCES DURABLES : les forces ennemies sont FINIES — une troupe décimée ou une armée vaincue reste vaincue, pas de vague identique au tour suivant ni de renforts surgis de nulle part ; montre les effets durables d'une victoire (silence, survivants en fuite, répit crédible) et ne ressuscite jamais un ennemi vaincu sans cause visible (vaisseau, appel radio).
 10. FIL ROUGE & PROGRESSION : cette scène doit faire avancer l'objectif de campagne ou montrer clairement le prix d'un retard. Le monde ne remplace pas la quête principale par une succession de rencontres aléatoires.
 11. INVENTAIRE : l'état contient les seuls objets disponibles. Si un objet est pertinent, le Cerveau devra proposer une option qui l'utilise ; n'en invente aucun.
-12. RYTHME : si le contexte indique deux scènes action/confrontation consécutives, écris une accalmie, un dialogue ou une exploration. Ne rajoute pas un combat par réflexe.${prologue}${varietyNote(overusedTerms)}`;
+12. RYTHME : si le contexte indique deux scènes action/confrontation consécutives, écris une accalmie, un dialogue ou une exploration. Ne rajoute pas un combat par réflexe.
+13. ${ERA_HONESTY}${prologue}${varietyNote(overusedTerms)}`;
 }
 
-function directorUser(summary: string, action: string, turnNumber: number, digest: string, canon: string, recentSectionTypes: string[] = []): string {
+/** Era references, marked OPTIONAL so they inform the scene without steering it. */
+function codexBlock(codex: CodexEntry[] = []): string {
+  return codex.length
+    ? `\nCODEX DE L'ÉPOQUE (contexte optionnel — utilise-le seulement si pertinent, ne le force jamais) :\n${codex.map((e) => `- ${e.text}`).join('\n')}`
+    : '';
+}
+
+function directorUser(summary: string, action: string, turnNumber: number, digest: string, canon: string, recentSectionTypes: string[] = [], codex: CodexEntry[] = []): string {
   let consecutiveIntense = 0;
   for (let i = recentSectionTypes.length - 1; i >= 0; i -= 1) {
     if (['action', 'confrontation'].includes(recentSectionTypes[i])) consecutiveIntense += 1;
@@ -70,7 +78,7 @@ function directorUser(summary: string, action: string, turnNumber: number, diges
   return `Tour ${turnNumber}. Situation : ${cleanText(summary, 2600) || '(ouverture)'}
 
 ÉTAT DU MONDE :
-${digest}${canon}${pacing}
+${digest}${canon}${codexBlock(codex)}${pacing}
 
 Action joueur : ${cleanText(action, 240)}
 
@@ -100,10 +108,7 @@ function writerUser(
   const archiveBlock = foldedArchive.length
     ? `\nRÉSUMÉ DES TOURS ANCIENS (continuité, ne pas répéter mot à mot) :\n${foldedArchive.map((a) => `- ${a}`).join('\n')}`
     : '';
-  const codexBlock = codex.length
-    ? `\nCODEX DE L'ÉPOQUE (contexte optionnel — utilise-le seulement si pertinent, ne le force jamais) :\n${codex.map((e) => `- ${e.text}`).join('\n')}`
-    : '';
-  const context = `${renderWorldBlock(world, protagonist)}${renderMemoryBlock(memory)}${archiveBlock}${codexBlock}${canon}\n\n`;
+  const context = `${renderWorldBlock(world, protagonist)}${renderMemoryBlock(memory)}${archiveBlock}${codexBlock(codex)}${canon}\n\n`;
   const mustInclude = Array.isArray(brief.must_include) ? brief.must_include.map((m) => `- ${cleanText(m, 100)}`).join('\n') : '- Conséquence directe de l\'action';
   return `${context}But de scène : ${cleanText(brief.scene_goal, 200)}
 Tension : ${cleanText(brief.tension, 200)}
@@ -214,7 +219,7 @@ export async function runAgenticTurn(
 
   // 1. Director — scene brief (JSON), planned from the condensed story-so-far
   const briefRaw = await callTextModel(
-    [{ role: 'system', content: `${languageInstruction(lang)}\n\n${DIRECTOR_SYSTEM}` }, { role: 'user', content: directorUser(ctx.situation, ctx.actionText, ctx.turnNumber, digest, canon, ctx.recentSectionTypes ?? []) }],
+    [{ role: 'system', content: `${languageInstruction(lang)}\n\n${DIRECTOR_SYSTEM}` }, { role: 'user', content: directorUser(ctx.situation, ctx.actionText, ctx.turnNumber, digest, canon, ctx.recentSectionTypes ?? [], ctx.codex ?? []) }],
     provider,
     { jsonMode: true, skipReasoning: true }
   );

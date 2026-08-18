@@ -21,6 +21,11 @@ export const ERA_COHERENCE = `COHÉRENCE D'ÈRE (CRITIQUE) : ne confonds JAMAIS 
 - "imperial" : l'Empire gouverne, l'Ordre Jedi est détruit, les soldats sont des Stormtroopers.
 - "old_republic" : ni Clones ni Stormtroopers impériaux — forces de la République classique ou de l'Empire Sith de l'époque.`;
 
+/* Anti-anachronism guardrail. Shared by BOTH engines (Direct GM rules and the
+   agentic Writer): models know the movie eras well but are thin on the others,
+   and a half-remembered famous name is worse than a coherent invention. */
+export const ERA_HONESTY = `HONNÊTETÉ HISTORIQUE : tu connais bien les époques des films mais moins d'autres ères (Ancienne République, etc.). Si un lieu, un personnage ou une technologie de l'époque te semble incertain, INVENTE un équivalent cohérent avec l'ère au lieu d'importer un nom célèbre d'une autre époque. Ne prétends jamais connaître un fait que tu ne connais pas.`;
+
 export function contentModeDirective(contentMode?: string): string {
   const mode = (contentMode || '').toLowerCase();
   if (mode === 'dark') {

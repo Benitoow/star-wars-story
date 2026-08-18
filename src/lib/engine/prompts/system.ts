@@ -2,7 +2,7 @@ import { foldArchive, renderMemoryBlock } from '../memory';
 import { cleanText } from '../text';
 import type { MemoryFact, StorySetup, StoryChapter, WorldState } from '../types';
 import { languageInstruction, languageName } from './language';
-import { ERA_COHERENCE, styleDirective, contentModeDirective } from './style';
+import { ERA_COHERENCE, ERA_HONESTY, styleDirective, contentModeDirective } from './style';
 
 function protagonistName(setup: StorySetup): string {
   return [setup.protagonistFirstName, setup.protagonistLastName].filter(Boolean).join(' ').trim() || 'Le protagoniste';
@@ -99,7 +99,7 @@ const GM_RULES = `RÈGLES DU MAÎTRE DU JEU :
 19. MONDE HORS CHAMP : lorsqu'un voyage, un repos, une ellipse ou une action du joueur laisse du temps au monde, fais évoluer au maximum 1 ou 2 événements externes plausibles via world_events_new. Ils doivent découler des faits établis, pas créer une nouvelle armée sans cause.
 20. ENJEUX : à 0 PV, donne une dernière scène de survie crédible. Si le protagoniste reste à 0 PV après cette chance, renseigne ending.type = death et ne propose plus de choix jouables. Une campagne peut aussi se terminer par victory, defeat ou une retraite explicitement choisie.
 21. PROGRESSION : attribue de l'expérience seulement pour une action significative (en général 5 à 25 XP), et un skill_gains uniquement pour un entraînement ou une révélation exceptionnelle.
-22. HONNÊTETÉ HISTORIQUE : tu connais bien les époques des films mais moins d'autres ères (Ancienne République, etc.). Si un lieu, un personnage ou une technologie de l'époque te semble incertain, INVENTE un équivalent cohérent avec l'ère au lieu d'importer un nom célèbre d'une autre époque. Ne prétends jamais connaître un fait que tu ne connais pas.`;
+22. ${ERA_HONESTY}`;
 
 function jsonContract(langName: string): string {
   return `Réponds UNIQUEMENT en JSON valide, sans markdown ni texte autour. TOUT le texte des champs est rédigé ENTIÈREMENT EN ${langName}. Priorité : prose riche dans "action" (2 à 4 paragraphes). Remplis state_update avec toutes les conséquences.
@@ -161,11 +161,13 @@ function buildRulesTail(setup: StorySetup, isTurn1: boolean): string {
   const protagonist = protagonistName(setup);
   const langName = languageName(setup.language || 'fr');
   const prologue = isTurn1
-    ? `\n17. PROLOGUE (TOUR 1) : commence par une riche introduction du protagoniste (${protagonist}) — apparence, origines liées à son rôle (${setup.role}) et sa faction (${setup.faction}), situation actuelle et tension immédiate. Pose le décor (state_update.location) avec soin avant l'action.`
+    ? `\n25. PROLOGUE (TOUR 1) : commence par une riche introduction du protagoniste (${protagonist}) — apparence, origines liées à son rôle (${setup.role}) et sa faction (${setup.faction}), situation actuelle et tension immédiate. Pose le décor (state_update.location) avec soin avant l'action.`
     : '';
+  // GM_RULES ends at 22 — these continue that same list so the numbering
+  // the model reads stays strictly increasing (no duplicate rule numbers).
   return `${GM_RULES}
-15. DIRECTIVE STYLISTIQUE : ${styleDirective(setup.writingStyle, setup.writingTone)}
-16. DIRECTIVE DE CONTENU : ${contentModeDirective(setup.contentMode)}
+23. DIRECTIVE STYLISTIQUE : ${styleDirective(setup.writingStyle, setup.writingTone)}
+24. DIRECTIVE DE CONTENU : ${contentModeDirective(setup.contentMode)}
 ${ERA_COHERENCE}${prologue}
 
 ${jsonContract(langName)}`;

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildContinuePrompt, buildStableSystemPrompt, buildSystemPrompt, buildTurnContextBlock, renderWorldDigest } from './prompts';
 import { initWorldState } from './worldState';
+import { ERA_HONESTY } from './prompts/style';
 import type { MemoryFact, StorySetup } from './types';
 
 const setup: StorySetup = { era: 'imperial', faction: 'jedi', role: 'padawan', premise: 'x', language: 'fr' };
@@ -83,5 +84,28 @@ describe('stable prompt prefix (provider input cache)', () => {
     expect(block).toContain('CODEX DE L\'ÉPOQUE');
     expect(block).toContain('contexte optionnel');
     expect(block).toContain('monde-cité');
+  });
+});
+
+describe('GM rule numbering + anti-anachronism coverage', () => {
+  it('never emits a duplicate rule number (GM_RULES + tail directives are one list)', () => {
+    for (const turn of [1, 4]) {
+      const numbers = [...buildStableSystemPrompt(setup, turn).matchAll(/^(\d+)\. /gm)].map((m) => Number(m[1]));
+      expect(numbers).toEqual([...new Set(numbers)]);            // no duplicates
+      expect(numbers).toEqual([...numbers].sort((a, b) => a - b)); // strictly increasing
+    }
+  });
+
+  it('the turn-1 prologue continues the numbering instead of colliding with a rule', () => {
+    const turn1 = buildStableSystemPrompt(setup, 1);
+    expect(turn1).toContain('25. PROLOGUE (TOUR 1)');
+    expect(turn1).toContain('17. CHOIX & ARBITRAGES'); // the rule the prologue used to shadow
+  });
+
+  it('both engines carry the historical-honesty guardrail', () => {
+    // Direct engine: rule 22 of the GM rules.
+    expect(buildStableSystemPrompt(setup, 3)).toContain('HONNÊTETÉ HISTORIQUE');
+    // Agentic engine (the DEFAULT runtime mode) must carry it too.
+    expect(ERA_HONESTY).toContain('INVENTE un équivalent cohérent');
   });
 });
