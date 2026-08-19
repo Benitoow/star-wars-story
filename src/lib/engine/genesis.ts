@@ -19,17 +19,27 @@ const CONTRACT = `{
   "background": "2 à 3 phrases de passé concret — d'où il vient, ce qu'il a fait, ce qu'il a perdu",
   "motivation": "une phrase : ce qui le pousse MAINTENANT",
   "flaw": "une phrase : un défaut réel et jouable contre lui (pas une qualité déguisée)",
-  "items": [{ "name": "objet de départ concret et utilisable", "qty": 1 }],
+  "items": [{ "name": "nom COURT de l'objet (2 à 5 mots, ex. « Blaster E-11 modifié »), pas une description", "qty": 1 }],
   "ally": { "name": "Prénom Nom", "role": "mentor|contact|rival|proche", "note": "en une phrase, qui il est et son lien avec le protagoniste", "affinity": 40 },
   "location": "lieu précis et cohérent avec l'ère où l'histoire s'ouvre",
   "premise": "2 à 3 phrases : la situation de départ, RÉÉCRITE pour CE personnage précis"
 }`;
 
+/** Item names are shown in the HUD and inside choices, so a hard slice would
+ *  cut mid-word ("…dans une cheville creus"). Trim on a word boundary instead. */
+function shortName(value: unknown, max: number): string {
+  const text = cleanText(value, max * 2);
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  const lastSpace = cut.lastIndexOf(' ');
+  return (lastSpace > max * 0.5 ? cut.slice(0, lastSpace) : cut).replace(/[\s,;:(-]+$/, '');
+}
+
 function coerceItems(raw: unknown): InventoryItem[] {
   if (!Array.isArray(raw)) return [];
   const items: InventoryItem[] = [];
   for (const entry of raw.slice(0, 2)) {
-    const name = cleanText(isRecord(entry) ? entry.name : entry, 60);
+    const name = shortName(isRecord(entry) ? entry.name : entry, 48);
     if (!name) continue;
     const qty = isRecord(entry) && typeof entry.qty === 'number' && entry.qty > 0 ? Math.min(Math.round(entry.qty), 9) : 1;
     items.push({ name, qty });
@@ -110,6 +120,7 @@ EXIGENCES :
 - Croise VRAIMENT l'ère, la faction, le rôle et la trame — un ${setup.role} de l'ère ${setup.era} n'a pas le même passé qu'ailleurs.
 - Le défaut doit pouvoir se retourner contre lui en jeu. Pas de « trop loyal » ni de « trop courageux ».
 - Les objets doivent être UTILISABLES dans une scène (outil, arme, document, appareil), pas des souvenirs décoratifs.
+- Nomme les objets COURT (2 à 5 mots). Les détails de dissimulation ou d'usage vont dans le passé, pas dans le nom.
 - L'allié est une personne précise avec un lien clair, pas une figure abstraite.
 - La prémisse réécrite doit parler de CE personnage nommé, pas d'un archétype.
 - N'écris AUCUN événement futur, aucune intrigue, aucune fin. Tu poses un point de départ.

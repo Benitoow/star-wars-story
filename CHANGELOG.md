@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.4.1 — 2026-08-19
+
+### 🐛 Noms d'objets tronqués
+- Un objet de genèse un peu long était coupé **en plein mot** (« Transpondeur volé (crypté) dissimulé dans une cheville creus ») — visible dans le HUD et dans les choix. La coupe se fait désormais **sur une frontière de mot**, et la genèse demande explicitement des noms courts (2 à 5 mots).
+- Repéré en jouant une vraie partie, pas par les tests.
+
 ## v3.4.0 — « Création » — 2026-08-19
 
 **L'assistant faisait prendre des décisions mécaniques lourdes sans jamais en montrer les conséquences.** Les 4 écrans avant la genèse sont refaits : données, affichage, style, animations.

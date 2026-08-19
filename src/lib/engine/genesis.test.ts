@@ -39,6 +39,19 @@ describe('parseGenesis', () => {
     expect(parsed?.ally.faction).toBe('rebels');
   });
 
+  it('trims an over-long item name on a word boundary, never mid-word', () => {
+    const parsed = parseGenesis(JSON.stringify({
+      background: 'b', premise: 'p',
+      items: [{ name: 'Transpondeur volé (crypté) dissimulé dans une cheville creuse et scellée', qty: 1 }]
+    }), setup);
+    const name = parsed!.items[0].name;
+    expect(name.length).toBeLessThanOrEqual(48);
+    expect(name).not.toMatch(/\s$/);          // no dangling space
+    expect(name.endsWith('creus')).toBe(false); // the exact cut seen in play
+    // Whatever survives is made of whole words.
+    expect('Transpondeur volé (crypté) dissimulé dans une cheville creuse et scellée').toContain(name);
+  });
+
   it('rejects a payload with no background or no premise — those are what turn 1 stages', () => {
     expect(parseGenesis(JSON.stringify({ background: 'x' }), setup)).toBeNull();
     expect(parseGenesis(JSON.stringify({ premise: 'x' }), setup)).toBeNull();
