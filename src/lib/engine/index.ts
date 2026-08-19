@@ -45,6 +45,10 @@ export { retrieveMemory, type MemoryRetrievalInput } from './memoryRetrieval';
 export { retrieveCodex, generateCampaignDossier, CODEX, CODEX_DOSSIER_TOP, type CodexEntry } from './codex';
 export { generateCharacterGenesis, parseGenesis } from './genesis';
 export {
+  parseDialogue, looksLikeSpeakerLine, isSpeakerName, speakersIn, protagonistMatcher,
+  type DialogueLine
+} from './dialogue';
+export {
   planConsolidation,
   consolidateInto,
   summarizeFacts,

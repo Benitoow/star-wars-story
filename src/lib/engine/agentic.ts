@@ -7,6 +7,7 @@
 import { foldArchive, renderMemoryBlock } from './memory';
 import { cleanText, isRecord } from './text';
 import { parseStoryResponse, sanitizeProse } from './parsing';
+import { looksLikeSpeakerLine } from './dialogue';
 import { callTextModel, callTextModelStream } from './provider';
 import { languageInstruction, languageName } from './prompts/language';
 import { ERA_COHERENCE, ERA_HONESTY, styleDirective, contentModeDirective, lengthDirective, povDirective, renderGenesis } from './prompts/style';
@@ -167,16 +168,15 @@ ${cleanText(draft, 3000)}
 Livre la version finale : mêmes faits, même issue, meilleure écriture (et vocabulaire varié si des mots récurrents sont signalés ci-dessus).`;
 }
 
-const SPEAKER_RE = /^[A-Za-zÀ-ÖØ-öø-ÿ0-9'’ .-]{2,40}\s*:\s+\S/;
-
-/** Split mixed writer prose into action vs "Nom : réplique" dialogue lines. */
+/** Split writer prose into action vs "Nom : réplique" lines. The speaker test is
+ *  shared with the renderer, so "Attention : …" is no longer filed as speech. */
 function splitProse(prose: string): { action: string; dialogue: string } {
   const action: string[] = [];
   const dialogue: string[] = [];
   for (const block of prose.split(/\n{2,}/)) {
     const trimmed = block.trim();
     if (!trimmed) continue;
-    (SPEAKER_RE.test(trimmed) ? dialogue : action).push(trimmed);
+    (looksLikeSpeakerLine(trimmed.split('\n')[0]) ? dialogue : action).push(trimmed);
   }
   return { action: action.join('\n\n'), dialogue: dialogue.join('\n') };
 }

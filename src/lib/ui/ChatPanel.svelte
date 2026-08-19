@@ -1,11 +1,17 @@
 <script lang="ts">
   import { afterUpdate } from 'svelte';
   import { play } from '$lib/stores/play';
+  import { FACTIONS } from '$lib/content/catalog';
+  import { foldText } from '$lib/engine';
 
   let draft = '';
   let threadEl: HTMLDivElement;
 
   $: chat = $play.chat;
+  // Same identity language as the scene: an NPC keeps their faction's colour
+  // whether they speak in the narration or in a live conversation.
+  $: npc = $play.worldState?.npcs.find((n) => foldText(n.name) === foldText(chat.npcName));
+  $: tint = (npc?.faction ? FACTIONS.find((f) => f.id === npc.faction)?.color : null) ?? 'var(--color-blue)';
 
   // Auto-scroll to the latest message / streaming token.
   afterUpdate(() => {
@@ -22,7 +28,7 @@
   }
 </script>
 
-<section class="chat">
+<section class="chat" style="--npc-tint: {tint}">
   <header class="chat-head">
     <div class="who">
       <span class="avatar">{chat.npcName.charAt(0).toUpperCase()}</span>
@@ -98,7 +104,7 @@
 
   .chat-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); padding-bottom: var(--space-md); border-bottom: 1px solid var(--border-subtle); }
   .who { display: flex; align-items: center; gap: var(--space-sm); min-width: 0; }
-  .avatar { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--font-display); color: var(--color-gold); background: rgba(216,185,119,0.1); border: 1px solid var(--color-gold-dim); }
+  .avatar { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--font-display); color: var(--npc-tint); background: color-mix(in srgb, var(--npc-tint) 12%, transparent); border: 1px solid var(--npc-tint); }
   .who-text { display: flex; flex-direction: column; min-width: 0; }
   .name { font-family: var(--font-display); font-size: 1.05rem; color: var(--color-text-primary); }
   .sub { font-size: 0.68rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--color-text-muted); }
@@ -117,7 +123,7 @@
     animation: slideUp var(--transition-fast) ease;
   }
   .bubble.player { align-self: flex-end; background: rgba(216,185,119,0.14); border: 1px solid var(--color-gold-dim); color: var(--color-text-primary); border-bottom-right-radius: var(--radius-sm); }
-  .bubble.npc { align-self: flex-start; background: var(--surface-glass); border: 1px solid var(--color-border); color: var(--color-text-secondary); border-bottom-left-radius: var(--radius-sm); }
+  .bubble.npc { align-self: flex-start; background: var(--surface-glass); border: 1px solid var(--color-border); border-left: 2px solid var(--npc-tint); color: var(--color-text-secondary); border-bottom-left-radius: var(--radius-sm); }
   .caret { color: var(--color-gold); animation: pulse 1s steps(2) infinite; }
 
   .typing { display: inline-flex; gap: 4px; }

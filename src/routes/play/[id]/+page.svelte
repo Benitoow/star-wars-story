@@ -12,6 +12,7 @@
   import JournalPanel from '$lib/ui/JournalPanel.svelte';
   import SceneActions from '$lib/ui/SceneActions.svelte';
   import CharacterSheet from '$lib/ui/CharacterSheet.svelte';
+  import SceneDialogue from '$lib/ui/SceneDialogue.svelte';
 
   $: id = $page.params.id;
   $: if (browser && id) void play.open(id);
@@ -35,10 +36,6 @@
     action: 'Action', dialogue: 'Dialogue', exploration: 'Exploration', tension: 'Tension',
     revelation: 'Révélation', repos: 'Repos', interlude: 'Interlude', confrontation: 'Confrontation'
   };
-  function splitDialogueLine(line: string): { speaker: string; text: string } | null {
-    const m = line.match(/^([A-Za-zÀ-ÖØ-öø-ÿ0-9'’ .-]{2,40})\s*:\s+(.+)$/);
-    return m ? { speaker: m[1].trim(), text: m[2].trim() } : null;
-  }
 
   $: generating = $play.status === 'generating';
   $: chapter = $play.currentChapter;
@@ -46,7 +43,6 @@
   $: partialParagraphs = (partial?.text || '').split(/\n{2,}/).map((s) => s.trim()).filter(Boolean);
   $: backdrop = $play.setup ? eraBackdrop($play.setup.era) : 'cosmic-darkness';
   $: actionParagraphs = (chapter?.narrative.action || '').split(/\n{2,}/).map((s) => s.trim()).filter(Boolean);
-  $: dialogueLines = (chapter?.narrative.dialogue || '').split(/\n+/).map((s) => s.trim()).filter(Boolean);
   $: reflection = chapter?.narrative.reflection?.trim() || '';
   $: atmosphere = chapter?.narrative.atmosphere || 'tense';
   $: sectionLabel = chapter ? (SECTION_LABELS[chapter.section_type] ?? chapter.section_type) : '';
@@ -111,18 +107,11 @@
         <h1 class="scene-title">{chapter.chapter_title}</h1>
         <div class="scene-rule" data-atmosphere={atmosphere}></div>
         {#each actionParagraphs as para, i}<p class="prose" class:first={i === 0}>{para}</p>{/each}
-        {#if dialogueLines.length}
-          <div class="dialogue">
-            {#each dialogueLines as line}
-              {@const parsed = splitDialogueLine(line)}
-              {#if parsed}
-                <p class="line"><span class="speaker">{parsed.speaker}</span><span class="line-text">{parsed.text}</span></p>
-              {:else}
-                <p class="line"><span class="line-text">{line}</span></p>
-              {/if}
-            {/each}
-          </div>
-        {/if}
+        <SceneDialogue
+          dialogue={chapter.narrative.dialogue}
+          world={$play.worldState}
+          protagonist={protagonistName}
+        />
         {#if reflection}<p class="reflection">{reflection}</p>{/if}
 
         {#if $play.worldState?.ending}
@@ -220,19 +209,6 @@
     padding: 0.06em 0.12em 0 0;
     color: var(--color-gold);
   }
-  .dialogue { margin: var(--space-md) 0; padding-left: var(--space-md); border-left: 2px solid var(--color-gold-dim); }
-  .line { font-family: var(--font-narrative); color: var(--color-text-secondary); margin-bottom: 0.6rem; }
-  .line .speaker {
-    display: block;
-    font-family: var(--font-display);
-    font-size: 0.72rem;
-    font-weight: 500;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--color-gold);
-    margin-bottom: 2px;
-  }
-  .line .line-text { font-style: italic; }
   .reflection { font-style: italic; color: var(--color-text-muted); margin: var(--space-md) 0; }
 
   .center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-lg); text-align: center; padding: var(--space-xl); }

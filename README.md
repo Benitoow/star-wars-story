@@ -74,7 +74,7 @@ npm run build
 src/
 ├── lib/
 │   ├── engine/        # moteur pur (zéro dépendance UI, testé)
-│   │   ├── types · text · dice · codex · genesis · usage
+│   │   ├── types · text · dice · codex · genesis · usage · dialogue
 │   │   ├── worldState · worldNormalize · worldMutations
 │   │   ├── parsing · jsonScan · sanitize · stateUpdate
 │   │   ├── memory · retrieval · embedding · consolidate
@@ -85,7 +85,7 @@ src/
 │   ├── persistence/   # Dexie : stories · sessions · preferences · embeddings
 │   ├── stores/        # ui · preferences · playSession · play · playChat
 │   ├── ui/            # SceneBackdrop · GameHud · SceneActions · ChatPanel
-│   │                  # CharacterSheet · Emblem · SkillBars · JournalPanel
+│   │                  # CharacterSheet · SceneDialogue · Emblem · SkillBars · JournalPanel
 │   │   └── wizard/    # les 5 étapes de création
 │   │                  # JournalPanel · ProviderSettings · StoryCard · TopNav · Toast
 │   └── version.ts

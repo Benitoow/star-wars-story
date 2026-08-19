@@ -1,5 +1,25 @@
 # Changelog
 
+## v3.6.0 — « Dialogue » — 2026-08-19
+
+**Toutes les répliques se ressemblaient.** Tes propres mots s'affichaient exactement comme ceux d'un ennemi, et une réplique qui débordait sur une deuxième ligne perdait son locuteur.
+
+### 🗣️ Qui parle, enfin visible
+- **Tes répliques** portent un dégradé doré et la mention « — toi ». Impossible de les confondre avec celles d'un PNJ.
+- Chaque PNJ connu parle **dans la couleur de sa faction** ; les inconnus en bleu neutre. Le Mode Direct suit la même règle : l'avatar et la bulle de conversation portent la couleur du personnage.
+- Une ligne sans attribution devient une **didascalie** (bordure pointillée, italique atténuée) au lieu d'un orphelin sans nom.
+
+### 🔍 Un parseur au lieu d'une regex
+- L'ancien test était `^Mot : texte` — donc **« Attention : le blaster est vide » était classé comme un dialogue**, et « 19 AVBY : la proclamation » aussi.
+- Le nouveau parseur exige un vrai nom : 1 à 4 mots, initiale majuscule, hors liste de labels narratifs (attention, note, objectif, résumé…).
+- Une ligne sans « Nom : » **continue le locuteur précédent** au lieu de perdre son attribution.
+- Le moteur utilise **le même test** que l'affichage : ce que le Cerveau classe en dialogue et ce que l'écran montre ne peuvent plus diverger.
+- `protagonistMatcher` résout le prénom seul (« Kael » → « Kael Voss »), parce que les modèles écrivent rarement le nom complet — mais **jamais** si un PNJ porte déjà ce nom.
+
+### 🗄️ Technique
+- Nouveau module pur `dialogue.ts` (14 tests) et composant `SceneDialogue.svelte`. La page de jeu n'embarque plus sa propre regex de locuteur.
+- Teintes et attributions résolues dans un bloc réactif : Svelte ne suivait pas `world` à travers un appel de fonction depuis le template.
+- **193 tests Vitest verts** · `svelte-check` 0 erreur / 0 warning · ESLint 0 erreur · build Cloudflare OK · aucun fichier > 300 lignes.
 ## v3.5.0 — « Fiche » — 2026-08-19
 
 **La genèse était invisible une fois la partie lancée.** Le personnage avait un passé, une motivation et une faille que le Maître du Jeu joue contre toi — et rien de tout ça n'apparaissait à l'écran de jeu.
