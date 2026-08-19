@@ -1,5 +1,34 @@
 # Changelog
 
+## v3.4.0 — « Création » — 2026-08-19
+
+**L'assistant faisait prendre des décisions mécaniques lourdes sans jamais en montrer les conséquences.** Les 4 écrans avant la genèse sont refaits : données, affichage, style, animations.
+
+### 📊 Les conséquences deviennent visibles
+- **Profil d'aptitudes vivant** : les 6 barres (1–5) se recalculent à chaque changement de rôle ou de faction. Ce profil pilotait déjà tous les jets de dés de la campagne — il était simplement invisible au moment de choisir.
+- **Crédits de départ affichés** : ils varient de ₡250 (Padawan) à ₡5 000 (Sénateur). Jamais montré auparavant.
+- **Descriptions** pour les 9 factions et les 16 rôles — le catalogue n'en avait aucune.
+- L'ambiance de l'ère (`ERA_CONTEXT`) est enfin affichée ; elle n'existait que dans les prompts.
+
+### 🕰️ Cohérence d'époque
+- Les factions **impossibles à une époque sont grisées et expliquées** (« L'Empire galactique naîtra dans près de 4 000 ans »), les cas **rares** signalés sans être bloqués (« L'Ordre est détruit ; tu es un survivant traqué »).
+- Tu peux toujours forcer une combinaison — mais en connaissance de cause. Le moteur passait jusqu'ici son temps à rattraper des anachronismes que l'assistant lui laissait construire.
+- Fenêtre de l'Ancienne République corrigée : `~3950 AVBY` au lieu de « 25 000 – 1000 AVBY », en accord avec la date de départ réelle et le codex.
+
+### 🎨 18 SVG enfin utilisés
+- Chaque ère, faction et rôle portait un emblème dans `static/svg/` — **aucun n'était affiché** : tous les fichiers sont en `fill="#000000"`, donc invisibles sur le thème sombre.
+- Ils sont désormais rendus en **masque CSS**, ce qui permet de les **teinter à la couleur de la faction** et de leur donner un halo à la sélection.
+
+### ✨ Style, mouvement, structure
+- Entrées en cascade des tuiles, transition entre étapes, barres d'aptitude animées, halos de sélection — le tout **désactivé sous `prefers-reduced-motion`** (que `svelte/transition` n'honore pas seul).
+- L'identité (avatar, prénom, nom) remonte sur l'étape **Personnage** : elle était enterrée sous l'étape de style alors qu'elle nourrit la genèse.
+- **Carte récap** en tête de la genèse : les 6 décisions enfin vues ensemble.
+- La navigation par en-tête permet de revenir sur toute étape déjà atteinte.
+- Écrire sa propre prémisse puis changer de trame **ne l'écrase plus en silence** — une confirmation apparaît.
+
+### 🗄️ Technique
+- Nouveau module `content/lore.ts` (descriptions + cohérence d'ère, pur et testé) et 7 composants sous `ui/wizard/`. La page passe de 245 lignes d'écrans mêlés à un orchestrateur.
+- **178 tests Vitest verts** (11 nouveaux) · `svelte-check` 0 erreur / 0 warning · ESLint 0 erreur · build Cloudflare OK · aucun fichier > 300 lignes.
 ## v3.3.0 — « Genèse » — 2026-08-18
 
 **La création de personnage produisait des identifiants, pas un personnage.** Le tour 1 devait donc inventer le protagoniste tout en ouvrant la scène, fixant l'objectif, créant un PNJ et proposant des choix — six métiers en un appel. D'où une introduction bâclée et des choix génériques.

@@ -11,7 +11,7 @@ export interface CatalogItem {
 }
 
 export const ERAS: Array<CatalogItem & { years: string; backdrop: string }> = [
-  { id: 'old_republic', name: 'Ancienne République', years: '25 000 – 1000 AVBY', icon: 'AncientRepublic.svg', backdrop: 'cosmic-nebula' },
+  { id: 'old_republic', name: 'Ancienne République', years: '~3950 AVBY', icon: 'AncientRepublic.svg', backdrop: 'cosmic-nebula' },
   { id: 'clone_wars', name: 'Guerres des Clones', years: '22 – 19 AVBY', icon: 'jedi-order-svgrepo-com.svg', backdrop: 'city-dusk' },
   { id: 'imperial', name: 'Ère Impériale', years: '19 – 4 AVBY', icon: 'Emblem_of_the_First_Galactic_Empire.svg', backdrop: 'stormtroopers' },
   { id: 'new_republic', name: 'Nouvelle République', years: '4 – 28 APBY', icon: 'NR_Seal.svg', backdrop: 'city-night' },

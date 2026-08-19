@@ -81,7 +81,7 @@ src/
 │   │   ├── provider   # transport OpenRouter / MiMo (fetch direct)
 │   │   ├── generate · agentic   # orchestration d'un tour
 │   │   └── prompts/   # system · turn · style · language
-│   ├── content/       # catalogue SW, config provider, langues
+│   ├── content/       # catalogue SW, lore (cohérence d'ère), provider, langues
 │   ├── persistence/   # Dexie : stories · sessions · preferences · embeddings
 │   ├── stores/        # ui · preferences · playSession · play · playChat
 │   ├── ui/            # SceneBackdrop · GameHud · SceneActions · ChatPanel · GenesisStep
@@ -90,7 +90,7 @@ src/
 └── routes/
     ├── +layout.svelte
     ├── +page.svelte           # bibliothèque
-    ├── new/+page.svelte       # assistant de création (5 étapes, dont la genèse)
+    ├── new/+page.svelte       # assistant de création (orchestre ui/wizard/)
     ├── play/[id]/+page.svelte # écran de jeu
     └── settings/+page.svelte  # réglages
 ```
