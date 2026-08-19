@@ -1,5 +1,27 @@
 # Changelog
 
+## v3.5.0 — « Fiche » — 2026-08-19
+
+**La genèse était invisible une fois la partie lancée.** Le personnage avait un passé, une motivation et une faille que le Maître du Jeu joue contre toi — et rien de tout ça n'apparaissait à l'écran de jeu.
+
+### 🪪 Fiche de personnage
+- Nouveau panneau, ouvert par **l'avatar dans la barre du haut** : passé, ce qui te pousse, **ta faille** (signalée en rouge, avec la mention que le MJ peut s'en servir), le lien avec ton allié, tes aptitudes, ton inventaire et tes blessures.
+- L'**avatar choisi à la création** est enfin affiché — il était stocké et rendu nulle part depuis toujours. Il sert désormais de bouton, avec ton nom en infobulle.
+- Le **lien** affiche l'état actuel de la relation (l'allié est une entité vivante du monde), pas l'affinité de départ. S'il meurt, c'est indiqué.
+- Les parties créées avant la genèse affichent un message clair au lieu d'une fiche vide.
+
+### 📊 Un seul langage visuel
+- Les aptitudes du HUD passent des points `●●●○○` aux **mêmes barres que l'assistant de création**. Le nombre qui décide de chaque jet ne se lit plus de deux façons différentes selon l'écran.
+- La **réputation de faction** porte l'emblème et la couleur de la faction, comme dans l'assistant.
+- `Emblem` et `SkillBars` sont désormais des composants partagés (`ui/`) au lieu d'être enfermés dans `ui/wizard/`.
+
+### 📖 Dossier de campagne lisible
+- La « bible » factuelle générée au tour 1 alimentait tous les prompts depuis la v3.2.1 — **le joueur n'avait aucun moyen de lire le monde dans lequel il joue**. Elle apparaît dans le journal, onglet Monde.
+
+### 🗄️ Technique
+- Nouveaux composants `CharacterSheet.svelte` et `SkillBars.svelte` · `Emblem` promu en composant partagé.
+- L'overlay de la fiche **clippe son animation d'entrée** : sans ça, le décalage de départ élargissait le document tant que l'animation tournait.
+- **179 tests Vitest verts** · `svelte-check` 0 erreur / 0 warning · ESLint 0 erreur · build Cloudflare OK · aucun fichier > 300 lignes.
 ## v3.4.1 — 2026-08-19
 
 ### 🐛 Noms d'objets tronqués

@@ -3,7 +3,7 @@
      This is the last look before the character is written. */
   import { ERAS, FACTIONS, ROLES } from '$lib/content/catalog';
   import { eraFit } from '$lib/content/lore';
-  import Emblem from './Emblem.svelte';
+  import Emblem from '../Emblem.svelte';
 
   export let era: string;
   export let faction: string;

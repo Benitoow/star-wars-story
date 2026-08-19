@@ -11,11 +11,13 @@
   import ChatPanel from '$lib/ui/ChatPanel.svelte';
   import JournalPanel from '$lib/ui/JournalPanel.svelte';
   import SceneActions from '$lib/ui/SceneActions.svelte';
+  import CharacterSheet from '$lib/ui/CharacterSheet.svelte';
 
   $: id = $page.params.id;
   $: if (browser && id) void play.open(id);
 
   let showJournal = false;
+  let showSheet = false;
 
   async function exportDiag() {
     const storyId = id;
@@ -48,6 +50,7 @@
   $: reflection = chapter?.narrative.reflection?.trim() || '';
   $: atmosphere = chapter?.narrative.atmosphere || 'tense';
   $: sectionLabel = chapter ? (SECTION_LABELS[chapter.section_type] ?? chapter.section_type) : '';
+  $: protagonistName = [$play.setup?.protagonistFirstName, $play.setup?.protagonistLastName].filter(Boolean).join(' ').trim() || 'Protagoniste';
 </script>
 
 <svelte:head><title>{chapter?.chapter_title || 'Aventure'} — Star Wars Story</title></svelte:head>
@@ -58,6 +61,15 @@
   <div class="topbar">
     <div class="topbar-actions">
       <button type="button" class="icon-btn" on:click={() => goto('/')} aria-label="Bibliothèque">←</button>
+      {#if $play.worldState && $play.setup}
+        <button
+          type="button"
+          class="icon-btn avatar-btn"
+          on:click={() => (showSheet = true)}
+          aria-label="Fiche de personnage"
+          title="{protagonistName} — fiche de personnage"
+        >{$play.setup.protagonistAvatar || '🧑‍🚀'}</button>
+      {/if}
       {#if $play.worldState}
         <button type="button" class="icon-btn" on:click={() => (showJournal = true)} aria-label="Journal de bord" title="Journal de bord">📖</button>
       {/if}
@@ -129,6 +141,10 @@
     {/if}
   </div>
 
+  {#if showSheet && $play.worldState && $play.setup}
+    <CharacterSheet setup={$play.setup} world={$play.worldState} onClose={() => (showSheet = false)} />
+  {/if}
+
   {#if showJournal && $play.worldState}
     <JournalPanel world={$play.worldState} chapters={$play.chapterHistory} memory={$play.memory} onClose={() => (showJournal = false)} />
   {/if}
@@ -156,6 +172,8 @@
     border: 1px solid var(--color-border); border-radius: var(--radius-sm); cursor: pointer;
   }
   .icon-btn:hover { border-color: var(--color-border-hover); }
+  .avatar-btn { font-size: 1.05rem; }
+  .avatar-btn:hover { border-color: var(--color-gold-dim); background: rgba(216, 185, 119, 0.1); }
 
   .stage { position: relative; z-index: 2; flex: 1; display: flex; }
 

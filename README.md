@@ -84,7 +84,9 @@ src/
 │   ├── content/       # catalogue SW, lore (cohérence d'ère), provider, langues
 │   ├── persistence/   # Dexie : stories · sessions · preferences · embeddings
 │   ├── stores/        # ui · preferences · playSession · play · playChat
-│   ├── ui/            # SceneBackdrop · GameHud · SceneActions · ChatPanel · GenesisStep
+│   ├── ui/            # SceneBackdrop · GameHud · SceneActions · ChatPanel
+│   │                  # CharacterSheet · Emblem · SkillBars · JournalPanel
+│   │   └── wizard/    # les 5 étapes de création
 │   │                  # JournalPanel · ProviderSettings · StoryCard · TopNav · Toast
 │   └── version.ts
 └── routes/

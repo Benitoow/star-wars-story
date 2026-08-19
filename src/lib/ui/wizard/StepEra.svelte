@@ -2,7 +2,7 @@
   /* Era pick. The catalog carried an emblem and a one-line mood for every era
      and the wizard showed neither — just a name and a date range. */
   import { ERAS, ERA_CONTEXT } from '$lib/content/catalog';
-  import Emblem from './Emblem.svelte';
+  import Emblem from '../Emblem.svelte';
 
   export let era: string;
 

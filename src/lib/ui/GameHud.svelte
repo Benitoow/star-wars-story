@@ -1,5 +1,7 @@
 <script lang="ts">
   import { FACTIONS } from '$lib/content/catalog';
+  import Emblem from './Emblem.svelte';
+  import SkillBars from './SkillBars.svelte';
   import type { WorldState } from '$lib/engine';
 
   export let world: WorldState;
@@ -15,11 +17,7 @@
     .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
     .slice(0, 6);
   $: xpPct = Math.max(0, Math.min(100, (p.experience % 100)));
-  const skillLabels: Record<string, string> = { combat: 'Combat', diplomacy: 'Diplomatie', stealth: 'Furtivité', tech: 'Technique', force: 'Force', survival: 'Survie' };
-
-  function factionName(id: string): string {
-    return FACTIONS.find((f) => f.id === id)?.name || id;
-  }
+  const factionOf = (id: string) => FACTIONS.find((f) => f.id === id);
 
   // -100..100 → readable relationship tiers (no raw numbers shown).
   function bond(a: number): { label: string; cls: string } {
@@ -81,11 +79,7 @@
     <div class="hud-detail">
       <section>
         <h4 class="eyebrow">Aptitudes</h4>
-        <div class="skills">
-          {#each Object.entries(p.skills ?? {}) as [id, score]}
-            <div class="skill"><span>{skillLabels[id] ?? id}</span><span class="skill-dots">{'●'.repeat(score)}<i>{'●'.repeat(Math.max(0, 5 - score))}</i></span></div>
-          {/each}
-        </div>
+        <SkillBars skills={p.skills} />
       </section>
       {#if livingNpcs.length}
         <section>
@@ -115,8 +109,10 @@
           <ul class="rows">
             {#each topFactions as [id, score]}
               {@const st = standing(score)}
+              {@const f = factionOf(id)}
               <li class="faction">
-                <span class="name">{factionName(id)}</span>
+                <Emblem icon={f?.icon} tint={f?.color ?? 'var(--color-text-muted)'} size="16px" />
+                <span class="name">{f?.name ?? id}</span>
                 <div class="warmth"><span class="warmth-fill {st.cls}" style="width:{warmth(score)}%"></span></div>
                 <span class="tier {st.cls}">{st.label}</span>
               </li>
@@ -223,10 +219,6 @@
   }
   section h4 { display: flex; align-items: center; gap: 6px; margin-bottom: var(--space-sm); }
   .count { font-family: var(--font-body); font-size: 0.62rem; letter-spacing: normal; color: var(--color-text-muted); background: rgba(255,255,255,0.06); border-radius: 99px; padding: 0 6px; }
-  .skills { display: grid; gap: 5px; }
-  .skill { display: flex; justify-content: space-between; gap: 8px; font-size: 0.75rem; color: var(--color-text-secondary); }
-  .skill-dots { color: var(--color-gold); letter-spacing: 1px; font-size: 0.58rem; white-space: nowrap; }
-  .skill-dots i { color: rgba(255,255,255,0.15); font-style: normal; }
 
   .rows { list-style: none; display: flex; flex-direction: column; gap: var(--space-sm); }
   .name { color: var(--color-text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -245,7 +237,7 @@
   .rel { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 
   /* Faction standing row */
-  .faction { display: grid; grid-template-columns: 1fr 56px auto; align-items: center; gap: var(--space-sm); }
+  .faction { display: grid; grid-template-columns: 16px 1fr 56px auto; align-items: center; gap: var(--space-sm); }
 
   /* Tier word — the primary, readable signal */
   .tier { font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-muted); white-space: nowrap; }
@@ -281,7 +273,7 @@
     .hud-top { gap: var(--space-sm); }
     .npc { grid-template-columns: 28px 1fr; gap: 6px; }
     .rel { display: none; }
-    .faction { grid-template-columns: 1fr auto; }
+    .faction { grid-template-columns: 16px 1fr auto; }
     .warmth { display: none; }
     .hud-detail { max-height: 60vh; }
     .hud-toggle { padding: 8px 14px; min-height: 44px; }

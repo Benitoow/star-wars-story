@@ -3,7 +3,7 @@
      and era coherence surfaced instead of left for the engine to fight later. */
   import { FACTIONS, ROLES, AVATARS, defaultRoleForFaction } from '$lib/content/catalog';
   import { FACTION_DESC, ROLE_DESC, eraFit } from '$lib/content/lore';
-  import Emblem from './Emblem.svelte';
+  import Emblem from '../Emblem.svelte';
   import SkillProfile from './SkillProfile.svelte';
 
   export let era: string;

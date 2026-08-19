@@ -109,6 +109,14 @@
             <p class="entry-text">{world.environment_status}</p>
           </article>
         {/if}
+        {#if world.campaign?.dossier}
+          <!-- Generated once at turn 1 and used by every prompt since; the
+               player had no way to read the world they are playing in. -->
+          <article class="entry">
+            <p class="eyebrow">Dossier de campagne</p>
+            <p class="entry-text dossier">{world.campaign.dossier}</p>
+          </article>
+        {/if}
         {#if !world.world_events?.length}
           <p class="empty">Le monde n'a pas encore bougé hors champ.</p>
         {/if}
@@ -255,6 +263,7 @@
   .chip.mort { text-decoration: line-through; }
   .affinity { font-size: 0.8rem; color: var(--color-text-muted); }
   .entry-meta { margin-top: 4px; font-size: 0.78rem; color: var(--color-text-muted); }
+  .dossier { white-space: pre-wrap; }
   .entry-text { margin-top: 6px; font-family: var(--font-narrative); font-size: 0.92rem; line-height: 1.5; color: var(--color-text-secondary); }
 
   .facts { list-style: none; margin-top: var(--space-sm); display: flex; flex-direction: column; gap: 6px; }
